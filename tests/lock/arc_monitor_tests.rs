@@ -157,6 +157,94 @@ fn test_arc_monitor_wait_timeout_until_delegates_to_monitor() {
 }
 
 #[test]
+fn test_arc_monitor_wait_while_delegates_to_monitor() {
+    let monitor = ArcMonitor::new(Vec::<i32>::new());
+    let (started_tx, started_rx) = mpsc::channel();
+    let (done_tx, done_rx) = mpsc::channel();
+
+    let waiter_monitor = monitor.clone();
+    let waiter = thread::spawn(move || {
+        started_tx
+            .send(())
+            .expect("test should observe waiter start");
+        let result = waiter_monitor.wait_while(
+            |items| items.is_empty(),
+            |items| items.pop().expect("item should be ready"),
+        );
+        done_tx
+            .send(result)
+            .expect("test should receive waiter result");
+    });
+
+    started_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("waiter should start within timeout");
+    assert!(done_rx.recv_timeout(Duration::from_millis(30)).is_err());
+
+    monitor.write(|items| items.push(7));
+    monitor.notify_one();
+
+    assert_eq!(
+        done_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("waiter should finish after notification"),
+        7,
+    );
+    waiter.join().expect("waiter should not panic");
+}
+
+#[test]
+fn test_arc_monitor_wait_timeout_while_returns_ready_when_predicate_clears() {
+    let monitor = ArcMonitor::new(Vec::<i32>::new());
+    let (started_tx, started_rx) = mpsc::channel();
+    let (done_tx, done_rx) = mpsc::channel();
+
+    let waiter_monitor = monitor.clone();
+    let waiter = thread::spawn(move || {
+        started_tx
+            .send(())
+            .expect("test should observe waiter start");
+        let result = waiter_monitor.wait_timeout_while(
+            Duration::from_secs(1),
+            |items| items.is_empty(),
+            |items| items.pop().expect("item should be ready"),
+        );
+        done_tx
+            .send(result)
+            .expect("test should receive waiter result");
+    });
+
+    started_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("waiter should start within timeout");
+
+    monitor.write(|items| items.push(9));
+    monitor.notify_all();
+
+    assert_eq!(
+        done_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("waiter should finish after predicate becomes ready"),
+        WaitTimeoutResult::Ready(9),
+    );
+    waiter.join().expect("waiter should not panic");
+}
+
+#[test]
+fn test_arc_monitor_wait_timeout_while_returns_timed_out() {
+    let monitor = ArcMonitor::new(Vec::<i32>::new());
+
+    assert_eq!(
+        monitor.wait_timeout_while(
+            Duration::from_millis(30),
+            |items| items.is_empty(),
+            |items| items.pop(),
+        ),
+        WaitTimeoutResult::TimedOut,
+    );
+}
+
+#[test]
 fn test_arc_monitor_notify_all_wakes_multiple_waiters() {
     let monitor = ArcMonitor::new(false);
     let (started_tx, started_rx) = mpsc::channel();
