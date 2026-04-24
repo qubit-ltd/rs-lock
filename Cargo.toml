@@ -27,8 +27,8 @@ doctest = true
 tokio = { version = "1.5", features = ["sync", "rt"] }
 log = "0.4"
 parking_lot = "0.12"
-qubit-function = "0.10"
 thiserror = "2.0"
+qubit-function = "0.10"
 
 [dev-dependencies]
 tokio = { version = "1.5", features = ["macros", "rt-multi-thread", "time"] }
