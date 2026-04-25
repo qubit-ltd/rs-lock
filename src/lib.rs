@@ -15,25 +15,13 @@
 //! - Synchronous lock wrappers with `Arc` integrated internally.
 //! - Asynchronous Tokio-based lock wrappers.
 //! - Monitor-style coordination built on `Mutex` plus `Condvar`.
-//! - A reusable double-checked locking executor.
 //!
 //! # Author
 //!
 //! Haixing Hu
 
-pub mod double_checked;
 pub mod lock;
-
-pub use double_checked::{
-    DoubleCheckedLockExecutor,
-    ExecutionContext,
-    ExecutionLogger,
-    ExecutionResult,
-    ExecutorBuilder,
-    ExecutorError,
-    ExecutorLockBuilder,
-    ExecutorReadyBuilder,
-};
+mod monitor;
 pub use lock::{
     ArcAsyncMutex,
     ArcAsyncRwLock,

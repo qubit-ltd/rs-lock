@@ -16,9 +16,9 @@ checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
 name = "libc"
-version = "0.2.185"
+version = "0.2.186"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52ff2c0fe9bc6cb6b14a0592c2ff4fa9ceb83eea9db979b0487cd054946a2b8f"
+checksum = "68ab91017fe16c622486840e4c83c9a37afeff978bd239b5293d61ece587de66"
 
 [[package]]
 name = "lock_api"
@@ -59,12 +59,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pastey"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5a797f0e07bdf071d15742978fc3128ec6c22891c31a3a931513263904c982a"
-
-[[package]]
 name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -80,22 +74,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "qubit-function"
-version = "0.10.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b597b48e86b813801c61a7c0ce3ec8a37be6c53ae1f10343a90560b3c1dea7b4"
-dependencies = [
- "parking_lot",
- "pastey",
-]
-
-[[package]]
 name = "qubit-lock"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "log",
  "parking_lot",
- "qubit-function",
  "thiserror",
  "tokio",
 ]

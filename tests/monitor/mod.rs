@@ -6,10 +6,10 @@
  *    All rights reserved.
  *
  ******************************************************************************/
-mod config_tests;
-mod double_checked_lock_executor_tests;
-mod error_tests;
-mod executor_builder_tests;
-mod executor_lock_builder_tests;
-mod executor_ready_builder_tests;
-mod result_tests;
+//! # Monitor 相关测试
+//!
+//! 与 `src/monitor` 对应：`Monitor`、`MonitorGuard`、`ArcMonitor` 的行为测试。
+
+mod arc_monitor_tests;
+mod monitor_guard_tests;
+mod monitor_tests;

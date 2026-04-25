@@ -6,10 +6,10 @@
  *    All rights reserved.
  *
  ******************************************************************************/
-//! # Lock Module Tests
+//! # Qubit Lock 集成测试
 //!
-//! Tests for lock and double-checked locking utilities.
+//! 按源码模块划分：`lock` 与 `monitor`。
 
 mod docs;
-mod double_checked;
 mod lock;
+mod monitor;

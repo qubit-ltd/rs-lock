@@ -7,21 +7,20 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
-Lock-focused utilities for the Qubit Rust libraries. The crate provides synchronous and asynchronous lock wrappers, monitor-style coordination, and a reusable double-checked locking executor.
+Lock-focused utilities for the Qubit Rust libraries. The crate provides synchronous and asynchronous lock wrappers plus monitor-style coordination.
 
 ## Features
 
 - `ArcMutex`, `ArcRwLock`, `ArcStdMutex`: synchronous lock wrappers with `Arc` built in.
 - `ArcAsyncMutex`, `ArcAsyncRwLock`: Tokio-based asynchronous lock wrappers.
 - `Monitor`, `ArcMonitor`, `MonitorGuard`: condition-based state coordination.
-- `DoubleCheckedLockExecutor`: reusable test-outside-lock / re-test-inside-lock workflow.
 - Closure-based APIs that keep lock acquisition and release scoped to one call.
 
 ## Installation
 
 ```toml
 [dependencies]
-qubit-lock = "0.1.0"
+qubit-lock = "0.2.0"
 ```
 
 ## Quick Start
@@ -50,46 +49,12 @@ fn main() {
 }
 ```
 
-### Double-checked locking
-
-```rust
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
-
-use qubit_lock::{ArcMutex, DoubleCheckedLockExecutor};
-
-fn main() {
-    let data = ArcMutex::new(10);
-    let enabled = Arc::new(AtomicBool::new(true));
-
-    let executor = DoubleCheckedLockExecutor::builder()
-        .on(data.clone())
-        .when({
-            let enabled = enabled.clone();
-            move || enabled.load(Ordering::Acquire)
-        })
-        .build();
-
-    let result = executor
-        .call_with(|value: &mut i32| {
-            *value += 5;
-            Ok::<i32, std::io::Error>(*value)
-        })
-        .get_result()
-        .unwrap();
-
-    assert_eq!(result, 15);
-}
-```
-
 ## Project Layout
 
-- `src/lock`: lock traits, wrappers, and monitor primitives.
-- `src/double_checked`: reusable double-checked locking executor and builders.
-- `tests/lock`: lock and monitor behavior tests.
-- `tests/double_checked`: double-checked locking behavior tests.
+- `src/lock`: lock traits and lock wrappers.
+- `src/monitor`: `Monitor` / `ArcMonitor` and related condition-variable primitives.
+- `tests/lock`: lock behavior tests.
+- `tests/monitor`: monitor behavior tests.
 - `tests/docs`: README and doctext consistency tests.
 
 ## Quality Checks
