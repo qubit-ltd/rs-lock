@@ -1,4 +1,4 @@
-# Rustfmt configuration file for rs-concurrent (crate: qubit-concurrent)
+# Rustfmt configuration file for rs-lock (crate: qubit-lock)
 #
 # This configuration requires nightly Rust for imports formatting.
 # Use `cargo +nightly fmt` or run `./format.sh` to format code.

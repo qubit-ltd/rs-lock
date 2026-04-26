@@ -12,7 +12,21 @@
 # Run this script before committing code to ensure it passes all CircleCI checks
 #
 
-set -e  # Exit immediately on error
+set -euo pipefail
+
+CLIPPY_LOG=""
+AUDIT_LOG=""
+
+cleanup() {
+    if [ -n "$CLIPPY_LOG" ]; then
+        command rm -f "$CLIPPY_LOG"
+    fi
+    if [ -n "$AUDIT_LOG" ]; then
+        command rm -f "$AUDIT_LOG"
+    fi
+}
+
+trap cleanup EXIT
 
 # Color definitions
 RED='\033[0;31m'
@@ -68,15 +82,15 @@ echo ""
 
 # Check 2: Clippy linting
 print_step "2/6 Running Clippy checks (cargo +nightly clippy)..."
-if cargo +nightly clippy --all-targets --all-features -- -D warnings 2>&1 | tee /tmp/clippy-output.txt | grep -q "warning\|error"; then
+CLIPPY_LOG=$(mktemp)
+if cargo +nightly clippy --all-targets --all-features -- -D warnings 2>&1 | tee "$CLIPPY_LOG"; then
+    print_success "Clippy checks passed"
+else
     print_error "Clippy found issues"
-    cat /tmp/clippy-output.txt
     echo ""
     echo "Please try to auto-fix with:"
     echo "  cargo +nightly clippy --fix --all-targets --all-features"
     exit 1
-else
-    print_success "Clippy checks passed"
 fi
 echo ""
 
@@ -205,8 +219,12 @@ echo ""
 # Check 6: Security audit
 print_step "6/6 Running security audit (cargo audit)..."
 if command -v cargo-audit &> /dev/null; then
-    if cargo audit; then
+    AUDIT_LOG=$(mktemp)
+    if cargo audit 2>&1 | tee "$AUDIT_LOG"; then
         print_success "Security audit passed, no known vulnerabilities found"
+    elif grep -qi "couldn't fetch advisory database\\|failed to fetch advisory database\\|error sending request" "$AUDIT_LOG"; then
+        print_warning "Security audit could not fetch the RustSec advisory database; skipping audit check"
+        echo "Try again when network access to https://github.com/RustSec/advisory-db.git is available."
     else
         print_error "Security audit found issues"
         echo ""
@@ -231,7 +249,3 @@ echo ""
 echo "Your code is ready to commit."
 echo "After pushing, CircleCI will automatically run the same checks."
 echo ""
-
-# Clean up temporary files
-rm -f /tmp/clippy-output.txt
-

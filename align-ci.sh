@@ -12,7 +12,7 @@
 # Run from repo root: ./align-ci.sh
 #
 
-set -e
+set -euo pipefail
 
 cd "$(dirname "$0")"
 

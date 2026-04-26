@@ -12,7 +12,7 @@
 # Uses cargo-llvm-cov to generate code coverage reports
 #
 
-set -e
+set -euo pipefail
 
 echo "🔍 Starting code coverage testing..."
 
@@ -191,7 +191,7 @@ case "$FORMAT_ARG" in
         ;;
 
     *)
-        echo "❌ Error: Unknown format '$1'"
+        echo "❌ Error: Unknown format '$FORMAT_ARG'"
         echo "Run './coverage.sh help' to see available options"
         exit 1
         ;;
