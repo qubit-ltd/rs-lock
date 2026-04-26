@@ -21,13 +21,14 @@
 //! Haixing Hu
 
 pub mod lock;
-mod monitor;
+pub mod monitor;
 pub use lock::{
     ArcAsyncMutex,
     ArcAsyncRwLock,
     ArcMonitor,
     ArcMutex,
     ArcRwLock,
+    ArcStdMutex,
     AsyncLock,
     Lock,
     Monitor,

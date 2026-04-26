@@ -15,6 +15,7 @@ use std::sync::Arc;
 use qubit_lock::{
     ArcAsyncRwLock,
     AsyncLock,
+    TryLockError,
 };
 
 #[cfg(test)]
@@ -384,7 +385,7 @@ mod arc_async_rw_lock_tests {
     }
 
     #[tokio::test]
-    async fn test_arc_async_rw_lock_try_read_returns_none_when_write_locked() {
+    async fn test_arc_async_rw_lock_try_read_returns_would_block_when_write_locked() {
         let async_rw_lock = Arc::new(ArcAsyncRwLock::new(0));
         let barrier = Arc::new(std::sync::Barrier::new(2));
 
@@ -404,10 +405,7 @@ mod arc_async_rw_lock_tests {
 
         barrier.wait();
         let result = async_rw_lock.try_read(|value| *value);
-        assert!(
-            result.is_none(),
-            "Expected None when write lock is held by another thread"
-        );
+        assert_eq!(result, Err(TryLockError::WouldBlock));
 
         handle.join().unwrap();
     }
@@ -416,8 +414,8 @@ mod arc_async_rw_lock_tests {
     async fn test_arc_async_rw_lock_try_methods_cover_shared_function_pointer_paths() {
         let async_rw_lock = Arc::new(ArcAsyncRwLock::new(0));
 
-        assert_eq!(async_rw_lock.try_read(read_i32), Some(0));
-        assert_eq!(async_rw_lock.try_write(increment_i32), Some(1));
+        assert_eq!(async_rw_lock.try_read(read_i32), Ok(0));
+        assert_eq!(async_rw_lock.try_write(increment_i32), Ok(1));
 
         let read_barrier = Arc::new(std::sync::Barrier::new(2));
         let read_lock = async_rw_lock.clone();
@@ -434,7 +432,10 @@ mod arc_async_rw_lock_tests {
             });
         });
         read_barrier.wait();
-        assert_eq!(async_rw_lock.try_read(read_i32), None);
+        assert_eq!(
+            async_rw_lock.try_read(read_i32),
+            Err(TryLockError::WouldBlock),
+        );
         read_holder.join().unwrap();
 
         let write_barrier = Arc::new(std::sync::Barrier::new(2));
@@ -452,12 +453,15 @@ mod arc_async_rw_lock_tests {
             });
         });
         write_barrier.wait();
-        assert_eq!(async_rw_lock.try_write(increment_i32), None);
+        assert_eq!(
+            async_rw_lock.try_write(increment_i32),
+            Err(TryLockError::WouldBlock),
+        );
         write_holder.join().unwrap();
     }
 
     #[tokio::test]
-    async fn test_arc_async_rw_lock_try_write_returns_none_when_read_locked() {
+    async fn test_arc_async_rw_lock_try_write_returns_would_block_when_read_locked() {
         let async_rw_lock = Arc::new(ArcAsyncRwLock::new(0));
         let barrier = Arc::new(std::sync::Barrier::new(2));
 
@@ -477,10 +481,7 @@ mod arc_async_rw_lock_tests {
 
         barrier.wait();
         let result = async_rw_lock.try_write(|value| *value);
-        assert!(
-            result.is_none(),
-            "Expected None when read lock is held by another thread"
-        );
+        assert_eq!(result, Err(TryLockError::WouldBlock));
 
         handle.join().unwrap();
     }

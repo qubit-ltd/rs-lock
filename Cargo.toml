@@ -1,6 +1,6 @@
 [package]
 name = "qubit-lock"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.94"
 authors = ["Haixing Hu <starfish.hu@gmail.com>"]
@@ -25,9 +25,7 @@ doctest = true
 
 [dependencies]
 tokio = { version = "1.5", features = ["sync", "rt"] }
-log = "0.4"
 parking_lot = "0.12"
-thiserror = "2.0"
 
 [dev-dependencies]
 tokio = { version = "1.5", features = ["macros", "rt-multi-thread", "time"] }

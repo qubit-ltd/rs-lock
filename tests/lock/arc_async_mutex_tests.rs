@@ -15,6 +15,7 @@ use std::sync::Arc;
 use qubit_lock::{
     ArcAsyncMutex,
     AsyncLock,
+    TryLockError,
 };
 
 #[cfg(test)]
@@ -76,7 +77,7 @@ mod arc_async_mutex_tests {
     }
 
     #[tokio::test]
-    async fn test_arc_async_mutex_try_with_lock_returns_none() {
+    async fn test_arc_async_mutex_try_with_lock_returns_would_block() {
         let async_mutex = Arc::new(ArcAsyncMutex::new(0));
 
         let async_mutex_clone = async_mutex.clone();
@@ -98,19 +99,16 @@ mod arc_async_mutex_tests {
         // Give spawned thread time to acquire the lock
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
-        // Try to acquire lock, should return None
+        // Try to acquire lock, should report contention.
         let result = async_mutex.try_read(|value| *value);
-        assert!(
-            result.is_none(),
-            "Expected None when lock is held by another thread"
-        );
+        assert_eq!(result, Err(TryLockError::WouldBlock));
 
         // Wait for child thread to complete
         handle.join().unwrap();
 
         // Now should be able to successfully acquire the lock
         let result = async_mutex.try_read(|value| *value);
-        assert_eq!(result, Some(1));
+        assert_eq!(result, Ok(1));
     }
 
     #[tokio::test]
@@ -273,27 +271,26 @@ mod arc_async_mutex_tests {
     }
 
     #[tokio::test]
-    async fn test_arc_async_mutex_does_not_block_executor() {
+    async fn test_arc_async_mutex_serializes_contended_writes() {
         let async_mutex = ArcAsyncMutex::new(0);
         let async_mutex = Arc::new(async_mutex);
 
         let async_mutex_clone = async_mutex.clone();
 
-        // Hold lock in one task
+        // Hold the lock long enough for the second task to contend.
         let handle1 = tokio::spawn(async move {
             async_mutex_clone
                 .write(|value| {
                     *value += 1;
-                    // Simulate long operation (using thread::sleep to simulate CPU work)
+                    // The closure itself is synchronous while the guard is held.
                     std::thread::sleep(std::time::Duration::from_millis(50));
                 })
                 .await;
         });
 
-        // Try to acquire lock in another task (should wait without blocking)
+        // The second write should wait for the first guard to be released.
         let async_mutex_clone2 = async_mutex.clone();
         let handle2 = tokio::spawn(async move {
-            // This should wait for lock to be released
             async_mutex_clone2
                 .write(|value| {
                     *value += 1;
@@ -327,28 +324,28 @@ mod arc_async_mutex_tests {
     }
 
     #[tokio::test]
-    async fn test_arc_async_mutex_try_write_with_lock_returns_some() {
+    async fn test_arc_async_mutex_try_write_with_lock_returns_ok() {
         let async_mutex = ArcAsyncMutex::new(0);
 
         // For async mutex, try_write will succeed when the lock is not held
         // This test verifies that try_write works correctly in the normal case
         let result = async_mutex.try_write(|value| *value);
-        assert_eq!(result, Some(0));
+        assert_eq!(result, Ok(0));
 
         // Try again immediately, should still succeed since we released the lock
         let result = async_mutex.try_write(|value| {
             *value += 1;
             *value
         });
-        assert_eq!(result, Some(1));
+        assert_eq!(result, Ok(1));
     }
 
     #[tokio::test]
     async fn test_arc_async_mutex_try_methods_cover_shared_function_pointer_paths() {
         let async_mutex = Arc::new(ArcAsyncMutex::new(0));
 
-        assert_eq!(async_mutex.try_read(read_i32), Some(0));
-        assert_eq!(async_mutex.try_write(increment_i32), Some(1));
+        assert_eq!(async_mutex.try_read(read_i32), Ok(0));
+        assert_eq!(async_mutex.try_write(increment_i32), Ok(1));
 
         let barrier = Arc::new(std::sync::Barrier::new(2));
         let lock_clone = async_mutex.clone();
@@ -366,8 +363,14 @@ mod arc_async_mutex_tests {
         });
 
         barrier.wait();
-        assert_eq!(async_mutex.try_read(read_i32), None);
-        assert_eq!(async_mutex.try_write(increment_i32), None);
+        assert_eq!(
+            async_mutex.try_read(read_i32),
+            Err(TryLockError::WouldBlock),
+        );
+        assert_eq!(
+            async_mutex.try_write(increment_i32),
+            Err(TryLockError::WouldBlock),
+        );
         holder.join().unwrap();
     }
 
@@ -382,10 +385,10 @@ mod arc_async_mutex_tests {
         assert_eq!(result, "write_result");
 
         let result = async_mutex.try_read(|_| "try_read_result");
-        assert_eq!(result, Some("try_read_result"));
+        assert_eq!(result, Ok("try_read_result"));
 
         let result = async_mutex.try_write(|_| "try_write_result");
-        assert_eq!(result, Some("try_write_result"));
+        assert_eq!(result, Ok("try_write_result"));
     }
 
     #[tokio::test]

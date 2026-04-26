@@ -71,6 +71,22 @@ mod lock_trait_tests {
     }
 
     #[test]
+    fn test_try_lock_error_display_messages() {
+        assert_eq!(
+            TryLockError::WouldBlock.to_string(),
+            "lock acquisition would block",
+        );
+        assert_eq!(TryLockError::Poisoned.to_string(), "lock is poisoned");
+    }
+
+    #[test]
+    fn test_try_lock_error_implements_std_error() {
+        fn assert_std_error<E: std::error::Error>() {}
+
+        assert_std_error::<TryLockError>();
+    }
+
+    #[test]
     fn test_mutex_try_with_lock_success() {
         let mutex = ArcStdMutex::new(42);
 
@@ -640,7 +656,7 @@ mod rwlock_trait_tests {
     }
 
     #[test]
-    fn test_rwlock_try_write_returns_none_when_locked() {
+    fn test_rwlock_try_write_succeeds_after_read_guard_released() {
         let rw_lock = ArcRwLock::new(0);
 
         // First acquire read lock to ensure it's locked

@@ -20,7 +20,7 @@
 
 ```toml
 [dependencies]
-qubit-lock = "0.2.0"
+qubit-lock = "0.3.0"
 ```
 
 ## 快速开始
@@ -40,7 +40,7 @@ fn main() {
 ### Monitor
 
 ```rust
-use qubit_lock::lock::ArcMonitor;
+use qubit_lock::monitor::ArcMonitor;
 
 fn main() {
     let monitor = ArcMonitor::new(vec![1, 2, 3]);

@@ -19,7 +19,10 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock as AsyncRwLock;
 
-use crate::lock::AsyncLock;
+use crate::lock::{
+    AsyncLock,
+    TryLockError,
+};
 
 /// Asynchronous Read-Write Lock Wrapper
 ///
@@ -203,18 +206,17 @@ where
     ///
     /// # Returns
     ///
-    /// `Some(result)` if a read lock was acquired, or `None` if the lock was
-    /// busy.
+    /// `Ok(result)` if a read lock was acquired, or
+    /// [`TryLockError::WouldBlock`] if the lock was busy.
     #[inline]
-    fn try_read<R, F>(&self, f: F) -> Option<R>
+    fn try_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&T) -> R,
     {
-        if let Ok(guard) = self.inner.try_read() {
-            Some(f(&*guard))
-        } else {
-            None
-        }
+        self.inner
+            .try_read()
+            .map(|guard| f(&*guard))
+            .map_err(|_| TryLockError::WouldBlock)
     }
 
     /// Attempts to acquire the write lock without waiting.
@@ -225,18 +227,17 @@ where
     ///
     /// # Returns
     ///
-    /// `Some(result)` if a write lock was acquired, or `None` if the lock was
-    /// busy.
+    /// `Ok(result)` if a write lock was acquired, or
+    /// [`TryLockError::WouldBlock`] if the lock was busy.
     #[inline]
-    fn try_write<R, F>(&self, f: F) -> Option<R>
+    fn try_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&mut T) -> R,
     {
-        if let Ok(mut guard) = self.inner.try_write() {
-            Some(f(&mut *guard))
-        } else {
-            None
-        }
+        self.inner
+            .try_write()
+            .map(|mut guard| f(&mut *guard))
+            .map_err(|_| TryLockError::WouldBlock)
     }
 }
 

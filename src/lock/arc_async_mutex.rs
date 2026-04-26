@@ -18,7 +18,10 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex as AsyncMutex;
 
-use crate::lock::AsyncLock;
+use crate::lock::{
+    AsyncLock,
+    TryLockError,
+};
 
 /// Asynchronous Mutex Wrapper
 ///
@@ -56,7 +59,7 @@ use crate::lock::AsyncLock;
 ///     }).await;
 ///
 ///     // Try to acquire lock
-///     if let Some(value) = counter.try_read(|c| *c) {
+///     if let Ok(value) = counter.try_read(|c| *c) {
 ///         println!("Current value: {}", value);
 ///     }
 /// });
@@ -147,17 +150,17 @@ where
     ///
     /// # Returns
     ///
-    /// `Some(result)` if the mutex was acquired, or `None` if it was busy.
+    /// `Ok(result)` if the mutex was acquired, or
+    /// [`TryLockError::WouldBlock`] if it was busy.
     #[inline]
-    fn try_read<R, F>(&self, f: F) -> Option<R>
+    fn try_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&T) -> R,
     {
-        if let Ok(guard) = self.inner.try_lock() {
-            Some(f(&*guard))
-        } else {
-            None
-        }
+        self.inner
+            .try_lock()
+            .map(|guard| f(&*guard))
+            .map_err(|_| TryLockError::WouldBlock)
     }
 
     /// Attempts to acquire the mutex for a mutable operation without waiting.
@@ -168,17 +171,17 @@ where
     ///
     /// # Returns
     ///
-    /// `Some(result)` if the mutex was acquired, or `None` if it was busy.
+    /// `Ok(result)` if the mutex was acquired, or
+    /// [`TryLockError::WouldBlock`] if it was busy.
     #[inline]
-    fn try_write<R, F>(&self, f: F) -> Option<R>
+    fn try_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&mut T) -> R,
     {
-        if let Ok(mut guard) = self.inner.try_lock() {
-            Some(f(&mut *guard))
-        } else {
-            None
-        }
+        self.inner
+            .try_lock()
+            .map(|mut guard| f(&mut *guard))
+            .map_err(|_| TryLockError::WouldBlock)
     }
 }
 

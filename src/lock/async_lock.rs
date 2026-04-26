@@ -21,6 +21,8 @@ use tokio::sync::{
     RwLock as AsyncRwLock,
 };
 
+use super::try_lock_error::TryLockError;
+
 /// Unified asynchronous lock trait
 ///
 /// Provides a unified interface for different types of asynchronous
@@ -49,6 +51,12 @@ use tokio::sync::{
 /// - Generic async code that works with any lock type
 /// - Performance optimization through appropriate lock selection
 /// - Non-blocking async operations
+///
+/// Only lock acquisition is asynchronous. The closure passed to `read` or
+/// `write` executes synchronously while the guard is held, so it cannot
+/// `.await` and should not perform blocking or long-running work. Compute
+/// expensive values before acquiring the lock, or move blocking work to a
+/// dedicated blocking task and keep the locked closure short.
 ///
 /// # Performance Characteristics
 ///
@@ -196,9 +204,9 @@ pub trait AsyncLock<T: ?Sized> {
     /// Attempts to acquire a read lock without waiting
     ///
     /// This method tries to acquire a read lock immediately. If the lock
-    /// is currently held by another task in write mode, it returns `None`
-    /// without waiting. Otherwise, it executes the closure and returns
-    /// `Some` containing the result.
+    /// cannot be acquired, it returns [`TryLockError::WouldBlock`] without
+    /// waiting. Otherwise, it executes the closure and returns `Ok` containing
+    /// the result.
     ///
     /// # Arguments
     ///
@@ -207,8 +215,14 @@ pub trait AsyncLock<T: ?Sized> {
     ///
     /// # Returns
     ///
-    /// * `Some(R)` - If the lock was acquired and closure executed
-    /// * `None` - If the lock is currently held in write mode
+    /// * `Ok(R)` - If the lock was acquired and closure executed
+    /// * `Err(TryLockError::WouldBlock)` - If the lock is currently held in write mode
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TryLockError::WouldBlock`] when the async lock cannot be
+    /// acquired immediately. Tokio locks are not poisoned, so this method does
+    /// not return [`TryLockError::Poisoned`].
     ///
     /// # Example
     ///
@@ -216,13 +230,13 @@ pub trait AsyncLock<T: ?Sized> {
     /// use qubit_lock::lock::{AsyncLock, ArcAsyncRwLock};
     ///
     /// let lock = ArcAsyncRwLock::new(42);
-    /// if let Some(value) = lock.try_read(|data| *data) {
+    /// if let Ok(value) = lock.try_read(|data| *data) {
     ///     println!("Got value: {}", value);
     /// } else {
     ///     println!("Lock is busy with write operation");
     /// }
     /// ```
-    fn try_read<R, F>(&self, f: F) -> Option<R>
+    fn try_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&T) -> R;
 
@@ -230,8 +244,8 @@ pub trait AsyncLock<T: ?Sized> {
     ///
     /// This method tries to acquire a write lock immediately. If the lock
     /// is currently held by another task (in either read or write mode),
-    /// it returns `None` without waiting. Otherwise, it executes the
-    /// closure and returns `Some` containing the result.
+    /// it returns [`TryLockError::WouldBlock`] without waiting. Otherwise, it
+    /// executes the closure and returns `Ok` containing the result.
     ///
     /// # Arguments
     ///
@@ -240,8 +254,14 @@ pub trait AsyncLock<T: ?Sized> {
     ///
     /// # Returns
     ///
-    /// * `Some(R)` - If the lock was acquired and closure executed
-    /// * `None` - If the lock is currently held by another task
+    /// * `Ok(R)` - If the lock was acquired and closure executed
+    /// * `Err(TryLockError::WouldBlock)` - If the lock is currently held by another task
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TryLockError::WouldBlock`] when the async lock cannot be
+    /// acquired immediately. Tokio locks are not poisoned, so this method does
+    /// not return [`TryLockError::Poisoned`].
     ///
     /// # Example
     ///
@@ -249,7 +269,7 @@ pub trait AsyncLock<T: ?Sized> {
     /// use qubit_lock::lock::{AsyncLock, ArcAsyncMutex};
     ///
     /// let lock = ArcAsyncMutex::new(42);
-    /// if let Some(result) = lock.try_write(|data| {
+    /// if let Ok(result) = lock.try_write(|data| {
     ///     *data += 1;
     ///     *data
     /// }) {
@@ -258,7 +278,7 @@ pub trait AsyncLock<T: ?Sized> {
     ///     println!("Lock is busy");
     /// }
     /// ```
-    fn try_write<R, F>(&self, f: F) -> Option<R>
+    fn try_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&mut T) -> R;
 }
@@ -324,17 +344,16 @@ impl<T: ?Sized + Send> AsyncLock<T> for AsyncMutex<T> {
     ///
     /// # Returns
     ///
-    /// `Some(result)` if the mutex is acquired, or `None` if it is busy.
+    /// `Ok(result)` if the mutex is acquired, or
+    /// [`TryLockError::WouldBlock`] if it is busy.
     #[inline]
-    fn try_read<R, F>(&self, f: F) -> Option<R>
+    fn try_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&T) -> R,
     {
-        if let Ok(guard) = self.try_lock() {
-            Some(f(&*guard))
-        } else {
-            None
-        }
+        self.try_lock()
+            .map(|guard| f(&*guard))
+            .map_err(|_| TryLockError::WouldBlock)
     }
 
     /// Attempts to acquire the mutex without waiting for a mutable closure.
@@ -345,17 +364,16 @@ impl<T: ?Sized + Send> AsyncLock<T> for AsyncMutex<T> {
     ///
     /// # Returns
     ///
-    /// `Some(result)` if the mutex is acquired, or `None` if it is busy.
+    /// `Ok(result)` if the mutex is acquired, or
+    /// [`TryLockError::WouldBlock`] if it is busy.
     #[inline]
-    fn try_write<R, F>(&self, f: F) -> Option<R>
+    fn try_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&mut T) -> R,
     {
-        if let Ok(mut guard) = self.try_lock() {
-            Some(f(&mut *guard))
-        } else {
-            None
-        }
+        self.try_lock()
+            .map(|mut guard| f(&mut *guard))
+            .map_err(|_| TryLockError::WouldBlock)
     }
 }
 
@@ -422,17 +440,16 @@ impl<T: ?Sized + Send + Sync> AsyncLock<T> for AsyncRwLock<T> {
     ///
     /// # Returns
     ///
-    /// `Some(result)` if a read lock is acquired, or `None` if it is busy.
+    /// `Ok(result)` if a read lock is acquired, or
+    /// [`TryLockError::WouldBlock`] if it is busy.
     #[inline]
-    fn try_read<R, F>(&self, f: F) -> Option<R>
+    fn try_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&T) -> R,
     {
-        if let Ok(guard) = self.try_read() {
-            Some(f(&*guard))
-        } else {
-            None
-        }
+        self.try_read()
+            .map(|guard| f(&*guard))
+            .map_err(|_| TryLockError::WouldBlock)
     }
 
     /// Attempts to acquire an exclusive write lock without waiting.
@@ -444,16 +461,15 @@ impl<T: ?Sized + Send + Sync> AsyncLock<T> for AsyncRwLock<T> {
     ///
     /// # Returns
     ///
-    /// `Some(result)` if a write lock is acquired, or `None` if it is busy.
+    /// `Ok(result)` if a write lock is acquired, or
+    /// [`TryLockError::WouldBlock`] if it is busy.
     #[inline]
-    fn try_write<R, F>(&self, f: F) -> Option<R>
+    fn try_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&mut T) -> R,
     {
-        if let Ok(mut guard) = self.try_write() {
-            Some(f(&mut *guard))
-        } else {
-            None
-        }
+        self.try_write()
+            .map(|mut guard| f(&mut *guard))
+            .map_err(|_| TryLockError::WouldBlock)
     }
 }
