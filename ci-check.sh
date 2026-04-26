@@ -74,8 +74,8 @@ else
     echo ""
     echo "Please run the following command to fix formatting issues:"
     echo "  cargo +nightly fmt"
-    echo "Or use the format script:"
-    echo "  ./format.sh"
+    echo "Or run the local auto-fix pipeline:"
+    echo "  ./align-ci.sh"
     exit 1
 fi
 echo ""
