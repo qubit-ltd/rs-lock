@@ -23,6 +23,9 @@
 qubit-lock = "0.3.0"
 ```
 
+异步锁包装器使用 Tokio 同步原语。如果应用需要创建 Tokio runtime，请在应用自己的
+`Cargo.toml` 中启用合适的 Tokio runtime 特性，例如 `rt` 或 `rt-multi-thread`。
+
 ## 快速开始
 
 ### 同步锁

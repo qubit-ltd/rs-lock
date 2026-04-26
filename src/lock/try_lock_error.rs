@@ -19,12 +19,14 @@ use std::fmt;
 /// Non-blocking lock acquisition error.
 ///
 /// This error type is used by `try_read` and `try_write` to distinguish
-/// lock contention from poisoned lock states.
+/// immediate lock contention from poisoned lock states. The
+/// [`Self::Poisoned`] variant is returned only by lock implementations that
+/// support poisoning.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TryLockError {
-    /// The lock is currently held by another thread.
+    /// The lock could not be acquired immediately because another guard is active.
     WouldBlock,
-    /// The lock is poisoned due to a panic while the lock was held.
+    /// The lock implementation reports a poisoned state.
     Poisoned,
 }
 

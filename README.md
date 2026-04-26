@@ -23,6 +23,10 @@ Lock-focused utilities for the Qubit Rust libraries. The crate provides synchron
 qubit-lock = "0.3.0"
 ```
 
+The async wrappers use Tokio synchronization primitives. If your application
+creates a Tokio runtime, enable the appropriate Tokio runtime features in your
+own `Cargo.toml`, such as `rt` or `rt-multi-thread`.
+
 ## Quick Start
 
 ### Synchronous lock
