@@ -10,7 +10,13 @@
 //!
 //! Tests for the ArcAsyncRwLock implementation
 
-use std::sync::Arc;
+use std::{
+    sync::{
+        Arc,
+        mpsc,
+    },
+    time::Duration,
+};
 
 use qubit_lock::{
     ArcAsyncRwLock,
@@ -288,27 +294,45 @@ mod arc_async_rw_lock_tests {
     async fn test_arc_async_rw_lock_writer_blocks_readers() {
         let async_rw_lock = ArcAsyncRwLock::new(0);
         let async_rw_lock = Arc::new(async_rw_lock);
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
 
         // Hold write lock in one task
         let async_rw_lock_clone = async_rw_lock.clone();
-        let write_handle = tokio::spawn(async move {
-            async_rw_lock_clone
-                .write(|value| {
-                    *value += 1;
-                    // Hold the write lock for some time
-                    std::thread::sleep(std::time::Duration::from_millis(50));
-                })
-                .await;
+        let write_handle = std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
+            rt.block_on(async {
+                async_rw_lock_clone
+                    .write(move |value| {
+                        *value += 1;
+                        locked_tx
+                            .send(())
+                            .expect("test should observe held write lock");
+                        release_rx
+                            .recv_timeout(Duration::from_secs(1))
+                            .expect("test should release held write lock");
+                    })
+                    .await;
+            });
         });
 
-        // Give the write task time to acquire the lock
-        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("write lock should be held within timeout");
 
         // Try to read (should wait for write to complete)
-        let read_result = async_rw_lock.read(|value| *value).await;
+        let read_handle = tokio::spawn({
+            let async_rw_lock = async_rw_lock.clone();
+            async move { async_rw_lock.read(|value| *value).await }
+        });
+
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
+        let read_result = read_handle.await.unwrap();
 
         // Wait for write task to complete
-        write_handle.await.unwrap();
+        write_handle.join().expect("holder thread should not panic");
 
         // Should see the updated value
         assert_eq!(read_result, 1);
@@ -387,27 +411,34 @@ mod arc_async_rw_lock_tests {
     #[tokio::test]
     async fn test_arc_async_rw_lock_try_read_returns_would_block_when_write_locked() {
         let async_rw_lock = Arc::new(ArcAsyncRwLock::new(0));
-        let barrier = Arc::new(std::sync::Barrier::new(2));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
 
         let lock_clone = async_rw_lock.clone();
-        let barrier_clone = barrier.clone();
         let handle = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().unwrap();
+            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
             rt.block_on(async {
                 lock_clone
-                    .write(|_| {
-                        barrier_clone.wait();
-                        std::thread::sleep(std::time::Duration::from_millis(100));
+                    .write(move |_| {
+                        locked_tx.send(()).expect("test should observe held lock");
+                        release_rx
+                            .recv_timeout(Duration::from_secs(1))
+                            .expect("test should release held lock");
                     })
                     .await;
             });
         });
 
-        barrier.wait();
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("write lock should be held within timeout");
         let result = async_rw_lock.try_read(|value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
 
-        handle.join().unwrap();
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
+        handle.join().expect("holder thread should not panic");
     }
 
     #[tokio::test]
@@ -417,72 +448,97 @@ mod arc_async_rw_lock_tests {
         assert_eq!(async_rw_lock.try_read(read_i32), Ok(0));
         assert_eq!(async_rw_lock.try_write(increment_i32), Ok(1));
 
-        let read_barrier = Arc::new(std::sync::Barrier::new(2));
+        let (read_locked_tx, read_locked_rx) = mpsc::channel();
+        let (read_release_tx, read_release_rx) = mpsc::channel();
         let read_lock = async_rw_lock.clone();
-        let read_barrier_clone = read_barrier.clone();
         let read_holder = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().unwrap();
+            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
             rt.block_on(async {
                 read_lock
-                    .write(|_| {
-                        read_barrier_clone.wait();
-                        std::thread::sleep(std::time::Duration::from_millis(50));
+                    .write(move |_| {
+                        read_locked_tx
+                            .send(())
+                            .expect("test should observe held write lock");
+                        read_release_rx
+                            .recv_timeout(Duration::from_secs(1))
+                            .expect("test should release held write lock");
                     })
                     .await;
             });
         });
-        read_barrier.wait();
+        read_locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("write lock should be held within timeout");
         assert_eq!(
             async_rw_lock.try_read(read_i32),
             Err(TryLockError::WouldBlock),
         );
-        read_holder.join().unwrap();
+        read_release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
+        read_holder.join().expect("holder thread should not panic");
 
-        let write_barrier = Arc::new(std::sync::Barrier::new(2));
+        let (write_locked_tx, write_locked_rx) = mpsc::channel();
+        let (write_release_tx, write_release_rx) = mpsc::channel();
         let write_lock = async_rw_lock.clone();
-        let write_barrier_clone = write_barrier.clone();
         let write_holder = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().unwrap();
+            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
             rt.block_on(async {
                 write_lock
-                    .read(|_| {
-                        write_barrier_clone.wait();
-                        std::thread::sleep(std::time::Duration::from_millis(50));
+                    .read(move |_| {
+                        write_locked_tx
+                            .send(())
+                            .expect("test should observe held read lock");
+                        write_release_rx
+                            .recv_timeout(Duration::from_secs(1))
+                            .expect("test should release held read lock");
                     })
                     .await;
             });
         });
-        write_barrier.wait();
+        write_locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("read lock should be held within timeout");
         assert_eq!(
             async_rw_lock.try_write(increment_i32),
             Err(TryLockError::WouldBlock),
         );
-        write_holder.join().unwrap();
+        write_release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
+        write_holder.join().expect("holder thread should not panic");
     }
 
     #[tokio::test]
     async fn test_arc_async_rw_lock_try_write_returns_would_block_when_read_locked() {
         let async_rw_lock = Arc::new(ArcAsyncRwLock::new(0));
-        let barrier = Arc::new(std::sync::Barrier::new(2));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
 
         let lock_clone = async_rw_lock.clone();
-        let barrier_clone = barrier.clone();
         let handle = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().unwrap();
+            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
             rt.block_on(async {
                 lock_clone
-                    .read(|_| {
-                        barrier_clone.wait();
-                        std::thread::sleep(std::time::Duration::from_millis(100));
+                    .read(move |_| {
+                        locked_tx.send(()).expect("test should observe held lock");
+                        release_rx
+                            .recv_timeout(Duration::from_secs(1))
+                            .expect("test should release held lock");
                     })
                     .await;
             });
         });
 
-        barrier.wait();
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("read lock should be held within timeout");
         let result = async_rw_lock.try_write(|value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
 
-        handle.join().unwrap();
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
+        handle.join().expect("holder thread should not panic");
     }
 }

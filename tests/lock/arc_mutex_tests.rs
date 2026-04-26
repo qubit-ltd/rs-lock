@@ -13,9 +13,10 @@
 use std::{
     sync::{
         Arc,
-        Barrier,
+        mpsc,
     },
     thread,
+    time::Duration,
 };
 
 use qubit_lock::{
@@ -80,28 +81,34 @@ mod arc_mutex_tests {
     #[test]
     fn test_arc_mutex_try_read_returns_would_block() {
         let mutex = Arc::new(ArcMutex::new(0));
-        let barrier = Arc::new(Barrier::new(2));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
 
         let mutex_clone = mutex.clone();
-        let barrier_clone = barrier.clone();
 
         // Hold the lock in another thread
         let handle = thread::spawn(move || {
             mutex_clone.write(|value| {
                 *value += 1;
-                // Notify main thread that it can try to acquire the lock
-                barrier_clone.wait();
-                // Hold the lock for some time
-                thread::sleep(std::time::Duration::from_millis(100));
+                locked_tx.send(()).expect("test should observe held mutex");
+                release_rx
+                    .recv_timeout(Duration::from_secs(1))
+                    .expect("test should release held mutex");
             });
         });
 
         // Wait for child thread to acquire the lock
-        barrier.wait();
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("mutex should be held within timeout");
 
         // Try to acquire lock, should return WouldBlock
         let result = mutex.try_read(|value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
+
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
         handle.join().unwrap();
@@ -114,24 +121,26 @@ mod arc_mutex_tests {
     #[test]
     fn test_arc_mutex_try_write_returns_would_block() {
         let mutex = Arc::new(ArcMutex::new(0));
-        let barrier = Arc::new(Barrier::new(2));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
 
         let mutex_clone = mutex.clone();
-        let barrier_clone = barrier.clone();
 
         // Hold the lock in another thread
         let handle = thread::spawn(move || {
             mutex_clone.write(|value| {
                 *value += 1;
-                // Notify main thread that it can try to acquire the lock
-                barrier_clone.wait();
-                // Hold the lock for some time
-                thread::sleep(std::time::Duration::from_millis(100));
+                locked_tx.send(()).expect("test should observe held mutex");
+                release_rx
+                    .recv_timeout(Duration::from_secs(1))
+                    .expect("test should release held mutex");
             });
         });
 
         // Wait for child thread to acquire the lock
-        barrier.wait();
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("mutex should be held within timeout");
 
         // Try to acquire write lock, should return WouldBlock
         let result = mutex.try_write(|value| {
@@ -139,6 +148,10 @@ mod arc_mutex_tests {
             *value
         });
         assert_eq!(result, Err(TryLockError::WouldBlock));
+
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
         handle.join().unwrap();

@@ -14,8 +14,10 @@ use std::{
     sync::{
         Arc,
         Barrier,
+        mpsc,
     },
     thread,
+    time::Duration,
 };
 
 use std::sync::{
@@ -105,28 +107,34 @@ mod lock_trait_tests {
     #[test]
     fn test_mutex_try_read_returns_would_block_when_locked() {
         let mutex = Arc::new(ArcStdMutex::new(0));
-        let barrier = Arc::new(Barrier::new(2));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
 
         let mutex_clone = mutex.clone();
-        let barrier_clone = barrier.clone();
 
         // Hold the lock in another thread
         let handle = thread::spawn(move || {
             mutex_clone.write(|value| {
                 *value += 1;
-                // Notify main thread
-                barrier_clone.wait();
-                // Hold the lock for some time
-                thread::sleep(std::time::Duration::from_millis(100));
+                locked_tx.send(()).expect("test should observe held mutex");
+                release_rx
+                    .recv_timeout(Duration::from_secs(1))
+                    .expect("test should release held mutex");
             });
         });
 
         // Wait for child thread to acquire the lock
-        barrier.wait();
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("mutex should be held within timeout");
 
         // Try to acquire lock, should return WouldBlock
         let result = mutex.try_read(|value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
+
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
         handle.join().unwrap();
@@ -285,26 +293,32 @@ mod lock_trait_tests {
     #[test]
     fn test_std_mutex_try_read_returns_would_block_when_locked_short_path() {
         let mutex = Arc::new(Mutex::new(0));
-        let barrier = Arc::new(Barrier::new(2));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
 
         let mutex_clone = mutex.clone();
-        let barrier_clone = barrier.clone();
 
         // Hold the lock in another thread
         let handle = thread::spawn(move || {
             let _guard = mutex_clone.lock().unwrap();
-            // Notify main thread that we have the lock
-            barrier_clone.wait();
-            // Hold the lock for some time
-            thread::sleep(std::time::Duration::from_millis(100));
+            locked_tx.send(()).expect("test should observe held mutex");
+            release_rx
+                .recv_timeout(Duration::from_secs(1))
+                .expect("test should release held mutex");
         });
 
         // Wait for child thread to acquire the lock
-        barrier.wait();
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("mutex should be held within timeout");
 
         // Try to acquire read lock, should return WouldBlock since it's held by another thread
         let result = Lock::try_read(&*mutex, |value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
+
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
         handle.join().unwrap();
@@ -317,26 +331,32 @@ mod lock_trait_tests {
     #[test]
     fn test_std_mutex_try_write_returns_would_block_when_locked() {
         let mutex = Arc::new(Mutex::new(0));
-        let barrier = Arc::new(Barrier::new(2));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
 
         let mutex_clone = mutex.clone();
-        let barrier_clone = barrier.clone();
 
         // Hold the lock in another thread
         let handle = thread::spawn(move || {
             let _guard = mutex_clone.lock().unwrap();
-            // Notify main thread that we have the lock
-            barrier_clone.wait();
-            // Hold the lock for some time
-            thread::sleep(std::time::Duration::from_millis(100));
+            locked_tx.send(()).expect("test should observe held mutex");
+            release_rx
+                .recv_timeout(Duration::from_secs(1))
+                .expect("test should release held mutex");
         });
 
         // Wait for child thread to acquire the lock
-        barrier.wait();
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("mutex should be held within timeout");
 
         // Try to acquire write lock, should return WouldBlock since it's held by another thread
         let result = Lock::try_write(&*mutex, |value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
+
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
         handle.join().unwrap();
@@ -352,21 +372,28 @@ mod lock_trait_tests {
     #[test]
     fn test_std_mutex_try_read_returns_would_block_when_locked() {
         let mutex = Arc::new(Mutex::new(0));
-        let barrier = Arc::new(Barrier::new(2));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
 
         let mutex_clone = mutex.clone();
-        let barrier_clone = barrier.clone();
 
         let handle = thread::spawn(move || {
             let _guard = mutex_clone.lock().unwrap();
-            barrier_clone.wait();
-            thread::sleep(std::time::Duration::from_millis(100));
+            locked_tx.send(()).expect("test should observe held mutex");
+            release_rx
+                .recv_timeout(Duration::from_secs(1))
+                .expect("test should release held mutex");
         });
 
-        barrier.wait();
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("mutex should be held within timeout");
         let result = Lock::try_read(&*mutex, |value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
 
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
         handle.join().unwrap();
     }
 
@@ -421,15 +448,19 @@ mod lock_trait_tests {
         assert_eq!(Lock::try_read(&*mutex, read_i32), Ok(0));
         assert_eq!(Lock::try_write(&*mutex, increment_i32), Ok(1));
 
-        let barrier = Arc::new(Barrier::new(2));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
         let mutex_clone = mutex.clone();
-        let barrier_clone = barrier.clone();
         let handle = thread::spawn(move || {
             let _guard = mutex_clone.lock().unwrap();
-            barrier_clone.wait();
-            thread::sleep(std::time::Duration::from_millis(50));
+            locked_tx.send(()).expect("test should observe held mutex");
+            release_rx
+                .recv_timeout(Duration::from_secs(1))
+                .expect("test should release held mutex");
         });
-        barrier.wait();
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("mutex should be held within timeout");
         assert_eq!(
             Lock::try_read(&*mutex, read_i32),
             Err(TryLockError::WouldBlock)
@@ -438,6 +469,9 @@ mod lock_trait_tests {
             Lock::try_write(&*mutex, increment_i32),
             Err(TryLockError::WouldBlock),
         );
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
         handle.join().unwrap();
 
         let poisoned = Arc::new(Mutex::new(0));
@@ -624,28 +658,36 @@ mod rwlock_trait_tests {
     #[test]
     fn test_rwlock_try_read_returns_would_block_when_write_locked() {
         let rw_lock = Arc::new(ArcRwLock::new(0));
-        let barrier = Arc::new(Barrier::new(2));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
 
         let rw_lock_clone = rw_lock.clone();
-        let barrier_clone = barrier.clone();
 
         // Hold the write lock in another thread
         let handle = thread::spawn(move || {
             rw_lock_clone.write(|value| {
                 *value += 1;
-                // Notify main thread
-                barrier_clone.wait();
-                // Hold the write lock for some time
-                thread::sleep(std::time::Duration::from_millis(100));
+                locked_tx
+                    .send(())
+                    .expect("test should observe held write lock");
+                release_rx
+                    .recv_timeout(Duration::from_secs(1))
+                    .expect("test should release held write lock");
             });
         });
 
         // Wait for child thread to acquire the write lock
-        barrier.wait();
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("write lock should be held within timeout");
 
         // Try to acquire read lock while write lock is held by another thread
         let result = rw_lock.try_read(|value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
+
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
         handle.join().unwrap();
@@ -747,26 +789,34 @@ mod rwlock_trait_tests {
     #[test]
     fn test_std_rwlock_try_read_returns_would_block_when_write_locked() {
         let rwlock = Arc::new(RwLock::new(0));
-        let barrier = Arc::new(Barrier::new(2));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
 
         let rwlock_clone = rwlock.clone();
-        let barrier_clone = barrier.clone();
 
         // Hold the write lock in another thread
         let handle = thread::spawn(move || {
             let _guard = rwlock_clone.write().unwrap();
-            // Notify main thread that we have the write lock
-            barrier_clone.wait();
-            // Hold the write lock for some time
-            thread::sleep(std::time::Duration::from_millis(100));
+            locked_tx
+                .send(())
+                .expect("test should observe held write lock");
+            release_rx
+                .recv_timeout(Duration::from_secs(1))
+                .expect("test should release held write lock");
         });
 
         // Wait for child thread to acquire the write lock
-        barrier.wait();
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("write lock should be held within timeout");
 
         // Try to acquire read lock, should return WouldBlock since write lock is held by another thread
         let result = Lock::try_read(&*rwlock, |value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
+
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
         handle.join().unwrap();
@@ -779,26 +829,34 @@ mod rwlock_trait_tests {
     #[test]
     fn test_std_rwlock_try_write_returns_would_block_when_read_locked_short_path() {
         let rwlock = Arc::new(RwLock::new(0));
-        let barrier = Arc::new(Barrier::new(2));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
 
         let rwlock_clone = rwlock.clone();
-        let barrier_clone = barrier.clone();
 
         // Hold the read lock in another thread
         let handle = thread::spawn(move || {
             let _guard = rwlock_clone.read().unwrap();
-            // Notify main thread that we have the read lock
-            barrier_clone.wait();
-            // Hold the read lock for some time
-            thread::sleep(std::time::Duration::from_millis(100));
+            locked_tx
+                .send(())
+                .expect("test should observe held read lock");
+            release_rx
+                .recv_timeout(Duration::from_secs(1))
+                .expect("test should release held read lock");
         });
 
         // Wait for child thread to acquire the read lock
-        barrier.wait();
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("read lock should be held within timeout");
 
         // Try to acquire write lock, should return WouldBlock since read lock is held by another thread
         let result = Lock::try_write(&*rwlock, |value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
+
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
         handle.join().unwrap();
@@ -814,26 +872,34 @@ mod rwlock_trait_tests {
     #[test]
     fn test_std_rwlock_try_write_returns_would_block_when_write_locked() {
         let rwlock = Arc::new(RwLock::new(0));
-        let barrier = Arc::new(Barrier::new(2));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
 
         let rwlock_clone = rwlock.clone();
-        let barrier_clone = barrier.clone();
 
         // Hold the write lock in another thread
         let handle = thread::spawn(move || {
             let _guard = rwlock_clone.write().unwrap();
-            // Notify main thread that we have the write lock
-            barrier_clone.wait();
-            // Hold the write lock for some time
-            thread::sleep(std::time::Duration::from_millis(100));
+            locked_tx
+                .send(())
+                .expect("test should observe held write lock");
+            release_rx
+                .recv_timeout(Duration::from_secs(1))
+                .expect("test should release held write lock");
         });
 
         // Wait for child thread to acquire the write lock
-        barrier.wait();
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("write lock should be held within timeout");
 
         // Try to acquire write lock, should return WouldBlock since write lock is held by another thread
         let result = Lock::try_write(&*rwlock, |value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
+
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
         handle.join().unwrap();
@@ -849,21 +915,30 @@ mod rwlock_trait_tests {
     #[test]
     fn test_std_rwlock_try_write_returns_would_block_when_read_locked() {
         let rwlock = Arc::new(RwLock::new(0));
-        let barrier = Arc::new(Barrier::new(2));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
 
         let rwlock_clone = rwlock.clone();
-        let barrier_clone = barrier.clone();
 
         let handle = thread::spawn(move || {
             let _guard = rwlock_clone.read().unwrap();
-            barrier_clone.wait();
-            thread::sleep(std::time::Duration::from_millis(100));
+            locked_tx
+                .send(())
+                .expect("test should observe held read lock");
+            release_rx
+                .recv_timeout(Duration::from_secs(1))
+                .expect("test should release held read lock");
         });
 
-        barrier.wait();
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("read lock should be held within timeout");
         let result = Lock::try_write(&*rwlock, |value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
 
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
         handle.join().unwrap();
     }
 
@@ -908,34 +983,52 @@ mod rwlock_trait_tests {
         assert_eq!(Lock::try_read(&*rwlock, read_i32), Ok(0));
         assert_eq!(Lock::try_write(&*rwlock, increment_i32), Ok(1));
 
-        let read_barrier = Arc::new(Barrier::new(2));
+        let (read_locked_tx, read_locked_rx) = mpsc::channel();
+        let (read_release_tx, read_release_rx) = mpsc::channel();
         let read_lock = rwlock.clone();
-        let read_barrier_clone = read_barrier.clone();
         let read_holder = thread::spawn(move || {
             let _guard = read_lock.write().unwrap();
-            read_barrier_clone.wait();
-            thread::sleep(std::time::Duration::from_millis(50));
+            read_locked_tx
+                .send(())
+                .expect("test should observe held write lock");
+            read_release_rx
+                .recv_timeout(Duration::from_secs(1))
+                .expect("test should release held write lock");
         });
-        read_barrier.wait();
+        read_locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("write lock should be held within timeout");
         assert_eq!(
             Lock::try_read(&*rwlock, read_i32),
             Err(TryLockError::WouldBlock)
         );
+        read_release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
         read_holder.join().unwrap();
 
-        let write_barrier = Arc::new(Barrier::new(2));
+        let (write_locked_tx, write_locked_rx) = mpsc::channel();
+        let (write_release_tx, write_release_rx) = mpsc::channel();
         let write_lock = rwlock.clone();
-        let write_barrier_clone = write_barrier.clone();
         let write_holder = thread::spawn(move || {
             let _guard = write_lock.read().unwrap();
-            write_barrier_clone.wait();
-            thread::sleep(std::time::Duration::from_millis(50));
+            write_locked_tx
+                .send(())
+                .expect("test should observe held read lock");
+            write_release_rx
+                .recv_timeout(Duration::from_secs(1))
+                .expect("test should release held read lock");
         });
-        write_barrier.wait();
+        write_locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("read lock should be held within timeout");
         assert_eq!(
             Lock::try_write(&*rwlock, increment_i32),
             Err(TryLockError::WouldBlock),
         );
+        write_release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
         write_holder.join().unwrap();
 
         let poisoned = Arc::new(RwLock::new(0));
