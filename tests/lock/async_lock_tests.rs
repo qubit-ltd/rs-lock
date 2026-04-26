@@ -36,7 +36,7 @@ mod async_lock_trait_tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_async_mutex_with_lock_basic_operations() {
+    async fn test_async_mutex_read_write_basic_operations() {
         let async_mutex = ArcAsyncMutex::new(0);
 
         // Test basic lock and modify
@@ -54,7 +54,7 @@ mod async_lock_trait_tests {
     }
 
     #[tokio::test]
-    async fn test_async_mutex_with_lock_returns_closure_result() {
+    async fn test_async_mutex_read_returns_closure_result() {
         let async_mutex = ArcAsyncMutex::new(vec![1, 2, 3]);
 
         let length = async_mutex.read(|v| v.len()).await;
@@ -65,7 +65,7 @@ mod async_lock_trait_tests {
     }
 
     #[tokio::test]
-    async fn test_async_mutex_try_with_lock_success() {
+    async fn test_async_mutex_try_read_write_success() {
         let async_mutex = ArcAsyncMutex::new(42);
 
         // Should successfully acquire the lock
@@ -81,7 +81,7 @@ mod async_lock_trait_tests {
     }
 
     #[tokio::test]
-    async fn test_async_mutex_try_with_lock_returns_would_block_when_locked() {
+    async fn test_async_mutex_try_read_returns_would_block_when_locked() {
         use std::{
             sync::{
                 Arc,
@@ -162,7 +162,7 @@ mod async_lock_trait_tests {
     }
 
     #[tokio::test]
-    async fn test_async_mutex_with_lock_complex_types() {
+    async fn test_async_mutex_read_write_complex_types() {
         let async_mutex = ArcAsyncMutex::new(String::from("Hello"));
 
         async_mutex

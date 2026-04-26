@@ -44,7 +44,7 @@ mod lock_trait_tests {
     use super::*;
 
     #[test]
-    fn test_mutex_with_lock_basic_operations() {
+    fn test_mutex_read_write_basic_operations() {
         let mutex = ArcStdMutex::new(0);
 
         // Test basic lock and modify
@@ -60,7 +60,7 @@ mod lock_trait_tests {
     }
 
     #[test]
-    fn test_mutex_with_lock_returns_closure_result() {
+    fn test_mutex_read_returns_closure_result() {
         let mutex = ArcStdMutex::new(vec![1, 2, 3]);
 
         let length = mutex.read(|v| v.len());
@@ -87,7 +87,7 @@ mod lock_trait_tests {
     }
 
     #[test]
-    fn test_mutex_try_with_lock_success() {
+    fn test_mutex_try_read_write_success() {
         let mutex = ArcStdMutex::new(42);
 
         // Should successfully acquire the lock
@@ -103,7 +103,7 @@ mod lock_trait_tests {
     }
 
     #[test]
-    fn test_mutex_try_with_lock_returns_would_block_when_locked() {
+    fn test_mutex_try_read_returns_would_block_when_locked() {
         let mutex = Arc::new(ArcStdMutex::new(0));
         let barrier = Arc::new(Barrier::new(2));
 
@@ -164,7 +164,7 @@ mod lock_trait_tests {
 
     #[test]
     #[should_panic(expected = "PoisonError")]
-    fn test_mutex_with_lock_panics_on_poisoned() {
+    fn test_mutex_read_panics_on_poisoned() {
         let mutex = Arc::new(ArcStdMutex::new(0));
         let barrier = Arc::new(Barrier::new(2));
 
@@ -191,7 +191,7 @@ mod lock_trait_tests {
     }
 
     #[test]
-    fn test_mutex_try_with_lock_returns_poisoned_on_poisoned() {
+    fn test_mutex_try_read_returns_poisoned_on_poisoned() {
         let mutex = Arc::new(ArcStdMutex::new(0));
         let barrier = Arc::new(Barrier::new(2));
 
@@ -219,7 +219,7 @@ mod lock_trait_tests {
     }
 
     #[test]
-    fn test_mutex_with_lock_complex_types() {
+    fn test_mutex_read_write_complex_types() {
         let mutex = ArcStdMutex::new(String::from("Hello"));
 
         mutex.write(|s| {

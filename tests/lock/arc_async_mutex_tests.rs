@@ -40,7 +40,7 @@ mod arc_async_mutex_tests {
     }
 
     #[tokio::test]
-    async fn test_arc_async_mutex_with_lock() {
+    async fn test_arc_async_mutex_read_write() {
         let async_mutex = ArcAsyncMutex::new(0);
 
         // Test async lock
@@ -77,7 +77,7 @@ mod arc_async_mutex_tests {
     }
 
     #[tokio::test]
-    async fn test_arc_async_mutex_try_with_lock_returns_would_block() {
+    async fn test_arc_async_mutex_try_read_returns_would_block() {
         let async_mutex = Arc::new(ArcAsyncMutex::new(0));
 
         let async_mutex_clone = async_mutex.clone();
@@ -324,7 +324,7 @@ mod arc_async_mutex_tests {
     }
 
     #[tokio::test]
-    async fn test_arc_async_mutex_try_write_with_lock_returns_ok() {
+    async fn test_arc_async_mutex_try_write_returns_ok() {
         let async_mutex = ArcAsyncMutex::new(0);
 
         // For async mutex, try_write will succeed when the lock is not held

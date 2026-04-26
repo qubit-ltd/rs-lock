@@ -37,7 +37,7 @@ mod arc_mutex_tests {
     }
 
     #[test]
-    fn test_arc_mutex_with_lock_basic_operations() {
+    fn test_arc_mutex_read_write_basic_operations() {
         let mutex = ArcMutex::new(0);
 
         // Test basic lock and modify
@@ -53,7 +53,7 @@ mod arc_mutex_tests {
     }
 
     #[test]
-    fn test_arc_mutex_try_with_lock_success() {
+    fn test_arc_mutex_try_read_write_success() {
         let mutex = ArcMutex::new(42);
 
         let result = mutex.try_read(|value| *value).unwrap();
@@ -78,7 +78,7 @@ mod arc_mutex_tests {
     }
 
     #[test]
-    fn test_arc_mutex_try_with_lock_returns_would_block() {
+    fn test_arc_mutex_try_read_returns_would_block() {
         let mutex = Arc::new(ArcMutex::new(0));
         let barrier = Arc::new(Barrier::new(2));
 
@@ -112,7 +112,7 @@ mod arc_mutex_tests {
     }
 
     #[test]
-    fn test_arc_mutex_try_write_with_lock_returns_would_block() {
+    fn test_arc_mutex_try_write_returns_would_block() {
         let mutex = Arc::new(ArcMutex::new(0));
         let barrier = Arc::new(Barrier::new(2));
 

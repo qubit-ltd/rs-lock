@@ -46,7 +46,7 @@ mod arc_std_mutex_tests {
     }
 
     #[test]
-    fn test_arc_mutex_with_lock_basic_operations() {
+    fn test_arc_mutex_read_write_basic_operations() {
         let mutex = ArcStdMutex::new(0);
 
         // Test basic lock and modify
@@ -62,7 +62,7 @@ mod arc_std_mutex_tests {
     }
 
     #[test]
-    fn test_arc_mutex_try_with_lock_success() {
+    fn test_arc_mutex_try_read_write_success() {
         let mutex = ArcStdMutex::new(42);
 
         let result = mutex.try_read(|value| *value).unwrap();
@@ -140,7 +140,7 @@ mod arc_std_mutex_tests {
     }
 
     #[test]
-    fn test_arc_mutex_try_with_lock_returns_would_block() {
+    fn test_arc_mutex_try_read_returns_would_block_when_lock_is_held() {
         let mutex = Arc::new(ArcStdMutex::new(0));
         let barrier = Arc::new(Barrier::new(2));
 
@@ -174,7 +174,7 @@ mod arc_std_mutex_tests {
     }
 
     #[test]
-    fn test_arc_mutex_try_with_lock_poisoned() {
+    fn test_arc_mutex_try_read_returns_poisoned_after_write_panic() {
         let mutex = Arc::new(ArcStdMutex::new(0));
         let barrier = Arc::new(Barrier::new(2));
 
@@ -315,7 +315,7 @@ mod arc_std_mutex_tests {
 
     #[test]
     #[should_panic(expected = "PoisonError")]
-    fn test_arc_mutex_with_lock_poisoned() {
+    fn test_arc_mutex_read_panics_on_poisoned() {
         let mutex = Arc::new(ArcStdMutex::new(0));
         let barrier = Arc::new(Barrier::new(2));
 
