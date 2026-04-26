@@ -24,6 +24,13 @@ fn test_readme_no_legacy_lock_api_names() {
 }
 
 #[test]
+/// Ensures README quick-start snippets import the trait needed for lock methods.
+fn test_readme_quick_start_imports_lock_trait() {
+    assert!(README_EN.contains("use qubit_lock::{ArcMutex, Lock};"));
+    assert!(README_ZH.contains("use qubit_lock::{ArcMutex, Lock};"));
+}
+
+#[test]
 /// Ensures lock source examples reference the current trait names.
 fn test_rw_lock_docs_use_current_trait_names() {
     assert!(!ARC_RW_LOCK_SRC.contains("ReadWriteLock"));

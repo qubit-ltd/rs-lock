@@ -42,7 +42,6 @@ use crate::lock::{
 ///
 /// ```rust
 /// use qubit_lock::lock::{ArcAsyncMutex, AsyncLock};
-/// use std::sync::Arc;
 ///
 /// let rt = tokio::runtime::Builder::new_current_thread()
 ///     .enable_all()
@@ -50,7 +49,6 @@ use crate::lock::{
 ///     .unwrap();
 /// rt.block_on(async {
 ///     let counter = ArcAsyncMutex::new(0);
-///     let counter = Arc::new(counter);
 ///
 ///     // Asynchronously modify data
 ///     counter.write(|c| {

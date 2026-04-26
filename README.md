@@ -28,7 +28,7 @@ qubit-lock = "0.3.0"
 ### Synchronous lock
 
 ```rust
-use qubit_lock::ArcMutex;
+use qubit_lock::{ArcMutex, Lock};
 
 fn main() {
     let counter = ArcMutex::new(0);

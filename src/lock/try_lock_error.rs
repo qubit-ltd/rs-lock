@@ -8,7 +8,7 @@
  ******************************************************************************/
 //! # Try Lock Error
 //!
-//! Error type for non-blocking lock acquisition on synchronous locks.
+//! Error type for non-blocking lock acquisition.
 //!
 //! # Author
 //!

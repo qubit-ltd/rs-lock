@@ -43,10 +43,8 @@ use crate::lock::{
 ///
 /// ```rust
 /// use qubit_lock::lock::{ArcStdMutex, Lock};
-/// use std::sync::Arc;
 ///
 /// let counter = ArcStdMutex::new(0);
-/// let counter = Arc::new(counter);
 ///
 /// // Synchronously modify data
 /// counter.write(|c| {
