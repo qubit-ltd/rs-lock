@@ -126,27 +126,30 @@ fn test_monitor_wait_notify_returns_timed_out() {
 }
 
 #[test]
-fn test_monitor_wait_notify_returns_woken_when_notified() {
+fn test_monitor_guard_wait_timeout_returns_woken_when_notified() {
     let monitor = Arc::new(Monitor::new(false));
-    let (started_tx, started_rx) = mpsc::channel();
+    let (waiting_tx, waiting_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
 
     let waiter_monitor = Arc::clone(&monitor);
     let waiter = thread::spawn(move || {
-        started_tx
+        let guard = waiter_monitor.lock();
+        waiting_tx
             .send(())
-            .expect("test should observe waiter start");
-        let notified = waiter_monitor.wait_notify(Duration::from_secs(1));
+            .expect("test should observe waiter before wait");
+        let (_guard, notified) = guard.wait_timeout(Duration::from_secs(5));
         done_tx
             .send(notified)
             .expect("test should receive waiter result");
     });
 
-    started_rx
+    waiting_rx
         .recv_timeout(Duration::from_secs(1))
-        .expect("waiter should start within timeout");
-    thread::sleep(Duration::from_millis(30));
+        .expect("waiter should reach wait setup within timeout");
 
+    // Reacquiring the monitor lock proves the waiter entered the condvar wait
+    // and released the mutex, so the notification cannot be sent too early.
+    drop(monitor.lock());
     monitor.notify_one();
 
     assert_eq!(
