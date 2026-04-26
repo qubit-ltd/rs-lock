@@ -78,33 +78,48 @@ mod arc_async_mutex_tests {
 
     #[tokio::test]
     async fn test_arc_async_mutex_try_read_returns_would_block() {
+        use std::{
+            sync::mpsc,
+            time::Duration,
+        };
+
         let async_mutex = Arc::new(ArcAsyncMutex::new(0));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
 
         let async_mutex_clone = async_mutex.clone();
 
         // Hold the lock in another thread (note: using thread instead of tokio task)
         let handle = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().unwrap();
+            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
             rt.block_on(async {
                 async_mutex_clone
-                    .write(|value| {
+                    .write(move |value| {
                         *value += 1;
-                        // Hold the lock for some time
-                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        locked_tx.send(()).expect("test should observe held mutex");
+                        release_rx
+                            .recv_timeout(Duration::from_secs(1))
+                            .expect("test should release held mutex");
                     })
                     .await;
             });
         });
 
-        // Give spawned thread time to acquire the lock
-        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        // Wait for the spawned thread to acquire the lock.
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("mutex should be held within timeout");
 
         // Try to acquire lock, should report contention.
         let result = async_mutex.try_read(|value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
 
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
+
         // Wait for child thread to complete
-        handle.join().unwrap();
+        handle.join().expect("holder thread should not panic");
 
         // Now should be able to successfully acquire the lock
         let result = async_mutex.try_read(|value| *value);
@@ -342,27 +357,36 @@ mod arc_async_mutex_tests {
 
     #[tokio::test]
     async fn test_arc_async_mutex_try_methods_cover_shared_function_pointer_paths() {
+        use std::{
+            sync::mpsc,
+            time::Duration,
+        };
+
         let async_mutex = Arc::new(ArcAsyncMutex::new(0));
 
         assert_eq!(async_mutex.try_read(read_i32), Ok(0));
         assert_eq!(async_mutex.try_write(increment_i32), Ok(1));
 
-        let barrier = Arc::new(std::sync::Barrier::new(2));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
         let lock_clone = async_mutex.clone();
-        let barrier_clone = barrier.clone();
         let holder = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().unwrap();
+            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
             rt.block_on(async {
                 lock_clone
-                    .write(|_| {
-                        barrier_clone.wait();
-                        std::thread::sleep(std::time::Duration::from_millis(50));
+                    .write(move |_| {
+                        locked_tx.send(()).expect("test should observe held mutex");
+                        release_rx
+                            .recv_timeout(Duration::from_secs(1))
+                            .expect("test should release held mutex");
                     })
                     .await;
             });
         });
 
-        barrier.wait();
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("mutex should be held within timeout");
         assert_eq!(
             async_mutex.try_read(read_i32),
             Err(TryLockError::WouldBlock),
@@ -371,7 +395,10 @@ mod arc_async_mutex_tests {
             async_mutex.try_write(increment_i32),
             Err(TryLockError::WouldBlock),
         );
-        holder.join().unwrap();
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
+        holder.join().expect("holder thread should not panic");
     }
 
     #[tokio::test]
