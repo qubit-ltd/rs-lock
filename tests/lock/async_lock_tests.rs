@@ -85,49 +85,51 @@ mod async_lock_trait_tests {
         use std::{
             sync::{
                 Arc,
-                atomic::{
-                    AtomicBool,
-                    Ordering,
-                },
+                mpsc,
             },
             time::Duration,
         };
 
         let async_mutex = Arc::new(ArcAsyncMutex::new(0));
-        let lock_held = Arc::new(AtomicBool::new(false));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
 
         // Create a new reference to try acquiring in parallel
         let async_mutex_clone = async_mutex.clone();
-        let lock_held_clone = lock_held.clone();
 
         // Hold the lock in another thread (note: using thread instead of tokio task)
         let handle = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().unwrap();
+            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
             rt.block_on(async {
                 async_mutex_clone
-                    .write(|_| {
-                        lock_held_clone.store(true, Ordering::Release);
-                        // Hold the lock for a short time
-                        std::thread::sleep(Duration::from_millis(10));
+                    .write(move |_| {
+                        locked_tx.send(()).expect("test should observe held mutex");
+                        release_rx
+                            .recv_timeout(Duration::from_secs(1))
+                            .expect("test should release held mutex");
                     })
                     .await;
             });
         });
 
         // Wait for the lock to be held
-        while !lock_held.load(Ordering::Acquire) {
-            tokio::time::sleep(Duration::from_millis(1)).await;
-        }
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("mutex should be held within timeout");
 
         // Try to acquire lock while it's held, should report contention.
-        let result = async_mutex.try_write(|value| *value);
+        let result = async_mutex.try_read(|value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
 
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
+
         // Wait for the spawned thread to complete
-        handle.join().unwrap();
+        handle.join().expect("holder thread should not panic");
 
         // Now should be able to successfully acquire the lock
-        let result = async_mutex.try_write(|value| *value);
+        let result = async_mutex.try_read(|value| *value);
         assert_eq!(result, Ok(0));
     }
 
