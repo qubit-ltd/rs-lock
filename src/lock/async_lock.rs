@@ -248,9 +248,9 @@ pub trait AsyncLock<T: ?Sized> {
     /// Attempts to acquire a write lock without waiting
     ///
     /// This method tries to acquire a write lock immediately. If the lock
-    /// is currently held by another task (in either read or write mode),
-    /// it returns [`TryLockError::WouldBlock`] without waiting. Otherwise, it
-    /// executes the closure and returns `Ok` containing the result.
+    /// is currently unavailable, it returns [`TryLockError::WouldBlock`]
+    /// without waiting. Otherwise, it executes the closure and returns `Ok`
+    /// containing the result.
     ///
     /// # Arguments
     ///
@@ -260,7 +260,7 @@ pub trait AsyncLock<T: ?Sized> {
     /// # Returns
     ///
     /// * `Ok(R)` - If the lock was acquired and closure executed
-    /// * `Err(TryLockError::WouldBlock)` - If the lock is currently held by another task
+    /// * `Err(TryLockError::WouldBlock)` - If the lock is currently unavailable
     ///
     /// # Errors
     ///
