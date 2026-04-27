@@ -386,18 +386,21 @@ impl<T> ArcMonitor<T> {
         self.inner.wait_timeout_until(timeout, ready, f)
     }
 
-    /// Wakes one thread waiting in [`Self::wait_until`].
+    /// Wakes one thread waiting on this monitor's condition variable.
     ///
     /// Notifications do not carry state by themselves. A waiting thread only
-    /// proceeds when its predicate observes the protected state as ready.
+    /// proceeds safely after rechecking the protected state. Call this after
+    /// changing state that may make one waiter able to continue.
     #[inline]
     pub fn notify_one(&self) {
         self.inner.notify_one();
     }
 
-    /// Wakes all threads waiting in [`Self::wait_until`].
+    /// Wakes all threads waiting on this monitor's condition variable.
     ///
-    /// Every awakened thread rechecks its predicate before continuing.
+    /// Notifications do not carry state by themselves. Every awakened thread
+    /// must recheck the protected state before continuing. Call this after a
+    /// state change that may allow multiple waiters to make progress.
     #[inline]
     pub fn notify_all(&self) {
         self.inner.notify_all();
