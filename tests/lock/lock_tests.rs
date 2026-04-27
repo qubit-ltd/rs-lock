@@ -524,26 +524,35 @@ mod rwlock_trait_tests {
     #[test]
     fn test_rwlock_concurrent_readers() {
         let rw_lock = Arc::new(ArcRwLock::new(vec![1, 2, 3, 4, 5]));
-        let mut handles = vec![];
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
 
-        // Create multiple reader threads
-        for _ in 0..10 {
-            let rw_lock = Arc::clone(&rw_lock);
-            let handle = thread::spawn(move || {
-                rw_lock.read(|data| {
-                    // Simulate some read operation
-                    thread::sleep(std::time::Duration::from_millis(10));
-                    data.iter().sum::<i32>()
-                })
+        let rw_lock_clone = Arc::clone(&rw_lock);
+        let holder = thread::spawn(move || {
+            let sum = rw_lock_clone.read(|data| {
+                locked_tx
+                    .send(())
+                    .expect("test should observe held read lock");
+                let sum = data.iter().sum::<i32>();
+                release_rx
+                    .recv_timeout(Duration::from_secs(1))
+                    .expect("test should release held read lock");
+                sum
             });
-            handles.push(handle);
-        }
-
-        // All readers should get the same result
-        for handle in handles {
-            let sum = handle.join().unwrap();
             assert_eq!(sum, 15);
-        }
+        });
+
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("read lock should be held within timeout");
+
+        let concurrent_sum = rw_lock.try_read(|data| data.iter().sum::<i32>());
+        assert_eq!(concurrent_sum, Ok(15));
+
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
+        holder.join().expect("holder thread should not panic");
     }
 
     #[test]

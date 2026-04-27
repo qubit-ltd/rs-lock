@@ -261,33 +261,41 @@ mod arc_async_rw_lock_tests {
 
     #[tokio::test]
     async fn test_arc_async_rw_lock_readers_do_not_block_each_other() {
-        let async_rw_lock = ArcAsyncRwLock::new(vec![1, 2, 3, 4, 5]);
-        let async_rw_lock = Arc::new(async_rw_lock);
-        let mut handles = vec![];
+        let async_rw_lock = Arc::new(ArcAsyncRwLock::new(vec![1, 2, 3, 4, 5]));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
 
-        // Create multiple readers that all access the lock simultaneously
-        for i in 0..5 {
-            let async_rw_lock = Arc::clone(&async_rw_lock);
-            let handle = tokio::spawn(async move {
-                // All readers should be able to access concurrently
-                async_rw_lock
-                    .read(|data| data.iter().sum::<i32>() + i)
-                    .await
+        let async_rw_lock_clone = Arc::clone(&async_rw_lock);
+        let holder = std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
+            rt.block_on(async {
+                let sum = async_rw_lock_clone
+                    .read(move |data| {
+                        locked_tx
+                            .send(())
+                            .expect("test should observe held read lock");
+                        let sum = data.iter().sum::<i32>();
+                        release_rx
+                            .recv_timeout(Duration::from_secs(1))
+                            .expect("test should release held read lock");
+                        sum
+                    })
+                    .await;
+                assert_eq!(sum, 15);
             });
-            handles.push(handle);
-        }
+        });
 
-        // All readers should successfully complete and return results
-        let mut results = vec![];
-        for handle in handles {
-            results.push(handle.await.unwrap());
-        }
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("read lock should be held within timeout");
 
-        // Verify all readers got the correct sum (15) plus their index
-        assert_eq!(results.len(), 5);
-        for (i, &result) in results.iter().enumerate() {
-            assert_eq!(result, 15 + i as i32);
-        }
+        let concurrent_sum = async_rw_lock.try_read(|data| data.iter().sum::<i32>());
+        assert_eq!(concurrent_sum, Ok(15));
+
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
+        holder.join().expect("holder thread should not panic");
     }
 
     #[tokio::test]
