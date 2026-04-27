@@ -199,7 +199,7 @@ pub trait Lock<T: ?Sized> {
     /// # Returns
     ///
     /// * `Ok(R)` - If the lock was acquired and closure executed
-    /// * `Err(TryLockError::WouldBlock)` - If the lock is currently held in write mode
+    /// * `Err(TryLockError::WouldBlock)` - If the lock is currently unavailable
     /// * `Err(TryLockError::Poisoned)` - If the lock is poisoned
     ///
     /// # Errors

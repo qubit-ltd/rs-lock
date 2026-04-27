@@ -221,7 +221,7 @@ pub trait AsyncLock<T: ?Sized> {
     /// # Returns
     ///
     /// * `Ok(R)` - If the lock was acquired and closure executed
-    /// * `Err(TryLockError::WouldBlock)` - If the lock is currently held in write mode
+    /// * `Err(TryLockError::WouldBlock)` - If the lock is currently unavailable
     ///
     /// # Errors
     ///
@@ -238,7 +238,7 @@ pub trait AsyncLock<T: ?Sized> {
     /// if let Ok(value) = lock.try_read(|data| *data) {
     ///     println!("Got value: {}", value);
     /// } else {
-    ///     println!("Lock is busy with write operation");
+    ///     println!("Lock is unavailable");
     /// }
     /// ```
     fn try_read<R, F>(&self, f: F) -> Result<R, TryLockError>
