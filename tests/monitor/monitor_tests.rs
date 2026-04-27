@@ -76,16 +76,21 @@ fn test_monitor_wait_while_returns_when_predicate_is_false() {
 #[test]
 fn test_monitor_wait_until_blocks_until_notify_one() {
     let monitor = Arc::new(Monitor::new(false));
-    let (started_tx, started_rx) = mpsc::channel();
+    let (checked_tx, checked_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
 
     let waiter_monitor = Arc::clone(&monitor);
     let waiter = thread::spawn(move || {
-        started_tx
-            .send(())
-            .expect("test should observe waiter start");
+        let mut checked_tx = Some(checked_tx);
         let result = waiter_monitor.wait_until(
-            |ready| *ready,
+            move |ready| {
+                if !*ready && let Some(checked_tx) = checked_tx.take() {
+                    checked_tx
+                        .send(())
+                        .expect("test should observe predicate check");
+                }
+                *ready
+            },
             |ready| {
                 *ready = false;
                 42
@@ -96,10 +101,10 @@ fn test_monitor_wait_until_blocks_until_notify_one() {
             .expect("test should receive waiter result");
     });
 
-    started_rx
+    checked_rx
         .recv_timeout(Duration::from_secs(1))
-        .expect("waiter should start within timeout");
-    assert!(done_rx.recv_timeout(Duration::from_millis(30)).is_err());
+        .expect("waiter should check the initial state within timeout");
+    drop(monitor.lock());
 
     monitor.write(|ready| {
         *ready = true;
@@ -224,23 +229,36 @@ fn test_monitor_wait_timeout_until_returns_result_when_predicate_true() {
 #[test]
 fn test_monitor_wait_until_ignores_notification_until_predicate_true() {
     let monitor = Arc::new(Monitor::new(false));
-    let (started_tx, started_rx) = mpsc::channel();
+    let (checked_tx, checked_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
 
     let waiter_monitor = Arc::clone(&monitor);
     let waiter = thread::spawn(move || {
-        started_tx
-            .send(())
-            .expect("test should observe waiter start");
-        waiter_monitor.wait_until(|ready| *ready, |_| ());
+        waiter_monitor.wait_until(
+            move |ready| {
+                if !*ready {
+                    checked_tx
+                        .send(())
+                        .expect("test should observe predicate check");
+                }
+                *ready
+            },
+            |ready| {
+                assert!(*ready);
+            },
+        );
         done_tx.send(()).expect("test should receive waiter result");
     });
 
-    started_rx
+    checked_rx
         .recv_timeout(Duration::from_secs(1))
-        .expect("waiter should start within timeout");
+        .expect("waiter should check the initial state within timeout");
+    drop(monitor.lock());
     monitor.notify_all();
-    assert!(done_rx.recv_timeout(Duration::from_millis(30)).is_err());
+    checked_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("waiter should recheck after notification");
+    drop(monitor.lock());
 
     monitor.write(|ready| {
         *ready = true;
@@ -337,15 +355,20 @@ fn test_monitor_wait_until_recovers_poisoned_state_after_notification() {
     });
     assert!(poisoner.join().is_err());
 
-    let (started_tx, started_rx) = mpsc::channel();
+    let (checked_tx, checked_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
     let waiter_monitor = Arc::clone(&monitor);
     let waiter = thread::spawn(move || {
-        started_tx
-            .send(())
-            .expect("test should observe waiter start");
+        let mut checked_tx = Some(checked_tx);
         waiter_monitor.wait_until(
-            |ready| *ready,
+            move |ready| {
+                if !*ready && let Some(checked_tx) = checked_tx.take() {
+                    checked_tx
+                        .send(())
+                        .expect("test should observe predicate check");
+                }
+                *ready
+            },
             |ready| {
                 *ready = false;
             },
@@ -353,10 +376,10 @@ fn test_monitor_wait_until_recovers_poisoned_state_after_notification() {
         done_tx.send(()).expect("test should receive waiter result");
     });
 
-    started_rx
+    checked_rx
         .recv_timeout(Duration::from_secs(1))
-        .expect("waiter should start within timeout");
-    assert!(done_rx.recv_timeout(Duration::from_millis(30)).is_err());
+        .expect("waiter should check the initial state within timeout");
+    drop(monitor.lock());
 
     monitor.write(|ready| {
         *ready = true;

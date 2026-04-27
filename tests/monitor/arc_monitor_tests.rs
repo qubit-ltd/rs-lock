@@ -66,16 +66,21 @@ fn test_arc_monitor_lock_guard_updates_state() {
 #[test]
 fn test_arc_monitor_wait_until_blocks_until_notify_one() {
     let monitor = ArcMonitor::new(false);
-    let (started_tx, started_rx) = mpsc::channel();
+    let (checked_tx, checked_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
 
     let waiter_monitor = monitor.clone();
     let waiter = thread::spawn(move || {
-        started_tx
-            .send(())
-            .expect("test should observe waiter start");
+        let mut checked_tx = Some(checked_tx);
         let result = waiter_monitor.wait_until(
-            |ready| *ready,
+            move |ready| {
+                if !*ready && let Some(checked_tx) = checked_tx.take() {
+                    checked_tx
+                        .send(())
+                        .expect("test should observe predicate check");
+                }
+                *ready
+            },
             |ready| {
                 *ready = false;
                 42
@@ -86,10 +91,10 @@ fn test_arc_monitor_wait_until_blocks_until_notify_one() {
             .expect("test should receive waiter result");
     });
 
-    started_rx
+    checked_rx
         .recv_timeout(Duration::from_secs(1))
-        .expect("waiter should start within timeout");
-    assert!(done_rx.recv_timeout(Duration::from_millis(30)).is_err());
+        .expect("waiter should check the initial state within timeout");
+    drop(monitor.lock());
 
     monitor.write(|ready| {
         *ready = true;
@@ -159,16 +164,23 @@ fn test_arc_monitor_wait_timeout_until_delegates_to_monitor() {
 #[test]
 fn test_arc_monitor_wait_while_delegates_to_monitor() {
     let monitor = ArcMonitor::new(Vec::<i32>::new());
-    let (started_tx, started_rx) = mpsc::channel();
+    let (checked_tx, checked_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
 
     let waiter_monitor = monitor.clone();
     let waiter = thread::spawn(move || {
-        started_tx
-            .send(())
-            .expect("test should observe waiter start");
+        let mut checked_tx = Some(checked_tx);
         let result = waiter_monitor.wait_while(
-            |items| items.is_empty(),
+            move |items| {
+                if items.is_empty()
+                    && let Some(checked_tx) = checked_tx.take()
+                {
+                    checked_tx
+                        .send(())
+                        .expect("test should observe predicate check");
+                }
+                items.is_empty()
+            },
             |items| items.pop().expect("item should be ready"),
         );
         done_tx
@@ -176,10 +188,10 @@ fn test_arc_monitor_wait_while_delegates_to_monitor() {
             .expect("test should receive waiter result");
     });
 
-    started_rx
+    checked_rx
         .recv_timeout(Duration::from_secs(1))
-        .expect("waiter should start within timeout");
-    assert!(done_rx.recv_timeout(Duration::from_millis(30)).is_err());
+        .expect("waiter should check the initial state within timeout");
+    drop(monitor.lock());
 
     monitor.write(|items| items.push(7));
     monitor.notify_one();
@@ -279,7 +291,10 @@ fn test_arc_monitor_notify_all_wakes_multiple_waiters() {
             .recv_timeout(Duration::from_secs(1))
             .expect("waiter should start within timeout");
     }
-    assert!(started_rx.recv_timeout(Duration::from_millis(30)).is_err());
+    assert!(matches!(
+        started_rx.try_recv(),
+        Err(mpsc::TryRecvError::Empty),
+    ));
 
     monitor.write(|ready| {
         *ready = true;

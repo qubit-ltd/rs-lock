@@ -228,25 +228,44 @@ mod async_lock_trait_tests {
 
     #[tokio::test]
     async fn test_async_mutex_serializes_contended_writes() {
-        use std::sync::Arc;
+        use std::{
+            sync::{
+                Arc,
+                mpsc,
+            },
+            time::Duration,
+        };
 
         let async_mutex = Arc::new(ArcAsyncMutex::new(0));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let (attempted_tx, attempted_rx) = tokio::sync::oneshot::channel();
         let async_mutex_clone = async_mutex.clone();
 
-        // Hold the lock long enough for the second task to contend.
-        let handle1 = tokio::spawn(async move {
-            async_mutex_clone
-                .write(|value| {
-                    *value += 1;
-                    // The closure itself is synchronous while the guard is held.
-                    std::thread::sleep(std::time::Duration::from_millis(50));
-                })
-                .await;
+        let holder = std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
+            rt.block_on(async {
+                async_mutex_clone
+                    .write(move |value| {
+                        *value += 1;
+                        locked_tx.send(()).expect("test should observe held mutex");
+                        release_rx
+                            .recv_timeout(Duration::from_secs(1))
+                            .expect("test should release held mutex");
+                    })
+                    .await;
+            });
         });
 
-        // The second write should wait for the first guard to be released.
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("mutex should be held within timeout");
+
         let async_mutex_clone2 = async_mutex.clone();
-        let handle2 = tokio::spawn(async move {
+        let writer = tokio::spawn(async move {
+            attempted_tx
+                .send(())
+                .expect("test should observe contended writer attempt");
             async_mutex_clone2
                 .write(|value| {
                     *value += 1;
@@ -254,9 +273,19 @@ mod async_lock_trait_tests {
                 .await;
         });
 
-        // Both tasks should complete
-        handle1.await.unwrap();
-        handle2.await.unwrap();
+        attempted_rx
+            .await
+            .expect("contended writer should attempt to acquire the mutex");
+        assert_eq!(
+            async_mutex.try_read(|value| *value),
+            Err(TryLockError::WouldBlock),
+        );
+
+        release_tx
+            .send(())
+            .expect("holder thread should still be waiting for release");
+        holder.join().expect("holder thread should not panic");
+        writer.await.unwrap();
 
         let result = async_mutex.read(|value| *value).await;
         assert_eq!(result, 2);
