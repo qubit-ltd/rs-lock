@@ -26,9 +26,9 @@ use std::{
     time::Duration,
 };
 
-use super::monitor::{
-    Monitor,
-    WaitTimeoutStatus,
+use super::{
+    monitor::Monitor,
+    wait_timeout_status::WaitTimeoutStatus,
 };
 
 /// Guard returned by [`Monitor::lock`](super::Monitor::lock).

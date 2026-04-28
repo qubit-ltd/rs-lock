@@ -38,80 +38,10 @@ use std::{
 };
 
 use super::monitor_guard::MonitorGuard;
-
-/// Result of a timed wait operation.
-///
-/// This status is returned by [`MonitorGuard::wait_timeout`] and
-/// [`Monitor::wait_notify`]. It describes why a timed wait
-/// returned, but callers must still re-check the protected state because
-/// condition variables may wake spuriously.
-///
-/// # Example
-///
-/// ```rust
-/// use std::time::Duration;
-///
-/// use qubit_lock::lock::{Monitor, WaitTimeoutStatus};
-///
-/// let monitor = Monitor::new(false);
-/// let guard = monitor.lock();
-/// let (_guard, status) = guard.wait_timeout(Duration::from_millis(1));
-/// assert_eq!(status, WaitTimeoutStatus::TimedOut);
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WaitTimeoutStatus {
-    /// The wait returned before the timeout elapsed.
-    ///
-    /// This usually means another thread called [`Monitor::notify_one`] or
-    /// [`Monitor::notify_all`], but it may also be a spurious wakeup. Always
-    /// re-check the guarded state before acting on this status.
-    Woken,
-    /// The wait reached the timeout boundary.
-    ///
-    /// Even after this status, callers should inspect the protected state
-    /// because another thread may have changed it while the waiting thread was
-    /// reacquiring the mutex.
-    TimedOut,
-}
-
-/// Result of waiting for a predicate with an overall timeout.
-///
-/// This type is returned by [`Monitor::wait_timeout_while`] and
-/// [`Monitor::wait_timeout_until`]. It is more explicit than `Option<R>`: a
-/// ready predicate produces [`Self::Ready`], while an expired timeout produces
-/// [`Self::TimedOut`].
-///
-/// # Type Parameters
-///
-/// * `R` - The value produced after the protected state satisfies the
-///   predicate.
-///
-/// # Example
-///
-/// ```rust
-/// use std::time::Duration;
-///
-/// use qubit_lock::lock::{Monitor, WaitTimeoutResult};
-///
-/// let monitor = Monitor::new(true);
-/// let result = monitor.wait_timeout_until(
-///     Duration::from_secs(1),
-///     |ready| *ready,
-///     |ready| {
-///         *ready = false;
-///         "ready"
-///     },
-/// );
-///
-/// assert_eq!(result, WaitTimeoutResult::Ready("ready"));
-/// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WaitTimeoutResult<R> {
-    /// The predicate became ready before the timeout and produced this value.
-    Ready(R),
-    /// The timeout elapsed before the predicate became ready.
-    TimedOut,
-}
+use super::{
+    wait_timeout_result::WaitTimeoutResult,
+    wait_timeout_status::WaitTimeoutStatus,
+};
 
 /// Shared state protected by a mutex and a condition variable.
 ///
