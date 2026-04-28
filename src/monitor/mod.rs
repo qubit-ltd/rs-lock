@@ -20,11 +20,11 @@
 mod arc_monitor;
 mod monitor;
 mod monitor_guard;
+mod wait_timeout_result;
+mod wait_timeout_status;
 
 pub use arc_monitor::ArcMonitor;
-pub use monitor::{
-    Monitor,
-    WaitTimeoutResult,
-    WaitTimeoutStatus,
-};
+pub use monitor::Monitor;
 pub use monitor_guard::MonitorGuard;
+pub use wait_timeout_result::WaitTimeoutResult;
+pub use wait_timeout_status::WaitTimeoutStatus;
