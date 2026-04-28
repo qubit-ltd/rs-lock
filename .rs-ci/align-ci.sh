@@ -39,13 +39,7 @@ require_command cargo
 require_command rustup
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-if [ -n "${RS_CI_PROJECT_ROOT:-}" ]; then
-    PROJECT_ROOT="$RS_CI_PROJECT_ROOT"
-elif [ -f "$SCRIPT_DIR/Cargo.toml" ]; then
-    PROJECT_ROOT="$SCRIPT_DIR"
-else
-    PROJECT_ROOT=$(cd "$SCRIPT_DIR/.." && pwd)
-fi
+PROJECT_ROOT="${RS_CI_PROJECT_ROOT:-$SCRIPT_DIR}"
 cd "$PROJECT_ROOT"
 
 ensure_toolchain_components
