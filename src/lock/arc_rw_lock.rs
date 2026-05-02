@@ -1,9 +1,10 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! # Synchronous Read-Write Lock Wrapper
@@ -11,9 +12,6 @@
 //! Provides an Arc-wrapped synchronous read-write lock for protecting
 //! shared data with multiple concurrent readers or a single writer.
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 use std::sync::{
     Arc,
@@ -66,9 +64,6 @@ use crate::lock::{
 /// });
 /// ```
 ///
-/// # Author
-///
-/// Haixing Hu
 ///
 pub struct ArcRwLock<T> {
     /// Shared standard read-write lock protecting the wrapped value.

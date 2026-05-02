@@ -1,9 +1,10 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! # Lock Module
@@ -13,9 +14,6 @@
 //! for different types of locks through traits, making it easier to
 //! write generic code that works with multiple lock types.
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 // 子模块 `lock` 存放同步锁 trait `Lock`，与父模块同名是刻意分层；避免 clippy::module_inception 误报
 #![allow(clippy::module_inception)]

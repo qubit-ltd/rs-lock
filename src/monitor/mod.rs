@@ -1,18 +1,16 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! # Monitor 模块
 //!
 //! 在互斥与条件变量之上提供 `Monitor` / `ArcMonitor` 及 `MonitorGuard` 等原语。
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 // 子模块 `monitor` 对应类型 `Monitor`；`monitor/monitor.rs` 与父模块同名是刻意分层
 #![allow(clippy::module_inception)]

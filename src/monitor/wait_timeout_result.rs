@@ -1,18 +1,16 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! # Wait Timeout Result
 //!
 //! Provides the result returned by predicate-based timed monitor waits.
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 /// Result of waiting for a predicate with an overall timeout.
 ///

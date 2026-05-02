@@ -1,18 +1,16 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! # Wait Timeout Status
 //!
 //! Provides the status returned by one timed condition-variable wait.
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 /// Result of a timed wait operation.
 ///
