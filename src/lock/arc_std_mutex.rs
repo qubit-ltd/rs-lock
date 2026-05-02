@@ -1,9 +1,10 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! # Synchronous Standard Mutex Wrapper
@@ -11,9 +12,6 @@
 //! Provides an Arc-wrapped synchronous mutex using std::sync::Mutex
 //! for protecting shared data in multi-threaded environments.
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 use std::sync::{
     Arc,
@@ -58,9 +56,6 @@ use crate::lock::{
 /// }
 /// ```
 ///
-/// # Author
-///
-/// Haixing Hu
 ///
 pub struct ArcStdMutex<T> {
     /// Shared standard mutex protecting the wrapped value.

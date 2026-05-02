@@ -1,9 +1,10 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! # Monitor
@@ -22,9 +23,6 @@
 //! [`MonitorGuard::wait`] and [`MonitorGuard::wait_timeout`] for more complex
 //! state machines such as thread pools.
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 use std::{
     sync::{
@@ -115,9 +113,6 @@ use super::{
 /// assert!(!monitor.read(|ready| *ready));
 /// ```
 ///
-/// # Author
-///
-/// Haixing Hu
 pub struct Monitor<T> {
     /// Mutex protecting the monitor state.
     state: Mutex<T>,

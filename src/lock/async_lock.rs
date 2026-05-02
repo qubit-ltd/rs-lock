@@ -1,9 +1,10 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! # Asynchronous Lock Trait
@@ -11,9 +12,6 @@
 //! Defines an asynchronous lock abstraction that supports acquiring
 //! locks without blocking threads.
 //!
-//! # Author
-//!
-//! Haixing Hu
 use std::future::Future;
 
 use tokio::sync::{
@@ -84,9 +82,6 @@ use super::try_lock_error::TryLockError;
 ///
 /// * `T` - The type of data protected by the lock
 ///
-/// # Author
-///
-/// Haixing Hu
 pub trait AsyncLock<T: ?Sized> {
     /// Acquires a read lock asynchronously and executes a closure
     ///
@@ -299,9 +294,6 @@ pub trait AsyncLock<T: ?Sized> {
 ///
 /// * `T` - The type of data protected by the lock
 ///
-/// # Author
-///
-/// Haixing Hu
 impl<T: ?Sized + Send> AsyncLock<T> for AsyncMutex<T> {
     /// Acquires the mutex and executes a read-only closure.
     ///
@@ -394,9 +386,6 @@ impl<T: ?Sized + Send> AsyncLock<T> for AsyncMutex<T> {
 ///
 /// * `T` - The type of data protected by the lock
 ///
-/// # Author
-///
-/// Haixing Hu
 impl<T: ?Sized + Send + Sync> AsyncLock<T> for AsyncRwLock<T> {
     /// Acquires a shared read lock and executes a closure.
     ///

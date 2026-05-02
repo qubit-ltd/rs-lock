@@ -1,9 +1,10 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! # Lock Trait
@@ -13,9 +14,6 @@
 //! used in a generic way through closures, avoiding the complexity of
 //! explicitly managing lock guards and their lifetimes.
 //!
-//! # Author
-//!
-//! Haixing Hu
 use std::sync::{
     Mutex,
     RwLock,
@@ -71,9 +69,6 @@ use super::try_lock_error::TryLockError;
 ///
 /// * `T` - The type of data protected by the lock
 ///
-/// # Author
-///
-/// Haixing Hu
 pub trait Lock<T: ?Sized> {
     /// Acquires a read lock and executes a closure
     ///
@@ -277,9 +272,6 @@ pub trait Lock<T: ?Sized> {
 ///
 /// * `T` - The type of data protected by the lock
 ///
-/// # Author
-///
-/// Haixing Hu
 impl<T: ?Sized> Lock<T> for Mutex<T> {
     /// Acquires the mutex and executes a read-only closure.
     ///
@@ -389,9 +381,6 @@ impl<T: ?Sized> Lock<T> for Mutex<T> {
 ///
 /// * `T` - The type of data protected by the lock
 ///
-/// # Author
-///
-/// Haixing Hu
 impl<T: ?Sized> Lock<T> for RwLock<T> {
     /// Acquires a shared read lock and executes a closure.
     ///
@@ -509,9 +498,6 @@ impl<T: ?Sized> Lock<T> for RwLock<T> {
 /// - Reduced memory overhead
 /// - No risk of lock poisoning (panics don't poison the lock)
 ///
-/// # Author
-///
-/// Haixing Hu
 impl<T: ?Sized> Lock<T> for ParkingLotMutex<T> {
     /// Acquires the parking_lot mutex and executes a read-only closure.
     ///

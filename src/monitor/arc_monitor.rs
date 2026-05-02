@@ -1,9 +1,10 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! # Arc Monitor
@@ -11,9 +12,6 @@
 //! Provides an Arc-wrapped synchronous monitor for condition-based state
 //! coordination across threads.
 //!
-//! # Author
-//!
-//! Haixing Hu
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -64,9 +62,6 @@ use super::{
 /// assert!(!monitor.read(|ready| *ready));
 /// ```
 ///
-/// # Author
-///
-/// Haixing Hu
 pub struct ArcMonitor<T> {
     /// Shared monitor instance.
     inner: Arc<Monitor<T>>,

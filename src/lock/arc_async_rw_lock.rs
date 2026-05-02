@@ -1,9 +1,10 @@
 /*******************************************************************************
  *
- *    Copyright (c) 2025 - 2026.
- *    Haixing Hu, Qubit Co. Ltd.
+ *    Copyright (c) 2025 - 2026 Haixing Hu.
  *
- *    All rights reserved.
+ *    SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
 //! # Asynchronous Read-Write Lock Wrapper
@@ -12,9 +13,6 @@
 //! protecting shared data with multiple concurrent readers or a
 //! single writer in async environments.
 //!
-//! # Author
-//!
-//! Haixing Hu
 use std::sync::Arc;
 
 use tokio::sync::RwLock as AsyncRwLock;
@@ -71,9 +69,6 @@ use crate::lock::{
 /// });
 /// ```
 ///
-/// # Author
-///
-/// Haixing Hu
 ///
 pub struct ArcAsyncRwLock<T> {
     /// Shared Tokio read-write lock protecting the wrapped value.
