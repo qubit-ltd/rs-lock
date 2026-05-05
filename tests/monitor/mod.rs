@@ -14,3 +14,5 @@
 mod arc_monitor_tests;
 mod monitor_guard_tests;
 mod monitor_tests;
+mod wait_timeout_result_tests;
+mod wait_timeout_status_tests;
