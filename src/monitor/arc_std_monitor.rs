@@ -7,7 +7,7 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-//! # Arc Monitor
+//! # Arc StdMonitor
 //!
 //! Provides an Arc-wrapped synchronous monitor for condition-based state
 //! coordination across threads.
@@ -17,18 +17,18 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use super::{
-    Monitor,
-    MonitorGuard,
+    StdMonitor,
+    StdMonitorGuard,
     WaitTimeoutResult,
     WaitTimeoutStatus,
 };
 
 /// Arc-wrapped monitor for shared condition-based state coordination.
 ///
-/// `ArcMonitor` stores a [`Monitor`] behind an [`Arc`], so callers can clone
-/// the monitor handle directly without writing `Arc::new(Monitor::new(...))`.
-/// It preserves the same guard-based waiting and predicate-based waiting
-/// semantics as [`Monitor`].
+/// `ArcStdMonitor` stores a [`StdMonitor`] behind an [`Arc`], so callers can clone
+/// the monitor handle directly without writing `Arc::new(StdMonitor::new(...))`.
+/// It preserves the same guard-based waiting, predicate-based waiting, and
+/// poison recovery semantics as [`StdMonitor`].
 ///
 /// # Type Parameters
 ///
@@ -39,9 +39,9 @@ use super::{
 /// ```rust
 /// use std::thread;
 ///
-/// use qubit_lock::lock::ArcMonitor;
+/// use qubit_lock::lock::ArcStdMonitor;
 ///
-/// let monitor = ArcMonitor::new(false);
+/// let monitor = ArcStdMonitor::new(false);
 /// let waiter_monitor = monitor.clone();
 ///
 /// let waiter = thread::spawn(move || {
@@ -62,12 +62,12 @@ use super::{
 /// assert!(!monitor.read(|ready| *ready));
 /// ```
 ///
-pub struct ArcMonitor<T> {
+pub struct ArcStdMonitor<T> {
     /// Shared monitor instance.
-    inner: Arc<Monitor<T>>,
+    inner: Arc<StdMonitor<T>>,
 }
 
-impl<T> ArcMonitor<T> {
+impl<T> ArcStdMonitor<T> {
     /// Creates an Arc-wrapped monitor protecting the supplied state value.
     ///
     /// # Arguments
@@ -80,16 +80,19 @@ impl<T> ArcMonitor<T> {
     #[inline]
     pub fn new(state: T) -> Self {
         Self {
-            inner: Arc::new(Monitor::new(state)),
+            inner: Arc::new(StdMonitor::new(state)),
         }
     }
 
     /// Acquires the shared monitor and returns a guard.
     ///
-    /// This delegates to [`Monitor::lock`]. The returned [`MonitorGuard`]
+    /// This delegates to [`StdMonitor::lock`]. The returned [`StdMonitorGuard`]
     /// keeps the monitor mutex locked until it is dropped. It can also wait on
-    /// the monitor's condition variable through [`MonitorGuard::wait`] or
-    /// [`MonitorGuard::wait_timeout`].
+    /// the monitor's condition variable through [`StdMonitorGuard::wait`] or
+    /// [`StdMonitorGuard::wait_timeout`].
+    ///
+    /// If the underlying mutex is poisoned, this method recovers the inner
+    /// state and still returns a guard.
     ///
     /// # Returns
     ///
@@ -98,9 +101,9 @@ impl<T> ArcMonitor<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::ArcMonitor;
+    /// use qubit_lock::lock::ArcStdMonitor;
     ///
-    /// let monitor = ArcMonitor::new(1);
+    /// let monitor = ArcStdMonitor::new(1);
     /// {
     ///     let mut value = monitor.lock();
     ///     *value += 1;
@@ -109,13 +112,13 @@ impl<T> ArcMonitor<T> {
     /// assert_eq!(monitor.read(|value| *value), 2);
     /// ```
     #[inline]
-    pub fn lock(&self) -> MonitorGuard<'_, T> {
+    pub fn lock(&self) -> StdMonitorGuard<'_, T> {
         self.inner.lock()
     }
 
     /// Acquires the monitor and reads the protected state.
     ///
-    /// This delegates to [`Monitor::read`]. The closure runs while the monitor
+    /// This delegates to [`StdMonitor::read`]. The closure runs while the monitor
     /// mutex is held, so keep it short and avoid long blocking work.
     ///
     /// # Arguments
@@ -135,7 +138,7 @@ impl<T> ArcMonitor<T> {
 
     /// Acquires the monitor and mutates the protected state.
     ///
-    /// This delegates to [`Monitor::write`]. Callers should explicitly invoke
+    /// This delegates to [`StdMonitor::write`]. Callers should explicitly invoke
     /// [`Self::notify_one`] or [`Self::notify_all`] after changing state that a
     /// waiting thread may observe.
     ///
@@ -156,12 +159,13 @@ impl<T> ArcMonitor<T> {
 
     /// Waits for a notification or timeout without checking state.
     ///
-    /// This delegates to [`Monitor::wait_notify`]. Most
+    /// This delegates to [`StdMonitor::wait_notify`]. Most
     /// coordination code should prefer [`Self::wait_while`],
-    /// [`Self::wait_until`], or an explicit [`MonitorGuard`] loop.
+    /// [`Self::wait_until`], or an explicit [`StdMonitorGuard`] loop.
     ///
-    /// [`WaitTimeoutStatus::Woken`] means the condition variable was notified,
-    /// but it does not prove that the protected state changed in a useful way.
+    /// Condition variables may wake spuriously, so
+    /// [`WaitTimeoutStatus::Woken`] does not prove that a notifier changed the
+    /// state.
     ///
     /// # Arguments
     ///
@@ -177,9 +181,9 @@ impl<T> ArcMonitor<T> {
     /// ```rust
     /// use std::time::Duration;
     ///
-    /// use qubit_lock::lock::{ArcMonitor, WaitTimeoutStatus};
+    /// use qubit_lock::lock::{ArcStdMonitor, WaitTimeoutStatus};
     ///
-    /// let monitor = ArcMonitor::new(false);
+    /// let monitor = ArcStdMonitor::new(false);
     /// let status = monitor.wait_notify(Duration::from_millis(1));
     ///
     /// assert_eq!(status, WaitTimeoutStatus::TimedOut);
@@ -191,7 +195,7 @@ impl<T> ArcMonitor<T> {
 
     /// Waits while a predicate remains true, then mutates the protected state.
     ///
-    /// This delegates to [`Monitor::wait_while`]. The predicate is evaluated
+    /// This delegates to [`StdMonitor::wait_while`]. The predicate is evaluated
     /// while holding the monitor mutex, and the closure runs while the mutex is
     /// still held after the predicate stops blocking.
     ///
@@ -214,9 +218,9 @@ impl<T> ArcMonitor<T> {
     /// ```rust
     /// use std::thread;
     ///
-    /// use qubit_lock::lock::ArcMonitor;
+    /// use qubit_lock::lock::ArcStdMonitor;
     ///
-    /// let monitor = ArcMonitor::new(Vec::<i32>::new());
+    /// let monitor = ArcStdMonitor::new(Vec::<i32>::new());
     /// let worker_monitor = monitor.clone();
     ///
     /// let worker = thread::spawn(move || {
@@ -242,7 +246,7 @@ impl<T> ArcMonitor<T> {
 
     /// Waits until the protected state satisfies a predicate, then mutates it.
     ///
-    /// This delegates to [`Monitor::wait_until`]. It may block indefinitely if
+    /// This delegates to [`StdMonitor::wait_until`]. It may block indefinitely if
     /// no thread changes the state to satisfy the predicate and sends a
     /// notification.
     ///
@@ -265,7 +269,7 @@ impl<T> ArcMonitor<T> {
 
     /// Waits while a predicate remains true, with an overall time limit.
     ///
-    /// This delegates to [`Monitor::wait_timeout_while`]. If `waiting` becomes
+    /// This delegates to [`StdMonitor::wait_timeout_while`]. If `waiting` becomes
     /// false before `timeout` expires, `f` runs while the monitor lock is still
     /// held. If the timeout expires first, the closure is not called.
     ///
@@ -288,9 +292,9 @@ impl<T> ArcMonitor<T> {
     /// ```rust
     /// use std::time::Duration;
     ///
-    /// use qubit_lock::lock::{ArcMonitor, WaitTimeoutResult};
+    /// use qubit_lock::lock::{ArcStdMonitor, WaitTimeoutResult};
     ///
-    /// let monitor = ArcMonitor::new(Vec::<i32>::new());
+    /// let monitor = ArcStdMonitor::new(Vec::<i32>::new());
     /// let result = monitor.wait_timeout_while(
     ///     Duration::from_millis(1),
     ///     |items| items.is_empty(),
@@ -315,7 +319,7 @@ impl<T> ArcMonitor<T> {
 
     /// Waits until a predicate becomes true, with an overall time limit.
     ///
-    /// This delegates to [`Monitor::wait_timeout_until`]. If `ready` becomes
+    /// This delegates to [`StdMonitor::wait_timeout_until`]. If `ready` becomes
     /// true before `timeout` expires, `f` runs while the monitor lock is still
     /// held. If the timeout expires first, the closure is not called.
     ///
@@ -339,9 +343,9 @@ impl<T> ArcMonitor<T> {
     ///     time::Duration,
     /// };
     ///
-    /// use qubit_lock::lock::{ArcMonitor, WaitTimeoutResult};
+    /// use qubit_lock::lock::{ArcStdMonitor, WaitTimeoutResult};
     ///
-    /// let monitor = ArcMonitor::new(false);
+    /// let monitor = ArcStdMonitor::new(false);
     /// let worker_monitor = monitor.clone();
     ///
     /// let worker = thread::spawn(move || {
@@ -398,7 +402,7 @@ impl<T> ArcMonitor<T> {
     }
 }
 
-impl<T: Default> Default for ArcMonitor<T> {
+impl<T: Default> Default for ArcStdMonitor<T> {
     /// Creates an Arc-wrapped monitor containing `T::default()`.
     ///
     /// # Returns
@@ -410,7 +414,7 @@ impl<T: Default> Default for ArcMonitor<T> {
     }
 }
 
-impl<T> Clone for ArcMonitor<T> {
+impl<T> Clone for ArcStdMonitor<T> {
     /// Clones this monitor handle.
     ///
     /// The cloned handle shares the same protected state and condition

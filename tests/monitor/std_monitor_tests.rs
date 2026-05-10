@@ -7,7 +7,7 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-//! Tests for [`Monitor`](qubit_lock::lock::Monitor).
+//! Tests for [`StdMonitor`](qubit_lock::lock::StdMonitor).
 
 use std::{
     sync::{
@@ -19,14 +19,14 @@ use std::{
 };
 
 use qubit_lock::lock::{
-    Monitor,
+    StdMonitor,
     WaitTimeoutResult,
     WaitTimeoutStatus,
 };
 
 #[test]
-fn test_monitor_new_read_write_updates_state() {
-    let monitor = Monitor::new(vec![1, 2, 3]);
+fn test_std_monitor_new_read_write_updates_state() {
+    let monitor = StdMonitor::new(vec![1, 2, 3]);
 
     monitor.write(|items| {
         items.push(4);
@@ -36,15 +36,15 @@ fn test_monitor_new_read_write_updates_state() {
 }
 
 #[test]
-fn test_monitor_default_uses_default_value() {
-    let monitor = Monitor::<Vec<i32>>::default();
+fn test_std_monitor_default_uses_default_value() {
+    let monitor = StdMonitor::<Vec<i32>>::default();
 
     assert!(monitor.read(|items| items.is_empty()));
 }
 
 #[test]
-fn test_monitor_wait_until_returns_when_predicate_is_ready() {
-    let monitor = Monitor::new(3);
+fn test_std_monitor_wait_until_returns_when_predicate_is_ready() {
+    let monitor = StdMonitor::new(3);
 
     let result = monitor.wait_until(
         |value| *value >= 3,
@@ -59,8 +59,8 @@ fn test_monitor_wait_until_returns_when_predicate_is_ready() {
 }
 
 #[test]
-fn test_monitor_wait_while_returns_when_predicate_is_false() {
-    let monitor = Monitor::new(vec![1, 2, 3]);
+fn test_std_monitor_wait_while_returns_when_predicate_is_false() {
+    let monitor = StdMonitor::new(vec![1, 2, 3]);
 
     let result = monitor.wait_while(
         |items| items.is_empty(),
@@ -75,8 +75,8 @@ fn test_monitor_wait_while_returns_when_predicate_is_false() {
 }
 
 #[test]
-fn test_monitor_wait_until_blocks_until_notify_one() {
-    let monitor = Arc::new(Monitor::new(false));
+fn test_std_monitor_wait_until_blocks_until_notify_one() {
+    let monitor = Arc::new(StdMonitor::new(false));
     let (checked_tx, checked_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
 
@@ -123,8 +123,8 @@ fn test_monitor_wait_until_blocks_until_notify_one() {
 }
 
 #[test]
-fn test_monitor_wait_notify_returns_timed_out() {
-    let monitor = Monitor::new(false);
+fn test_std_monitor_wait_notify_returns_timed_out() {
+    let monitor = StdMonitor::new(false);
 
     let status = monitor.wait_notify(Duration::from_millis(30));
 
@@ -132,8 +132,8 @@ fn test_monitor_wait_notify_returns_timed_out() {
 }
 
 #[test]
-fn test_monitor_guard_wait_timeout_returns_woken_when_notified() {
-    let monitor = Arc::new(Monitor::new(false));
+fn test_std_monitor_guard_wait_timeout_returns_woken_when_notified() {
+    let monitor = Arc::new(StdMonitor::new(false));
     let (waiting_tx, waiting_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
 
@@ -168,8 +168,8 @@ fn test_monitor_guard_wait_timeout_returns_woken_when_notified() {
 }
 
 #[test]
-fn test_monitor_wait_timeout_while_returns_timed_out_when_timeout() {
-    let monitor = Monitor::new(false);
+fn test_std_monitor_wait_timeout_while_returns_timed_out_when_timeout() {
+    let monitor = StdMonitor::new(false);
 
     let result = monitor.wait_timeout_while(Duration::from_millis(20), |ready| !*ready, |_| ());
 
@@ -177,8 +177,8 @@ fn test_monitor_wait_timeout_while_returns_timed_out_when_timeout() {
 }
 
 #[test]
-fn test_monitor_wait_timeout_until_returns_timed_out_when_timeout() {
-    let monitor = Monitor::new(false);
+fn test_std_monitor_wait_timeout_until_returns_timed_out_when_timeout() {
+    let monitor = StdMonitor::new(false);
 
     let result = monitor.wait_timeout_until(Duration::from_millis(20), |ready| *ready, |_| ());
 
@@ -186,8 +186,8 @@ fn test_monitor_wait_timeout_until_returns_timed_out_when_timeout() {
 }
 
 #[test]
-fn test_monitor_wait_timeout_until_returns_result_when_predicate_true() {
-    let monitor = Arc::new(Monitor::new(false));
+fn test_std_monitor_wait_timeout_until_returns_result_when_predicate_true() {
+    let monitor = Arc::new(StdMonitor::new(false));
     let (started_tx, started_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
 
@@ -228,8 +228,8 @@ fn test_monitor_wait_timeout_until_returns_result_when_predicate_true() {
 }
 
 #[test]
-fn test_monitor_wait_until_ignores_notification_until_predicate_true() {
-    let monitor = Arc::new(Monitor::new(false));
+fn test_std_monitor_wait_until_ignores_notification_until_predicate_true() {
+    let monitor = Arc::new(StdMonitor::new(false));
     let (checked_tx, checked_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
 
@@ -273,10 +273,10 @@ fn test_monitor_wait_until_ignores_notification_until_predicate_true() {
 }
 
 #[test]
-fn test_monitor_notify_all_wakes_all_ready_waiters() {
+fn test_std_monitor_notify_all_wakes_all_ready_waiters() {
     const WAITER_COUNT: usize = 3;
 
-    let monitor = Arc::new(Monitor::new(0usize));
+    let monitor = Arc::new(StdMonitor::new(0usize));
     let (started_tx, started_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
     let mut waiters = Vec::with_capacity(WAITER_COUNT);
@@ -322,8 +322,8 @@ fn test_monitor_notify_all_wakes_all_ready_waiters() {
 }
 
 #[test]
-fn test_monitor_remains_usable_after_panic_while_locked() {
-    let monitor = Arc::new(Monitor::new(0usize));
+fn test_std_monitor_remains_usable_after_panic_while_locked() {
+    let monitor = Arc::new(StdMonitor::new(0usize));
     let poison_monitor = Arc::clone(&monitor);
 
     let poisoner = thread::spawn(move || {
@@ -344,8 +344,8 @@ fn test_monitor_remains_usable_after_panic_while_locked() {
 }
 
 #[test]
-fn test_monitor_wait_until_continues_after_panic_while_locked() {
-    let monitor = Arc::new(Monitor::new(false));
+fn test_std_monitor_wait_until_continues_after_panic_while_locked() {
+    let monitor = Arc::new(StdMonitor::new(false));
     let poison_monitor = Arc::clone(&monitor);
 
     let poisoner = thread::spawn(move || {

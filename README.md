@@ -13,14 +13,15 @@ Lock-focused utilities for the Qubit Rust libraries. The crate provides synchron
 
 - `ArcMutex`, `ArcRwLock`, `ArcStdMutex`: synchronous lock wrappers with `Arc` built in.
 - `ArcAsyncMutex`, `ArcAsyncRwLock`: Tokio-based asynchronous lock wrappers.
-- `Monitor`, `ArcMonitor`, `MonitorGuard`: condition-based state coordination.
+- `Monitor`, `ArcMonitor`, `MonitorGuard`: parking_lot-based condition coordination.
+- `StdMonitor`, `ArcStdMonitor`, `StdMonitorGuard`: std-based condition coordination.
 - Closure-based APIs that keep lock acquisition and release scoped to one call.
 
 ## Installation
 
 ```toml
 [dependencies]
-qubit-lock = "0.3.2"
+qubit-lock = "0.4.0"
 ```
 
 The async wrappers use Tokio synchronization primitives. If your application
@@ -56,7 +57,7 @@ fn main() {
 ## Project Layout
 
 - `src/lock`: lock traits and lock wrappers.
-- `src/monitor`: `Monitor` / `ArcMonitor` and related condition-variable primitives.
+- `src/monitor`: parking_lot and std monitor primitives.
 - `tests/lock`: lock behavior tests.
 - `tests/monitor`: monitor behavior tests.
 - `tests/docs`: README and doctext consistency tests.

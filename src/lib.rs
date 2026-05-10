@@ -15,7 +15,8 @@
 //!
 //! - Synchronous lock wrappers with `Arc` integrated internally.
 //! - Asynchronous Tokio-based lock wrappers.
-//! - Monitor-style coordination built on `Mutex` plus `Condvar`.
+//! - Monitor-style coordination built on `parking_lot` and standard-library
+//!   `Mutex` plus `Condvar` pairs.
 //!
 
 pub mod lock;
@@ -26,11 +27,14 @@ pub use lock::{
     ArcMonitor,
     ArcMutex,
     ArcRwLock,
+    ArcStdMonitor,
     ArcStdMutex,
     AsyncLock,
     Lock,
     Monitor,
     MonitorGuard,
+    StdMonitor,
+    StdMonitorGuard,
     TryLockError,
     WaitTimeoutResult,
     WaitTimeoutStatus,

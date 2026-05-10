@@ -34,8 +34,11 @@ mod arc_std_mutex;
 // Re-export implementations
 pub use crate::monitor::{
     ArcMonitor,
+    ArcStdMonitor,
     Monitor,
     MonitorGuard,
+    StdMonitor,
+    StdMonitorGuard,
     WaitTimeoutResult,
     WaitTimeoutStatus,
 };
