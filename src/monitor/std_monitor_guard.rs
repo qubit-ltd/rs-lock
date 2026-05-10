@@ -7,10 +7,10 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-//! # Monitor Guard
+//! # StdMonitor Guard
 //!
-//! Provides the guard returned by [`Monitor::lock`](super::Monitor::lock).
-//! The guard wraps a parking_lot mutex guard and keeps a reference to the
+//! Provides the guard returned by [`StdMonitor::lock`](super::StdMonitor::lock).
+//! The guard wraps a standard-library mutex guard and keeps a reference to the
 //! monitor that created it, so waiting operations can use the matching
 //! condition variable.
 //!
@@ -20,20 +20,19 @@ use std::{
         Deref,
         DerefMut,
     },
+    sync::MutexGuard,
     time::Duration,
 };
 
-use parking_lot::MutexGuard;
-
 use super::{
-    monitor::Monitor,
+    std_monitor::StdMonitor,
     wait_timeout_status::WaitTimeoutStatus,
 };
 
-/// Guard returned by [`Monitor::lock`](super::Monitor::lock).
+/// Guard returned by [`StdMonitor::lock`](super::StdMonitor::lock).
 ///
-/// `MonitorGuard` is the monitor-specific counterpart of
-/// [`parking_lot::MutexGuard`]. While it exists, the protected state is locked.
+/// `StdMonitorGuard` is the monitor-specific counterpart of
+/// [`std::sync::MutexGuard`]. While it exists, the protected state is locked.
 /// Dropping the guard releases the lock. It implements [`Deref`] and
 /// [`DerefMut`], so callers can read and mutate the protected state as if they
 /// held `&T` or `&mut T`.
@@ -49,9 +48,9 @@ use super::{
 /// # Example
 ///
 /// ```rust
-/// use qubit_lock::lock::Monitor;
+/// use qubit_lock::lock::StdMonitor;
 ///
-/// let monitor = Monitor::new(Vec::new());
+/// let monitor = StdMonitor::new(Vec::new());
 /// {
 ///     let mut items = monitor.lock();
 ///     items.push("first");
@@ -59,41 +58,44 @@ use super::{
 ///
 /// assert_eq!(monitor.read(|items| items.len()), 1);
 /// ```
-pub struct MonitorGuard<'a, T> {
-    /// Monitor that owns the mutex and condition variable.
-    monitor: &'a Monitor<T>,
-    /// Parking-lot mutex guard protecting the monitor state.
+pub struct StdMonitorGuard<'a, T> {
+    /// StdMonitor that owns the mutex and condition variable.
+    monitor: &'a StdMonitor<T>,
+    /// Standard mutex guard protecting the monitor state.
     inner: MutexGuard<'a, T>,
 }
 
-impl<'a, T> MonitorGuard<'a, T> {
-    /// Creates a guard from its owning monitor and parking_lot mutex guard.
+impl<'a, T> StdMonitorGuard<'a, T> {
+    /// Creates a guard from its owning monitor and standard mutex guard.
     ///
     /// # Parameters
     ///
-    /// * `monitor` - Monitor whose mutex produced `inner`.
-    /// * `inner` - Parking-lot mutex guard protecting the monitor state.
+    /// * `monitor` - StdMonitor whose mutex produced `inner`.
+    /// * `inner` - Standard mutex guard protecting the monitor state.
     ///
     /// # Returns
     ///
     /// A monitor guard that can access state and wait on the monitor's
     /// condition variable.
     #[inline]
-    pub(super) fn new(monitor: &'a Monitor<T>, inner: MutexGuard<'a, T>) -> Self {
+    pub(super) fn new(monitor: &'a StdMonitor<T>, inner: MutexGuard<'a, T>) -> Self {
         Self { monitor, inner }
     }
 
     /// Waits for a notification while temporarily releasing the monitor lock.
     ///
     /// This method consumes the current guard, calls the underlying
-    /// [`parking_lot::Condvar::wait`], and returns the guard after the lock has
+    /// [`std::sync::Condvar::wait`], and returns a new guard after the lock has
     /// been reacquired. It is intended for explicit guarded-suspension loops
     /// where the caller needs to inspect or update state before and after
     /// waiting.
     ///
-    /// The method may block indefinitely if no notification is sent. Callers
-    /// should still use it inside a loop that re-checks the protected state so
-    /// notifications that do not make progress are handled correctly.
+    /// The method may block indefinitely if no notification is sent. The wait
+    /// may also wake spuriously, so callers should use it inside a loop that
+    /// re-checks the protected state.
+    ///
+    /// If the mutex is poisoned while waiting, the poisoned state is recovered
+    /// and returned in the new guard.
     ///
     /// # Returns
     ///
@@ -107,9 +109,9 @@ impl<'a, T> MonitorGuard<'a, T> {
     ///     thread,
     /// };
     ///
-    /// use qubit_lock::lock::Monitor;
+    /// use qubit_lock::lock::StdMonitor;
     ///
-    /// let monitor = Arc::new(Monitor::new(false));
+    /// let monitor = Arc::new(StdMonitor::new(false));
     /// let waiter_monitor = Arc::clone(&monitor);
     ///
     /// let waiter = thread::spawn(move || {
@@ -130,22 +132,30 @@ impl<'a, T> MonitorGuard<'a, T> {
     /// assert!(!monitor.read(|ready| *ready));
     /// ```
     #[inline]
-    pub fn wait(mut self) -> Self {
-        self.monitor.changed.wait(&mut self.inner);
-        self
+    pub fn wait(self) -> Self {
+        let StdMonitorGuard { monitor, inner } = self;
+        let inner = monitor
+            .changed
+            .wait(inner)
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        Self { monitor, inner }
     }
 
     /// Waits for a notification or timeout while temporarily releasing the lock.
     ///
     /// This method consumes the current guard, calls the underlying
-    /// [`parking_lot::Condvar::wait_for`], and returns the guard after the
+    /// [`std::sync::Condvar::wait_timeout`], and returns a new guard after the
     /// lock has been reacquired. The status reports whether the wait reached
     /// the timeout boundary or returned earlier.
     ///
     /// A [`WaitTimeoutStatus::Woken`] result does not prove that another thread
-    /// changed the state. A [`WaitTimeoutStatus::TimedOut`] result also does
-    /// not remove the need to inspect the state, because another thread may
-    /// have changed it while this thread was reacquiring the lock.
+    /// changed the state; condition variables may wake spuriously. A
+    /// [`WaitTimeoutStatus::TimedOut`] result also does not remove the need to
+    /// inspect the state, because another thread may have changed it while this
+    /// thread was reacquiring the lock.
+    ///
+    /// If the mutex is poisoned while waiting, the poisoned state is recovered
+    /// and returned in the new guard.
     ///
     /// # Arguments
     ///
@@ -161,9 +171,9 @@ impl<'a, T> MonitorGuard<'a, T> {
     /// ```rust
     /// use std::time::Duration;
     ///
-    /// use qubit_lock::lock::{Monitor, WaitTimeoutStatus};
+    /// use qubit_lock::lock::{StdMonitor, WaitTimeoutStatus};
     ///
-    /// let monitor = Monitor::new(0);
+    /// let monitor = StdMonitor::new(0);
     /// let guard = monitor.lock();
     /// let (guard, status) = guard.wait_timeout(Duration::from_millis(1));
     ///
@@ -171,18 +181,22 @@ impl<'a, T> MonitorGuard<'a, T> {
     /// assert_eq!(status, WaitTimeoutStatus::TimedOut);
     /// ```
     #[inline]
-    pub fn wait_timeout(mut self, timeout: Duration) -> (Self, WaitTimeoutStatus) {
-        let timeout_result = self.monitor.changed.wait_for(&mut self.inner, timeout);
+    pub fn wait_timeout(self, timeout: Duration) -> (Self, WaitTimeoutStatus) {
+        let StdMonitorGuard { monitor, inner } = self;
+        let (inner, timeout_result) = monitor
+            .changed
+            .wait_timeout(inner, timeout)
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let status = if timeout_result.timed_out() {
             WaitTimeoutStatus::TimedOut
         } else {
             WaitTimeoutStatus::Woken
         };
-        (self, status)
+        (Self { monitor, inner }, status)
     }
 }
 
-impl<T> Deref for MonitorGuard<'_, T> {
+impl<T> Deref for StdMonitorGuard<'_, T> {
     type Target = T;
 
     /// Returns an immutable reference to the protected state.
@@ -192,7 +206,7 @@ impl<T> Deref for MonitorGuard<'_, T> {
     }
 }
 
-impl<T> DerefMut for MonitorGuard<'_, T> {
+impl<T> DerefMut for StdMonitorGuard<'_, T> {
     /// Returns a mutable reference to the protected state.
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {

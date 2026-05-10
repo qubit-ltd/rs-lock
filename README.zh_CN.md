@@ -13,14 +13,15 @@
 
 - `ArcMutex`、`ArcRwLock`、`ArcStdMutex`：内部已集成 `Arc` 的同步锁包装器。
 - `ArcAsyncMutex`、`ArcAsyncRwLock`：基于 Tokio 的异步锁包装器。
-- `Monitor`、`ArcMonitor`、`MonitorGuard`：基于条件变量的状态协调工具。
+- `Monitor`、`ArcMonitor`、`MonitorGuard`：基于 parking_lot 的条件变量协调工具。
+- `StdMonitor`、`ArcStdMonitor`、`StdMonitorGuard`：基于标准库的条件变量协调工具。
 - 基于闭包的访问接口，让加锁和释放始终局限在一次调用内部。
 
 ## 安装
 
 ```toml
 [dependencies]
-qubit-lock = "0.3.2"
+qubit-lock = "0.4.0"
 ```
 
 异步锁包装器使用 Tokio 同步原语。如果应用需要创建 Tokio runtime，请在应用自己的
@@ -55,7 +56,7 @@ fn main() {
 ## 项目结构
 
 - `src/lock`：锁 trait 与锁包装器。
-- `src/monitor`：基于条件变量的 `Monitor` / `ArcMonitor` 等原语。
+- `src/monitor`：基于 parking_lot 和标准库的 monitor 原语。
 - `tests/lock`：锁相关行为测试。
 - `tests/monitor`：monitor 相关行为测试。
 - `tests/docs`：README 与文档文本一致性测试。
