@@ -23,7 +23,7 @@
 
 ```toml
 [dependencies]
-qubit-lock = "0.4.0"
+qubit-lock = "0.4"
 ```
 
 异步锁包装器使用 Tokio 同步原语。如果应用需要创建 Tokio runtime，请在应用自己的
