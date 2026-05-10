@@ -9,6 +9,11 @@
  ******************************************************************************/
 //! README and lock documentation consistency tests.
 
+use semver::{
+    Version,
+    VersionReq,
+};
+
 const CARGO_TOML: &str = include_str!("../../Cargo.toml");
 const README_EN: &str = include_str!("../../README.md");
 const README_ZH: &str = include_str!("../../README.zh_CN.md");
@@ -50,16 +55,25 @@ fn test_rw_lock_docs_use_current_trait_names() {
 }
 
 #[test]
-/// Ensures README dependency snippets stay in sync with Cargo.toml.
+/// Ensures README `qubit-lock` version requirements accept the crate version in Cargo.toml.
 fn test_readme_dependency_version_matches_cargo_toml() {
     let cargo_version =
         extract_package_version(CARGO_TOML).expect("Failed to extract version from Cargo.toml");
-    let readme_en_version = extract_readme_dependency_version(README_EN)
+    let package_ver = Version::parse(cargo_version).expect("Invalid package version in Cargo.toml");
+    let readme_en_req = extract_readme_dependency_version(README_EN)
         .expect("Failed to extract version from README.md");
-    let readme_zh_version = extract_readme_dependency_version(README_ZH)
+    let readme_zh_req = extract_readme_dependency_version(README_ZH)
         .expect("Failed to extract version from README.zh_CN.md");
-    assert_eq!(readme_en_version, cargo_version);
-    assert_eq!(readme_zh_version, cargo_version);
+    let req_en = VersionReq::parse(readme_en_req).expect("Invalid version req in README.md");
+    let req_zh = VersionReq::parse(readme_zh_req).expect("Invalid version req in README.zh_CN.md");
+    assert!(
+        req_en.matches(&package_ver),
+        "README.md qubit-lock = \"{readme_en_req}\" does not accept package version {cargo_version}"
+    );
+    assert!(
+        req_zh.matches(&package_ver),
+        "README.zh_CN.md qubit-lock = \"{readme_zh_req}\" does not accept package version {cargo_version}"
+    );
 }
 
 /// Extracts the first package version entry from Cargo.toml content.
