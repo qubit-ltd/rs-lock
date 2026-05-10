@@ -14,7 +14,10 @@
 //! for protecting shared data in multi-threaded environments.
 //!
 
-use std::sync::Arc;
+use std::{
+    ops::Deref,
+    sync::Arc,
+};
 
 use parking_lot::Mutex;
 
@@ -40,6 +43,8 @@ use crate::lock::{
 ///   release
 /// - Better performance compared to std::sync::Mutex
 /// - More ergonomic API with no unwrap() calls
+/// - Implements [`Deref`] and [`AsRef`] to expose the underlying
+///   [`parking_lot::Mutex`] API when guard-based access is needed
 ///
 /// # Usage Example
 ///
@@ -89,6 +94,31 @@ impl<T> ArcMutex<T> {
         Self {
             inner: Arc::new(Mutex::new(data)),
         }
+    }
+}
+
+impl<T> AsRef<Mutex<T>> for ArcMutex<T> {
+    /// Returns a reference to the underlying parking_lot mutex.
+    ///
+    /// This is useful when callers need guard-based APIs such as
+    /// [`Mutex::lock`] or [`Mutex::try_lock`] instead of the closure-based
+    /// [`Lock`] methods.
+    #[inline]
+    fn as_ref(&self) -> &Mutex<T> {
+        self.inner.as_ref()
+    }
+}
+
+impl<T> Deref for ArcMutex<T> {
+    type Target = Mutex<T>;
+
+    /// Dereferences this wrapper to the underlying parking_lot mutex.
+    ///
+    /// Method-call dereferencing lets callers use native mutex APIs directly,
+    /// while the wrapper continues to provide the [`Lock`] trait methods.
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.inner.as_ref()
     }
 }
 

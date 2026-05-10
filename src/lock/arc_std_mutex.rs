@@ -13,6 +13,7 @@
 //! for protecting shared data in multi-threaded environments.
 //!
 
+use std::ops::Deref;
 use std::sync::{
     Arc,
     Mutex,
@@ -36,6 +37,8 @@ use crate::lock::{
 /// - Thread-safe, supports multi-threaded sharing
 /// - Automatic lock management through RAII ensures proper lock
 ///   release
+/// - Implements [`Deref`] and [`AsRef`] to expose the underlying
+///   [`std::sync::Mutex`] API when guard-based access is needed
 ///
 /// # Usage Example
 ///
@@ -85,6 +88,31 @@ impl<T> ArcStdMutex<T> {
         Self {
             inner: Arc::new(Mutex::new(data)),
         }
+    }
+}
+
+impl<T> AsRef<Mutex<T>> for ArcStdMutex<T> {
+    /// Returns a reference to the underlying standard mutex.
+    ///
+    /// This is useful when callers need guard-based APIs such as
+    /// [`Mutex::lock`] or [`Mutex::try_lock`] instead of the closure-based
+    /// [`Lock`] methods.
+    #[inline]
+    fn as_ref(&self) -> &Mutex<T> {
+        self.inner.as_ref()
+    }
+}
+
+impl<T> Deref for ArcStdMutex<T> {
+    type Target = Mutex<T>;
+
+    /// Dereferences this wrapper to the underlying standard mutex.
+    ///
+    /// Method-call dereferencing lets callers use native mutex APIs directly,
+    /// while the wrapper continues to provide the [`Lock`] trait methods.
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.inner.as_ref()
     }
 }
 

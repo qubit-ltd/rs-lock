@@ -13,6 +13,7 @@
 //! shared data with multiple concurrent readers or a single writer.
 //!
 
+use std::ops::Deref;
 use std::sync::{
     Arc,
     RwLock,
@@ -39,6 +40,8 @@ use crate::lock::{
 /// - Thread-safe, supports multi-threaded sharing
 /// - Automatic lock management through RAII ensures proper lock
 ///   release
+/// - Implements [`Deref`] and [`AsRef`] to expose the underlying
+///   [`std::sync::RwLock`] API when guard-based access is needed
 ///
 /// # Use Cases
 ///
@@ -93,6 +96,33 @@ impl<T> ArcRwLock<T> {
         Self {
             inner: Arc::new(RwLock::new(data)),
         }
+    }
+}
+
+impl<T> AsRef<RwLock<T>> for ArcRwLock<T> {
+    /// Returns a reference to the underlying standard read-write lock.
+    ///
+    /// This is useful when callers need guard-based APIs such as
+    /// [`RwLock::read`] or [`RwLock::write`] instead of the closure-based
+    /// [`Lock`] methods.
+    #[inline]
+    fn as_ref(&self) -> &RwLock<T> {
+        self.inner.as_ref()
+    }
+}
+
+impl<T> Deref for ArcRwLock<T> {
+    type Target = RwLock<T>;
+
+    /// Dereferences this wrapper to the underlying standard read-write lock.
+    ///
+    /// When [`Lock`] is in scope, `read` and `write` with closure arguments
+    /// still call the trait methods on this wrapper. Use explicit
+    /// dereferencing or [`AsRef::as_ref`] when you want the native guard-based
+    /// [`RwLock`] methods.
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.inner.as_ref()
     }
 }
 

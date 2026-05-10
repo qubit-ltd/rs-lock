@@ -65,6 +65,22 @@ fn test_arc_monitor_lock_guard_updates_state() {
 }
 
 #[test]
+fn test_arc_monitor_deref_and_as_ref_expose_monitor_api() {
+    let monitor = ArcMonitor::new(1);
+
+    {
+        let mut value = (*monitor).lock();
+        *value += 1;
+    }
+
+    monitor.as_ref().write(|value| {
+        *value += 1;
+    });
+
+    assert_eq!(monitor.read(|value| *value), 3);
+}
+
+#[test]
 fn test_arc_monitor_wait_until_blocks_until_notify_one() {
     let monitor = ArcMonitor::new(false);
     let (checked_tx, checked_rx) = mpsc::channel();

@@ -49,6 +49,26 @@ mod arc_rw_lock_tests {
     }
 
     #[test]
+    fn test_arc_rw_lock_deref_and_as_ref_expose_rw_lock_api() {
+        let rw_lock = ArcRwLock::new(1);
+
+        {
+            let guard = (*rw_lock).read().expect("rw lock should not be poisoned");
+            assert_eq!(*guard, 1);
+        }
+
+        {
+            let mut guard = rw_lock
+                .as_ref()
+                .write()
+                .expect("rw lock should not be poisoned");
+            *guard += 1;
+        }
+
+        assert_eq!(rw_lock.read(|value| *value), 2);
+    }
+
+    #[test]
     fn test_arc_rw_lock_read() {
         let rw_lock = ArcRwLock::new(0);
 

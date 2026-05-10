@@ -13,7 +13,10 @@
 //! protecting shared data with multiple concurrent readers or a
 //! single writer in async environments.
 //!
-use std::sync::Arc;
+use std::{
+    ops::Deref,
+    sync::Arc,
+};
 
 use tokio::sync::RwLock as AsyncRwLock;
 
@@ -38,6 +41,8 @@ use crate::lock::{
 /// - Thread-safe, supports multi-threaded sharing
 /// - Automatic lock management through RAII ensures proper lock
 ///   release
+/// - Implements [`Deref`] and [`AsRef`] to expose the underlying
+///   [`tokio::sync::RwLock`] API when guard-based access is needed
 ///
 /// # Use Cases
 ///
@@ -98,6 +103,33 @@ impl<T> ArcAsyncRwLock<T> {
         Self {
             inner: Arc::new(AsyncRwLock::new(data)),
         }
+    }
+}
+
+impl<T> AsRef<AsyncRwLock<T>> for ArcAsyncRwLock<T> {
+    /// Returns a reference to the underlying Tokio read-write lock.
+    ///
+    /// This is useful when callers need guard-based APIs such as
+    /// [`AsyncRwLock::read`] or [`AsyncRwLock::write`] instead of the
+    /// closure-based [`AsyncLock`] methods.
+    #[inline]
+    fn as_ref(&self) -> &AsyncRwLock<T> {
+        self.inner.as_ref()
+    }
+}
+
+impl<T> Deref for ArcAsyncRwLock<T> {
+    type Target = AsyncRwLock<T>;
+
+    /// Dereferences this wrapper to the underlying Tokio read-write lock.
+    ///
+    /// When [`AsyncLock`] is in scope, `read` and `write` with closure
+    /// arguments still call the trait methods on this wrapper. Use explicit
+    /// dereferencing or [`AsRef::as_ref`] when you want the native guard-based
+    /// [`AsyncRwLock`] methods.
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.inner.as_ref()
     }
 }
 
