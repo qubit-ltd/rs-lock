@@ -13,8 +13,11 @@
 //! coordination across threads.
 //!
 
-use std::sync::Arc;
-use std::time::Duration;
+use std::{
+    ops::Deref,
+    sync::Arc,
+    time::Duration,
+};
 
 use super::{
     Monitor,
@@ -28,7 +31,8 @@ use super::{
 /// `ArcMonitor` stores a [`Monitor`] behind an [`Arc`], so callers can clone
 /// the monitor handle directly without writing `Arc::new(Monitor::new(...))`.
 /// It preserves the same guard-based waiting and predicate-based waiting
-/// semantics as [`Monitor`].
+/// semantics as [`Monitor`]. It implements [`Deref`] and [`AsRef`] so callers
+/// can pass it to APIs that expect a [`Monitor`] reference.
 ///
 /// # Type Parameters
 ///
@@ -395,6 +399,30 @@ impl<T> ArcMonitor<T> {
     #[inline]
     pub fn notify_all(&self) {
         self.inner.notify_all();
+    }
+}
+
+impl<T> AsRef<Monitor<T>> for ArcMonitor<T> {
+    /// Returns a reference to the underlying monitor.
+    ///
+    /// This is useful when callers need an explicit [`Monitor`] reference while
+    /// keeping the cloneable [`ArcMonitor`] handle.
+    #[inline]
+    fn as_ref(&self) -> &Monitor<T> {
+        self.inner.as_ref()
+    }
+}
+
+impl<T> Deref for ArcMonitor<T> {
+    type Target = Monitor<T>;
+
+    /// Dereferences this wrapper to the underlying monitor.
+    ///
+    /// Method-call dereferencing lets callers use native [`Monitor`] APIs
+    /// directly, while this wrapper still provides cloneable ownership.
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.inner.as_ref()
     }
 }
 

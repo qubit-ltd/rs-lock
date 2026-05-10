@@ -16,6 +16,8 @@
 - `Monitor`、`ArcMonitor`、`MonitorGuard`：基于 parking_lot 的条件变量协调工具。
 - `StdMonitor`、`ArcStdMonitor`、`StdMonitorGuard`：基于标准库的条件变量协调工具。
 - 基于闭包的访问接口，让加锁和释放始终局限在一次调用内部。
+- `Arc*` 包装器实现了 `Deref` 和 `AsRef`，需要时仍可使用底层同步原语的
+  guard 风格原生接口。
 
 ## 安装
 
@@ -40,6 +42,30 @@ fn main() {
     assert_eq!(counter.read(|value| *value), 1);
 }
 ```
+
+### 原生锁接口
+
+`Arc*` 包装器可以通过 `Deref` 或 `AsRef` 继续使用底层同步原语的原生锁接口。
+
+```rust
+use qubit_lock::{ArcMutex, Lock};
+
+fn main() {
+    let counter = ArcMutex::new(0);
+
+    {
+        let mut guard = counter.lock();
+        *guard += 1;
+    }
+
+    counter.write(|value| *value += 1);
+    assert_eq!(counter.read(|value| *value), 2);
+}
+```
+
+对 `ArcRwLock` 和 `ArcAsyncRwLock`，闭包式 `read` / `write` 与底层
+guard 风格方法同名。当 `Lock` 或 `AsyncLock` 在作用域中时，如果要调用底层
+guard API，请使用 `lock.as_ref().read()`，或用 `(*lock).read()` 显式解引用。
 
 ### Monitor
 

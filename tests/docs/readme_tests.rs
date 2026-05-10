@@ -32,6 +32,15 @@ fn test_readme_quick_start_imports_lock_trait() {
 }
 
 #[test]
+/// Ensures README files document direct access to wrapped primitives.
+fn test_readme_documents_deref_and_as_ref_support() {
+    assert!(README_EN.contains("Deref"));
+    assert!(README_EN.contains("AsRef"));
+    assert!(README_ZH.contains("Deref"));
+    assert!(README_ZH.contains("AsRef"));
+}
+
+#[test]
 /// Ensures lock source examples reference the current trait names.
 fn test_rw_lock_docs_use_current_trait_names() {
     assert!(!ARC_RW_LOCK_SRC.contains("ReadWriteLock"));

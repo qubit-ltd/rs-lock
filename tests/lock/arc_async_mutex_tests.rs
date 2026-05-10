@@ -42,6 +42,26 @@ mod arc_async_mutex_tests {
     }
 
     #[tokio::test]
+    async fn test_arc_async_mutex_deref_and_as_ref_expose_mutex_api() {
+        let async_mutex = ArcAsyncMutex::new(1);
+
+        {
+            let mut guard = async_mutex.lock().await;
+            *guard += 1;
+        }
+
+        {
+            let mut guard = async_mutex
+                .as_ref()
+                .try_lock()
+                .expect("mutex should be available");
+            *guard += 1;
+        }
+
+        assert_eq!(async_mutex.read(|value| *value).await, 3);
+    }
+
+    #[tokio::test]
     async fn test_arc_async_mutex_read_write() {
         let async_mutex = ArcAsyncMutex::new(0);
 

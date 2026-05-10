@@ -50,6 +50,26 @@ mod arc_std_mutex_tests {
     }
 
     #[test]
+    fn test_arc_std_mutex_deref_and_as_ref_expose_mutex_api() {
+        let mutex = ArcStdMutex::new(1);
+
+        {
+            let mut guard = mutex.lock().expect("mutex should not be poisoned");
+            *guard += 1;
+        }
+
+        {
+            let mut guard = mutex
+                .as_ref()
+                .try_lock()
+                .expect("mutex should be available and not poisoned");
+            *guard += 1;
+        }
+
+        assert_eq!(mutex.read(|value| *value), 3);
+    }
+
+    #[test]
     fn test_arc_mutex_read_write_basic_operations() {
         let mutex = ArcStdMutex::new(0);
 

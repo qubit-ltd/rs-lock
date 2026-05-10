@@ -48,6 +48,23 @@ mod arc_async_rw_lock_tests {
     }
 
     #[tokio::test]
+    async fn test_arc_async_rw_lock_deref_and_as_ref_expose_rw_lock_api() {
+        let async_rw_lock = ArcAsyncRwLock::new(1);
+
+        {
+            let guard = (*async_rw_lock).read().await;
+            assert_eq!(*guard, 1);
+        }
+
+        {
+            let mut guard = async_rw_lock.as_ref().write().await;
+            *guard += 1;
+        }
+
+        assert_eq!(async_rw_lock.read(|value| *value).await, 2);
+    }
+
+    #[tokio::test]
     async fn test_arc_async_rw_lock_read() {
         let async_rw_lock = ArcAsyncRwLock::new(0);
 

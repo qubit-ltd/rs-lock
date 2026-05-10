@@ -16,6 +16,8 @@ Lock-focused utilities for the Qubit Rust libraries. The crate provides synchron
 - `Monitor`, `ArcMonitor`, `MonitorGuard`: parking_lot-based condition coordination.
 - `StdMonitor`, `ArcStdMonitor`, `StdMonitorGuard`: std-based condition coordination.
 - Closure-based APIs that keep lock acquisition and release scoped to one call.
+- `Arc*` wrappers implement `Deref` and `AsRef`, so the native guard-based
+  APIs of the wrapped primitive remain available when needed.
 
 ## Installation
 
@@ -41,6 +43,32 @@ fn main() {
     assert_eq!(counter.read(|value| *value), 1);
 }
 ```
+
+### Native lock APIs
+
+`Arc*` wrappers can still use the native lock APIs of their wrapped
+primitives through `Deref` or `AsRef`.
+
+```rust
+use qubit_lock::{ArcMutex, Lock};
+
+fn main() {
+    let counter = ArcMutex::new(0);
+
+    {
+        let mut guard = counter.lock();
+        *guard += 1;
+    }
+
+    counter.write(|value| *value += 1);
+    assert_eq!(counter.read(|value| *value), 2);
+}
+```
+
+For `ArcRwLock` and `ArcAsyncRwLock`, the closure-based `read` and `write`
+methods have the same names as the native guard-based methods. When `Lock` or
+`AsyncLock` is in scope, use `lock.as_ref().read()` or explicit dereferencing
+such as `(*lock).read()` to call the native guard API.
 
 ### Monitor
 
