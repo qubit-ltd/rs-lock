@@ -23,7 +23,7 @@ Lock-focused utilities for the Qubit Rust libraries. The crate provides synchron
 
 ```toml
 [dependencies]
-qubit-lock = "0.4"
+qubit-lock = "0.5"
 ```
 
 The async wrappers use Tokio synchronization primitives. If your application
