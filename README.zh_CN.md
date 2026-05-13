@@ -12,7 +12,7 @@
 ## 特性
 
 - `ArcMutex`、`ArcRwLock`、`ArcStdMutex`：内部已集成 `Arc` 的同步锁包装器。
-- `ArcAsyncMutex`、`ArcAsyncRwLock`：基于 Tokio 的异步锁包装器。
+- `ArcAsyncMutex`、`ArcAsyncRwLock`：默认 `async` 特性启用的 Tokio 异步锁包装器。
 - `Monitor`、`ArcMonitor`、`MonitorGuard`：基于 parking_lot 的条件变量协调工具。
 - `StdMonitor`、`ArcStdMonitor`、`StdMonitorGuard`：基于标准库的条件变量协调工具。
 - 基于闭包的访问接口，让加锁和释放始终局限在一次调用内部。
@@ -23,11 +23,17 @@
 
 ```toml
 [dependencies]
-qubit-lock = "0.5"
+qubit-lock = "0.6"
 ```
 
-异步锁包装器使用 Tokio 同步原语。如果应用需要创建 Tokio runtime，请在应用自己的
-`Cargo.toml` 中启用合适的 Tokio runtime 特性，例如 `rt` 或 `rt-multi-thread`。
+异步锁包装器使用 Tokio 同步原语，并默认启用。只需要同步锁与 Monitor、且希望依赖图中不包含 Tokio 的使用方，可以关闭默认特性：
+
+```toml
+[dependencies]
+qubit-lock = { version = "0.6", default-features = false }
+```
+
+如果应用需要创建 Tokio runtime，请在应用自己的 `Cargo.toml` 中启用合适的 Tokio runtime 特性，例如 `rt` 或 `rt-multi-thread`。
 
 ## 快速开始
 

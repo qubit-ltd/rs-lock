@@ -12,7 +12,7 @@ Lock-focused utilities for the Qubit Rust libraries. The crate provides synchron
 ## Features
 
 - `ArcMutex`, `ArcRwLock`, `ArcStdMutex`: synchronous lock wrappers with `Arc` built in.
-- `ArcAsyncMutex`, `ArcAsyncRwLock`: Tokio-based asynchronous lock wrappers.
+- `ArcAsyncMutex`, `ArcAsyncRwLock`: Tokio-based asynchronous lock wrappers enabled by the default `async` feature.
 - `Monitor`, `ArcMonitor`, `MonitorGuard`: parking_lot-based condition coordination.
 - `StdMonitor`, `ArcStdMonitor`, `StdMonitorGuard`: std-based condition coordination.
 - Closure-based APIs that keep lock acquisition and release scoped to one call.
@@ -23,12 +23,19 @@ Lock-focused utilities for the Qubit Rust libraries. The crate provides synchron
 
 ```toml
 [dependencies]
-qubit-lock = "0.5"
+qubit-lock = "0.6"
 ```
 
-The async wrappers use Tokio synchronization primitives. If your application
-creates a Tokio runtime, enable the appropriate Tokio runtime features in your
-own `Cargo.toml`, such as `rt` or `rt-multi-thread`.
+The async wrappers use Tokio synchronization primitives and are enabled by
+default. For sync-only users that want to avoid Tokio in the dependency graph:
+
+```toml
+[dependencies]
+qubit-lock = { version = "0.6", default-features = false }
+```
+
+If your application creates a Tokio runtime, enable the appropriate Tokio
+runtime features in your own `Cargo.toml`, such as `rt` or `rt-multi-thread`.
 
 ## Quick Start
 
