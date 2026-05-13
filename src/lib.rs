@@ -14,22 +14,25 @@
 //! The crate provides:
 //!
 //! - Synchronous lock wrappers with `Arc` integrated internally.
-//! - Asynchronous Tokio-based lock wrappers.
+//! - Optional asynchronous Tokio-based lock wrappers behind the `async` feature.
 //! - Monitor-style coordination built on `parking_lot` and standard-library
 //!   `Mutex` plus `Condvar` pairs.
 //!
 
 pub mod lock;
 pub mod monitor;
+#[cfg(feature = "async")]
 pub use lock::{
     ArcAsyncMutex,
     ArcAsyncRwLock,
+    AsyncLock,
+};
+pub use lock::{
     ArcMonitor,
     ArcMutex,
     ArcRwLock,
     ArcStdMonitor,
     ArcStdMutex,
-    AsyncLock,
     Lock,
     Monitor,
     MonitorGuard,

@@ -13,11 +13,14 @@
 //! including tests for traits and their implementations.
 
 // Trait tests
+#[cfg(feature = "async")]
 mod async_lock_tests;
 mod lock_tests;
 
 // Implementation tests
+#[cfg(feature = "async")]
 mod arc_async_mutex_tests;
+#[cfg(feature = "async")]
 mod arc_async_rw_lock_tests;
 mod arc_mutex_tests;
 mod arc_rw_lock_tests;
