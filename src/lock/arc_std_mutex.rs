@@ -279,6 +279,34 @@ impl<T> Lock<T> for ArcStdMutex<T> {
     }
 }
 
+impl<T> From<T> for ArcStdMutex<T> {
+    /// Creates an Arc-wrapped standard mutex from a value.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The value to protect.
+    ///
+    /// # Returns
+    ///
+    /// A new [`ArcStdMutex`] protecting `value`.
+    #[inline]
+    fn from(value: T) -> Self {
+        Self::new(value)
+    }
+}
+
+impl<T: Default> Default for ArcStdMutex<T> {
+    /// Creates an Arc-wrapped standard mutex containing `T::default()`.
+    ///
+    /// # Returns
+    ///
+    /// A new [`ArcStdMutex`] protecting the default value for `T`.
+    #[inline]
+    fn default() -> Self {
+        Self::new(T::default())
+    }
+}
+
 impl<T> Clone for ArcStdMutex<T> {
     /// Clones the synchronous mutex
     ///

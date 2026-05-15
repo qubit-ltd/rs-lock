@@ -11,7 +11,8 @@
 
 ## 特性
 
-- `ArcMutex`、`ArcRwLock`、`ArcStdMutex`：内部已集成 `Arc` 的同步锁包装器。
+- `ArcMutex`、`ArcRwLock`：基于 parking_lot、内部已集成 `Arc` 的同步锁包装器。
+- `ArcStdMutex`、`ArcStdRwLock`：基于标准库、保留 poison 语义的同步锁包装器。
 - `ArcAsyncMutex`、`ArcAsyncRwLock`：默认 `async` 特性启用的 Tokio 异步锁包装器。
 - `Monitor`、`ArcMonitor`、`MonitorGuard`：基于 parking_lot 的条件变量协调工具。
 - `StdMonitor`、`ArcStdMonitor`、`StdMonitorGuard`：基于标准库的条件变量协调工具。

@@ -209,6 +209,34 @@ where
     }
 }
 
+impl<T> From<T> for ArcAsyncMutex<T> {
+    /// Creates an Arc-wrapped Tokio mutex from a value.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The value to protect.
+    ///
+    /// # Returns
+    ///
+    /// A new [`ArcAsyncMutex`] protecting `value`.
+    #[inline]
+    fn from(value: T) -> Self {
+        Self::new(value)
+    }
+}
+
+impl<T: Default> Default for ArcAsyncMutex<T> {
+    /// Creates an Arc-wrapped Tokio mutex containing `T::default()`.
+    ///
+    /// # Returns
+    ///
+    /// A new [`ArcAsyncMutex`] protecting the default value for `T`.
+    #[inline]
+    fn default() -> Self {
+        Self::new(T::default())
+    }
+}
+
 impl<T> Clone for ArcAsyncMutex<T> {
     /// Clones the asynchronous mutex
     ///

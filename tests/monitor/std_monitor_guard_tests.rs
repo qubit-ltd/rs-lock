@@ -7,11 +7,11 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-//! Tests for [`StdMonitorGuard`](qubit_lock::lock::StdMonitorGuard).
+//! Tests for [`StdMonitorGuard`](qubit_lock::monitor::StdMonitorGuard).
 
 use std::time::Duration;
 
-use qubit_lock::lock::{
+use qubit_lock::monitor::{
     StdMonitor,
     WaitTimeoutStatus,
 };

@@ -9,10 +9,10 @@
  ******************************************************************************/
 //! # Lock Module
 //!
-//! Provides synchronous lock abstractions, monitor re-exports, and
-//! feature-gated asynchronous lock abstractions. This module offers unified
-//! interfaces for different types of locks through traits, making it easier to
-//! write generic code that works with multiple lock types.
+//! Provides synchronous lock abstractions and feature-gated asynchronous lock
+//! abstractions. This module offers unified interfaces for different types of
+//! locks through traits, making it easier to write generic code that works with
+//! multiple lock types.
 //!
 
 // 子模块 `lock` 存放同步锁 trait `Lock`，与父模块同名是刻意分层；避免 clippy::module_inception 误报
@@ -32,19 +32,9 @@ mod arc_async_rw_lock;
 mod arc_mutex;
 mod arc_rw_lock;
 mod arc_std_mutex;
+mod arc_std_rw_lock;
 
-// Re-export traits
 // Re-export implementations
-pub use crate::monitor::{
-    ArcMonitor,
-    ArcStdMonitor,
-    Monitor,
-    MonitorGuard,
-    StdMonitor,
-    StdMonitorGuard,
-    WaitTimeoutResult,
-    WaitTimeoutStatus,
-};
 #[cfg(feature = "async")]
 pub use arc_async_mutex::ArcAsyncMutex;
 #[cfg(feature = "async")]
@@ -52,6 +42,7 @@ pub use arc_async_rw_lock::ArcAsyncRwLock;
 pub use arc_mutex::ArcMutex;
 pub use arc_rw_lock::ArcRwLock;
 pub use arc_std_mutex::ArcStdMutex;
+pub use arc_std_rw_lock::ArcStdRwLock;
 #[cfg(feature = "async")]
 pub use async_lock::AsyncLock;
 pub use lock::Lock;

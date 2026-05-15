@@ -25,5 +25,7 @@ mod arc_async_rw_lock_tests;
 mod arc_mutex_tests;
 mod arc_rw_lock_tests;
 mod arc_std_mutex_tests;
+mod arc_std_rw_lock_tests;
 mod parking_lot_mutex_tests;
+mod parking_lot_rw_lock_tests;
 mod try_lock_error_tests;

@@ -30,7 +30,7 @@
 /// ```rust
 /// use std::time::Duration;
 ///
-/// use qubit_lock::lock::{Monitor, WaitTimeoutResult};
+/// use qubit_lock::monitor::{Monitor, WaitTimeoutResult};
 ///
 /// let monitor = Monitor::new(true);
 /// let result = monitor.wait_timeout_until(

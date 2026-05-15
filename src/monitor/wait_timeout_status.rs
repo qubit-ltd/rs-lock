@@ -25,7 +25,7 @@
 /// ```rust
 /// use std::time::Duration;
 ///
-/// use qubit_lock::lock::{Monitor, WaitTimeoutStatus};
+/// use qubit_lock::monitor::{Monitor, WaitTimeoutStatus};
 ///
 /// let monitor = Monitor::new(false);
 /// let guard = monitor.lock();

@@ -40,6 +40,15 @@ mod arc_mutex_tests {
     }
 
     #[test]
+    fn test_arc_mutex_from_and_default() {
+        let from_value = ArcMutex::from(42);
+        assert_eq!(from_value.read(|value| *value), 42);
+
+        let default_value = ArcMutex::<Vec<i32>>::default();
+        assert!(default_value.read(|items| items.is_empty()));
+    }
+
+    #[test]
     fn test_arc_mutex_deref_and_as_ref_expose_mutex_api() {
         let mutex = ArcMutex::new(1);
 

@@ -11,7 +11,8 @@ Lock-focused utilities for the Qubit Rust libraries. The crate provides synchron
 
 ## Features
 
-- `ArcMutex`, `ArcRwLock`, `ArcStdMutex`: synchronous lock wrappers with `Arc` built in.
+- `ArcMutex`, `ArcRwLock`: parking_lot-based synchronous lock wrappers with `Arc` built in.
+- `ArcStdMutex`, `ArcStdRwLock`: standard-library lock wrappers for callers that need poison semantics.
 - `ArcAsyncMutex`, `ArcAsyncRwLock`: Tokio-based asynchronous lock wrappers enabled by the default `async` feature.
 - `Monitor`, `ArcMonitor`, `MonitorGuard`: parking_lot-based condition coordination.
 - `StdMonitor`, `ArcStdMonitor`, `StdMonitorGuard`: std-based condition coordination.

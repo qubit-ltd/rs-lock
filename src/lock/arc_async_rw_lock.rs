@@ -268,6 +268,34 @@ where
     }
 }
 
+impl<T> From<T> for ArcAsyncRwLock<T> {
+    /// Creates an Arc-wrapped Tokio read-write lock from a value.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The value to protect.
+    ///
+    /// # Returns
+    ///
+    /// A new [`ArcAsyncRwLock`] protecting `value`.
+    #[inline]
+    fn from(value: T) -> Self {
+        Self::new(value)
+    }
+}
+
+impl<T: Default> Default for ArcAsyncRwLock<T> {
+    /// Creates an Arc-wrapped Tokio read-write lock containing `T::default()`.
+    ///
+    /// # Returns
+    ///
+    /// A new [`ArcAsyncRwLock`] protecting the default value for `T`.
+    #[inline]
+    fn default() -> Self {
+        Self::new(T::default())
+    }
+}
+
 impl<T> Clone for ArcAsyncRwLock<T> {
     /// Clones the asynchronous read-write lock
     ///

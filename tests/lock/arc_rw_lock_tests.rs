@@ -53,19 +53,25 @@ mod arc_rw_lock_tests {
         let rw_lock = ArcRwLock::new(1);
 
         {
-            let guard = (*rw_lock).read().expect("rw lock should not be poisoned");
+            let guard = (*rw_lock).read();
             assert_eq!(*guard, 1);
         }
 
         {
-            let mut guard = rw_lock
-                .as_ref()
-                .write()
-                .expect("rw lock should not be poisoned");
+            let mut guard = rw_lock.as_ref().write();
             *guard += 1;
         }
 
         assert_eq!(rw_lock.read(|value| *value), 2);
+    }
+
+    #[test]
+    fn test_arc_rw_lock_from_and_default() {
+        let from_value = ArcRwLock::from(42);
+        assert_eq!(from_value.read(|value| *value), 42);
+
+        let default_value = ArcRwLock::<Vec<i32>>::default();
+        assert!(default_value.read(|items| items.is_empty()));
     }
 
     #[test]
@@ -272,53 +278,48 @@ mod arc_rw_lock_tests {
     }
 
     #[test]
-    #[should_panic(expected = "PoisonError")]
-    fn test_arc_rw_lock_read_panics_on_poisoned() {
+    fn test_arc_rw_lock_read_remains_usable_after_panic() {
         let rw_lock = ArcRwLock::new(0);
         let rw_lock = Arc::new(rw_lock);
 
         let rw_lock_clone = rw_lock.clone();
 
-        // Poison the lock by panicking while holding write lock
         let handle = thread::spawn(move || {
             rw_lock_clone.write(|value| {
                 *value += 1;
-                panic!("intentional panic to poison the lock");
+                panic!("intentional panic while holding the lock");
             });
         });
 
-        // Wait for thread to panic
         let _ = handle.join();
 
-        // Try to acquire read lock on poisoned lock, should panic
-        rw_lock.read(|_| {});
+        assert_eq!(rw_lock.read(|value| *value), 1);
     }
 
     #[test]
-    #[should_panic(expected = "PoisonError")]
-    fn test_arc_rw_lock_write_panics_on_poisoned() {
+    fn test_arc_rw_lock_write_remains_usable_after_panic() {
         let rw_lock = ArcRwLock::new(0);
         let rw_lock = Arc::new(rw_lock);
 
         let rw_lock_clone = rw_lock.clone();
 
-        // Poison the lock by panicking while holding write lock
         let handle = thread::spawn(move || {
             rw_lock_clone.write(|value| {
                 *value += 1;
-                panic!("intentional panic to poison the lock");
+                panic!("intentional panic while holding the lock");
             });
         });
 
-        // Wait for thread to panic
         let _ = handle.join();
 
-        // Try to acquire write lock on poisoned lock, should panic
-        rw_lock.write(|_| {});
+        rw_lock.write(|value| {
+            *value += 1;
+        });
+        assert_eq!(rw_lock.read(|value| *value), 2);
     }
 
     #[test]
-    fn test_arc_rw_lock_try_read_returns_poisoned() {
+    fn test_arc_rw_lock_try_read_remains_usable_after_panic() {
         let rw_lock = ArcRwLock::new(0);
         let rw_lock = Arc::new(rw_lock);
 
@@ -326,13 +327,13 @@ mod arc_rw_lock_tests {
         let handle = thread::spawn(move || {
             rw_lock_clone.write(|value| {
                 *value += 1;
-                panic!("intentional panic to poison the lock");
+                panic!("intentional panic while holding the lock");
             });
         });
 
         let _ = handle.join();
         let result = rw_lock.try_read(|value| *value);
-        assert_eq!(result, Err(TryLockError::Poisoned));
+        assert_eq!(result, Ok(1));
     }
 
     #[test]
@@ -389,21 +390,18 @@ mod arc_rw_lock_tests {
             .expect("holder thread should still be waiting for release");
         write_holder.join().unwrap();
 
-        let poisoned = Arc::new(ArcRwLock::new(0));
-        let poisoned_clone = poisoned.clone();
+        let recovered = Arc::new(ArcRwLock::new(0));
+        let recovered_clone = recovered.clone();
         let handle = thread::spawn(move || {
-            poisoned_clone.write(|value| {
+            recovered_clone.write(|value| {
                 *value += 1;
-                panic!("intentional panic to poison the lock");
+                panic!("intentional panic while holding the lock");
             });
         });
         let _ = handle.join();
 
-        assert_eq!(poisoned.try_read(read_i32), Err(TryLockError::Poisoned));
-        assert_eq!(
-            poisoned.try_write(increment_i32),
-            Err(TryLockError::Poisoned),
-        );
+        assert_eq!(recovered.try_read(read_i32), Ok(1));
+        assert_eq!(recovered.try_write(increment_i32), Ok(2));
     }
 
     #[test]
@@ -467,20 +465,20 @@ mod arc_rw_lock_tests {
     }
 
     #[test]
-    fn test_arc_rw_lock_try_write_returns_poisoned() {
+    fn test_arc_rw_lock_try_write_remains_usable_after_panic() {
         let rw_lock = Arc::new(ArcRwLock::new(0));
 
         let rw_lock_clone = rw_lock.clone();
         let handle = thread::spawn(move || {
             rw_lock_clone.write(|value| {
                 *value += 1;
-                panic!("intentional panic to poison the lock");
+                panic!("intentional panic while holding the lock");
             });
         });
 
         let _ = handle.join();
         let result = rw_lock.try_write(|value| *value);
-        assert_eq!(result, Err(TryLockError::Poisoned));
+        assert_eq!(result, Ok(1));
     }
 
     #[test]
