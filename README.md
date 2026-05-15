@@ -126,6 +126,8 @@ fn main() {
 
 ## Quality Checks
 
+From a repository checkout:
+
 ```bash
 ./align-ci.sh
 ./ci-check.sh
