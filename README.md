@@ -24,7 +24,7 @@ Lock-focused utilities for the Qubit Rust libraries. The crate provides synchron
 
 ```toml
 [dependencies]
-qubit-lock = "0.6"
+qubit-lock = "0.7"
 ```
 
 The async wrappers use Tokio synchronization primitives and are enabled by
@@ -32,11 +32,25 @@ default. For sync-only users that want to avoid Tokio in the dependency graph:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.6", default-features = false }
+qubit-lock = { version = "0.7", default-features = false }
 ```
 
 If your application creates a Tokio runtime, enable the appropriate Tokio
 runtime features in your own `Cargo.toml`, such as `rt` or `rt-multi-thread`.
+
+## Migration from 0.6
+
+Version `0.7` contains intentional breaking API cleanup:
+
+- `ArcRwLock` now wraps `parking_lot::RwLock` and no longer uses poisoning.
+  After a panic while holding the lock, future acquisitions continue normally
+  and `try_read` / `try_write` do not return `TryLockError::Poisoned`.
+- Use `ArcStdRwLock` when standard-library `std::sync::RwLock` poisoning
+  semantics are required.
+- Monitor types are no longer re-exported from `qubit_lock::lock`. Import
+  them from `qubit_lock::monitor` or from the crate root.
+- Wrapper types now implement convenient `From<T>` and `Default`
+  constructors where applicable.
 
 ## Quick Start
 

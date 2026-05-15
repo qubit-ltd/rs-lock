@@ -7,37 +7,51 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
+use std::time::Duration;
+
+use qubit_lock::monitor::{
+    ArcMonitor,
+    WaitTimeoutResult,
+};
 use qubit_lock::{
+    ArcRwLock,
+    ArcStdRwLock,
     Lock,
-    lock::ArcStdMutex,
 };
 
 fn main() {
-    println!("Testing ArcStdMutex Clone functionality...");
+    println!("Demonstrating rs-lock wrapper boundaries...");
 
-    // Test Clone with different types
-    let string_mutex = ArcStdMutex::new(String::from("hello"));
-    let string_clone = string_mutex.clone();
-    string_clone.write(|s| s.push_str(" world"));
-    let result = string_mutex.read(|s| s.clone());
-    assert_eq!(result, "hello world");
-    println!("✓ String clone test passed");
+    let cache = ArcRwLock::from(Vec::<String>::new());
+    cache.write(|items| items.push(String::from("ready")));
+    assert_eq!(cache.read(|items| items.len()), 1);
 
-    // Test Clone with Vec
-    let vec_mutex = ArcStdMutex::new(vec![1, 2, 3]);
-    let vec_clone = vec_mutex.clone();
-    vec_clone.write(|v| v.push(4));
-    let result = vec_mutex.read(|v| v.clone());
-    assert_eq!(result, vec![1, 2, 3, 4]);
-    println!("✓ Vec clone test passed");
+    let std_state = ArcStdRwLock::new(String::from("std semantics"));
+    assert_eq!(
+        std_state.read(|value| value.clone()),
+        String::from("std semantics"),
+    );
 
-    // Test Clone with Option
-    let option_mutex = ArcStdMutex::new(Some(42));
-    let option_clone = option_mutex.clone();
-    option_clone.write(|opt| *opt = Some(84));
-    let result = option_mutex.read(|opt| *opt);
-    assert_eq!(result, Some(84));
-    println!("✓ Option clone test passed");
+    let monitor = ArcMonitor::new(Vec::<i32>::new());
+    let result = monitor.wait_timeout_while(
+        Duration::from_millis(1),
+        |items| items.is_empty(),
+        |items| items.pop(),
+    );
+    assert!(result.is_timed_out());
 
-    println!("All Clone tests passed! 🎉");
+    monitor.write(|items| items.push(7));
+    monitor.notify_one();
+    let result = monitor.wait_timeout_until(
+        Duration::from_millis(1),
+        |items| !items.is_empty(),
+        |items| items.pop(),
+    );
+    assert_eq!(result, WaitTimeoutResult::Ready(Some(7)));
+    assert_eq!(
+        result.map(|item| item.unwrap_or_default()).into_option(),
+        Some(7)
+    );
+
+    println!("All wrapper boundary examples passed.");
 }

@@ -51,3 +51,63 @@ pub enum WaitTimeoutResult<R> {
     /// The timeout elapsed before the predicate became ready.
     TimedOut,
 }
+
+impl<R> WaitTimeoutResult<R> {
+    /// Returns `true` when the result contains a ready value.
+    ///
+    /// # Returns
+    ///
+    /// `true` for [`Self::Ready`], otherwise `false`.
+    #[inline]
+    pub const fn is_ready(&self) -> bool {
+        match self {
+            Self::Ready(_) => true,
+            Self::TimedOut => false,
+        }
+    }
+
+    /// Returns `true` when the timeout elapsed before the predicate was ready.
+    ///
+    /// # Returns
+    ///
+    /// `true` for [`Self::TimedOut`], otherwise `false`.
+    #[inline]
+    pub const fn is_timed_out(&self) -> bool {
+        match self {
+            Self::Ready(_) => false,
+            Self::TimedOut => true,
+        }
+    }
+
+    /// Converts this result into an [`Option`].
+    ///
+    /// # Returns
+    ///
+    /// `Some(value)` for [`Self::Ready`], or `None` for [`Self::TimedOut`].
+    #[inline]
+    pub fn into_option(self) -> Option<R> {
+        match self {
+            Self::Ready(value) => Some(value),
+            Self::TimedOut => None,
+        }
+    }
+
+    /// Maps a ready value while preserving timeout status.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - Closure applied to the contained value when this result is
+    ///   [`Self::Ready`].
+    ///
+    /// # Returns
+    ///
+    /// [`Self::Ready`] containing the mapped value, or
+    /// [`WaitTimeoutResult::TimedOut`] when this result timed out.
+    #[inline]
+    pub fn map<U, F: FnOnce(R) -> U>(self, f: F) -> WaitTimeoutResult<U> {
+        match self {
+            Self::Ready(value) => WaitTimeoutResult::Ready(f(value)),
+            Self::TimedOut => WaitTimeoutResult::TimedOut,
+        }
+    }
+}
