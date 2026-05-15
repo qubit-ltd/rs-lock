@@ -41,6 +41,7 @@ use crate::lock::{
 /// - Thread-safe, supports multi-threaded sharing
 /// - Automatic lock management through RAII ensures proper lock
 ///   release
+/// - Implements [`AsyncLock`] when the protected value is `Send + Sync`
 /// - Implements [`Deref`] and [`AsRef`] to expose the underlying
 ///   [`tokio::sync::RwLock`] API when guard-based access is needed
 ///

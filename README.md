@@ -37,6 +37,8 @@ qubit-lock = { version = "0.7", default-features = false }
 
 If your application creates a Tokio runtime, enable the appropriate Tokio
 runtime features in your own `Cargo.toml`, such as `rt` or `rt-multi-thread`.
+`AsyncLock` returns `Send` futures: `ArcAsyncMutex<T>` implements it for
+`T: Send`, while `ArcAsyncRwLock<T>` implements it for `T: Send + Sync`.
 
 ## Migration from 0.6
 

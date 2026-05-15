@@ -61,6 +61,11 @@ use super::try_lock_error::TryLockError;
 /// enable an appropriate Tokio runtime feature such as `rt` or
 /// `rt-multi-thread`.
 ///
+/// The trait intentionally returns `Send` futures. Closures and return values
+/// passed to `read` and `write` must be `Send`; Tokio mutex implementations
+/// require `T: Send`, and Tokio read-write lock implementations require
+/// `T: Send + Sync`.
+///
 /// # Performance Characteristics
 ///
 /// Different async lock implementations have different performance
