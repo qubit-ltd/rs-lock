@@ -17,7 +17,7 @@ use tokio::sync::{
     RwLock as AsyncRwLock,
 };
 
-use qubit_lock::lock::{
+use qubit_lock::{
     ArcAsyncMutex,
     ArcAsyncRwLock,
     AsyncLock,

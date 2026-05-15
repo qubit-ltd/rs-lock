@@ -242,6 +242,86 @@ impl<T> Monitor<T> {
         f(&mut *guard)
     }
 
+    /// Acquires the monitor, mutates the protected state, and wakes one waiter.
+    ///
+    /// The closure runs while the mutex is held. After the closure returns, the
+    /// mutex guard is dropped and one thread waiting on this monitor's condition
+    /// variable is notified. This is a convenience method for the common
+    /// "update state, then notify one waiter" pattern.
+    ///
+    /// If `f` panics, the panic is propagated and no notification is sent.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - Closure that receives a mutable reference to the state.
+    ///
+    /// # Returns
+    ///
+    /// The value returned by the closure.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use qubit_lock::Monitor;
+    ///
+    /// let monitor = Monitor::new(Vec::<i32>::new());
+    /// let len = monitor.write_notify_one(|items| {
+    ///     items.push(7);
+    ///     items.len()
+    /// });
+    ///
+    /// assert_eq!(len, 1);
+    /// ```
+    #[inline]
+    pub fn write_notify_one<R, F>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut T) -> R,
+    {
+        let result = self.write(f);
+        self.notify_one();
+        result
+    }
+
+    /// Acquires the monitor, mutates the protected state, and wakes all waiters.
+    ///
+    /// The closure runs while the mutex is held. After the closure returns, the
+    /// mutex guard is dropped and all threads waiting on this monitor's condition
+    /// variable are notified. This is a convenience method for state changes that
+    /// may allow multiple waiters to make progress.
+    ///
+    /// If `f` panics, the panic is propagated and no notification is sent.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - Closure that receives a mutable reference to the state.
+    ///
+    /// # Returns
+    ///
+    /// The value returned by the closure.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use qubit_lock::Monitor;
+    ///
+    /// let monitor = Monitor::new(false);
+    /// let ready = monitor.write_notify_all(|ready| {
+    ///     *ready = true;
+    ///     *ready
+    /// });
+    ///
+    /// assert!(ready);
+    /// ```
+    #[inline]
+    pub fn write_notify_all<R, F>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut T) -> R,
+    {
+        let result = self.write(f);
+        self.notify_all();
+        result
+    }
+
     /// Waits for a notification or timeout without checking state.
     ///
     /// This convenience method locks the monitor, waits once on the condition
