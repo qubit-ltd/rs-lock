@@ -273,6 +273,34 @@ impl<T> Lock<T> for ArcMutex<T> {
     }
 }
 
+impl<T> From<T> for ArcMutex<T> {
+    /// Creates an Arc-wrapped parking_lot mutex from a value.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The value to protect.
+    ///
+    /// # Returns
+    ///
+    /// A new [`ArcMutex`] protecting `value`.
+    #[inline]
+    fn from(value: T) -> Self {
+        Self::new(value)
+    }
+}
+
+impl<T: Default> Default for ArcMutex<T> {
+    /// Creates an Arc-wrapped parking_lot mutex containing `T::default()`.
+    ///
+    /// # Returns
+    ///
+    /// A new [`ArcMutex`] protecting the default value for `T`.
+    #[inline]
+    fn default() -> Self {
+        Self::new(T::default())
+    }
+}
+
 impl<T> Clone for ArcMutex<T> {
     /// Clones the synchronous mutex
     ///

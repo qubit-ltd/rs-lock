@@ -90,7 +90,7 @@ use super::{
 /// ```rust
 /// use std::thread;
 ///
-/// use qubit_lock::lock::ArcStdMonitor;
+/// use qubit_lock::monitor::ArcStdMonitor;
 ///
 /// let monitor = ArcStdMonitor::new(false);
 /// let waiter_monitor = monitor.clone();
@@ -134,7 +134,7 @@ impl<T> StdMonitor<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::StdMonitor;
+    /// use qubit_lock::monitor::StdMonitor;
     ///
     /// let monitor = StdMonitor::new(0_u32);
     /// assert_eq!(monitor.read(|n| *n), 0);
@@ -164,7 +164,7 @@ impl<T> StdMonitor<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::StdMonitor;
+    /// use qubit_lock::monitor::StdMonitor;
     ///
     /// let monitor = StdMonitor::new(1);
     /// {
@@ -203,7 +203,7 @@ impl<T> StdMonitor<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::StdMonitor;
+    /// use qubit_lock::monitor::StdMonitor;
     ///
     /// let monitor = StdMonitor::new(10_i32);
     /// let n = monitor.read(|x| *x);
@@ -239,7 +239,7 @@ impl<T> StdMonitor<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::StdMonitor;
+    /// use qubit_lock::monitor::StdMonitor;
     ///
     /// let monitor = StdMonitor::new(String::new());
     /// let len = monitor.write(|s| {
@@ -287,7 +287,7 @@ impl<T> StdMonitor<T> {
     /// ```rust
     /// use std::time::Duration;
     ///
-    /// use qubit_lock::lock::{StdMonitor, WaitTimeoutStatus};
+    /// use qubit_lock::monitor::{StdMonitor, WaitTimeoutStatus};
     ///
     /// let monitor = StdMonitor::new(false);
     /// let status = monitor.wait_notify(Duration::from_millis(1));
@@ -336,7 +336,7 @@ impl<T> StdMonitor<T> {
     ///     thread,
     /// };
     ///
-    /// use qubit_lock::lock::StdMonitor;
+    /// use qubit_lock::monitor::StdMonitor;
     ///
     /// let monitor = Arc::new(StdMonitor::new(Vec::<i32>::new()));
     /// let worker_monitor = Arc::clone(&monitor);
@@ -398,7 +398,7 @@ impl<T> StdMonitor<T> {
     ///     thread,
     /// };
     ///
-    /// use qubit_lock::lock::StdMonitor;
+    /// use qubit_lock::monitor::StdMonitor;
     ///
     /// let monitor = Arc::new(StdMonitor::new(false));
     /// let waiter_monitor = Arc::clone(&monitor);
@@ -461,7 +461,7 @@ impl<T> StdMonitor<T> {
     /// ```rust
     /// use std::time::Duration;
     ///
-    /// use qubit_lock::lock::{StdMonitor, WaitTimeoutResult};
+    /// use qubit_lock::monitor::{StdMonitor, WaitTimeoutResult};
     ///
     /// let monitor = StdMonitor::new(Vec::<i32>::new());
     /// let result = monitor.wait_timeout_while(
@@ -536,7 +536,7 @@ impl<T> StdMonitor<T> {
     ///     time::Duration,
     /// };
     ///
-    /// use qubit_lock::lock::{StdMonitor, WaitTimeoutResult};
+    /// use qubit_lock::monitor::{StdMonitor, WaitTimeoutResult};
     ///
     /// let monitor = Arc::new(StdMonitor::new(false));
     /// let waiter_monitor = Arc::clone(&monitor);
@@ -585,7 +585,7 @@ impl<T> StdMonitor<T> {
     /// ```rust
     /// use std::thread;
     ///
-    /// use qubit_lock::lock::ArcStdMonitor;
+    /// use qubit_lock::monitor::ArcStdMonitor;
     ///
     /// let monitor = ArcStdMonitor::new(0_u32);
     /// let waiter = {
@@ -617,7 +617,7 @@ impl<T> StdMonitor<T> {
     /// ```rust
     /// use std::thread;
     ///
-    /// use qubit_lock::lock::ArcStdMonitor;
+    /// use qubit_lock::monitor::ArcStdMonitor;
     ///
     /// let monitor = ArcStdMonitor::new(false);
     /// let mut handles = Vec::new();
@@ -640,6 +640,22 @@ impl<T> StdMonitor<T> {
     }
 }
 
+impl<T> From<T> for StdMonitor<T> {
+    /// Creates a standard monitor from an initial state value.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Initial state protected by the monitor.
+    ///
+    /// # Returns
+    ///
+    /// A standard monitor initialized with `value`.
+    #[inline]
+    fn from(value: T) -> Self {
+        Self::new(value)
+    }
+}
+
 impl<T: Default> Default for StdMonitor<T> {
     /// Creates a monitor containing `T::default()`.
     ///
@@ -650,7 +666,7 @@ impl<T: Default> Default for StdMonitor<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::StdMonitor;
+    /// use qubit_lock::monitor::StdMonitor;
     ///
     /// let monitor: StdMonitor<String> = StdMonitor::default();
     /// assert!(monitor.read(|s| s.is_empty()));

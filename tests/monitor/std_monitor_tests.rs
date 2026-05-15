@@ -7,7 +7,7 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-//! Tests for [`StdMonitor`](qubit_lock::lock::StdMonitor).
+//! Tests for [`StdMonitor`](qubit_lock::monitor::StdMonitor).
 
 use std::{
     sync::{
@@ -18,7 +18,7 @@ use std::{
     time::Duration,
 };
 
-use qubit_lock::lock::{
+use qubit_lock::monitor::{
     StdMonitor,
     WaitTimeoutResult,
     WaitTimeoutStatus,
@@ -40,6 +40,13 @@ fn test_std_monitor_default_uses_default_value() {
     let monitor = StdMonitor::<Vec<i32>>::default();
 
     assert!(monitor.read(|items| items.is_empty()));
+}
+
+#[test]
+fn test_std_monitor_from_uses_supplied_value() {
+    let monitor = StdMonitor::from(vec![1, 2, 3]);
+
+    assert_eq!(monitor.read(|items| items.len()), 3);
 }
 
 #[test]

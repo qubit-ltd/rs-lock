@@ -7,7 +7,7 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-use qubit_lock::lock::WaitTimeoutResult;
+use qubit_lock::monitor::WaitTimeoutResult;
 
 /// Test wait-timeout result variants and value semantics.
 #[test]

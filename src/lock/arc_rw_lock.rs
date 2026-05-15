@@ -9,27 +9,25 @@
  ******************************************************************************/
 //! # Synchronous Read-Write Lock Wrapper
 //!
-//! Provides an Arc-wrapped synchronous read-write lock for protecting
+//! Provides an Arc-wrapped parking_lot read-write lock for protecting
 //! shared data with multiple concurrent readers or a single writer.
 //!
 
 use std::ops::Deref;
-use std::sync::{
-    Arc,
-    RwLock,
-};
+use std::sync::Arc;
+
+use parking_lot::RwLock;
 
 use crate::lock::{
     Lock,
     TryLockError,
 };
 
-/// Synchronous Read-Write Lock Wrapper
+/// Parking-lot read-write lock wrapper.
 ///
-/// Provides an encapsulation of synchronous read-write lock,
-/// supporting multiple read operations or a single write operation.
-/// Read operations can execute concurrently, while write operations
-/// have exclusive access.
+/// Provides an Arc-wrapped [`parking_lot::RwLock`] for synchronous shared state.
+/// Read operations can execute concurrently, while write operations have
+/// exclusive access.
 ///
 /// # Features
 ///
@@ -40,8 +38,10 @@ use crate::lock::{
 /// - Thread-safe, supports multi-threaded sharing
 /// - Automatic lock management through RAII ensures proper lock
 ///   release
+/// - Does not use lock poisoning; panic while holding the lock does not make
+///   future acquisitions fail
 /// - Implements [`Deref`] and [`AsRef`] to expose the underlying
-///   [`std::sync::RwLock`] API when guard-based access is needed
+///   [`parking_lot::RwLock`] API when guard-based access is needed
 ///
 /// # Use Cases
 ///
@@ -69,7 +69,7 @@ use crate::lock::{
 ///
 ///
 pub struct ArcRwLock<T> {
-    /// Shared standard read-write lock protecting the wrapped value.
+    /// Shared parking_lot read-write lock protecting the wrapped value.
     inner: Arc<RwLock<T>>,
 }
 
@@ -100,7 +100,7 @@ impl<T> ArcRwLock<T> {
 }
 
 impl<T> AsRef<RwLock<T>> for ArcRwLock<T> {
-    /// Returns a reference to the underlying standard read-write lock.
+    /// Returns a reference to the underlying parking_lot read-write lock.
     ///
     /// This is useful when callers need guard-based APIs such as
     /// [`RwLock::read`] or [`RwLock::write`] instead of the closure-based
@@ -114,7 +114,7 @@ impl<T> AsRef<RwLock<T>> for ArcRwLock<T> {
 impl<T> Deref for ArcRwLock<T> {
     type Target = RwLock<T>;
 
-    /// Dereferences this wrapper to the underlying standard read-write lock.
+    /// Dereferences this wrapper to the underlying parking_lot read-write lock.
     ///
     /// When [`Lock`] is in scope, `read` and `write` with closure arguments
     /// still call the trait methods on this wrapper. Use explicit
@@ -143,10 +143,6 @@ impl<T> Lock<T> for ArcRwLock<T> {
     ///
     /// Returns the result of executing the closure
     ///
-    /// # Panics
-    ///
-    /// Panics if the underlying standard read-write lock is poisoned.
-    ///
     /// # Example
     ///
     /// ```rust
@@ -162,7 +158,7 @@ impl<T> Lock<T> for ArcRwLock<T> {
     where
         F: FnOnce(&T) -> R,
     {
-        let guard = self.inner.read().unwrap();
+        let guard = self.inner.read();
         f(&*guard)
     }
 
@@ -182,10 +178,6 @@ impl<T> Lock<T> for ArcRwLock<T> {
     ///
     /// Returns the result of executing the closure
     ///
-    /// # Panics
-    ///
-    /// Panics if the underlying standard read-write lock is poisoned.
-    ///
     /// # Example
     ///
     /// ```rust
@@ -203,7 +195,7 @@ impl<T> Lock<T> for ArcRwLock<T> {
     where
         F: FnOnce(&mut T) -> R,
     {
-        let mut guard = self.inner.write().unwrap();
+        let mut guard = self.inner.write();
         f(&mut *guard)
     }
 
@@ -220,7 +212,6 @@ impl<T> Lock<T> for ArcRwLock<T> {
     ///
     /// * `Ok(R)` - If the lock was successfully acquired and the closure executed
     /// * `Err(TryLockError::WouldBlock)` - If the lock is currently held in write mode
-    /// * `Err(TryLockError::Poisoned)` - If the lock is poisoned
     ///
     /// # Example
     ///
@@ -240,11 +231,10 @@ impl<T> Lock<T> for ArcRwLock<T> {
     where
         F: FnOnce(&T) -> R,
     {
-        match self.inner.try_read() {
-            Ok(guard) => Ok(f(&*guard)),
-            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
-            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
-        }
+        self.inner
+            .try_read()
+            .map(|guard| f(&*guard))
+            .ok_or(TryLockError::WouldBlock)
     }
 
     /// Attempts to acquire a write lock without blocking
@@ -259,8 +249,7 @@ impl<T> Lock<T> for ArcRwLock<T> {
     /// # Returns
     ///
     /// * `Ok(R)` - If the lock was successfully acquired and the closure executed
-    /// * `Err(TryLockError::WouldBlock)` - If the lock is currently held by another thread
-    /// * `Err(TryLockError::Poisoned)` - If the lock is poisoned
+    /// * `Err(TryLockError::WouldBlock)` - If the lock is unavailable
     ///
     /// # Example
     ///
@@ -283,11 +272,39 @@ impl<T> Lock<T> for ArcRwLock<T> {
     where
         F: FnOnce(&mut T) -> R,
     {
-        match self.inner.try_write() {
-            Ok(mut guard) => Ok(f(&mut *guard)),
-            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
-            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
-        }
+        self.inner
+            .try_write()
+            .map(|mut guard| f(&mut *guard))
+            .ok_or(TryLockError::WouldBlock)
+    }
+}
+
+impl<T> From<T> for ArcRwLock<T> {
+    /// Creates an Arc-wrapped parking_lot read-write lock from a value.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The value to protect.
+    ///
+    /// # Returns
+    ///
+    /// A new [`ArcRwLock`] protecting `value`.
+    #[inline]
+    fn from(value: T) -> Self {
+        Self::new(value)
+    }
+}
+
+impl<T: Default> Default for ArcRwLock<T> {
+    /// Creates an Arc-wrapped parking_lot read-write lock containing
+    /// `T::default()`.
+    ///
+    /// # Returns
+    ///
+    /// A new [`ArcRwLock`] protecting the default value for `T`.
+    #[inline]
+    fn default() -> Self {
+        Self::new(T::default())
     }
 }
 

@@ -49,7 +49,7 @@ use super::{
 /// # Example
 ///
 /// ```rust
-/// use qubit_lock::lock::Monitor;
+/// use qubit_lock::monitor::Monitor;
 ///
 /// let monitor = Monitor::new(Vec::new());
 /// {
@@ -107,7 +107,7 @@ impl<'a, T> MonitorGuard<'a, T> {
     ///     thread,
     /// };
     ///
-    /// use qubit_lock::lock::Monitor;
+    /// use qubit_lock::monitor::Monitor;
     ///
     /// let monitor = Arc::new(Monitor::new(false));
     /// let waiter_monitor = Arc::clone(&monitor);
@@ -161,7 +161,7 @@ impl<'a, T> MonitorGuard<'a, T> {
     /// ```rust
     /// use std::time::Duration;
     ///
-    /// use qubit_lock::lock::{Monitor, WaitTimeoutStatus};
+    /// use qubit_lock::monitor::{Monitor, WaitTimeoutStatus};
     ///
     /// let monitor = Monitor::new(0);
     /// let guard = monitor.lock();

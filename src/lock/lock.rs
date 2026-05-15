@@ -19,7 +19,10 @@ use std::sync::{
     RwLock,
 };
 
-use parking_lot::Mutex as ParkingLotMutex;
+use parking_lot::{
+    Mutex as ParkingLotMutex,
+    RwLock as ParkingLotRwLock,
+};
 
 use super::try_lock_error::TryLockError;
 
@@ -54,12 +57,12 @@ use super::try_lock_error::TryLockError;
 ///
 /// Different lock implementations have different performance characteristics:
 ///
-/// ## Mutex-based locks (ArcMutex, Mutex)
+/// ## Mutex-based locks (ArcMutex, ArcStdMutex, Mutex)
 /// - `read`: Acquires exclusive lock, same performance as write
 /// - `write`: Acquires exclusive lock, same performance as read
 /// - **Use case**: When you need exclusive access or don't know access patterns
 ///
-/// ## RwLock-based locks (ArcRwLock, RwLock)
+/// ## RwLock-based locks (ArcRwLock, ArcStdRwLock, RwLock)
 /// - `read`: Acquires shared lock, allows concurrent readers
 /// - `write`: Acquires exclusive lock, blocks all other operations
 /// - **Use case**: Read-heavy workloads where multiple readers can proceed
@@ -579,6 +582,101 @@ impl<T: ?Sized> Lock<T> for ParkingLotMutex<T> {
         F: FnOnce(&mut T) -> R,
     {
         self.try_lock()
+            .map(|mut guard| f(&mut *guard))
+            .ok_or(TryLockError::WouldBlock)
+    }
+}
+
+/// High-performance synchronous read-write lock implementation of the Lock trait.
+///
+/// This implementation uses the `parking_lot` crate's `RwLock` type to provide
+/// a non-poisoning read-write lock. Read operations use shared locks allowing
+/// concurrent readers, while write operations use exclusive locks.
+///
+/// # Type Parameters
+///
+/// * `T` - The type of data protected by the lock
+impl<T: ?Sized> Lock<T> for ParkingLotRwLock<T> {
+    /// Acquires a shared read lock and executes a closure.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - Closure receiving immutable access to the protected value.
+    ///
+    /// # Returns
+    ///
+    /// The value returned by `f`.
+    #[inline]
+    fn read<R, F>(&self, f: F) -> R
+    where
+        F: FnOnce(&T) -> R,
+    {
+        let guard = self.read();
+        f(&*guard)
+    }
+
+    /// Acquires an exclusive write lock and executes a closure.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - Closure receiving mutable access to the protected value.
+    ///
+    /// # Returns
+    ///
+    /// The value returned by `f`.
+    #[inline]
+    fn write<R, F>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut T) -> R,
+    {
+        let mut guard = self.write();
+        f(&mut *guard)
+    }
+
+    /// Attempts to acquire a shared read lock without blocking.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - Closure receiving immutable access when a read lock is acquired.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(result)` if a read lock is acquired.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TryLockError::WouldBlock`] when the lock is unavailable.
+    /// parking_lot read-write locks are not poisoned.
+    #[inline]
+    fn try_read<R, F>(&self, f: F) -> Result<R, TryLockError>
+    where
+        F: FnOnce(&T) -> R,
+    {
+        self.try_read()
+            .map(|guard| f(&*guard))
+            .ok_or(TryLockError::WouldBlock)
+    }
+
+    /// Attempts to acquire an exclusive write lock without blocking.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - Closure receiving mutable access when a write lock is acquired.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(result)` if a write lock is acquired.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TryLockError::WouldBlock`] when the lock is unavailable.
+    /// parking_lot read-write locks are not poisoned.
+    #[inline]
+    fn try_write<R, F>(&self, f: F) -> Result<R, TryLockError>
+    where
+        F: FnOnce(&mut T) -> R,
+    {
+        self.try_write()
             .map(|mut guard| f(&mut *guard))
             .ok_or(TryLockError::WouldBlock)
     }

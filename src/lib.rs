@@ -28,17 +28,20 @@ pub use lock::{
     AsyncLock,
 };
 pub use lock::{
-    ArcMonitor,
     ArcMutex,
     ArcRwLock,
-    ArcStdMonitor,
     ArcStdMutex,
+    ArcStdRwLock,
     Lock,
+    TryLockError,
+};
+pub use monitor::{
+    ArcMonitor,
+    ArcStdMonitor,
     Monitor,
     MonitorGuard,
     StdMonitor,
     StdMonitorGuard,
-    TryLockError,
     WaitTimeoutResult,
     WaitTimeoutStatus,
 };

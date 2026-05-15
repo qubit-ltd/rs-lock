@@ -48,6 +48,15 @@ mod arc_async_rw_lock_tests {
     }
 
     #[tokio::test]
+    async fn test_arc_async_rw_lock_from_and_default() {
+        let from_value = ArcAsyncRwLock::from(42);
+        assert_eq!(from_value.read(|value| *value).await, 42);
+
+        let default_value = ArcAsyncRwLock::<Vec<i32>>::default();
+        assert!(default_value.read(|items| items.is_empty()).await);
+    }
+
+    #[tokio::test]
     async fn test_arc_async_rw_lock_deref_and_as_ref_expose_rw_lock_api() {
         let async_rw_lock = ArcAsyncRwLock::new(1);
 
