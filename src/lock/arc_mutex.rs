@@ -49,7 +49,7 @@ use crate::lock::{
 /// # Usage Example
 ///
 /// ```rust
-/// use qubit_lock::lock::{ArcMutex, Lock};
+/// use qubit_lock::{ArcMutex, Lock};
 ///
 /// let counter = ArcMutex::new(0);
 ///
@@ -85,7 +85,7 @@ impl<T> ArcMutex<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::ArcMutex;
+    /// use qubit_lock::ArcMutex;
     ///
     /// let lock = ArcMutex::new(42);
     /// ```
@@ -140,7 +140,7 @@ impl<T> Lock<T> for ArcMutex<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{ArcMutex, Lock};
+    /// use qubit_lock::{ArcMutex, Lock};
     ///
     /// let counter = ArcMutex::new(42);
     ///
@@ -173,7 +173,7 @@ impl<T> Lock<T> for ArcMutex<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{ArcMutex, Lock};
+    /// use qubit_lock::{ArcMutex, Lock};
     ///
     /// let counter = ArcMutex::new(0);
     ///
@@ -210,7 +210,7 @@ impl<T> Lock<T> for ArcMutex<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{ArcMutex, Lock};
+    /// use qubit_lock::{ArcMutex, Lock};
     ///
     /// let counter = ArcMutex::new(42);
     ///
@@ -248,7 +248,7 @@ impl<T> Lock<T> for ArcMutex<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{ArcMutex, Lock};
+    /// use qubit_lock::{ArcMutex, Lock};
     ///
     /// let counter = ArcMutex::new(0);
     ///

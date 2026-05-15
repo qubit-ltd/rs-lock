@@ -7,12 +7,14 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-//! # Monitor 模块
+//! # Monitor Module
 //!
-//! 在互斥与条件变量之上提供 `Monitor` / `ArcMonitor` 及对应的标准库实现等原语。
+//! Provides `Monitor`, `ArcMonitor`, and standard-library counterparts built
+//! on mutex and condition-variable primitives.
 //!
 
-// 子模块 `monitor` 对应类型 `Monitor`；`monitor/monitor.rs` 与父模块同名是刻意分层
+// The nested `monitor` module owns the `Monitor` type; the repeated name is an
+// intentional module boundary.
 #![allow(clippy::module_inception)]
 
 mod arc_monitor;

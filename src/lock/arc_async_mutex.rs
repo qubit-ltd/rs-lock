@@ -44,7 +44,7 @@ use crate::lock::{
 /// # Usage Example
 ///
 /// ```rust
-/// use qubit_lock::lock::{ArcAsyncMutex, AsyncLock};
+/// use qubit_lock::{ArcAsyncMutex, AsyncLock};
 ///
 /// let rt = tokio::runtime::Builder::new_current_thread()
 ///     .enable_all()
@@ -86,7 +86,7 @@ impl<T> ArcAsyncMutex<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::ArcAsyncMutex;
+    /// use qubit_lock::ArcAsyncMutex;
     ///
     /// let lock = ArcAsyncMutex::new(42);
     /// ```

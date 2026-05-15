@@ -118,7 +118,7 @@ pub trait AsyncLock<T: ?Sized> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{AsyncLock, ArcAsyncRwLock};
+    /// use qubit_lock::{AsyncLock, ArcAsyncRwLock};
     ///
     /// let rt = tokio::runtime::Builder::new_current_thread()
     ///     .enable_all()
@@ -176,7 +176,7 @@ pub trait AsyncLock<T: ?Sized> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{AsyncLock, ArcAsyncRwLock};
+    /// use qubit_lock::{AsyncLock, ArcAsyncRwLock};
     ///
     /// let rt = tokio::runtime::Builder::new_current_thread()
     ///     .enable_all()
@@ -227,7 +227,7 @@ pub trait AsyncLock<T: ?Sized> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{AsyncLock, ArcAsyncRwLock};
+    /// use qubit_lock::{AsyncLock, ArcAsyncRwLock};
     ///
     /// let lock = ArcAsyncRwLock::new(42);
     /// if let Ok(value) = lock.try_read(|data| *data) {
@@ -266,7 +266,7 @@ pub trait AsyncLock<T: ?Sized> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{AsyncLock, ArcAsyncMutex};
+    /// use qubit_lock::{AsyncLock, ArcAsyncMutex};
     ///
     /// let lock = ArcAsyncMutex::new(42);
     /// if let Ok(result) = lock.try_write(|data| {

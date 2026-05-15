@@ -7,9 +7,9 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-//! # Qubit Lock 集成测试
+//! # Qubit Lock Integration Tests
 //!
-//! 按源码模块划分：`lock` 与 `monitor`。
+//! Organized by source module: `lock` and `monitor`.
 
 mod docs;
 mod lock;

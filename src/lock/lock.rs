@@ -112,7 +112,7 @@ pub trait Lock<T: ?Sized> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{Lock, ArcRwLock};
+    /// use qubit_lock::{Lock, ArcRwLock};
     ///
     /// let lock = ArcRwLock::new(vec![1, 2, 3]);
     ///
@@ -165,7 +165,7 @@ pub trait Lock<T: ?Sized> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{Lock, ArcRwLock};
+    /// use qubit_lock::{Lock, ArcRwLock};
     ///
     /// let lock = ArcRwLock::new(vec![1, 2, 3]);
     ///
@@ -209,7 +209,7 @@ pub trait Lock<T: ?Sized> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{Lock, ArcRwLock};
+    /// use qubit_lock::{Lock, ArcRwLock};
     ///
     /// let lock = ArcRwLock::new(42);
     /// if let Ok(value) = lock.try_read(|data| *data) {
@@ -248,7 +248,7 @@ pub trait Lock<T: ?Sized> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{Lock, ArcMutex};
+    /// use qubit_lock::{Lock, ArcMutex};
     ///
     /// let lock = ArcMutex::new(42);
     /// if let Ok(result) = lock.try_write(|data| {

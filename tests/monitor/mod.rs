@@ -7,9 +7,10 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-//! # Monitor 相关测试
+//! # Monitor Tests
 //!
-//! 与 `src/monitor` 对应：`Monitor`、`MonitorGuard`、`ArcMonitor` 的行为测试。
+//! Covers behavior corresponding to `src/monitor`: `Monitor`, `MonitorGuard`,
+//! and `ArcMonitor`.
 
 mod arc_monitor_tests;
 mod arc_std_monitor_tests;

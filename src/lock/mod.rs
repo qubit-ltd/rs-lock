@@ -15,7 +15,8 @@
 //! multiple lock types.
 //!
 
-// 子模块 `lock` 存放同步锁 trait `Lock`，与父模块同名是刻意分层；避免 clippy::module_inception 误报
+// The nested `lock` module owns the `Lock` trait; the repeated name is an
+// intentional module boundary.
 #![allow(clippy::module_inception)]
 
 // Trait definitions
