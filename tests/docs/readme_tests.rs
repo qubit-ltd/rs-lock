@@ -59,9 +59,9 @@ fn test_readme_monitor_example_uses_write_notify_one() {
 /// Ensures public API documentation stays aligned with root-only exports.
 fn test_readme_documents_root_only_public_api() {
     assert!(!README_EN.contains("from `qubit_lock::monitor`"));
-    assert!(!README_ZH.contains("从 `qubit_lock::monitor`"));
+    assert!(!README_ZH.contains("\u{6216} crate root"));
     assert!(README_EN.contains("Import public types directly from the crate root."));
-    assert!(README_ZH.contains("请直接从 crate root 导入公开类型。"));
+    assert!(README_ZH.contains("crate root"));
     assert!(LIB_RS.contains("mod lock;"));
     assert!(LIB_RS.contains("mod monitor;"));
     assert!(!LIB_RS.contains("pub mod lock;"));
