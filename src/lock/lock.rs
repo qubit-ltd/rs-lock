@@ -109,6 +109,12 @@ pub trait Lock<T: ?Sized> {
     ///
     /// Returns the result produced by the closure
     ///
+    /// # Panics
+    ///
+    /// Implementations backed by standard-library poisoned locks may panic
+    /// when the lock is poisoned. A panic from `f` is propagated after the
+    /// lock guard is dropped.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -161,6 +167,12 @@ pub trait Lock<T: ?Sized> {
     /// # Returns
     ///
     /// Returns the result produced by the closure
+    ///
+    /// # Panics
+    ///
+    /// Implementations backed by standard-library poisoned locks may panic
+    /// when the lock is poisoned. A panic from `f` is propagated after the
+    /// lock guard is dropped.
     ///
     /// # Example
     ///
