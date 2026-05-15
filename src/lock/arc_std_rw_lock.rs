@@ -53,7 +53,7 @@ impl<T> ArcStdRwLock<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::ArcStdRwLock;
+    /// use qubit_lock::ArcStdRwLock;
     ///
     /// let lock = ArcStdRwLock::new(vec![1, 2, 3]);
     /// ```

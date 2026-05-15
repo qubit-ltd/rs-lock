@@ -9,14 +9,12 @@
  ******************************************************************************/
 use std::time::Duration;
 
-use qubit_lock::monitor::{
-    ArcMonitor,
-    WaitTimeoutResult,
-};
 use qubit_lock::{
+    ArcMonitor,
     ArcRwLock,
     ArcStdRwLock,
     Lock,
+    WaitTimeoutResult,
 };
 
 fn main() {

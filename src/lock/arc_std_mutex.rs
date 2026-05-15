@@ -43,7 +43,7 @@ use crate::lock::{
 /// # Usage Example
 ///
 /// ```rust
-/// use qubit_lock::lock::{ArcStdMutex, Lock};
+/// use qubit_lock::{ArcStdMutex, Lock};
 ///
 /// let counter = ArcStdMutex::new(0);
 ///
@@ -79,7 +79,7 @@ impl<T> ArcStdMutex<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::ArcStdMutex;
+    /// use qubit_lock::ArcStdMutex;
     ///
     /// let lock = ArcStdMutex::new(42);
     /// ```
@@ -138,7 +138,7 @@ impl<T> Lock<T> for ArcStdMutex<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{ArcStdMutex, Lock};
+    /// use qubit_lock::{ArcStdMutex, Lock};
     ///
     /// let counter = ArcStdMutex::new(42);
     ///
@@ -175,7 +175,7 @@ impl<T> Lock<T> for ArcStdMutex<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{ArcStdMutex, Lock};
+    /// use qubit_lock::{ArcStdMutex, Lock};
     ///
     /// let counter = ArcStdMutex::new(0);
     ///
@@ -213,7 +213,7 @@ impl<T> Lock<T> for ArcStdMutex<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{ArcStdMutex, Lock};
+    /// use qubit_lock::{ArcStdMutex, Lock};
     ///
     /// let counter = ArcStdMutex::new(42);
     ///
@@ -253,7 +253,7 @@ impl<T> Lock<T> for ArcStdMutex<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{ArcStdMutex, Lock};
+    /// use qubit_lock::{ArcStdMutex, Lock};
     ///
     /// let counter = ArcStdMutex::new(0);
     ///

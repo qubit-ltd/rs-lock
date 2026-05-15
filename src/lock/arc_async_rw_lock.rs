@@ -52,7 +52,7 @@ use crate::lock::{
 /// # Usage Example
 ///
 /// ```rust
-/// use qubit_lock::lock::{ArcAsyncRwLock, AsyncLock};
+/// use qubit_lock::{ArcAsyncRwLock, AsyncLock};
 ///
 /// let rt = tokio::runtime::Builder::new_current_thread()
 ///     .enable_all()
@@ -94,7 +94,7 @@ impl<T> ArcAsyncRwLock<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::ArcAsyncRwLock;
+    /// use qubit_lock::ArcAsyncRwLock;
     ///
     /// let rw_lock = ArcAsyncRwLock::new(vec![1, 2, 3]);
     /// ```
@@ -156,7 +156,7 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{ArcAsyncRwLock, AsyncLock};
+    /// use qubit_lock::{ArcAsyncRwLock, AsyncLock};
     ///
     /// let rt = tokio::runtime::Builder::new_current_thread()
     ///     .enable_all()
@@ -199,7 +199,7 @@ where
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{ArcAsyncRwLock, AsyncLock};
+    /// use qubit_lock::{ArcAsyncRwLock, AsyncLock};
     ///
     /// let rt = tokio::runtime::Builder::new_current_thread()
     ///     .enable_all()

@@ -95,7 +95,7 @@ such as `(*lock).read()` to call the native guard API.
 ### Monitor
 
 ```rust
-use qubit_lock::monitor::ArcMonitor;
+use qubit_lock::ArcMonitor;
 
 fn main() {
     let monitor = ArcMonitor::new(vec![1, 2, 3]);

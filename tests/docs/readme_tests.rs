@@ -55,24 +55,30 @@ fn test_rw_lock_docs_use_current_trait_names() {
 }
 
 #[test]
-/// Ensures README `qubit-lock` version requirements accept the crate version in Cargo.toml.
-fn test_readme_dependency_version_matches_cargo_toml() {
+/// Ensures all README `qubit-lock` version requirements accept the crate version in Cargo.toml.
+fn test_readme_dependency_versions_match_cargo_toml() {
     let cargo_version =
         extract_package_version(CARGO_TOML).expect("Failed to extract version from Cargo.toml");
     let package_ver = Version::parse(cargo_version).expect("Invalid package version in Cargo.toml");
-    let readme_en_req = extract_readme_dependency_version(README_EN)
-        .expect("Failed to extract version from README.md");
-    let readme_zh_req = extract_readme_dependency_version(README_ZH)
-        .expect("Failed to extract version from README.zh_CN.md");
-    let req_en = VersionReq::parse(readme_en_req).expect("Invalid version req in README.md");
-    let req_zh = VersionReq::parse(readme_zh_req).expect("Invalid version req in README.zh_CN.md");
+
+    let readme_en_reqs = extract_readme_dependency_versions(README_EN);
+    let readme_zh_reqs = extract_readme_dependency_versions(README_ZH);
+
     assert!(
-        req_en.matches(&package_ver),
-        "README.md qubit-lock = \"{readme_en_req}\" does not accept package version {cargo_version}"
+        !readme_en_reqs.is_empty(),
+        "README.md does not contain any qubit-lock dependency versions"
     );
     assert!(
-        req_zh.matches(&package_ver),
-        "README.zh_CN.md qubit-lock = \"{readme_zh_req}\" does not accept package version {cargo_version}"
+        !readme_zh_reqs.is_empty(),
+        "README.zh_CN.md does not contain any qubit-lock dependency versions"
+    );
+
+    assert_readme_versions_match("README.md", &readme_en_reqs, &package_ver, cargo_version);
+    assert_readme_versions_match(
+        "README.zh_CN.md",
+        &readme_zh_reqs,
+        &package_ver,
+        cargo_version,
     );
 }
 
@@ -86,12 +92,31 @@ fn extract_package_version(content: &str) -> Option<&str> {
     None
 }
 
-/// Extracts the `qubit-lock` dependency version from a README file.
-fn extract_readme_dependency_version(content: &str) -> Option<&str> {
-    for line in content.lines() {
-        if let Some(value) = line.trim().strip_prefix("qubit-lock = \"") {
-            return value.strip_suffix('"');
-        }
+/// Asserts that every README dependency version accepts the package version.
+fn assert_readme_versions_match(
+    filename: &str,
+    readme_reqs: &[&str],
+    package_ver: &Version,
+    cargo_version: &str,
+) {
+    for (index, readme_req) in readme_reqs.iter().enumerate() {
+        let req = VersionReq::parse(readme_req)
+            .unwrap_or_else(|_| panic!("Invalid version req in {filename}: {readme_req}"));
+        assert!(
+            req.matches(package_ver),
+            "{filename} qubit-lock dependency #{index} = \"{readme_req}\" does not accept package version {cargo_version}"
+        );
     }
-    None
+}
+
+/// Extracts all `qubit-lock` dependency versions from a README file.
+fn extract_readme_dependency_versions(content: &str) -> Vec<&str> {
+    content
+        .lines()
+        .filter_map(|line| {
+            line.trim()
+                .strip_prefix("qubit-lock = \"")
+                .and_then(|value| value.strip_suffix('"'))
+        })
+        .collect()
 }

@@ -51,7 +51,7 @@ use crate::lock::{
 /// # Usage Example
 ///
 /// ```rust
-/// use qubit_lock::lock::{ArcRwLock, Lock};
+/// use qubit_lock::{ArcRwLock, Lock};
 ///
 /// let data = ArcRwLock::new(String::from("Hello"));
 ///
@@ -87,7 +87,7 @@ impl<T> ArcRwLock<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::ArcRwLock;
+    /// use qubit_lock::ArcRwLock;
     ///
     /// let rw_lock = ArcRwLock::new(vec![1, 2, 3]);
     /// ```
@@ -146,7 +146,7 @@ impl<T> Lock<T> for ArcRwLock<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{ArcRwLock, Lock};
+    /// use qubit_lock::{ArcRwLock, Lock};
     ///
     /// let data = ArcRwLock::new(vec![1, 2, 3]);
     ///
@@ -181,7 +181,7 @@ impl<T> Lock<T> for ArcRwLock<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{ArcRwLock, Lock};
+    /// use qubit_lock::{ArcRwLock, Lock};
     ///
     /// let data = ArcRwLock::new(vec![1, 2, 3]);
     ///
@@ -216,7 +216,7 @@ impl<T> Lock<T> for ArcRwLock<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{ArcRwLock, Lock};
+    /// use qubit_lock::{ArcRwLock, Lock};
     ///
     /// let data = ArcRwLock::new(vec![1, 2, 3]);
     ///
@@ -254,7 +254,7 @@ impl<T> Lock<T> for ArcRwLock<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::lock::{ArcRwLock, Lock};
+    /// use qubit_lock::{ArcRwLock, Lock};
     ///
     /// let data = ArcRwLock::new(vec![1, 2, 3]);
     ///

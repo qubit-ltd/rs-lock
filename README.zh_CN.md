@@ -90,7 +90,7 @@ guard API，请使用 `lock.as_ref().read()`，或用 `(*lock).read()` 显式解
 ### Monitor
 
 ```rust
-use qubit_lock::monitor::ArcMonitor;
+use qubit_lock::ArcMonitor;
 
 fn main() {
     let monitor = ArcMonitor::new(vec![1, 2, 3]);
