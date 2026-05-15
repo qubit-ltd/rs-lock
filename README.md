@@ -122,7 +122,7 @@ fn main() {
 - `src/monitor`: parking_lot and std monitor primitives.
 - `tests/lock`: lock behavior tests.
 - `tests/monitor`: monitor behavior tests.
-- `tests/docs`: README and doctext consistency tests.
+- `tests/docs`: README and doctest consistency tests.
 
 ## Quality Checks
 
