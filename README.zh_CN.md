@@ -121,6 +121,8 @@ fn main() {
 
 ## 质量检查
 
+在仓库 checkout 中执行：
+
 ```bash
 ./align-ci.sh
 ./ci-check.sh
