@@ -13,6 +13,8 @@ readme = "README.md"
 keywords = ["lock", "mutex", "rwlock", "monitor", "async"]
 categories = ["concurrency", "asynchronous"]
 exclude = [
+    ".gitignore",
+    ".gitmodules",
     "align-ci.sh",
     "ci-check.sh",
     "coverage.sh",
