@@ -63,6 +63,8 @@ fn test_readme_dependency_versions_match_cargo_toml() {
 
     let readme_en_reqs = extract_readme_dependency_versions(README_EN);
     let readme_zh_reqs = extract_readme_dependency_versions(README_ZH);
+    let readme_en_dependency_count = count_readme_dependency_lines(README_EN);
+    let readme_zh_dependency_count = count_readme_dependency_lines(README_ZH);
 
     assert!(
         !readme_en_reqs.is_empty(),
@@ -71,6 +73,16 @@ fn test_readme_dependency_versions_match_cargo_toml() {
     assert!(
         !readme_zh_reqs.is_empty(),
         "README.zh_CN.md does not contain any qubit-lock dependency versions"
+    );
+    assert_eq!(
+        readme_en_reqs.len(),
+        readme_en_dependency_count,
+        "README.md has qubit-lock dependency lines that were not parsed"
+    );
+    assert_eq!(
+        readme_zh_reqs.len(),
+        readme_zh_dependency_count,
+        "README.zh_CN.md has qubit-lock dependency lines that were not parsed"
     );
 
     assert_readme_versions_match("README.md", &readme_en_reqs, &package_ver, cargo_version);
@@ -113,10 +125,33 @@ fn assert_readme_versions_match(
 fn extract_readme_dependency_versions(content: &str) -> Vec<&str> {
     content
         .lines()
-        .filter_map(|line| {
-            line.trim()
-                .strip_prefix("qubit-lock = \"")
-                .and_then(|value| value.strip_suffix('"'))
-        })
+        .filter_map(|line| extract_readme_dependency_version(line.trim()))
         .collect()
+}
+
+/// Extracts a `qubit-lock` dependency version from one README line.
+fn extract_readme_dependency_version(line: &str) -> Option<&str> {
+    let value = line.strip_prefix("qubit-lock = ")?;
+    if let Some(quoted) = value.strip_prefix('"') {
+        return quoted.split_once('"').map(|(version, _)| version);
+    }
+
+    value
+        .strip_prefix('{')?
+        .strip_suffix('}')?
+        .split(',')
+        .find_map(|field| {
+            field
+                .trim()
+                .strip_prefix("version = \"")
+                .and_then(|version| version.strip_suffix('"'))
+        })
+}
+
+/// Counts `qubit-lock` dependency declaration lines in a README file.
+fn count_readme_dependency_lines(content: &str) -> usize {
+    content
+        .lines()
+        .filter(|line| line.trim().starts_with("qubit-lock = "))
+        .count()
 }
