@@ -23,9 +23,9 @@ use std::{
 };
 
 use qubit_lock::{
+    ArcStdMutex,
     Lock,
     TryLockError,
-    lock::ArcStdMutex,
 };
 
 #[cfg(test)]

@@ -17,6 +17,7 @@ use semver::{
 const CARGO_TOML: &str = include_str!("../../Cargo.toml");
 const README_EN: &str = include_str!("../../README.md");
 const README_ZH: &str = include_str!("../../README.zh_CN.md");
+const LIB_RS: &str = include_str!("../../src/lib.rs");
 const ARC_RW_LOCK_SRC: &str = include_str!("../../src/lock/arc_rw_lock.rs");
 const ARC_ASYNC_RW_LOCK_SRC: &str = include_str!("../../src/lock/arc_async_rw_lock.rs");
 
@@ -52,6 +53,19 @@ fn test_readme_monitor_example_uses_write_notify_one() {
     assert!(README_EN.contains("write_notify_one"));
     assert!(README_ZH.contains("use qubit_lock::ArcMonitor;"));
     assert!(README_ZH.contains("write_notify_one"));
+}
+
+#[test]
+/// Ensures public API documentation stays aligned with root-only exports.
+fn test_readme_documents_root_only_public_api() {
+    assert!(!README_EN.contains("from `qubit_lock::monitor`"));
+    assert!(!README_ZH.contains("从 `qubit_lock::monitor`"));
+    assert!(README_EN.contains("Import public types directly from the crate root."));
+    assert!(README_ZH.contains("请直接从 crate root 导入公开类型。"));
+    assert!(LIB_RS.contains("mod lock;"));
+    assert!(LIB_RS.contains("mod monitor;"));
+    assert!(!LIB_RS.contains("pub mod lock;"));
+    assert!(!LIB_RS.contains("pub mod monitor;"));
 }
 
 #[test]

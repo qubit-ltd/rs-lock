@@ -28,7 +28,7 @@ use crate::lock::{
 ///
 /// Provides an Arc-wrapped [`std::sync::RwLock`] for synchronous shared state.
 /// Read operations can execute concurrently, while write operations have
-/// exclusive access. Unlike [`ArcRwLock`](crate::lock::ArcRwLock), this type
+/// exclusive access. Unlike [`ArcRwLock`](crate::ArcRwLock), this type
 /// preserves standard-library poison behavior.
 ///
 /// # Type Parameters
