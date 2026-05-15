@@ -24,17 +24,30 @@
 
 ```toml
 [dependencies]
-qubit-lock = "0.6"
+qubit-lock = "0.7"
 ```
 
 异步锁包装器使用 Tokio 同步原语，并默认启用。只需要同步锁与 Monitor、且希望依赖图中不包含 Tokio 的使用方，可以关闭默认特性：
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.6", default-features = false }
+qubit-lock = { version = "0.7", default-features = false }
 ```
 
 如果应用需要创建 Tokio runtime，请在应用自己的 `Cargo.toml` 中启用合适的 Tokio runtime 特性，例如 `rt` 或 `rt-multi-thread`。
+
+## 从 0.6 迁移
+
+`0.7` 包含有意的破坏性 API 清理：
+
+- `ArcRwLock` 现在包装 `parking_lot::RwLock`，不再使用 poison 语义。持锁
+  panic 之后，后续加锁会继续正常工作，`try_read` / `try_write` 不再返回
+  `TryLockError::Poisoned`。
+- 如果需要标准库 `std::sync::RwLock` 的 poison 语义，请使用
+  `ArcStdRwLock`。
+- Monitor 类型不再从 `qubit_lock::lock` 转导出。请从
+  `qubit_lock::monitor` 或 crate root 导入。
+- 各包装类型在适用时新增了 `From<T>` 和 `Default` 便捷构造。
 
 ## 快速开始
 

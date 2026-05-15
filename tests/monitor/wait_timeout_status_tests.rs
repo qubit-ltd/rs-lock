@@ -19,3 +19,13 @@ fn test_wait_timeout_status_variants_are_distinct() {
     let copied = WaitTimeoutStatus::TimedOut;
     assert_eq!(copied, copied);
 }
+
+/// Test wait-timeout status helper methods.
+#[test]
+fn test_wait_timeout_status_helpers() {
+    assert!(WaitTimeoutStatus::Woken.is_woken());
+    assert!(!WaitTimeoutStatus::Woken.is_timed_out());
+
+    assert!(!WaitTimeoutStatus::TimedOut.is_woken());
+    assert!(WaitTimeoutStatus::TimedOut.is_timed_out());
+}

@@ -49,3 +49,31 @@ pub enum WaitTimeoutStatus {
     /// reacquiring the mutex.
     TimedOut,
 }
+
+impl WaitTimeoutStatus {
+    /// Returns `true` when the wait returned before the timeout elapsed.
+    ///
+    /// # Returns
+    ///
+    /// `true` for [`Self::Woken`], otherwise `false`.
+    #[inline]
+    pub const fn is_woken(&self) -> bool {
+        match self {
+            Self::Woken => true,
+            Self::TimedOut => false,
+        }
+    }
+
+    /// Returns `true` when the wait reached the timeout boundary.
+    ///
+    /// # Returns
+    ///
+    /// `true` for [`Self::TimedOut`], otherwise `false`.
+    #[inline]
+    pub const fn is_timed_out(&self) -> bool {
+        match self {
+            Self::Woken => false,
+            Self::TimedOut => true,
+        }
+    }
+}
