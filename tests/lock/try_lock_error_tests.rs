@@ -9,7 +9,7 @@
  ******************************************************************************/
 use std::error::Error;
 
-use qubit_lock::lock::TryLockError;
+use qubit_lock::TryLockError;
 
 /// Test try-lock error display text and error trait implementation.
 #[test]

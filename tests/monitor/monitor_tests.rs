@@ -7,7 +7,7 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-//! Tests for [`Monitor`](qubit_lock::monitor::Monitor).
+//! Tests for [`Monitor`](qubit_lock::Monitor).
 
 use std::{
     sync::{
@@ -18,7 +18,7 @@ use std::{
     time::Duration,
 };
 
-use qubit_lock::monitor::{
+use qubit_lock::{
     Monitor,
     WaitTimeoutResult,
     WaitTimeoutStatus,
@@ -33,6 +33,127 @@ fn test_monitor_new_read_write_updates_state() {
     });
 
     assert_eq!(monitor.read(|items| items.clone()), vec![1, 2, 3, 4]);
+}
+
+#[test]
+fn test_monitor_write_notify_one_updates_state_and_wakes_waiter() {
+    let monitor = Arc::new(Monitor::new(false));
+    let (checked_tx, checked_rx) = mpsc::channel();
+    let (done_tx, done_rx) = mpsc::channel();
+
+    let waiter_monitor = Arc::clone(&monitor);
+    let waiter = thread::spawn(move || {
+        let mut checked_tx = Some(checked_tx);
+        let result = waiter_monitor.wait_until(
+            move |ready| {
+                if !*ready && let Some(checked_tx) = checked_tx.take() {
+                    checked_tx
+                        .send(())
+                        .expect("test should observe waiter before notification");
+                }
+                *ready
+            },
+            |ready| {
+                *ready = false;
+                7
+            },
+        );
+        done_tx
+            .send(result)
+            .expect("test should receive waiter result");
+    });
+
+    checked_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("waiter should check state before notification");
+    drop(monitor.lock());
+
+    let write_result = monitor.write_notify_one(|ready| {
+        *ready = true;
+        5
+    });
+
+    assert_eq!(write_result, 5);
+    assert_eq!(
+        done_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("waiter should finish after write_notify_one"),
+        7,
+    );
+    waiter.join().expect("waiter should not panic");
+    assert!(!monitor.read(|ready| *ready));
+}
+
+#[test]
+fn test_monitor_write_notify_all_wakes_all_waiters() {
+    let monitor = Arc::new(Monitor::new(false));
+    let (first_checked_tx, first_checked_rx) = mpsc::channel();
+    let (second_checked_tx, second_checked_rx) = mpsc::channel();
+    let (done_tx, done_rx) = mpsc::channel();
+
+    let first_monitor = Arc::clone(&monitor);
+    let first_done_tx = done_tx.clone();
+    let first_waiter = thread::spawn(move || {
+        let mut checked_tx = Some(first_checked_tx);
+        first_monitor.wait_until(
+            move |ready| {
+                if !*ready && let Some(checked_tx) = checked_tx.take() {
+                    checked_tx
+                        .send(())
+                        .expect("test should observe first waiter");
+                }
+                *ready
+            },
+            |_| (),
+        );
+        first_done_tx
+            .send(())
+            .expect("test should receive first waiter result");
+    });
+
+    let second_monitor = Arc::clone(&monitor);
+    let second_waiter = thread::spawn(move || {
+        let mut checked_tx = Some(second_checked_tx);
+        second_monitor.wait_until(
+            move |ready| {
+                if !*ready && let Some(checked_tx) = checked_tx.take() {
+                    checked_tx
+                        .send(())
+                        .expect("test should observe second waiter");
+                }
+                *ready
+            },
+            |_| (),
+        );
+        done_tx
+            .send(())
+            .expect("test should receive second waiter result");
+    });
+
+    first_checked_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("first waiter should check state before notification");
+    second_checked_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("second waiter should check state before notification");
+    drop(monitor.lock());
+
+    let write_result = monitor.write_notify_all(|ready| {
+        *ready = true;
+        2
+    });
+
+    assert_eq!(write_result, 2);
+    done_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("first waiter should finish after write_notify_all");
+    done_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("second waiter should finish after write_notify_all");
+    first_waiter.join().expect("first waiter should not panic");
+    second_waiter
+        .join()
+        .expect("second waiter should not panic");
 }
 
 #[test]

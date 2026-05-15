@@ -162,6 +162,50 @@ impl<T> ArcStdMonitor<T> {
         self.inner.write(f)
     }
 
+    /// Mutates the protected state and wakes one waiter.
+    ///
+    /// This delegates to [`StdMonitor::write_notify_one`]. The closure runs
+    /// while the monitor mutex is held; after it returns, the lock is released
+    /// and one waiter is notified. If `f` panics, the panic is propagated and no
+    /// notification is sent.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - Closure that receives a mutable reference to the state.
+    ///
+    /// # Returns
+    ///
+    /// The value returned by `f`.
+    #[inline]
+    pub fn write_notify_one<R, F>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut T) -> R,
+    {
+        self.inner.write_notify_one(f)
+    }
+
+    /// Mutates the protected state and wakes all waiters.
+    ///
+    /// This delegates to [`StdMonitor::write_notify_all`]. The closure runs
+    /// while the monitor mutex is held; after it returns, the lock is released
+    /// and all waiters are notified. If `f` panics, the panic is propagated and
+    /// no notification is sent.
+    ///
+    /// # Arguments
+    ///
+    /// * `f` - Closure that receives a mutable reference to the state.
+    ///
+    /// # Returns
+    ///
+    /// The value returned by `f`.
+    #[inline]
+    pub fn write_notify_all<R, F>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut T) -> R,
+    {
+        self.inner.write_notify_all(f)
+    }
+
     /// Waits for a notification or timeout without checking state.
     ///
     /// This delegates to [`StdMonitor::wait_notify`]. Most

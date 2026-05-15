@@ -22,7 +22,7 @@ use std::{
 };
 
 use parking_lot::RwLock as ParkingLotRwLock;
-use qubit_lock::lock::{
+use qubit_lock::{
     Lock,
     TryLockError,
 };

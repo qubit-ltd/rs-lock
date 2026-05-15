@@ -7,7 +7,7 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-use qubit_lock::monitor::WaitTimeoutResult;
+use qubit_lock::WaitTimeoutResult;
 
 fn double_i32(value: i32) -> i32 {
     value * 2

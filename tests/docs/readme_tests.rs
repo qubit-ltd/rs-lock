@@ -46,6 +46,15 @@ fn test_readme_documents_deref_and_as_ref_support() {
 }
 
 #[test]
+/// Ensures README monitor snippets show the combined write-and-notify API.
+fn test_readme_monitor_example_uses_write_notify_one() {
+    assert!(README_EN.contains("use qubit_lock::ArcMonitor;"));
+    assert!(README_EN.contains("write_notify_one"));
+    assert!(README_ZH.contains("use qubit_lock::ArcMonitor;"));
+    assert!(README_ZH.contains("write_notify_one"));
+}
+
+#[test]
 /// Ensures lock source examples reference the current trait names.
 fn test_rw_lock_docs_use_current_trait_names() {
     assert!(!ARC_RW_LOCK_SRC.contains("ReadWriteLock"));

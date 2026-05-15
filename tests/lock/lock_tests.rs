@@ -27,7 +27,7 @@ use std::sync::{
     RwLock,
 };
 
-use qubit_lock::lock::{
+use qubit_lock::{
     ArcRwLock,
     ArcStdMutex,
     Lock,

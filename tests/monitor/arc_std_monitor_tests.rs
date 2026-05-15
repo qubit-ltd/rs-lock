@@ -7,7 +7,7 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-//! Tests for [`ArcStdMonitor`](qubit_lock::monitor::ArcStdMonitor).
+//! Tests for [`ArcStdMonitor`](qubit_lock::ArcStdMonitor).
 
 use std::{
     sync::mpsc,
@@ -15,7 +15,7 @@ use std::{
     time::Duration,
 };
 
-use qubit_lock::monitor::{
+use qubit_lock::{
     ArcStdMonitor,
     WaitTimeoutResult,
     WaitTimeoutStatus,
@@ -56,6 +56,32 @@ fn test_arc_std_monitor_clone_shares_state() {
     });
 
     assert_eq!(monitor.read(|value| *value), 2);
+}
+
+#[test]
+fn test_arc_std_monitor_write_notify_one_updates_state() {
+    let monitor = ArcStdMonitor::new(Vec::<i32>::new());
+
+    let len = monitor.write_notify_one(|items| {
+        items.push(7);
+        items.len()
+    });
+
+    assert_eq!(len, 1);
+    assert_eq!(monitor.read(|items| items.clone()), vec![7]);
+}
+
+#[test]
+fn test_arc_std_monitor_write_notify_all_updates_state() {
+    let monitor = ArcStdMonitor::new(false);
+
+    let ready = monitor.write_notify_all(|ready| {
+        *ready = true;
+        *ready
+    });
+
+    assert!(ready);
+    assert!(monitor.read(|ready| *ready));
 }
 
 #[test]

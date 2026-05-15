@@ -93,9 +93,19 @@ guard API，请使用 `lock.as_ref().read()`，或用 `(*lock).read()` 显式解
 use qubit_lock::ArcMonitor;
 
 fn main() {
-    let monitor = ArcMonitor::new(vec![1, 2, 3]);
-    let length = monitor.read(|items| items.len());
-    assert_eq!(length, 3);
+    let monitor = ArcMonitor::new(Vec::<i32>::new());
+    let worker_monitor = monitor.clone();
+
+    let worker = std::thread::spawn(move || {
+        worker_monitor.wait_until(
+            |items| !items.is_empty(),
+            |items| items.pop().expect("item should be ready"),
+        )
+    });
+
+    monitor.write_notify_one(|items| items.push(7));
+
+    assert_eq!(worker.join().expect("worker should finish"), 7);
 }
 ```
 
