@@ -45,8 +45,8 @@ qubit-lock = { version = "0.7", default-features = false }
   `TryLockError::Poisoned`。
 - 如果需要标准库 `std::sync::RwLock` 的 poison 语义，请使用
   `ArcStdRwLock`。
-- Monitor 类型不再从 `qubit_lock::lock` 转导出。请从
-  `qubit_lock::monitor` 或 crate root 导入。
+- `qubit_lock::lock` 和 `qubit_lock::monitor` 不再作为公开模块暴露。
+  请直接从 crate root 导入公开类型。
 - 各包装类型在适用时新增了 `From<T>` 和 `Default` 便捷构造。
 
 ## 快速开始

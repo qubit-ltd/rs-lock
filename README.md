@@ -47,8 +47,8 @@ Version `0.7` contains intentional breaking API cleanup:
   and `try_read` / `try_write` do not return `TryLockError::Poisoned`.
 - Use `ArcStdRwLock` when standard-library `std::sync::RwLock` poisoning
   semantics are required.
-- Monitor types are no longer re-exported from `qubit_lock::lock`. Import
-  them from `qubit_lock::monitor` or from the crate root.
+- `qubit_lock::lock` and `qubit_lock::monitor` are no longer public modules.
+  Import public types directly from the crate root.
 - Wrapper types now implement convenient `From<T>` and `Default`
   constructors where applicable.
 
