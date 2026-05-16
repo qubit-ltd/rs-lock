@@ -1,6 +1,6 @@
 [package]
 name = "qubit-lock"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2024"
 rust-version = "1.94"
 authors = ["Haixing Hu <starfish.hu@gmail.com>"]
@@ -12,18 +12,15 @@ documentation = "https://docs.rs/qubit-lock"
 readme = "README.md"
 keywords = ["lock", "mutex", "rwlock", "monitor", "async"]
 categories = ["concurrency", "asynchronous"]
-exclude = [
-    ".gitignore",
-    ".gitmodules",
-    "align-ci.sh",
-    "ci-check.sh",
-    "coverage.sh",
-    "style-check.sh",
-    "update-submodule.sh",
-    ".github/*",
-    ".rs-ci/**",
-    ".llvm-cov.toml",
-    ".cargo-audit.toml.example",
+include = [
+    "/Cargo.toml",
+    "/LICENSE",
+    "/README.md",
+    "/README.zh_CN.md",
+    "/doc/**/user_guide*.md",
+    "/examples/**",
+    "/src/**",
+    "/tests/**",
 ]
 
 [lib]
