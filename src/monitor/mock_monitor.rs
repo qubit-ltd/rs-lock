@@ -9,20 +9,35 @@
  ******************************************************************************/
 //! Mock monitor with manually controlled timeout time.
 
-use std::sync::{Condvar, Mutex, MutexGuard};
+use std::sync::{
+    Condvar,
+    Mutex,
+    MutexGuard,
+};
 use std::time::Duration;
 
 #[cfg(feature = "async")]
-use tokio::sync::{Notify, watch};
+use tokio::sync::{
+    Notify,
+    watch,
+};
 
 #[cfg(feature = "async")]
 use super::{
-    AsyncConditionWaiter, AsyncMonitorFuture, AsyncNotificationWaiter, AsyncTimeoutConditionWaiter,
+    AsyncConditionWaiter,
+    AsyncMonitorFuture,
+    AsyncNotificationWaiter,
+    AsyncTimeoutConditionWaiter,
     AsyncTimeoutNotificationWaiter,
 };
 use super::{
-    ConditionWaiter, NotificationWaiter, Notifier, TimeoutConditionWaiter,
-    TimeoutNotificationWaiter, WaitTimeoutResult, WaitTimeoutStatus,
+    ConditionWaiter,
+    NotificationWaiter,
+    Notifier,
+    TimeoutConditionWaiter,
+    TimeoutNotificationWaiter,
+    WaitTimeoutResult,
+    WaitTimeoutStatus,
 };
 
 /// Monitor implementation for deterministic tests.
@@ -416,9 +431,7 @@ impl<T: Send> AsyncTimeoutNotificationWaiter for MockMonitor<T> {
                 tokio::select! {
                     () = notified => return WaitTimeoutStatus::Woken,
                     changed = change_receiver.changed() => {
-                        if changed.is_err() {
-                            return WaitTimeoutStatus::TimedOut;
-                        }
+                        changed.expect("mock monitor sender should live while the monitor is borrowed");
                     }
                 }
             }
@@ -512,9 +525,10 @@ impl<T: Send> AsyncTimeoutConditionWaiter for MockMonitor<T> {
                         return WaitTimeoutResult::TimedOut;
                     }
                 }
-                if change_receiver.changed().await.is_err() {
-                    return WaitTimeoutResult::TimedOut;
-                }
+                change_receiver
+                    .changed()
+                    .await
+                    .expect("mock monitor sender should live while the monitor is borrowed");
             }
         })
     }

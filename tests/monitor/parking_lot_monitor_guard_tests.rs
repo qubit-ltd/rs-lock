@@ -11,7 +11,10 @@
 
 use std::time::Duration;
 
-use qubit_lock::{ParkingLotMonitor, WaitTimeoutStatus};
+use qubit_lock::{
+    ParkingLotMonitor,
+    WaitTimeoutStatus,
+};
 
 #[test]
 fn test_parking_lot_monitor_guard_updates_state() {

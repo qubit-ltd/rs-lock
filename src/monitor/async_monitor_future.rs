@@ -9,7 +9,10 @@
  ******************************************************************************/
 //! Boxed future type used by asynchronous monitor traits.
 
-use std::{future::Future, pin::Pin};
+use std::{
+    future::Future,
+    pin::Pin,
+};
 
 /// Sendable boxed future returned by asynchronous monitor operations.
 pub type AsyncMonitorFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;

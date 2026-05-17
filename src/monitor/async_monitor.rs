@@ -10,7 +10,10 @@
 //! Aggregate asynchronous monitor capability.
 
 use crate::monitor::{
-    AsyncNotificationWaiter, AsyncTimeoutConditionWaiter, AsyncTimeoutNotificationWaiter, Notifier,
+    AsyncNotificationWaiter,
+    AsyncTimeoutConditionWaiter,
+    AsyncTimeoutNotificationWaiter,
+    Notifier,
 };
 
 /// Aggregate trait for asynchronous monitor-style synchronization.

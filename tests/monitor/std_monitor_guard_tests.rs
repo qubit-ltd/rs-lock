@@ -11,7 +11,10 @@
 
 use std::time::Duration;
 
-use qubit_lock::{StdMonitor, WaitTimeoutStatus};
+use qubit_lock::{
+    StdMonitor,
+    WaitTimeoutStatus,
+};
 
 #[test]
 fn test_std_monitor_guard_updates_state() {

@@ -14,9 +14,15 @@
 //!
 
 use std::ops::Deref;
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    Arc,
+    Mutex,
+};
 
-use crate::lock::{Lock, TryLockError};
+use crate::lock::{
+    Lock,
+    TryLockError,
+};
 
 /// Synchronous Standard Mutex Wrapper
 ///

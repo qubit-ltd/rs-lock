@@ -9,16 +9,29 @@
  ******************************************************************************/
 //! Arc-wrapped mock monitor.
 
-use std::{ops::Deref, sync::Arc, time::Duration};
+use std::{
+    ops::Deref,
+    sync::Arc,
+    time::Duration,
+};
 
 #[cfg(feature = "async")]
 use super::{
-    AsyncConditionWaiter, AsyncMonitorFuture, AsyncNotificationWaiter, AsyncTimeoutConditionWaiter,
+    AsyncConditionWaiter,
+    AsyncMonitorFuture,
+    AsyncNotificationWaiter,
+    AsyncTimeoutConditionWaiter,
     AsyncTimeoutNotificationWaiter,
 };
 use super::{
-    ConditionWaiter, MockMonitor, NotificationWaiter, Notifier, TimeoutConditionWaiter,
-    TimeoutNotificationWaiter, WaitTimeoutResult, WaitTimeoutStatus,
+    ConditionWaiter,
+    MockMonitor,
+    NotificationWaiter,
+    Notifier,
+    TimeoutConditionWaiter,
+    TimeoutNotificationWaiter,
+    WaitTimeoutResult,
+    WaitTimeoutStatus,
 };
 
 /// Cloneable handle around a [`MockMonitor`].

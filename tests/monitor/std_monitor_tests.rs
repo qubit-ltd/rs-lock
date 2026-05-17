@@ -10,12 +10,24 @@
 //! Tests for [`StdMonitor`](qubit_lock::StdMonitor).
 
 use std::{
-    sync::{Arc, mpsc},
+    sync::{
+        Arc,
+        mpsc,
+    },
     thread,
     time::Duration,
 };
 
-use qubit_lock::{StdMonitor, WaitTimeoutResult, WaitTimeoutStatus};
+use qubit_lock::{
+    ConditionWaiter,
+    NotificationWaiter,
+    Notifier,
+    StdMonitor,
+    TimeoutConditionWaiter,
+    TimeoutNotificationWaiter,
+    WaitTimeoutResult,
+    WaitTimeoutStatus,
+};
 
 #[test]
 fn test_std_monitor_new_read_write_updates_state() {
@@ -161,6 +173,81 @@ fn test_std_monitor_from_uses_supplied_value() {
     let monitor = StdMonitor::from(vec![1, 2, 3]);
 
     assert_eq!(monitor.read(|items| items.len()), 3);
+}
+
+#[test]
+fn test_std_monitor_traits_delegate_to_monitor_methods() {
+    let monitor = StdMonitor::new(vec![1, 2]);
+
+    <StdMonitor<Vec<i32>> as Notifier>::notify_one(&monitor);
+    <StdMonitor<Vec<i32>> as Notifier>::notify_all(&monitor);
+
+    assert_eq!(
+        <StdMonitor<Vec<i32>> as TimeoutNotificationWaiter>::wait_for(&monitor, Duration::ZERO,),
+        WaitTimeoutStatus::TimedOut,
+    );
+    assert_eq!(
+        <StdMonitor<Vec<i32>> as ConditionWaiter>::wait_until(
+            &monitor,
+            |items| !items.is_empty(),
+            |items| items.pop().expect("item should be ready"),
+        ),
+        2,
+    );
+    assert_eq!(
+        <StdMonitor<Vec<i32>> as ConditionWaiter>::wait_while(
+            &monitor,
+            |items| items.is_empty(),
+            |items| {
+                items.push(3);
+                items.len()
+            },
+        ),
+        2,
+    );
+    assert_eq!(
+        <StdMonitor<Vec<i32>> as TimeoutConditionWaiter>::wait_until_for(
+            &monitor,
+            Duration::ZERO,
+            |items| !items.is_empty(),
+            |items| items.pop().expect("item should be ready"),
+        ),
+        WaitTimeoutResult::Ready(3),
+    );
+    assert_eq!(
+        <StdMonitor<Vec<i32>> as TimeoutConditionWaiter>::wait_while_for(
+            &monitor,
+            Duration::ZERO,
+            |items| items.is_empty(),
+            |items| items.pop(),
+        ),
+        WaitTimeoutResult::Ready(Some(1)),
+    );
+}
+
+#[test]
+fn test_std_monitor_notification_waiter_trait_wait_returns_after_notify() {
+    let monitor = Arc::new(StdMonitor::new(false));
+    let waiter_monitor = Arc::clone(&monitor);
+    let (done_tx, done_rx) = mpsc::channel();
+
+    let waiter = thread::spawn(move || {
+        <StdMonitor<bool> as NotificationWaiter>::wait(waiter_monitor.as_ref());
+        done_tx.send(()).expect("test should receive wait result");
+    });
+
+    let deadline = std::time::Instant::now() + Duration::from_secs(1);
+    loop {
+        <StdMonitor<bool> as Notifier>::notify_all(monitor.as_ref());
+        if done_rx.recv_timeout(Duration::from_millis(5)).is_ok() {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "notification wait should complete before deadline",
+        );
+    }
+    waiter.join().expect("waiter should finish");
 }
 
 #[test]

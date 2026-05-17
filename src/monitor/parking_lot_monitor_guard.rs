@@ -16,13 +16,19 @@
 //!
 
 use std::{
-    ops::{Deref, DerefMut},
+    ops::{
+        Deref,
+        DerefMut,
+    },
     time::Duration,
 };
 
 use parking_lot::MutexGuard;
 
-use super::{parking_lot_monitor::ParkingLotMonitor, wait_timeout_status::WaitTimeoutStatus};
+use super::{
+    parking_lot_monitor::ParkingLotMonitor,
+    wait_timeout_status::WaitTimeoutStatus,
+};
 
 /// Guard returned by [`ParkingLotMonitor::lock`](super::ParkingLotMonitor::lock).
 ///

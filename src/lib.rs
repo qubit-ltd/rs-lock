@@ -33,17 +33,47 @@
 mod lock;
 mod monitor;
 #[cfg(feature = "async")]
-pub use lock::{ArcAsyncMutex, ArcAsyncRwLock, AsyncLock};
-pub use lock::{ArcMutex, ArcRwLock, ArcStdMutex, ArcStdRwLock, Lock, TryLockError};
+pub use lock::{
+    ArcAsyncMutex,
+    ArcAsyncRwLock,
+    AsyncLock,
+};
+pub use lock::{
+    ArcMutex,
+    ArcRwLock,
+    ArcStdMutex,
+    ArcStdRwLock,
+    Lock,
+    TryLockError,
+};
 pub use monitor::{
-    ArcMockMonitor, ArcParkingLotMonitor, ArcStdMonitor, ConditionWaiter, MockMonitor, Monitor,
-    NotificationWaiter, Notifier, ParkingLotMonitor, ParkingLotMonitorGuard, SharedMonitor,
-    StdMonitor, StdMonitorGuard, TimeoutConditionWaiter, TimeoutNotificationWaiter,
-    WaitTimeoutResult, WaitTimeoutStatus,
+    ArcMockMonitor,
+    ArcParkingLotMonitor,
+    ArcStdMonitor,
+    ConditionWaiter,
+    MockMonitor,
+    Monitor,
+    NotificationWaiter,
+    Notifier,
+    ParkingLotMonitor,
+    ParkingLotMonitorGuard,
+    SharedMonitor,
+    StdMonitor,
+    StdMonitorGuard,
+    TimeoutConditionWaiter,
+    TimeoutNotificationWaiter,
+    WaitTimeoutResult,
+    WaitTimeoutStatus,
 };
 #[cfg(feature = "async")]
 pub use monitor::{
-    ArcTokioMonitor, AsyncConditionWaiter, AsyncMonitor, AsyncMonitorFuture,
-    AsyncNotificationWaiter, AsyncTimeoutConditionWaiter, AsyncTimeoutNotificationWaiter,
-    SharedAsyncMonitor, TokioMonitor,
+    ArcTokioMonitor,
+    AsyncConditionWaiter,
+    AsyncMonitor,
+    AsyncMonitorFuture,
+    AsyncNotificationWaiter,
+    AsyncTimeoutConditionWaiter,
+    AsyncTimeoutNotificationWaiter,
+    SharedAsyncMonitor,
+    TokioMonitor,
 };
