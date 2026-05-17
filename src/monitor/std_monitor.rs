@@ -25,14 +25,24 @@
 //!
 
 use std::{
-    sync::{Condvar, Mutex},
-    time::{Duration, Instant},
+    sync::{
+        Condvar,
+        Mutex,
+    },
+    time::{
+        Duration,
+        Instant,
+    },
 };
 
 use super::std_monitor_guard::StdMonitorGuard;
 use super::{
-    ConditionWaiter, NotificationWaiter, Notifier, TimeoutConditionWaiter,
-    TimeoutNotificationWaiter, wait_timeout_result::WaitTimeoutResult,
+    ConditionWaiter,
+    NotificationWaiter,
+    Notifier,
+    TimeoutConditionWaiter,
+    TimeoutNotificationWaiter,
+    wait_timeout_result::WaitTimeoutResult,
     wait_timeout_status::WaitTimeoutStatus,
 };
 

@@ -11,7 +11,10 @@
 
 use std::time::Duration;
 
-use crate::monitor::{AsyncMonitorFuture, WaitTimeoutStatus};
+use crate::monitor::{
+    AsyncMonitorFuture,
+    WaitTimeoutStatus,
+};
 
 /// Waits asynchronously for a notification with a relative timeout.
 pub trait AsyncTimeoutNotificationWaiter {

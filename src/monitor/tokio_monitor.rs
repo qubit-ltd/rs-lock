@@ -9,13 +9,25 @@
  ******************************************************************************/
 //! Tokio-based asynchronous monitor.
 
-use std::time::{Duration, Instant};
+use std::time::{
+    Duration,
+    Instant,
+};
 
-use tokio::sync::{Mutex, Notify};
+use tokio::sync::{
+    Mutex,
+    Notify,
+};
 
 use super::{
-    AsyncConditionWaiter, AsyncMonitorFuture, AsyncNotificationWaiter, AsyncTimeoutConditionWaiter,
-    AsyncTimeoutNotificationWaiter, Notifier, WaitTimeoutResult, WaitTimeoutStatus,
+    AsyncConditionWaiter,
+    AsyncMonitorFuture,
+    AsyncNotificationWaiter,
+    AsyncTimeoutConditionWaiter,
+    AsyncTimeoutNotificationWaiter,
+    Notifier,
+    WaitTimeoutResult,
+    WaitTimeoutStatus,
 };
 
 /// Asynchronous monitor built on Tokio synchronization primitives.

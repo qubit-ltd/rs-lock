@@ -9,11 +9,22 @@
  ******************************************************************************/
 //! Arc-wrapped Tokio monitor.
 
-use std::{ops::Deref, sync::Arc, time::Duration};
+use std::{
+    ops::Deref,
+    sync::Arc,
+    time::Duration,
+};
 
 use super::{
-    AsyncConditionWaiter, AsyncMonitorFuture, AsyncNotificationWaiter, AsyncTimeoutConditionWaiter,
-    AsyncTimeoutNotificationWaiter, Notifier, TokioMonitor, WaitTimeoutResult, WaitTimeoutStatus,
+    AsyncConditionWaiter,
+    AsyncMonitorFuture,
+    AsyncNotificationWaiter,
+    AsyncTimeoutConditionWaiter,
+    AsyncTimeoutNotificationWaiter,
+    Notifier,
+    TokioMonitor,
+    WaitTimeoutResult,
+    WaitTimeoutStatus,
 };
 
 /// Cloneable handle around a [`TokioMonitor`].

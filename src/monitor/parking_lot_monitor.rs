@@ -24,14 +24,24 @@
 //! state machines such as thread pools.
 //!
 
-use std::time::{Duration, Instant};
+use std::time::{
+    Duration,
+    Instant,
+};
 
-use parking_lot::{Condvar, Mutex};
+use parking_lot::{
+    Condvar,
+    Mutex,
+};
 
 use super::parking_lot_monitor_guard::ParkingLotMonitorGuard;
 use super::{
-    ConditionWaiter, NotificationWaiter, Notifier, TimeoutConditionWaiter,
-    TimeoutNotificationWaiter, wait_timeout_result::WaitTimeoutResult,
+    ConditionWaiter,
+    NotificationWaiter,
+    Notifier,
+    TimeoutConditionWaiter,
+    TimeoutNotificationWaiter,
+    wait_timeout_result::WaitTimeoutResult,
     wait_timeout_status::WaitTimeoutStatus,
 };
 

@@ -11,7 +11,10 @@
 
 use std::time::Duration;
 
-use crate::monitor::{ConditionWaiter, WaitTimeoutResult};
+use crate::monitor::{
+    ConditionWaiter,
+    WaitTimeoutResult,
+};
 
 /// Waits for predicates over protected state with relative timeouts.
 pub trait TimeoutConditionWaiter: ConditionWaiter {

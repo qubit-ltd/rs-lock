@@ -14,9 +14,15 @@
 //! used in a generic way through closures, avoiding the complexity of
 //! explicitly managing lock guards and their lifetimes.
 //!
-use std::sync::{Mutex, RwLock};
+use std::sync::{
+    Mutex,
+    RwLock,
+};
 
-use parking_lot::{Mutex as ParkingLotMutex, RwLock as ParkingLotRwLock};
+use parking_lot::{
+    Mutex as ParkingLotMutex,
+    RwLock as ParkingLotRwLock,
+};
 
 use super::try_lock_error::TryLockError;
 

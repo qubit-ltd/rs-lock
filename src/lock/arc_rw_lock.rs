@@ -18,7 +18,10 @@ use std::sync::Arc;
 
 use parking_lot::RwLock;
 
-use crate::lock::{Lock, TryLockError};
+use crate::lock::{
+    Lock,
+    TryLockError,
+};
 
 /// Parking-lot read-write lock wrapper.
 ///
