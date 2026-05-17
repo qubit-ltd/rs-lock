@@ -14,10 +14,7 @@
 //!
 use std::future::Future;
 
-use tokio::sync::{
-    Mutex as AsyncMutex,
-    RwLock as AsyncRwLock,
-};
+use tokio::sync::{Mutex as AsyncMutex, RwLock as AsyncRwLock};
 
 use super::try_lock_error::TryLockError;
 

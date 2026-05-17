@@ -13,17 +13,11 @@
 //! coordination across threads.
 //!
 
-use std::{
-    ops::Deref,
-    sync::Arc,
-    time::Duration,
-};
+use std::{ops::Deref, sync::Arc, time::Duration};
 
 use super::{
-    StdMonitor,
-    StdMonitorGuard,
-    WaitTimeoutResult,
-    WaitTimeoutStatus,
+    ConditionWaiter, NotificationWaiter, Notifier, StdMonitor, StdMonitorGuard,
+    TimeoutConditionWaiter, TimeoutNotificationWaiter, WaitTimeoutResult, WaitTimeoutStatus,
 };
 
 /// Arc-wrapped monitor for shared condition-based state coordination.
@@ -206,9 +200,17 @@ impl<T> ArcStdMonitor<T> {
         self.inner.write_notify_all(f)
     }
 
+    /// Waits for a notification without checking state.
+    ///
+    /// This delegates to [`StdMonitor::wait`].
+    #[inline]
+    pub fn wait(&self) {
+        self.inner.wait();
+    }
+
     /// Waits for a notification or timeout without checking state.
     ///
-    /// This delegates to [`StdMonitor::wait_notify`]. Most
+    /// This delegates to [`StdMonitor::wait_for`]. Most
     /// coordination code should prefer [`Self::wait_while`],
     /// [`Self::wait_until`], or an explicit [`StdMonitorGuard`] loop.
     ///
@@ -233,13 +235,13 @@ impl<T> ArcStdMonitor<T> {
     /// use qubit_lock::{ArcStdMonitor, WaitTimeoutStatus};
     ///
     /// let monitor = ArcStdMonitor::new(false);
-    /// let status = monitor.wait_notify(Duration::from_millis(1));
+    /// let status = monitor.wait_for(Duration::from_millis(1));
     ///
     /// assert_eq!(status, WaitTimeoutStatus::TimedOut);
     /// ```
     #[inline]
-    pub fn wait_notify(&self, timeout: Duration) -> WaitTimeoutStatus {
-        self.inner.wait_notify(timeout)
+    pub fn wait_for(&self, timeout: Duration) -> WaitTimeoutStatus {
+        self.inner.wait_for(timeout)
     }
 
     /// Waits while a predicate remains true, then mutates the protected state.
@@ -318,7 +320,7 @@ impl<T> ArcStdMonitor<T> {
 
     /// Waits while a predicate remains true, with an overall time limit.
     ///
-    /// This delegates to [`StdMonitor::wait_timeout_while`]. If `waiting` becomes
+    /// This delegates to [`StdMonitor::wait_while_for`]. If `waiting` becomes
     /// false before `timeout` expires, `f` runs while the monitor lock is still
     /// held. If the timeout expires first, the closure is not called.
     ///
@@ -344,7 +346,7 @@ impl<T> ArcStdMonitor<T> {
     /// use qubit_lock::{ArcStdMonitor, WaitTimeoutResult};
     ///
     /// let monitor = ArcStdMonitor::new(Vec::<i32>::new());
-    /// let result = monitor.wait_timeout_while(
+    /// let result = monitor.wait_while_for(
     ///     Duration::from_millis(1),
     ///     |items| items.is_empty(),
     ///     |items| items.pop(),
@@ -353,7 +355,7 @@ impl<T> ArcStdMonitor<T> {
     /// assert_eq!(result, WaitTimeoutResult::TimedOut);
     /// ```
     #[inline]
-    pub fn wait_timeout_while<R, P, F>(
+    pub fn wait_while_for<R, P, F>(
         &self,
         timeout: Duration,
         waiting: P,
@@ -363,12 +365,12 @@ impl<T> ArcStdMonitor<T> {
         P: FnMut(&T) -> bool,
         F: FnOnce(&mut T) -> R,
     {
-        self.inner.wait_timeout_while(timeout, waiting, f)
+        self.inner.wait_while_for(timeout, waiting, f)
     }
 
     /// Waits until a predicate becomes true, with an overall time limit.
     ///
-    /// This delegates to [`StdMonitor::wait_timeout_until`]. If `ready` becomes
+    /// This delegates to [`StdMonitor::wait_until_for`]. If `ready` becomes
     /// true before `timeout` expires, `f` runs while the monitor lock is still
     /// held. If the timeout expires first, the closure is not called.
     ///
@@ -398,7 +400,7 @@ impl<T> ArcStdMonitor<T> {
     /// let worker_monitor = monitor.clone();
     ///
     /// let worker = thread::spawn(move || {
-    ///     worker_monitor.wait_timeout_until(
+    ///     worker_monitor.wait_until_for(
     ///         Duration::from_secs(1),
     ///         |ready| *ready,
     ///         |ready| {
@@ -417,17 +419,12 @@ impl<T> ArcStdMonitor<T> {
     /// );
     /// ```
     #[inline]
-    pub fn wait_timeout_until<R, P, F>(
-        &self,
-        timeout: Duration,
-        ready: P,
-        f: F,
-    ) -> WaitTimeoutResult<R>
+    pub fn wait_until_for<R, P, F>(&self, timeout: Duration, ready: P, f: F) -> WaitTimeoutResult<R>
     where
         P: FnMut(&T) -> bool,
         F: FnOnce(&mut T) -> R,
     {
-        self.inner.wait_timeout_until(timeout, ready, f)
+        self.inner.wait_until_for(timeout, ready, f)
     }
 
     /// Wakes one thread waiting on this monitor's condition variable.
@@ -459,6 +456,92 @@ impl<T> AsRef<StdMonitor<T>> for ArcStdMonitor<T> {
     #[inline]
     fn as_ref(&self) -> &StdMonitor<T> {
         self.inner.as_ref()
+    }
+}
+
+impl<T> Notifier for ArcStdMonitor<T> {
+    /// Wakes one thread waiting on this monitor.
+    #[inline]
+    fn notify_one(&self) {
+        Self::notify_one(self);
+    }
+
+    /// Wakes all threads waiting on this monitor.
+    #[inline]
+    fn notify_all(&self) {
+        Self::notify_all(self);
+    }
+}
+
+impl<T> NotificationWaiter for ArcStdMonitor<T> {
+    /// Blocks until a notification wakes this waiter.
+    #[inline]
+    fn wait(&self) {
+        Self::wait(self);
+    }
+}
+
+impl<T> TimeoutNotificationWaiter for ArcStdMonitor<T> {
+    /// Blocks until a notification wakes this waiter or the timeout expires.
+    #[inline]
+    fn wait_for(&self, timeout: Duration) -> WaitTimeoutStatus {
+        Self::wait_for(self, timeout)
+    }
+}
+
+impl<T> ConditionWaiter for ArcStdMonitor<T> {
+    type State = T;
+
+    /// Blocks until the predicate becomes true, then runs the action.
+    #[inline]
+    fn wait_until<R, P, F>(&self, predicate: P, action: F) -> R
+    where
+        P: FnMut(&Self::State) -> bool,
+        F: FnOnce(&mut Self::State) -> R,
+    {
+        Self::wait_until(self, predicate, action)
+    }
+
+    /// Blocks while the predicate remains true, then runs the action.
+    #[inline]
+    fn wait_while<R, P, F>(&self, predicate: P, action: F) -> R
+    where
+        P: FnMut(&Self::State) -> bool,
+        F: FnOnce(&mut Self::State) -> R,
+    {
+        Self::wait_while(self, predicate, action)
+    }
+}
+
+impl<T> TimeoutConditionWaiter for ArcStdMonitor<T> {
+    /// Blocks until the predicate becomes true or the timeout expires.
+    #[inline]
+    fn wait_until_for<R, P, F>(
+        &self,
+        timeout: Duration,
+        predicate: P,
+        action: F,
+    ) -> WaitTimeoutResult<R>
+    where
+        P: FnMut(&Self::State) -> bool,
+        F: FnOnce(&mut Self::State) -> R,
+    {
+        Self::wait_until_for(self, timeout, predicate, action)
+    }
+
+    /// Blocks while the predicate remains true or until the timeout expires.
+    #[inline]
+    fn wait_while_for<R, P, F>(
+        &self,
+        timeout: Duration,
+        predicate: P,
+        action: F,
+    ) -> WaitTimeoutResult<R>
+    where
+        P: FnMut(&Self::State) -> bool,
+        F: FnOnce(&mut Self::State) -> R,
+    {
+        Self::wait_while_for(self, timeout, predicate, action)
     }
 }
 

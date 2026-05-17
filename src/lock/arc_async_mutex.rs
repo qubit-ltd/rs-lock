@@ -12,17 +12,11 @@
 //! Provides an Arc-wrapped asynchronous mutex for protecting shared
 //! data in async environments without blocking threads.
 //!
-use std::{
-    ops::Deref,
-    sync::Arc,
-};
+use std::{ops::Deref, sync::Arc};
 
 use tokio::sync::Mutex as AsyncMutex;
 
-use crate::lock::{
-    AsyncLock,
-    TryLockError,
-};
+use crate::lock::{AsyncLock, TryLockError};
 
 /// Asynchronous Mutex Wrapper
 ///

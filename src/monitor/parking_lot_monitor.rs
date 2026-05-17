@@ -7,29 +7,28 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-//! # StdMonitor
+//! # ParkingLotMonitor
 //!
 //! Provides a synchronous monitor built from a mutex and a condition variable.
 //! A monitor protects one shared state value and binds that state to the
 //! condition variable used to wait for changes. This is the same low-level
-//! mechanism as using [`std::sync::Mutex`] and [`std::sync::Condvar`] directly,
+//! mechanism as using [`parking_lot::Mutex`] and [`parking_lot::Condvar`] directly,
 //! but packaged so callers do not have to keep a mutex and its matching
 //! condition variable as separate fields.
 //!
-//! The high-level APIs ([`StdMonitor::read`], [`StdMonitor::write`],
-//! [`StdMonitor::wait_while`], and [`StdMonitor::wait_until`]) are intended for
+//! The high-level APIs ([`ParkingLotMonitor::read`], [`ParkingLotMonitor::write`],
+//! [`ParkingLotMonitor::wait_while`], and [`ParkingLotMonitor::wait_until`]) are intended for
 //! short critical sections and simple guarded-suspension flows. The lower-level
-//! [`StdMonitor::lock`] API returns a [`StdMonitorGuard`], which supports
-//! [`StdMonitorGuard::wait`] and [`StdMonitorGuard::wait_timeout`] for more complex
+//! [`ParkingLotMonitor::lock`] API returns a [`ParkingLotMonitorGuard`], which supports
+//! [`ParkingLotMonitorGuard::wait`] and [`ParkingLotMonitorGuard::wait_timeout`] for more complex
 //! state machines such as thread pools.
 //!
 
-use std::{
-    sync::{Condvar, Mutex},
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
-use super::std_monitor_guard::StdMonitorGuard;
+use parking_lot::{Condvar, Mutex};
+
+use super::parking_lot_monitor_guard::ParkingLotMonitorGuard;
 use super::{
     ConditionWaiter, NotificationWaiter, Notifier, TimeoutConditionWaiter,
     TimeoutNotificationWaiter, wait_timeout_result::WaitTimeoutResult,
@@ -38,32 +37,32 @@ use super::{
 
 /// Shared state protected by a mutex and a condition variable.
 ///
-/// `StdMonitor` is useful when callers need more than a short critical section.
+/// `ParkingLotMonitor` is useful when callers need more than a short critical section.
 /// It models the classic monitor object pattern: one mutex protects the state,
 /// and one condition variable lets threads wait until that state changes. This
-/// is the same relationship used by `std::sync::Mutex` and
-/// `std::sync::Condvar`, but represented as one object so the condition
+/// is the same relationship used by `parking_lot::Mutex` and
+/// `parking_lot::Condvar`, but represented as one object so the condition
 /// variable is not accidentally used with unrelated state.
 ///
-/// `StdMonitor` deliberately has two levels of API:
+/// `ParkingLotMonitor` deliberately has two levels of API:
 ///
 /// * `read` and `write` acquire the mutex, run a closure, and release it.
 /// * `wait_while`, `wait_until`, and their timeout variants implement common
 ///   predicate-based waits.
-/// * `lock` returns a [`StdMonitorGuard`] for callers that need to write their own
-///   loop around [`StdMonitorGuard::wait`] or [`StdMonitorGuard::wait_timeout`].
+/// * `lock` returns a [`ParkingLotMonitorGuard`] for callers that need to write their own
+///   loop around [`ParkingLotMonitorGuard::wait`] or [`ParkingLotMonitorGuard::wait_timeout`].
 ///
-/// A poisoned mutex is recovered by taking the inner state. This makes
-/// `StdMonitor` suitable for coordination state that should remain observable
-/// after another thread panics while holding the lock.
+/// The underlying `parking_lot` mutex is not poisoned when a thread panics
+/// while holding the lock. This keeps monitor coordination state observable
+/// after panic unwinding.
 ///
-/// # Difference from `Mutex` and `Condvar`
+/// # Difference from raw `Mutex` and `Condvar`
 ///
-/// With the standard library primitives, callers usually store two fields and
+/// With raw parking_lot primitives, callers usually store two fields and
 /// manually keep them paired:
 ///
 /// ```rust
-/// # use std::sync::{Condvar, Mutex};
+/// # use parking_lot::{Condvar, Mutex};
 /// # struct State;
 /// struct Shared {
 ///     state: Mutex<State>,
@@ -71,8 +70,8 @@ use super::{
 /// }
 /// ```
 ///
-/// `StdMonitor<State>` stores the same pair internally. A [`StdMonitorGuard`] is a
-/// wrapper around the standard library's `MutexGuard`; it keeps the protected
+/// `ParkingLotMonitor<State>` stores the same pair internally. A [`ParkingLotMonitorGuard`] is a
+/// wrapper around the parking_lot `MutexGuard`; it keeps the protected
 /// state locked and knows which monitor it belongs to, so its wait methods use
 /// the matching condition variable.
 ///
@@ -85,9 +84,9 @@ use super::{
 /// ```rust
 /// use std::thread;
 ///
-/// use qubit_lock::ArcStdMonitor;
+/// use qubit_lock::ArcParkingLotMonitor;
 ///
-/// let monitor = ArcStdMonitor::new(false);
+/// let monitor = ArcParkingLotMonitor::new(false);
 /// let waiter_monitor = monitor.clone();
 ///
 /// let waiter = thread::spawn(move || {
@@ -108,14 +107,14 @@ use super::{
 /// assert!(!monitor.read(|ready| *ready));
 /// ```
 ///
-pub struct StdMonitor<T> {
+pub struct ParkingLotMonitor<T> {
     /// Mutex protecting the monitor state.
     state: Mutex<T>,
     /// Condition variable used to wake predicate waiters after state changes.
     pub(super) changed: Condvar,
 }
 
-impl<T> StdMonitor<T> {
+impl<T> ParkingLotMonitor<T> {
     /// Creates a monitor protecting the supplied state value.
     ///
     /// # Arguments
@@ -129,9 +128,9 @@ impl<T> StdMonitor<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::StdMonitor;
+    /// use qubit_lock::ParkingLotMonitor;
     ///
-    /// let monitor = StdMonitor::new(0_u32);
+    /// let monitor = ParkingLotMonitor::new(0_u32);
     /// assert_eq!(monitor.read(|n| *n), 0);
     /// ```
     #[inline]
@@ -144,13 +143,10 @@ impl<T> StdMonitor<T> {
 
     /// Acquires the monitor and returns a guard for explicit state-machine code.
     ///
-    /// The returned [`StdMonitorGuard`] keeps the monitor mutex locked until the
+    /// The returned [`ParkingLotMonitorGuard`] keeps the monitor mutex locked until the
     /// guard is dropped. It can also be passed through
-    /// [`StdMonitorGuard::wait`] or [`StdMonitorGuard::wait_timeout`] to temporarily
+    /// [`ParkingLotMonitorGuard::wait`] or [`ParkingLotMonitorGuard::wait_timeout`] to temporarily
     /// release the lock while waiting on this monitor's condition variable.
-    ///
-    /// If the mutex is poisoned, this method recovers the inner state and still
-    /// returns a guard.
     ///
     /// # Returns
     ///
@@ -159,9 +155,9 @@ impl<T> StdMonitor<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::StdMonitor;
+    /// use qubit_lock::ParkingLotMonitor;
     ///
-    /// let monitor = StdMonitor::new(1);
+    /// let monitor = ParkingLotMonitor::new(1);
     /// {
     ///     let mut value = monitor.lock();
     ///     *value += 1;
@@ -170,22 +166,14 @@ impl<T> StdMonitor<T> {
     /// assert_eq!(monitor.read(|value| *value), 2);
     /// ```
     #[inline]
-    pub fn lock(&self) -> StdMonitorGuard<'_, T> {
-        StdMonitorGuard::new(
-            self,
-            self.state
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner),
-        )
+    pub fn lock(&self) -> ParkingLotMonitorGuard<'_, T> {
+        ParkingLotMonitorGuard::new(self, self.state.lock())
     }
 
     /// Acquires the monitor and reads the protected state.
     ///
     /// The closure runs while the mutex is held. Keep the closure short and do
     /// not call code that may block for a long time.
-    ///
-    /// If the mutex is poisoned, this method recovers the inner state and still
-    /// executes the closure.
     ///
     /// # Arguments
     ///
@@ -198,9 +186,9 @@ impl<T> StdMonitor<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::StdMonitor;
+    /// use qubit_lock::ParkingLotMonitor;
     ///
-    /// let monitor = StdMonitor::new(10_i32);
+    /// let monitor = ParkingLotMonitor::new(10_i32);
     /// let n = monitor.read(|x| *x);
     /// assert_eq!(n, 10);
     /// ```
@@ -220,9 +208,6 @@ impl<T> StdMonitor<T> {
     /// [`Self::notify_all`] after changing a condition that waiters may be
     /// observing.
     ///
-    /// If the mutex is poisoned, this method recovers the inner state and still
-    /// executes the closure.
-    ///
     /// # Arguments
     ///
     /// * `f` - Closure that receives a mutable reference to the state.
@@ -234,9 +219,9 @@ impl<T> StdMonitor<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::StdMonitor;
+    /// use qubit_lock::ParkingLotMonitor;
     ///
-    /// let monitor = StdMonitor::new(String::new());
+    /// let monitor = ParkingLotMonitor::new(String::new());
     /// let len = monitor.write(|s| {
     ///     s.push_str("hi");
     ///     s.len()
@@ -259,9 +244,7 @@ impl<T> StdMonitor<T> {
     /// variable is notified. This is a convenience method for the common
     /// "update state, then notify one waiter" pattern.
     ///
-    /// If the mutex is poisoned, this method recovers the inner state before
-    /// running the closure. If `f` panics, the panic is propagated and no
-    /// notification is sent.
+    /// If `f` panics, the panic is propagated and no notification is sent.
     ///
     /// # Arguments
     ///
@@ -274,9 +257,9 @@ impl<T> StdMonitor<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::StdMonitor;
+    /// use qubit_lock::ParkingLotMonitor;
     ///
-    /// let monitor = StdMonitor::new(Vec::<i32>::new());
+    /// let monitor = ParkingLotMonitor::new(Vec::<i32>::new());
     /// let len = monitor.write_notify_one(|items| {
     ///     items.push(7);
     ///     items.len()
@@ -301,9 +284,7 @@ impl<T> StdMonitor<T> {
     /// variable are notified. This is a convenience method for state changes that
     /// may allow multiple waiters to make progress.
     ///
-    /// If the mutex is poisoned, this method recovers the inner state before
-    /// running the closure. If `f` panics, the panic is propagated and no
-    /// notification is sent.
+    /// If `f` panics, the panic is propagated and no notification is sent.
     ///
     /// # Arguments
     ///
@@ -316,9 +297,9 @@ impl<T> StdMonitor<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::StdMonitor;
+    /// use qubit_lock::ParkingLotMonitor;
     ///
-    /// let monitor = StdMonitor::new(false);
+    /// let monitor = ParkingLotMonitor::new(false);
     /// let ready = monitor.write_notify_all(|ready| {
     ///     *ready = true;
     ///     *ready
@@ -341,10 +322,7 @@ impl<T> StdMonitor<T> {
     /// This method locks the monitor, waits once on the condition variable,
     /// and returns after the wait is woken. Most coordination code should
     /// prefer [`Self::wait_while`], [`Self::wait_until`], or an explicit
-    /// [`StdMonitorGuard`] loop that rechecks protected state.
-    ///
-    /// If the mutex is poisoned while waiting, this method recovers the inner
-    /// state and returns normally after the wait is woken.
+    /// [`ParkingLotMonitorGuard`] loop that rechecks protected state.
     ///
     /// This method may block indefinitely if no notification is sent.
     #[inline]
@@ -360,14 +338,10 @@ impl<T> StdMonitor<T> {
     /// when the caller genuinely needs a notification wait without inspecting
     /// state before or after the wait. Most coordination code should prefer
     /// [`Self::wait_while`], [`Self::wait_until`], or the explicit
-    /// [`StdMonitorGuard::wait_timeout`] loop.
+    /// [`ParkingLotMonitorGuard::wait_timeout`] loop.
     ///
-    /// Condition variables may wake spuriously, so
-    /// [`WaitTimeoutStatus::Woken`] does not prove that a notifier changed the
-    /// state.
-    ///
-    /// If the mutex is poisoned, this method recovers the inner state and
-    /// continues waiting.
+    /// [`WaitTimeoutStatus::Woken`] means the condition variable was notified,
+    /// but it does not prove that the protected state changed in a useful way.
     ///
     /// # Arguments
     ///
@@ -383,9 +357,9 @@ impl<T> StdMonitor<T> {
     /// ```rust
     /// use std::time::Duration;
     ///
-    /// use qubit_lock::{StdMonitor, WaitTimeoutStatus};
+    /// use qubit_lock::{ParkingLotMonitor, WaitTimeoutStatus};
     ///
-    /// let monitor = StdMonitor::new(false);
+    /// let monitor = ParkingLotMonitor::new(false);
     /// let status = monitor.wait_for(Duration::from_millis(1));
     ///
     /// assert_eq!(status, WaitTimeoutStatus::TimedOut);
@@ -402,16 +376,12 @@ impl<T> StdMonitor<T> {
     /// This is the monitor equivalent of the common `while condition { wait }`
     /// guarded-suspension pattern. The predicate is evaluated while holding the
     /// mutex. If it returns `true`, the current thread waits on the condition
-    /// variable and atomically releases the mutex. After a notification or
-    /// spurious wakeup, the mutex is reacquired and the predicate is evaluated
-    /// again. When the predicate returns `false`, `f` runs while the mutex is
-    /// still held.
+    /// variable and atomically releases the mutex. After a notification, the
+    /// mutex is reacquired and the predicate is evaluated again. When the
+    /// predicate returns `false`, `f` runs while the mutex is still held.
     ///
     /// This method may block indefinitely if no thread changes the state so
     /// that `waiting` becomes false and sends a notification.
-    ///
-    /// If the mutex is poisoned before or during the wait, this method recovers
-    /// the inner state and continues waiting or executes the closure.
     ///
     /// # Arguments
     ///
@@ -432,9 +402,9 @@ impl<T> StdMonitor<T> {
     ///     thread,
     /// };
     ///
-    /// use qubit_lock::StdMonitor;
+    /// use qubit_lock::ParkingLotMonitor;
     ///
-    /// let monitor = Arc::new(StdMonitor::new(Vec::<i32>::new()));
+    /// let monitor = Arc::new(ParkingLotMonitor::new(Vec::<i32>::new()));
     /// let worker_monitor = Arc::clone(&monitor);
     ///
     /// let worker = thread::spawn(move || {
@@ -467,15 +437,12 @@ impl<T> StdMonitor<T> {
     /// This is the positive-predicate counterpart of [`Self::wait_while`]. The
     /// predicate is evaluated while holding the mutex. If it returns `false`,
     /// the current thread waits on the condition variable and atomically
-    /// releases the mutex. After a notification or spurious wakeup, the mutex
-    /// is reacquired and the predicate is evaluated again. When the predicate
-    /// returns `true`, `f` runs while the mutex is still held.
+    /// releases the mutex. After a notification, the mutex is reacquired and
+    /// the predicate is evaluated again. When the predicate returns `true`, `f`
+    /// runs while the mutex is still held.
     ///
     /// This method may block indefinitely if no thread changes the state to
     /// satisfy the predicate and sends a notification.
-    ///
-    /// If the mutex is poisoned before or during the wait, this method recovers
-    /// the inner state and continues waiting or executes the closure.
     ///
     /// # Arguments
     ///
@@ -494,9 +461,9 @@ impl<T> StdMonitor<T> {
     ///     thread,
     /// };
     ///
-    /// use qubit_lock::StdMonitor;
+    /// use qubit_lock::ParkingLotMonitor;
     ///
-    /// let monitor = Arc::new(StdMonitor::new(false));
+    /// let monitor = Arc::new(ParkingLotMonitor::new(false));
     /// let waiter_monitor = Arc::clone(&monitor);
     ///
     /// let waiter = thread::spawn(move || {
@@ -531,12 +498,8 @@ impl<T> StdMonitor<T> {
     /// timeout expires, `f` runs while the lock is still held. If the timeout
     /// expires first, the closure is not called.
     ///
-    /// Condition variables may wake spuriously, and timeout status alone is not
-    /// used as proof that the predicate is still true; the predicate is always
-    /// rechecked under the lock.
-    ///
-    /// If the mutex is poisoned before or during the wait, this method recovers
-    /// the inner state and continues waiting or executes the closure.
+    /// Timeout status alone is not used as proof that the predicate is still
+    /// true; the predicate is always rechecked under the lock.
     ///
     /// # Arguments
     ///
@@ -557,9 +520,9 @@ impl<T> StdMonitor<T> {
     /// ```rust
     /// use std::time::Duration;
     ///
-    /// use qubit_lock::{StdMonitor, WaitTimeoutResult};
+    /// use qubit_lock::{ParkingLotMonitor, WaitTimeoutResult};
     ///
-    /// let monitor = StdMonitor::new(Vec::<i32>::new());
+    /// let monitor = ParkingLotMonitor::new(Vec::<i32>::new());
     /// let result = monitor.wait_while_for(
     ///     Duration::from_millis(1),
     ///     |items| items.is_empty(),
@@ -604,12 +567,8 @@ impl<T> StdMonitor<T> {
     /// expires, `f` runs while the monitor lock is still held. If the timeout
     /// expires first, the closure is not called.
     ///
-    /// Condition variables may wake spuriously, and timeout status alone is not
-    /// used as proof that the predicate is still false; the predicate is always
-    /// rechecked under the lock.
-    ///
-    /// If the mutex is poisoned before or during the wait, this method recovers
-    /// the inner state and continues waiting or executes the closure.
+    /// Timeout status alone is not used as proof that the predicate is still
+    /// false; the predicate is always rechecked under the lock.
     ///
     /// # Arguments
     ///
@@ -632,9 +591,9 @@ impl<T> StdMonitor<T> {
     ///     time::Duration,
     /// };
     ///
-    /// use qubit_lock::{StdMonitor, WaitTimeoutResult};
+    /// use qubit_lock::{ParkingLotMonitor, WaitTimeoutResult};
     ///
-    /// let monitor = Arc::new(StdMonitor::new(false));
+    /// let monitor = Arc::new(ParkingLotMonitor::new(false));
     /// let waiter_monitor = Arc::clone(&monitor);
     ///
     /// let waiter = thread::spawn(move || {
@@ -681,9 +640,9 @@ impl<T> StdMonitor<T> {
     /// ```rust
     /// use std::thread;
     ///
-    /// use qubit_lock::ArcStdMonitor;
+    /// use qubit_lock::ArcParkingLotMonitor;
     ///
-    /// let monitor = ArcStdMonitor::new(0_u32);
+    /// let monitor = ArcParkingLotMonitor::new(0_u32);
     /// let waiter = {
     ///     let m = monitor.clone();
     ///     thread::spawn(move || {
@@ -713,9 +672,9 @@ impl<T> StdMonitor<T> {
     /// ```rust
     /// use std::thread;
     ///
-    /// use qubit_lock::ArcStdMonitor;
+    /// use qubit_lock::ArcParkingLotMonitor;
     ///
-    /// let monitor = ArcStdMonitor::new(false);
+    /// let monitor = ArcParkingLotMonitor::new(false);
     /// let mut handles = Vec::new();
     /// for _ in 0..2 {
     ///     let m = monitor.clone();
@@ -736,7 +695,7 @@ impl<T> StdMonitor<T> {
     }
 }
 
-impl<T> Notifier for StdMonitor<T> {
+impl<T> Notifier for ParkingLotMonitor<T> {
     /// Wakes one thread waiting on this monitor.
     #[inline]
     fn notify_one(&self) {
@@ -750,7 +709,7 @@ impl<T> Notifier for StdMonitor<T> {
     }
 }
 
-impl<T> NotificationWaiter for StdMonitor<T> {
+impl<T> NotificationWaiter for ParkingLotMonitor<T> {
     /// Blocks until a notification wakes this waiter.
     #[inline]
     fn wait(&self) {
@@ -758,7 +717,7 @@ impl<T> NotificationWaiter for StdMonitor<T> {
     }
 }
 
-impl<T> TimeoutNotificationWaiter for StdMonitor<T> {
+impl<T> TimeoutNotificationWaiter for ParkingLotMonitor<T> {
     /// Blocks until a notification wakes this waiter or the timeout expires.
     #[inline]
     fn wait_for(&self, timeout: Duration) -> WaitTimeoutStatus {
@@ -766,7 +725,7 @@ impl<T> TimeoutNotificationWaiter for StdMonitor<T> {
     }
 }
 
-impl<T> ConditionWaiter for StdMonitor<T> {
+impl<T> ConditionWaiter for ParkingLotMonitor<T> {
     type State = T;
 
     /// Blocks until the predicate becomes true, then runs the action.
@@ -790,7 +749,7 @@ impl<T> ConditionWaiter for StdMonitor<T> {
     }
 }
 
-impl<T> TimeoutConditionWaiter for StdMonitor<T> {
+impl<T> TimeoutConditionWaiter for ParkingLotMonitor<T> {
     /// Blocks until the predicate becomes true or the timeout expires.
     #[inline]
     fn wait_until_for<R, P, F>(
@@ -822,8 +781,8 @@ impl<T> TimeoutConditionWaiter for StdMonitor<T> {
     }
 }
 
-impl<T> From<T> for StdMonitor<T> {
-    /// Creates a standard monitor from an initial state value.
+impl<T> From<T> for ParkingLotMonitor<T> {
+    /// Creates a monitor from an initial state value.
     ///
     /// # Arguments
     ///
@@ -831,14 +790,14 @@ impl<T> From<T> for StdMonitor<T> {
     ///
     /// # Returns
     ///
-    /// A standard monitor initialized with `value`.
+    /// A monitor initialized with `value`.
     #[inline]
     fn from(value: T) -> Self {
         Self::new(value)
     }
 }
 
-impl<T: Default> Default for StdMonitor<T> {
+impl<T: Default> Default for ParkingLotMonitor<T> {
     /// Creates a monitor containing `T::default()`.
     ///
     /// # Returns
@@ -848,9 +807,9 @@ impl<T: Default> Default for StdMonitor<T> {
     /// # Example
     ///
     /// ```rust
-    /// use qubit_lock::StdMonitor;
+    /// use qubit_lock::ParkingLotMonitor;
     ///
-    /// let monitor: StdMonitor<String> = StdMonitor::default();
+    /// let monitor: ParkingLotMonitor<String> = ParkingLotMonitor::default();
     /// assert!(monitor.read(|s| s.is_empty()));
     /// ```
     #[inline]

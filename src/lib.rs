@@ -15,8 +15,8 @@
 //!
 //! - Synchronous lock wrappers with `Arc` integrated internally.
 //! - Optional asynchronous Tokio-based lock wrappers behind the `async` feature.
-//! - Monitor-style coordination built on `parking_lot` and standard-library
-//!   `Mutex` plus `Condvar` pairs.
+//! - Monitor-style coordination traits and concrete parking_lot,
+//!   standard-library, Tokio, and mock monitor implementations.
 //!
 //! Public API items are re-exported from the crate root. The internal
 //! `lock` and `monitor` modules are implementation details and are not public
@@ -33,26 +33,17 @@
 mod lock;
 mod monitor;
 #[cfg(feature = "async")]
-pub use lock::{
-    ArcAsyncMutex,
-    ArcAsyncRwLock,
-    AsyncLock,
-};
-pub use lock::{
-    ArcMutex,
-    ArcRwLock,
-    ArcStdMutex,
-    ArcStdRwLock,
-    Lock,
-    TryLockError,
-};
+pub use lock::{ArcAsyncMutex, ArcAsyncRwLock, AsyncLock};
+pub use lock::{ArcMutex, ArcRwLock, ArcStdMutex, ArcStdRwLock, Lock, TryLockError};
 pub use monitor::{
-    ArcMonitor,
-    ArcStdMonitor,
-    Monitor,
-    MonitorGuard,
-    StdMonitor,
-    StdMonitorGuard,
-    WaitTimeoutResult,
-    WaitTimeoutStatus,
+    ArcMockMonitor, ArcParkingLotMonitor, ArcStdMonitor, ConditionWaiter, MockMonitor, Monitor,
+    NotificationWaiter, Notifier, ParkingLotMonitor, ParkingLotMonitorGuard, SharedMonitor,
+    StdMonitor, StdMonitorGuard, TimeoutConditionWaiter, TimeoutNotificationWaiter,
+    WaitTimeoutResult, WaitTimeoutStatus,
+};
+#[cfg(feature = "async")]
+pub use monitor::{
+    ArcTokioMonitor, AsyncConditionWaiter, AsyncMonitor, AsyncMonitorFuture,
+    AsyncNotificationWaiter, AsyncTimeoutConditionWaiter, AsyncTimeoutNotificationWaiter,
+    SharedAsyncMonitor, TokioMonitor,
 };

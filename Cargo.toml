@@ -1,6 +1,6 @@
 [package]
 name = "qubit-lock"
-version = "0.7.1"
+version = "0.8.0"
 edition = "2024"
 rust-version = "1.94"
 authors = ["Haixing Hu <starfish.hu@gmail.com>"]
@@ -33,7 +33,7 @@ async = ["dep:tokio"]
 
 [dependencies]
 parking_lot = "0.12"
-tokio = { version = "1.52", default-features = false, features = ["sync"], optional = true }
+tokio = { version = "1.52", default-features = false, features = ["macros", "sync", "time"], optional = true }
 
 [dev-dependencies]
 semver = { version = "1.0", default-features = false }

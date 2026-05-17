@@ -16,18 +16,12 @@
 //!
 
 use std::{
-    ops::{
-        Deref,
-        DerefMut,
-    },
+    ops::{Deref, DerefMut},
     sync::MutexGuard,
     time::Duration,
 };
 
-use super::{
-    std_monitor::StdMonitor,
-    wait_timeout_status::WaitTimeoutStatus,
-};
+use super::{std_monitor::StdMonitor, wait_timeout_status::WaitTimeoutStatus};
 
 /// Guard returned by [`StdMonitor::lock`](super::StdMonitor::lock).
 ///

@@ -9,17 +9,9 @@
  ******************************************************************************/
 //! Tests for [`ArcStdMonitor`](qubit_lock::ArcStdMonitor).
 
-use std::{
-    sync::mpsc,
-    thread,
-    time::Duration,
-};
+use std::{sync::mpsc, thread, time::Duration};
 
-use qubit_lock::{
-    ArcStdMonitor,
-    WaitTimeoutResult,
-    WaitTimeoutStatus,
-};
+use qubit_lock::{ArcStdMonitor, WaitTimeoutResult, WaitTimeoutStatus};
 
 #[test]
 fn test_arc_std_monitor_new_read_write_updates_state() {
@@ -162,17 +154,17 @@ fn test_arc_std_monitor_wait_until_blocks_until_notify_one() {
 }
 
 #[test]
-fn test_arc_std_monitor_wait_notify_returns_timed_out() {
+fn test_arc_std_monitor_wait_for_returns_timed_out() {
     let monitor = ArcStdMonitor::new(false);
 
     assert_eq!(
-        monitor.wait_notify(Duration::from_millis(30)),
+        monitor.wait_for(Duration::from_millis(30)),
         WaitTimeoutStatus::TimedOut,
     );
 }
 
 #[test]
-fn test_arc_std_monitor_wait_timeout_until_delegates_to_monitor() {
+fn test_arc_std_monitor_wait_until_for_delegates_to_monitor() {
     let monitor = ArcStdMonitor::new(false);
     let (started_tx, started_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
@@ -182,7 +174,7 @@ fn test_arc_std_monitor_wait_timeout_until_delegates_to_monitor() {
         started_tx
             .send(())
             .expect("test should observe waiter start");
-        let notified = waiter_monitor.wait_timeout_until(
+        let notified = waiter_monitor.wait_until_for(
             Duration::from_secs(1),
             |ready| *ready,
             |ready| {
@@ -256,7 +248,7 @@ fn test_arc_std_monitor_wait_while_delegates_to_monitor() {
 }
 
 #[test]
-fn test_arc_std_monitor_wait_timeout_while_returns_ready_when_predicate_clears() {
+fn test_arc_std_monitor_wait_while_for_returns_ready_when_predicate_clears() {
     let monitor = ArcStdMonitor::new(Vec::<i32>::new());
     let (started_tx, started_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
@@ -266,7 +258,7 @@ fn test_arc_std_monitor_wait_timeout_while_returns_ready_when_predicate_clears()
         started_tx
             .send(())
             .expect("test should observe waiter start");
-        let result = waiter_monitor.wait_timeout_while(
+        let result = waiter_monitor.wait_while_for(
             Duration::from_secs(1),
             |items| items.is_empty(),
             |items| items.pop().expect("item should be ready"),
@@ -293,11 +285,11 @@ fn test_arc_std_monitor_wait_timeout_while_returns_ready_when_predicate_clears()
 }
 
 #[test]
-fn test_arc_std_monitor_wait_timeout_while_returns_timed_out() {
+fn test_arc_std_monitor_wait_while_for_returns_timed_out() {
     let monitor = ArcStdMonitor::new(Vec::<i32>::new());
 
     assert_eq!(
-        monitor.wait_timeout_while(
+        monitor.wait_while_for(
             Duration::from_millis(30),
             |items| items.is_empty(),
             |items| items.pop(),

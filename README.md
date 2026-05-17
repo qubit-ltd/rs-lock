@@ -14,8 +14,10 @@ Lock-focused utilities for the Qubit Rust libraries. The crate provides synchron
 - `ArcMutex`, `ArcRwLock`: parking_lot-based synchronous lock wrappers with `Arc` built in.
 - `ArcStdMutex`, `ArcStdRwLock`: standard-library lock wrappers for callers that need poison semantics.
 - `ArcAsyncMutex`, `ArcAsyncRwLock`: Tokio-based asynchronous lock wrappers enabled by the default `async` feature.
-- `Monitor`, `ArcMonitor`, `MonitorGuard`: parking_lot-based condition coordination.
+- `ParkingLotMonitor`, `ArcParkingLotMonitor`, `ParkingLotMonitorGuard`: parking_lot-based condition coordination.
 - `StdMonitor`, `ArcStdMonitor`, `StdMonitorGuard`: std-based condition coordination.
+- `MockMonitor`, `ArcMockMonitor`: deterministic monitor testing with manually advanced timeout time.
+- `TokioMonitor`, `ArcTokioMonitor`: async monitor coordination with Tokio.
 - Closure-based APIs that keep lock acquisition and release scoped to one call.
 - `Arc*` wrappers implement `Deref` and `AsRef`, so the native guard-based
   APIs of the wrapped primitive remain available when needed.
@@ -24,7 +26,7 @@ Lock-focused utilities for the Qubit Rust libraries. The crate provides synchron
 
 ```toml
 [dependencies]
-qubit-lock = "0.7"
+qubit-lock = "0.8"
 ```
 
 The async wrappers use Tokio synchronization primitives and are enabled by
@@ -32,7 +34,7 @@ default. For sync-only users that want to avoid Tokio in the dependency graph:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.7", default-features = false }
+qubit-lock = { version = "0.8", default-features = false }
 ```
 
 If your application creates a Tokio runtime, enable the appropriate Tokio
@@ -40,19 +42,20 @@ runtime features in your own `Cargo.toml`, such as `rt` or `rt-multi-thread`.
 `AsyncLock` returns `Send` futures: `ArcAsyncMutex<T>` implements it for
 `T: Send`, while `ArcAsyncRwLock<T>` implements it for `T: Send + Sync`.
 
-## Migration from 0.6
+## Migration from 0.7
 
-Version `0.7` contains intentional breaking API cleanup:
+Version `0.8` contains intentional breaking API cleanup:
 
-- `ArcRwLock` now wraps `parking_lot::RwLock` and no longer uses poisoning.
-  After a panic while holding the lock, future acquisitions continue normally
-  and `try_read` / `try_write` do not return `TryLockError::Poisoned`.
-- Use `ArcStdRwLock` when standard-library `std::sync::RwLock` poisoning
-  semantics are required.
+- `Monitor` is now an aggregate trait for blocking monitor capabilities.
+- The concrete parking_lot monitor is now `ParkingLotMonitor`; its cloneable
+  handle is `ArcParkingLotMonitor`.
+- Timeout condition methods are named `wait_until_for` and `wait_while_for`.
+- `MockMonitor` and `ArcMockMonitor` provide manually advanced timeout time for
+  deterministic tests.
+- With the default `async` feature, `TokioMonitor` and `ArcTokioMonitor`
+  provide async monitor operations.
 - `qubit_lock::lock` and `qubit_lock::monitor` are no longer public modules.
   Import public types directly from the crate root.
-- Wrapper types now implement convenient `From<T>` and `Default`
-  constructors where applicable.
 
 ## Quick Start
 
@@ -94,13 +97,13 @@ methods have the same names as the native guard-based methods. When `Lock` or
 `AsyncLock` is in scope, use `lock.as_ref().read()` or explicit dereferencing
 such as `(*lock).read()` to call the native guard API.
 
-### Monitor
+### ParkingLotMonitor
 
 ```rust
-use qubit_lock::ArcMonitor;
+use qubit_lock::ArcParkingLotMonitor;
 
 fn main() {
-    let monitor = ArcMonitor::new(Vec::<i32>::new());
+    let monitor = ArcParkingLotMonitor::new(Vec::<i32>::new());
     let worker_monitor = monitor.clone();
 
     let worker = std::thread::spawn(move || {
@@ -119,7 +122,8 @@ fn main() {
 ## Project Layout
 
 - `src/lock`: lock traits and lock wrappers.
-- `src/monitor`: parking_lot and std monitor primitives.
+- `src/monitor`: monitor traits plus parking_lot, std, Tokio, and mock
+  monitor implementations.
 - `tests/lock`: lock behavior tests.
 - `tests/monitor`: monitor behavior tests.
 - `tests/docs`: README and doctest consistency tests.
