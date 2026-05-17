@@ -140,4 +140,42 @@ From a repository checkout:
 
 ## License
 
-Apache-2.0
+Copyright (c) 2025 - 2026. Haixing Hu.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+See [LICENSE](LICENSE) for the full license text.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+### Development Guidelines
+
+- Follow Rust API Guidelines
+- Keep comprehensive test coverage
+- Document and provide examples for all public APIs
+- Ensure all tests pass before submitting a PR
+
+## Author
+
+**Haixing Hu** - *Qubit Co. Ltd.*
+
+## Related Projects
+
+More Qubit Rust libraries are published under the
+[qubit-ltd](https://github.com/qubit-ltd) GitHub organization.
+
+---
+
+Repository: [https://github.com/qubit-ltd/rs-lock](https://github.com/qubit-ltd/rs-lock)
