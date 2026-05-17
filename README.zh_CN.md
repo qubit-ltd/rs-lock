@@ -134,4 +134,39 @@ fn main() {
 
 ## 许可证
 
-Apache-2.0
+Copyright (c) 2025 - 2026. Haixing Hu.
+
+根据 Apache 许可证 2.0 版（"许可证"）授权；
+除非遵守许可证，否则您不得使用此文件。
+您可以在以下位置获取许可证副本：
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+除非适用法律要求或书面同意，否则根据许可证分发的软件
+按"原样"分发，不附带任何明示或暗示的担保或条件。
+有关许可证下的特定语言管理权限和限制，请参阅许可证。
+
+完整的许可证文本请参阅 [LICENSE](LICENSE)。
+
+## 贡献
+
+欢迎贡献！请随时提交 Pull Request。
+
+### 开发指南
+
+- 遵循 Rust API 指南
+- 保持全面的测试覆盖
+- 为所有公共 API 编写文档和示例
+- 提交 PR 前确保所有测试通过
+
+## 作者
+
+**胡海星** - *Qubit Co. Ltd.*
+
+## 相关项目
+
+Qubit 旗下的更多 Rust 库发布在 GitHub 组织 [qubit-ltd](https://github.com/qubit-ltd)。
+
+---
+
+仓库地址：[https://github.com/qubit-ltd/rs-lock](https://github.com/qubit-ltd/rs-lock)
