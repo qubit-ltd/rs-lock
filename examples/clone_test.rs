@@ -10,7 +10,7 @@
 use std::time::Duration;
 
 use qubit_lock::{
-    ArcMonitor,
+    ArcParkingLotMonitor,
     ArcRwLock,
     ArcStdRwLock,
     Lock,
@@ -30,8 +30,8 @@ fn main() {
         String::from("std semantics"),
     );
 
-    let monitor = ArcMonitor::new(Vec::<i32>::new());
-    let result = monitor.wait_timeout_while(
+    let monitor = ArcParkingLotMonitor::new(Vec::<i32>::new());
+    let result = monitor.wait_while_for(
         Duration::from_millis(1),
         |items| items.is_empty(),
         |items| items.pop(),
@@ -40,7 +40,7 @@ fn main() {
 
     monitor.write(|items| items.push(7));
     monitor.notify_one();
-    let result = monitor.wait_timeout_until(
+    let result = monitor.wait_until_for(
         Duration::from_millis(1),
         |items| !items.is_empty(),
         |items| items.pop(),

@@ -13,17 +13,11 @@
 //! protecting shared data with multiple concurrent readers or a
 //! single writer in async environments.
 //!
-use std::{
-    ops::Deref,
-    sync::Arc,
-};
+use std::{ops::Deref, sync::Arc};
 
 use tokio::sync::RwLock as AsyncRwLock;
 
-use crate::lock::{
-    AsyncLock,
-    TryLockError,
-};
+use crate::lock::{AsyncLock, TryLockError};
 
 /// Asynchronous Read-Write Lock Wrapper
 ///

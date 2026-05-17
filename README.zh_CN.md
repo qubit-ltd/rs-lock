@@ -14,8 +14,10 @@
 - `ArcMutex`、`ArcRwLock`：基于 parking_lot、内部已集成 `Arc` 的同步锁包装器。
 - `ArcStdMutex`、`ArcStdRwLock`：基于标准库、保留 poison 语义的同步锁包装器。
 - `ArcAsyncMutex`、`ArcAsyncRwLock`：默认 `async` 特性启用的 Tokio 异步锁包装器。
-- `Monitor`、`ArcMonitor`、`MonitorGuard`：基于 parking_lot 的条件变量协调工具。
+- `ParkingLotMonitor`、`ArcParkingLotMonitor`、`ParkingLotMonitorGuard`：基于 parking_lot 的条件变量协调工具。
 - `StdMonitor`、`ArcStdMonitor`、`StdMonitorGuard`：基于标准库的条件变量协调工具。
+- `MockMonitor`、`ArcMockMonitor`：使用手动推进 timeout 时间的确定性测试 monitor。
+- `TokioMonitor`、`ArcTokioMonitor`：基于 Tokio 的异步 monitor 协调工具。
 - 基于闭包的访问接口，让加锁和释放始终局限在一次调用内部。
 - `Arc*` 包装器实现了 `Deref` 和 `AsRef`，需要时仍可使用底层同步原语的
   guard 风格原生接口。
@@ -24,32 +26,32 @@
 
 ```toml
 [dependencies]
-qubit-lock = "0.7"
+qubit-lock = "0.8"
 ```
 
-异步锁包装器使用 Tokio 同步原语，并默认启用。只需要同步锁与 Monitor、且希望依赖图中不包含 Tokio 的使用方，可以关闭默认特性：
+异步锁包装器使用 Tokio 同步原语，并默认启用。只需要同步锁与 ParkingLotMonitor、且希望依赖图中不包含 Tokio 的使用方，可以关闭默认特性：
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.7", default-features = false }
+qubit-lock = { version = "0.8", default-features = false }
 ```
 
 如果应用需要创建 Tokio runtime，请在应用自己的 `Cargo.toml` 中启用合适的 Tokio runtime 特性，例如 `rt` 或 `rt-multi-thread`。
 `AsyncLock` 返回 `Send` future：`ArcAsyncMutex<T>` 在 `T: Send` 时实现它，
 `ArcAsyncRwLock<T>` 在 `T: Send + Sync` 时实现它。
 
-## 从 0.6 迁移
+## 从 0.7 迁移
 
-`0.7` 包含有意的破坏性 API 清理：
+`0.8` 包含有意的破坏性 API 清理：
 
-- `ArcRwLock` 现在包装 `parking_lot::RwLock`，不再使用 poison 语义。持锁
-  panic 之后，后续加锁会继续正常工作，`try_read` / `try_write` 不再返回
-  `TryLockError::Poisoned`。
-- 如果需要标准库 `std::sync::RwLock` 的 poison 语义，请使用
-  `ArcStdRwLock`。
+- `Monitor` 现在是阻塞 monitor 能力的聚合 trait。
+- 基于 parking_lot 的具体实现改为 `ParkingLotMonitor`，其可克隆共享句柄改为
+  `ArcParkingLotMonitor`。
+- 带超时的 condition wait 方法改名为 `wait_until_for` 和 `wait_while_for`。
+- `MockMonitor` 和 `ArcMockMonitor` 提供手动推进的 timeout 时间，便于确定性测试。
+- 默认 `async` 特性下，`TokioMonitor` 和 `ArcTokioMonitor` 提供异步 monitor 操作。
 - `qubit_lock::lock` 和 `qubit_lock::monitor` 不再作为公开模块暴露。
   请直接从 crate root 导入公开类型。
-- 各包装类型在适用时新增了 `From<T>` 和 `Default` 便捷构造。
 
 ## 快速开始
 
@@ -89,13 +91,13 @@ fn main() {
 guard 风格方法同名。当 `Lock` 或 `AsyncLock` 在作用域中时，如果要调用底层
 guard API，请使用 `lock.as_ref().read()`，或用 `(*lock).read()` 显式解引用。
 
-### Monitor
+### ParkingLotMonitor
 
 ```rust
-use qubit_lock::ArcMonitor;
+use qubit_lock::ArcParkingLotMonitor;
 
 fn main() {
-    let monitor = ArcMonitor::new(Vec::<i32>::new());
+    let monitor = ArcParkingLotMonitor::new(Vec::<i32>::new());
     let worker_monitor = monitor.clone();
 
     let worker = std::thread::spawn(move || {
@@ -114,7 +116,8 @@ fn main() {
 ## 项目结构
 
 - `src/lock`：锁 trait 与锁包装器。
-- `src/monitor`：基于 parking_lot 和标准库的 monitor 原语。
+- `src/monitor`：monitor traits，以及 parking_lot、标准库、Tokio 和 mock
+  monitor 实现。
 - `tests/lock`：锁相关行为测试。
 - `tests/monitor`：monitor 相关行为测试。
 - `tests/docs`：README 与文档文本一致性测试。

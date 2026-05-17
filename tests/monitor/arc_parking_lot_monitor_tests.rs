@@ -7,23 +7,15 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-//! Tests for [`ArcMonitor`](qubit_lock::ArcMonitor).
+//! Tests for [`ArcParkingLotMonitor`](qubit_lock::ArcParkingLotMonitor).
 
-use std::{
-    sync::mpsc,
-    thread,
-    time::Duration,
-};
+use std::{sync::mpsc, thread, time::Duration};
 
-use qubit_lock::{
-    ArcMonitor,
-    WaitTimeoutResult,
-    WaitTimeoutStatus,
-};
+use qubit_lock::{ArcParkingLotMonitor, WaitTimeoutResult, WaitTimeoutStatus};
 
 #[test]
-fn test_arc_monitor_new_read_write_updates_state() {
-    let monitor = ArcMonitor::new(vec![1, 2, 3]);
+fn test_arc_parking_lot_monitor_new_read_write_updates_state() {
+    let monitor = ArcParkingLotMonitor::new(vec![1, 2, 3]);
 
     monitor.write(|items| {
         items.push(4);
@@ -33,22 +25,22 @@ fn test_arc_monitor_new_read_write_updates_state() {
 }
 
 #[test]
-fn test_arc_monitor_default_uses_default_value() {
-    let monitor = ArcMonitor::<Vec<i32>>::default();
+fn test_arc_parking_lot_monitor_default_uses_default_value() {
+    let monitor = ArcParkingLotMonitor::<Vec<i32>>::default();
 
     assert!(monitor.read(|items| items.is_empty()));
 }
 
 #[test]
-fn test_arc_monitor_from_uses_supplied_value() {
-    let monitor = ArcMonitor::from(vec![1, 2, 3]);
+fn test_arc_parking_lot_monitor_from_uses_supplied_value() {
+    let monitor = ArcParkingLotMonitor::from(vec![1, 2, 3]);
 
     assert_eq!(monitor.read(|items| items.len()), 3);
 }
 
 #[test]
-fn test_arc_monitor_clone_shares_state() {
-    let monitor = ArcMonitor::new(1usize);
+fn test_arc_parking_lot_monitor_clone_shares_state() {
+    let monitor = ArcParkingLotMonitor::new(1usize);
     let cloned = monitor.clone();
 
     cloned.write(|value| {
@@ -59,8 +51,8 @@ fn test_arc_monitor_clone_shares_state() {
 }
 
 #[test]
-fn test_arc_monitor_write_notify_one_updates_state() {
-    let monitor = ArcMonitor::new(Vec::<i32>::new());
+fn test_arc_parking_lot_monitor_write_notify_one_updates_state() {
+    let monitor = ArcParkingLotMonitor::new(Vec::<i32>::new());
 
     let len = monitor.write_notify_one(|items| {
         items.push(7);
@@ -72,8 +64,8 @@ fn test_arc_monitor_write_notify_one_updates_state() {
 }
 
 #[test]
-fn test_arc_monitor_write_notify_all_updates_state() {
-    let monitor = ArcMonitor::new(false);
+fn test_arc_parking_lot_monitor_write_notify_all_updates_state() {
+    let monitor = ArcParkingLotMonitor::new(false);
 
     let ready = monitor.write_notify_all(|ready| {
         *ready = true;
@@ -85,8 +77,8 @@ fn test_arc_monitor_write_notify_all_updates_state() {
 }
 
 #[test]
-fn test_arc_monitor_lock_guard_updates_state() {
-    let monitor = ArcMonitor::new(Vec::new());
+fn test_arc_parking_lot_monitor_lock_guard_updates_state() {
+    let monitor = ArcParkingLotMonitor::new(Vec::new());
 
     {
         let mut items = monitor.lock();
@@ -98,8 +90,8 @@ fn test_arc_monitor_lock_guard_updates_state() {
 }
 
 #[test]
-fn test_arc_monitor_deref_and_as_ref_expose_monitor_api() {
-    let monitor = ArcMonitor::new(1);
+fn test_arc_parking_lot_monitor_deref_and_as_ref_expose_monitor_api() {
+    let monitor = ArcParkingLotMonitor::new(1);
 
     {
         let mut value = (*monitor).lock();
@@ -114,8 +106,8 @@ fn test_arc_monitor_deref_and_as_ref_expose_monitor_api() {
 }
 
 #[test]
-fn test_arc_monitor_wait_until_blocks_until_notify_one() {
-    let monitor = ArcMonitor::new(false);
+fn test_arc_parking_lot_monitor_wait_until_blocks_until_notify_one() {
+    let monitor = ArcParkingLotMonitor::new(false);
     let (checked_tx, checked_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
 
@@ -162,18 +154,18 @@ fn test_arc_monitor_wait_until_blocks_until_notify_one() {
 }
 
 #[test]
-fn test_arc_monitor_wait_notify_returns_timed_out() {
-    let monitor = ArcMonitor::new(false);
+fn test_arc_parking_lot_monitor_wait_for_returns_timed_out() {
+    let monitor = ArcParkingLotMonitor::new(false);
 
     assert_eq!(
-        monitor.wait_notify(Duration::from_millis(30)),
+        monitor.wait_for(Duration::from_millis(30)),
         WaitTimeoutStatus::TimedOut,
     );
 }
 
 #[test]
-fn test_arc_monitor_wait_timeout_until_delegates_to_monitor() {
-    let monitor = ArcMonitor::new(false);
+fn test_arc_parking_lot_monitor_wait_until_for_delegates_to_monitor() {
+    let monitor = ArcParkingLotMonitor::new(false);
     let (started_tx, started_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
 
@@ -182,7 +174,7 @@ fn test_arc_monitor_wait_timeout_until_delegates_to_monitor() {
         started_tx
             .send(())
             .expect("test should observe waiter start");
-        let notified = waiter_monitor.wait_timeout_until(
+        let notified = waiter_monitor.wait_until_for(
             Duration::from_secs(1),
             |ready| *ready,
             |ready| {
@@ -212,8 +204,8 @@ fn test_arc_monitor_wait_timeout_until_delegates_to_monitor() {
 }
 
 #[test]
-fn test_arc_monitor_wait_while_delegates_to_monitor() {
-    let monitor = ArcMonitor::new(Vec::<i32>::new());
+fn test_arc_parking_lot_monitor_wait_while_delegates_to_monitor() {
+    let monitor = ArcParkingLotMonitor::new(Vec::<i32>::new());
     let (checked_tx, checked_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
 
@@ -256,8 +248,8 @@ fn test_arc_monitor_wait_while_delegates_to_monitor() {
 }
 
 #[test]
-fn test_arc_monitor_wait_timeout_while_returns_ready_when_predicate_clears() {
-    let monitor = ArcMonitor::new(Vec::<i32>::new());
+fn test_arc_parking_lot_monitor_wait_while_for_returns_ready_when_predicate_clears() {
+    let monitor = ArcParkingLotMonitor::new(Vec::<i32>::new());
     let (started_tx, started_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
 
@@ -266,7 +258,7 @@ fn test_arc_monitor_wait_timeout_while_returns_ready_when_predicate_clears() {
         started_tx
             .send(())
             .expect("test should observe waiter start");
-        let result = waiter_monitor.wait_timeout_while(
+        let result = waiter_monitor.wait_while_for(
             Duration::from_secs(1),
             |items| items.is_empty(),
             |items| items.pop().expect("item should be ready"),
@@ -293,11 +285,11 @@ fn test_arc_monitor_wait_timeout_while_returns_ready_when_predicate_clears() {
 }
 
 #[test]
-fn test_arc_monitor_wait_timeout_while_returns_timed_out() {
-    let monitor = ArcMonitor::new(Vec::<i32>::new());
+fn test_arc_parking_lot_monitor_wait_while_for_returns_timed_out() {
+    let monitor = ArcParkingLotMonitor::new(Vec::<i32>::new());
 
     assert_eq!(
-        monitor.wait_timeout_while(
+        monitor.wait_while_for(
             Duration::from_millis(30),
             |items| items.is_empty(),
             |items| items.pop(),
@@ -307,8 +299,8 @@ fn test_arc_monitor_wait_timeout_while_returns_timed_out() {
 }
 
 #[test]
-fn test_arc_monitor_notify_all_wakes_multiple_waiters() {
-    let monitor = ArcMonitor::new(false);
+fn test_arc_parking_lot_monitor_notify_all_wakes_multiple_waiters() {
+    let monitor = ArcParkingLotMonitor::new(false);
     let (started_tx, started_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
     let mut waiters = Vec::new();

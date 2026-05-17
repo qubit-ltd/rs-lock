@@ -7,32 +7,26 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-//! # Monitor Guard
+//! # ParkingLotMonitor Guard
 //!
-//! Provides the guard returned by [`Monitor::lock`](super::Monitor::lock).
+//! Provides the guard returned by [`ParkingLotMonitor::lock`](super::ParkingLotMonitor::lock).
 //! The guard wraps a parking_lot mutex guard and keeps a reference to the
 //! monitor that created it, so waiting operations can use the matching
 //! condition variable.
 //!
 
 use std::{
-    ops::{
-        Deref,
-        DerefMut,
-    },
+    ops::{Deref, DerefMut},
     time::Duration,
 };
 
 use parking_lot::MutexGuard;
 
-use super::{
-    monitor::Monitor,
-    wait_timeout_status::WaitTimeoutStatus,
-};
+use super::{parking_lot_monitor::ParkingLotMonitor, wait_timeout_status::WaitTimeoutStatus};
 
-/// Guard returned by [`Monitor::lock`](super::Monitor::lock).
+/// Guard returned by [`ParkingLotMonitor::lock`](super::ParkingLotMonitor::lock).
 ///
-/// `MonitorGuard` is the monitor-specific counterpart of
+/// `ParkingLotMonitorGuard` is the monitor-specific counterpart of
 /// [`parking_lot::MutexGuard`]. While it exists, the protected state is locked.
 /// Dropping the guard releases the lock. It implements [`Deref`] and
 /// [`DerefMut`], so callers can read and mutate the protected state as if they
@@ -49,9 +43,9 @@ use super::{
 /// # Example
 ///
 /// ```rust
-/// use qubit_lock::Monitor;
+/// use qubit_lock::ParkingLotMonitor;
 ///
-/// let monitor = Monitor::new(Vec::new());
+/// let monitor = ParkingLotMonitor::new(Vec::new());
 /// {
 ///     let mut items = monitor.lock();
 ///     items.push("first");
@@ -59,19 +53,19 @@ use super::{
 ///
 /// assert_eq!(monitor.read(|items| items.len()), 1);
 /// ```
-pub struct MonitorGuard<'a, T> {
-    /// Monitor that owns the mutex and condition variable.
-    monitor: &'a Monitor<T>,
+pub struct ParkingLotMonitorGuard<'a, T> {
+    /// ParkingLotMonitor that owns the mutex and condition variable.
+    monitor: &'a ParkingLotMonitor<T>,
     /// Parking-lot mutex guard protecting the monitor state.
     inner: MutexGuard<'a, T>,
 }
 
-impl<'a, T> MonitorGuard<'a, T> {
+impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     /// Creates a guard from its owning monitor and parking_lot mutex guard.
     ///
     /// # Parameters
     ///
-    /// * `monitor` - Monitor whose mutex produced `inner`.
+    /// * `monitor` - ParkingLotMonitor whose mutex produced `inner`.
     /// * `inner` - Parking-lot mutex guard protecting the monitor state.
     ///
     /// # Returns
@@ -79,7 +73,7 @@ impl<'a, T> MonitorGuard<'a, T> {
     /// A monitor guard that can access state and wait on the monitor's
     /// condition variable.
     #[inline]
-    pub(super) fn new(monitor: &'a Monitor<T>, inner: MutexGuard<'a, T>) -> Self {
+    pub(super) fn new(monitor: &'a ParkingLotMonitor<T>, inner: MutexGuard<'a, T>) -> Self {
         Self { monitor, inner }
     }
 
@@ -107,9 +101,9 @@ impl<'a, T> MonitorGuard<'a, T> {
     ///     thread,
     /// };
     ///
-    /// use qubit_lock::Monitor;
+    /// use qubit_lock::ParkingLotMonitor;
     ///
-    /// let monitor = Arc::new(Monitor::new(false));
+    /// let monitor = Arc::new(ParkingLotMonitor::new(false));
     /// let waiter_monitor = Arc::clone(&monitor);
     ///
     /// let waiter = thread::spawn(move || {
@@ -161,9 +155,9 @@ impl<'a, T> MonitorGuard<'a, T> {
     /// ```rust
     /// use std::time::Duration;
     ///
-    /// use qubit_lock::{Monitor, WaitTimeoutStatus};
+    /// use qubit_lock::{ParkingLotMonitor, WaitTimeoutStatus};
     ///
-    /// let monitor = Monitor::new(0);
+    /// let monitor = ParkingLotMonitor::new(0);
     /// let guard = monitor.lock();
     /// let (guard, status) = guard.wait_timeout(Duration::from_millis(1));
     ///
@@ -182,7 +176,7 @@ impl<'a, T> MonitorGuard<'a, T> {
     }
 }
 
-impl<T> Deref for MonitorGuard<'_, T> {
+impl<T> Deref for ParkingLotMonitorGuard<'_, T> {
     type Target = T;
 
     /// Returns an immutable reference to the protected state.
@@ -192,7 +186,7 @@ impl<T> Deref for MonitorGuard<'_, T> {
     }
 }
 
-impl<T> DerefMut for MonitorGuard<'_, T> {
+impl<T> DerefMut for ParkingLotMonitorGuard<'_, T> {
     /// Returns a mutable reference to the protected state.
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {

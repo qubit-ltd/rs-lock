@@ -49,9 +49,9 @@ fn test_readme_documents_deref_and_as_ref_support() {
 #[test]
 /// Ensures README monitor snippets show the combined write-and-notify API.
 fn test_readme_monitor_example_uses_write_notify_one() {
-    assert!(README_EN.contains("use qubit_lock::ArcMonitor;"));
+    assert!(README_EN.contains("use qubit_lock::ArcParkingLotMonitor;"));
     assert!(README_EN.contains("write_notify_one"));
-    assert!(README_ZH.contains("use qubit_lock::ArcMonitor;"));
+    assert!(README_ZH.contains("use qubit_lock::ArcParkingLotMonitor;"));
     assert!(README_ZH.contains("write_notify_one"));
 }
 

@@ -7,18 +7,15 @@
  *    Licensed under the Apache License, Version 2.0.
  *
  ******************************************************************************/
-//! Tests for [`MonitorGuard`](qubit_lock::MonitorGuard).
+//! Tests for [`ParkingLotMonitorGuard`](qubit_lock::ParkingLotMonitorGuard).
 
 use std::time::Duration;
 
-use qubit_lock::{
-    Monitor,
-    WaitTimeoutStatus,
-};
+use qubit_lock::{ParkingLotMonitor, WaitTimeoutStatus};
 
 #[test]
-fn test_monitor_guard_updates_state() {
-    let monitor = Monitor::new(Vec::new());
+fn test_parking_lot_monitor_guard_updates_state() {
+    let monitor = ParkingLotMonitor::new(Vec::new());
 
     {
         let mut items = monitor.lock();
@@ -30,8 +27,8 @@ fn test_monitor_guard_updates_state() {
 }
 
 #[test]
-fn test_monitor_guard_wait_timeout_returns_timed_out() {
-    let monitor = Monitor::new(false);
+fn test_parking_lot_monitor_guard_wait_timeout_returns_timed_out() {
+    let monitor = ParkingLotMonitor::new(false);
 
     let guard = monitor.lock();
     let (guard, status) = guard.wait_timeout(Duration::from_millis(30));

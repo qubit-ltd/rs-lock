@@ -15,8 +15,8 @@
 /// Result of waiting for a predicate with an overall timeout.
 ///
 /// This type is returned by
-/// [`Monitor::wait_timeout_while`](super::Monitor::wait_timeout_while) and
-/// [`Monitor::wait_timeout_until`](super::Monitor::wait_timeout_until). It is
+/// [`ParkingLotMonitor::wait_while_for`](super::ParkingLotMonitor::wait_while_for) and
+/// [`ParkingLotMonitor::wait_until_for`](super::ParkingLotMonitor::wait_until_for). It is
 /// more explicit than `Option<R>`: a ready predicate produces [`Self::Ready`],
 /// while an expired timeout produces [`Self::TimedOut`].
 ///
@@ -30,10 +30,10 @@
 /// ```rust
 /// use std::time::Duration;
 ///
-/// use qubit_lock::{Monitor, WaitTimeoutResult};
+/// use qubit_lock::{ParkingLotMonitor, WaitTimeoutResult};
 ///
-/// let monitor = Monitor::new(true);
-/// let result = monitor.wait_timeout_until(
+/// let monitor = ParkingLotMonitor::new(true);
+/// let result = monitor.wait_until_for(
 ///     Duration::from_secs(1),
 ///     |ready| *ready,
 ///     |ready| {

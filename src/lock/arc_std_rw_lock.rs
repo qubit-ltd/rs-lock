@@ -14,15 +14,9 @@
 //!
 
 use std::ops::Deref;
-use std::sync::{
-    Arc,
-    RwLock,
-};
+use std::sync::{Arc, RwLock};
 
-use crate::lock::{
-    Lock,
-    TryLockError,
-};
+use crate::lock::{Lock, TryLockError};
 
 /// Standard-library read-write lock wrapper.
 ///

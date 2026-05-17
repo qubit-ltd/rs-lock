@@ -10,19 +10,12 @@
 //! Tests for [`StdMonitor`](qubit_lock::StdMonitor).
 
 use std::{
-    sync::{
-        Arc,
-        mpsc,
-    },
+    sync::{Arc, mpsc},
     thread,
     time::Duration,
 };
 
-use qubit_lock::{
-    StdMonitor,
-    WaitTimeoutResult,
-    WaitTimeoutStatus,
-};
+use qubit_lock::{StdMonitor, WaitTimeoutResult, WaitTimeoutStatus};
 
 #[test]
 fn test_std_monitor_new_read_write_updates_state() {
@@ -251,10 +244,10 @@ fn test_std_monitor_wait_until_blocks_until_notify_one() {
 }
 
 #[test]
-fn test_std_monitor_wait_notify_returns_timed_out() {
+fn test_std_monitor_wait_for_returns_timed_out() {
     let monitor = StdMonitor::new(false);
 
-    let status = monitor.wait_notify(Duration::from_millis(30));
+    let status = monitor.wait_for(Duration::from_millis(30));
 
     assert_eq!(status, WaitTimeoutStatus::TimedOut);
 }
@@ -296,25 +289,25 @@ fn test_std_monitor_guard_wait_timeout_returns_woken_when_notified() {
 }
 
 #[test]
-fn test_std_monitor_wait_timeout_while_returns_timed_out_when_timeout() {
+fn test_std_monitor_wait_while_for_returns_timed_out_when_timeout() {
     let monitor = StdMonitor::new(false);
 
-    let result = monitor.wait_timeout_while(Duration::from_millis(20), |ready| !*ready, |_| ());
+    let result = monitor.wait_while_for(Duration::from_millis(20), |ready| !*ready, |_| ());
 
     assert_eq!(result, WaitTimeoutResult::TimedOut);
 }
 
 #[test]
-fn test_std_monitor_wait_timeout_until_returns_timed_out_when_timeout() {
+fn test_std_monitor_wait_until_for_returns_timed_out_when_timeout() {
     let monitor = StdMonitor::new(false);
 
-    let result = monitor.wait_timeout_until(Duration::from_millis(20), |ready| *ready, |_| ());
+    let result = monitor.wait_until_for(Duration::from_millis(20), |ready| *ready, |_| ());
 
     assert_eq!(result, WaitTimeoutResult::TimedOut);
 }
 
 #[test]
-fn test_std_monitor_wait_timeout_until_returns_result_when_predicate_true() {
+fn test_std_monitor_wait_until_for_returns_result_when_predicate_true() {
     let monitor = Arc::new(StdMonitor::new(false));
     let (started_tx, started_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
@@ -324,7 +317,7 @@ fn test_std_monitor_wait_timeout_until_returns_result_when_predicate_true() {
         started_tx
             .send(())
             .expect("test should observe waiter start");
-        let result = waiter_monitor.wait_timeout_until(
+        let result = waiter_monitor.wait_until_for(
             Duration::from_secs(1),
             |ready| *ready,
             |ready| {
