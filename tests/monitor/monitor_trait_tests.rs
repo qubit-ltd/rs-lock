@@ -16,7 +16,6 @@ use qubit_lock::{
     ArcParkingLotMonitor,
     Monitor,
     SharedMonitor,
-    TimeoutNotificationWaiter,
     WaitTimeoutResult,
     WaitTimeoutStatus,
 };

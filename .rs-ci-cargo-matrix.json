@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "checks": [
+    {
+      "name": "sync-only",
+      "defaultFeatures": false,
+      "commands": [
+        "test",
+        "doc",
+        "clippy"
+      ]
+    }
+  ]
+}
