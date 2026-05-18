@@ -503,16 +503,6 @@ impl<T> TimeoutNotificationWaiter for ArcStdMonitor<T> {
 impl<T> ConditionWaiter for ArcStdMonitor<T> {
     type State = T;
 
-    /// Blocks until the predicate becomes true, then runs the action.
-    #[inline]
-    fn wait_until<R, P, F>(&self, predicate: P, action: F) -> R
-    where
-        P: FnMut(&Self::State) -> bool,
-        F: FnOnce(&mut Self::State) -> R,
-    {
-        Self::wait_until(self, predicate, action)
-    }
-
     /// Blocks while the predicate remains true, then runs the action.
     #[inline]
     fn wait_while<R, P, F>(&self, predicate: P, action: F) -> R
@@ -525,21 +515,6 @@ impl<T> ConditionWaiter for ArcStdMonitor<T> {
 }
 
 impl<T> TimeoutConditionWaiter for ArcStdMonitor<T> {
-    /// Blocks until the predicate becomes true or the timeout expires.
-    #[inline]
-    fn wait_until_for<R, P, F>(
-        &self,
-        timeout: Duration,
-        predicate: P,
-        action: F,
-    ) -> WaitTimeoutResult<R>
-    where
-        P: FnMut(&Self::State) -> bool,
-        F: FnOnce(&mut Self::State) -> R,
-    {
-        Self::wait_until_for(self, timeout, predicate, action)
-    }
-
     /// Blocks while the predicate remains true or until the timeout expires.
     #[inline]
     fn wait_while_for<R, P, F>(

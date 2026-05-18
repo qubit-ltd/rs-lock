@@ -27,7 +27,7 @@ async fn test_tokio_monitor_async_wait_for_times_out() {
     let monitor = TokioMonitor::new(false);
 
     assert_eq!(
-        monitor.async_wait_for(Duration::from_millis(1)).await,
+        monitor.wait_for_async(Duration::from_millis(1)).await,
         WaitTimeoutStatus::TimedOut,
     );
 }
@@ -69,14 +69,14 @@ async fn test_tokio_monitor_traits_delegate_to_monitor_methods() {
     <TokioMonitor<Vec<i32>> as Notifier>::notify_one(&monitor);
     <TokioMonitor<Vec<i32>> as Notifier>::notify_all(&monitor);
 
-    let waiter = <TokioMonitor<Vec<i32>> as AsyncNotificationWaiter>::async_wait(&monitor);
+    let waiter = <TokioMonitor<Vec<i32>> as AsyncNotificationWaiter>::wait_async(&monitor);
     tokio::pin!(waiter);
     <TokioMonitor<Vec<i32>> as Notifier>::notify_one(&monitor);
     tokio::time::timeout(Duration::from_millis(100), &mut waiter)
         .await
         .expect("async notification wait should complete");
 
-    let timeout_wait = <TokioMonitor<Vec<i32>> as AsyncTimeoutNotificationWaiter>::async_wait_for(
+    let timeout_wait = <TokioMonitor<Vec<i32>> as AsyncTimeoutNotificationWaiter>::wait_for_async(
         &monitor,
         Duration::from_secs(1),
     );
@@ -89,31 +89,42 @@ async fn test_tokio_monitor_traits_delegate_to_monitor_methods() {
         WaitTimeoutStatus::Woken,
     );
 
-    assert_eq!(
-        <TokioMonitor<Vec<i32>> as AsyncConditionWaiter>::async_wait_while(
-            &monitor,
-            |items| items.is_empty(),
-            |items| items.pop().expect("item should be ready"),
-        )
-        .await,
-        2,
+    monitor.async_write(|items| items.clear()).await;
+    let condition_wait = <TokioMonitor<Vec<i32>> as AsyncConditionWaiter>::wait_while_async(
+        &monitor,
+        |items| items.is_empty(),
+        |items| items.pop().expect("item should be ready"),
     );
-    assert_eq!(
-        <TokioMonitor<Vec<i32>> as AsyncTimeoutConditionWaiter>::async_wait_until_for(
+    tokio::pin!(condition_wait);
+    assert!(
+        tokio::time::timeout(Duration::from_millis(10), &mut condition_wait)
+            .await
+            .is_err()
+    );
+    monitor.async_write_notify_one(|items| items.push(2)).await;
+    assert_eq!(condition_wait.await, 2);
+
+    let timeout_condition_wait =
+        <TokioMonitor<Vec<i32>> as AsyncTimeoutConditionWaiter>::wait_until_for_async(
             &monitor,
-            Duration::ZERO,
+            Duration::from_secs(1),
             |items| !items.is_empty(),
             |items| items.pop().expect("item should be ready"),
-        )
-        .await,
-        WaitTimeoutResult::Ready(1),
+        );
+    tokio::pin!(timeout_condition_wait);
+    assert!(
+        tokio::time::timeout(Duration::from_millis(10), &mut timeout_condition_wait)
+            .await
+            .is_err()
     );
+    monitor.async_write_notify_one(|items| items.push(1)).await;
+    assert_eq!(timeout_condition_wait.await, WaitTimeoutResult::Ready(1),);
 }
 
 #[tokio::test]
 async fn test_tokio_monitor_async_wait_for_uses_call_time_budget() {
     let monitor = TokioMonitor::new(false);
-    let wait = monitor.async_wait_for(Duration::from_millis(5));
+    let wait = monitor.wait_for_async(Duration::from_millis(5));
 
     tokio::time::sleep(Duration::from_millis(10)).await;
 
@@ -123,7 +134,7 @@ async fn test_tokio_monitor_async_wait_for_uses_call_time_budget() {
 #[tokio::test]
 async fn test_tokio_monitor_async_wait_while_for_uses_call_time_budget() {
     let monitor = TokioMonitor::new(false);
-    let wait = monitor.async_wait_while_for(Duration::from_millis(5), |ready| !*ready, |_| 7);
+    let wait = monitor.wait_while_for_async(Duration::from_millis(5), |ready| !*ready, |_| 7);
 
     tokio::time::sleep(Duration::from_millis(10)).await;
 
@@ -137,7 +148,7 @@ async fn test_tokio_monitor_async_wait_until_runs_action_after_notify() {
 
     let waiter = tokio::spawn(async move {
         waiter_monitor
-            .async_wait_until(
+            .wait_until_async(
                 |ready| *ready,
                 |ready| {
                     *ready = false;
@@ -161,7 +172,7 @@ async fn test_tokio_monitor_async_wait_while_for_returns_ready_after_notify() {
 
     let waiter = tokio::spawn(async move {
         waiter_monitor
-            .async_wait_while_for(
+            .wait_while_for_async(
                 Duration::from_secs(1),
                 |ready| !*ready,
                 |ready| {
@@ -189,7 +200,7 @@ async fn test_tokio_monitor_async_wait_while_for_rechecks_state_after_timeout() 
 
     let waiter = tokio::spawn(async move {
         waiter_monitor
-            .async_wait_while_for(
+            .wait_while_for_async(
                 Duration::from_millis(20),
                 |ready| !*ready,
                 |ready| {

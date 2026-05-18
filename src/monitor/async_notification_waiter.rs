@@ -14,5 +14,5 @@ use crate::monitor::AsyncMonitorFuture;
 /// Waits asynchronously until a notification is observed.
 pub trait AsyncNotificationWaiter {
     /// Returns a future that resolves after a notification wakes this waiter.
-    fn async_wait<'a>(&'a self) -> AsyncMonitorFuture<'a, ()>;
+    fn wait_async<'a>(&'a self) -> AsyncMonitorFuture<'a, ()>;
 }

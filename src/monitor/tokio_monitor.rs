@@ -170,14 +170,14 @@ impl<T> Notifier for TokioMonitor<T> {
 
 impl<T: Send> AsyncNotificationWaiter for TokioMonitor<T> {
     /// Returns a future that resolves after a Tokio notification.
-    fn async_wait<'a>(&'a self) -> AsyncMonitorFuture<'a, ()> {
+    fn wait_async<'a>(&'a self) -> AsyncMonitorFuture<'a, ()> {
         Box::pin(self.changed.notified())
     }
 }
 
 impl<T: Send> AsyncTimeoutNotificationWaiter for TokioMonitor<T> {
     /// Returns a future that resolves after notification or timeout.
-    fn async_wait_for<'a>(
+    fn wait_for_async<'a>(
         &'a self,
         timeout: Duration,
     ) -> AsyncMonitorFuture<'a, WaitTimeoutStatus> {
@@ -200,7 +200,7 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
     type State = T;
 
     /// Returns a future that waits until the predicate becomes true.
-    fn async_wait_until<'a, R, P, F>(
+    fn wait_until_async<'a, R, P, F>(
         &'a self,
         mut predicate: P,
         action: F,
@@ -210,11 +210,11 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
-        self.async_wait_while(move |state| !predicate(state), action)
+        self.wait_while_async(move |state| !predicate(state), action)
     }
 
     /// Returns a future that waits while the predicate remains true.
-    fn async_wait_while<'a, R, P, F>(
+    fn wait_while_async<'a, R, P, F>(
         &'a self,
         mut predicate: P,
         action: F,
@@ -239,7 +239,7 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
 
 impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// Returns a future that waits until the predicate becomes true or times out.
-    fn async_wait_until_for<'a, R, P, F>(
+    fn wait_until_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
         mut predicate: P,
@@ -250,11 +250,11 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
-        self.async_wait_while_for(timeout, move |state| !predicate(state), action)
+        self.wait_while_for_async(timeout, move |state| !predicate(state), action)
     }
 
     /// Returns a future that waits while the predicate remains true or times out.
-    fn async_wait_while_for<'a, R, P, F>(
+    fn wait_while_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
         mut predicate: P,

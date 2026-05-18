@@ -33,12 +33,15 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     fn wait_until_for<R, P, F>(
         &self,
         timeout: Duration,
-        predicate: P,
+        mut predicate: P,
         action: F,
     ) -> WaitTimeoutResult<R>
     where
         P: FnMut(&Self::State) -> bool,
-        F: FnOnce(&mut Self::State) -> R;
+        F: FnOnce(&mut Self::State) -> R,
+    {
+        self.wait_while_for(timeout, move |state| !predicate(state), action)
+    }
 
     /// Blocks while the predicate remains true or until the timeout expires.
     ///

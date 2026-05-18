@@ -335,15 +335,6 @@ impl<T> TimeoutNotificationWaiter for MockMonitor<T> {
 impl<T> ConditionWaiter for MockMonitor<T> {
     type State = T;
 
-    /// Blocks until the predicate becomes true, then runs the action.
-    fn wait_until<R, P, F>(&self, mut predicate: P, action: F) -> R
-    where
-        P: FnMut(&Self::State) -> bool,
-        F: FnOnce(&mut Self::State) -> R,
-    {
-        self.wait_while(|state| !predicate(state), action)
-    }
-
     /// Blocks while the predicate remains true, then runs the action.
     fn wait_while<R, P, F>(&self, mut predicate: P, action: F) -> R
     where
@@ -362,20 +353,6 @@ impl<T> ConditionWaiter for MockMonitor<T> {
 }
 
 impl<T> TimeoutConditionWaiter for MockMonitor<T> {
-    /// Blocks until the predicate becomes true or mock elapsed time reaches timeout.
-    fn wait_until_for<R, P, F>(
-        &self,
-        timeout: Duration,
-        mut predicate: P,
-        action: F,
-    ) -> WaitTimeoutResult<R>
-    where
-        P: FnMut(&Self::State) -> bool,
-        F: FnOnce(&mut Self::State) -> R,
-    {
-        self.wait_while_for(timeout, |state| !predicate(state), action)
-    }
-
     /// Blocks while the predicate remains true or until mock elapsed time reaches timeout.
     fn wait_while_for<R, P, F>(
         &self,
@@ -407,7 +384,7 @@ impl<T> TimeoutConditionWaiter for MockMonitor<T> {
 #[cfg(feature = "async")]
 impl<T: Send> AsyncNotificationWaiter for MockMonitor<T> {
     /// Returns a future that resolves after an async notification.
-    fn async_wait<'a>(&'a self) -> AsyncMonitorFuture<'a, ()> {
+    fn wait_async<'a>(&'a self) -> AsyncMonitorFuture<'a, ()> {
         let notified = self.async_notification.notified();
         Box::pin(notified)
     }
@@ -416,24 +393,33 @@ impl<T: Send> AsyncNotificationWaiter for MockMonitor<T> {
 #[cfg(feature = "async")]
 impl<T: Send> AsyncTimeoutNotificationWaiter for MockMonitor<T> {
     /// Returns a future that resolves after notification or mock timeout.
-    fn async_wait_for<'a>(
+    fn wait_for_async<'a>(
         &'a self,
         timeout: Duration,
     ) -> AsyncMonitorFuture<'a, WaitTimeoutStatus> {
-        let target_elapsed = self.elapsed().saturating_add(timeout);
         let mut change_receiver = self.async_change_sender.subscribe();
+        let (observed_epoch, target_elapsed) = {
+            let state = self.lock_state();
+            (
+                state.notification_epoch,
+                state.elapsed.saturating_add(timeout),
+            )
+        };
         Box::pin(async move {
             loop {
-                if self.elapsed() >= target_elapsed {
-                    return WaitTimeoutStatus::TimedOut;
-                }
-                let notified = self.async_notification.notified();
-                tokio::select! {
-                    () = notified => return WaitTimeoutStatus::Woken,
-                    changed = change_receiver.changed() => {
-                        changed.expect("mock monitor sender should live while the monitor is borrowed");
+                {
+                    let state = self.lock_state();
+                    if state.notification_epoch != observed_epoch {
+                        return WaitTimeoutStatus::Woken;
+                    }
+                    if state.elapsed >= target_elapsed {
+                        return WaitTimeoutStatus::TimedOut;
                     }
                 }
+                change_receiver
+                    .changed()
+                    .await
+                    .expect("mock monitor sender should live while the monitor is borrowed");
             }
         })
     }
@@ -443,22 +429,8 @@ impl<T: Send> AsyncTimeoutNotificationWaiter for MockMonitor<T> {
 impl<T: Send> AsyncConditionWaiter for MockMonitor<T> {
     type State = T;
 
-    /// Returns a future that waits until the predicate becomes true.
-    fn async_wait_until<'a, R, P, F>(
-        &'a self,
-        mut predicate: P,
-        action: F,
-    ) -> AsyncMonitorFuture<'a, R>
-    where
-        R: Send + 'a,
-        P: FnMut(&Self::State) -> bool + Send + 'a,
-        F: FnOnce(&mut Self::State) -> R + Send + 'a,
-    {
-        self.async_wait_while(move |state| !predicate(state), action)
-    }
-
     /// Returns a future that waits while the predicate remains true.
-    fn async_wait_while<'a, R, P, F>(
+    fn wait_while_async<'a, R, P, F>(
         &'a self,
         mut predicate: P,
         action: F,
@@ -485,23 +457,8 @@ impl<T: Send> AsyncConditionWaiter for MockMonitor<T> {
 
 #[cfg(feature = "async")]
 impl<T: Send> AsyncTimeoutConditionWaiter for MockMonitor<T> {
-    /// Returns a future that waits until the predicate becomes true or times out.
-    fn async_wait_until_for<'a, R, P, F>(
-        &'a self,
-        timeout: Duration,
-        mut predicate: P,
-        action: F,
-    ) -> AsyncMonitorFuture<'a, WaitTimeoutResult<R>>
-    where
-        R: Send + 'a,
-        P: FnMut(&Self::State) -> bool + Send + 'a,
-        F: FnOnce(&mut Self::State) -> R + Send + 'a,
-    {
-        self.async_wait_while_for(timeout, move |state| !predicate(state), action)
-    }
-
     /// Returns a future that waits while the predicate remains true or times out.
-    fn async_wait_while_for<'a, R, P, F>(
+    fn wait_while_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
         mut predicate: P,

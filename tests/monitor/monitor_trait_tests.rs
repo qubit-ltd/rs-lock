@@ -69,7 +69,7 @@ where
 {
     assert_eq!(
         monitor
-            .async_wait_until_for(Duration::from_millis(1), |ready| *ready, |_| 7)
+            .wait_until_for_async(Duration::from_millis(1), |ready| *ready, |_| 7)
             .await,
         WaitTimeoutResult::TimedOut,
     );

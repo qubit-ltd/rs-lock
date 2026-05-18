@@ -304,7 +304,7 @@ fn test_mock_monitor_wait_until_runs_action_after_notification() {
 #[tokio::test]
 async fn test_mock_monitor_async_wait_for_uses_mock_elapsed_time() {
     let monitor = MockMonitor::new(false);
-    let wait = monitor.async_wait_for(Duration::from_millis(100));
+    let wait = monitor.wait_for_async(Duration::from_millis(100));
     tokio::pin!(wait);
 
     monitor.advance(Duration::from_millis(99));
@@ -331,7 +331,7 @@ async fn test_mock_monitor_async_traits_delegate_to_monitor_methods() {
 
     let waiter_monitor = Arc::clone(&monitor);
     let waiter = tokio::spawn(async move {
-        <MockMonitor<Vec<i32>> as AsyncNotificationWaiter>::async_wait(waiter_monitor.as_ref())
+        <MockMonitor<Vec<i32>> as AsyncNotificationWaiter>::wait_async(waiter_monitor.as_ref())
             .await;
     });
     tokio::task::yield_now().await;
@@ -341,7 +341,7 @@ async fn test_mock_monitor_async_traits_delegate_to_monitor_methods() {
         .expect("async notification wait should complete")
         .expect("waiter task should finish");
 
-    let wait = <MockMonitor<Vec<i32>> as AsyncTimeoutNotificationWaiter>::async_wait_for(
+    let wait = <MockMonitor<Vec<i32>> as AsyncTimeoutNotificationWaiter>::wait_for_async(
         monitor.as_ref(),
         Duration::from_secs(1),
     );
@@ -355,7 +355,7 @@ async fn test_mock_monitor_async_traits_delegate_to_monitor_methods() {
     );
 
     assert_eq!(
-        <MockMonitor<Vec<i32>> as AsyncConditionWaiter>::async_wait_until(
+        <MockMonitor<Vec<i32>> as AsyncConditionWaiter>::wait_until_async(
             monitor.as_ref(),
             |items| !items.is_empty(),
             |items| items.pop().expect("item should be ready"),
@@ -364,7 +364,7 @@ async fn test_mock_monitor_async_traits_delegate_to_monitor_methods() {
         2,
     );
     assert_eq!(
-        <MockMonitor<Vec<i32>> as AsyncConditionWaiter>::async_wait_while(
+        <MockMonitor<Vec<i32>> as AsyncConditionWaiter>::wait_while_async(
             monitor.as_ref(),
             |items| items.is_empty(),
             |items| {
@@ -376,7 +376,7 @@ async fn test_mock_monitor_async_traits_delegate_to_monitor_methods() {
         2,
     );
     assert_eq!(
-        <MockMonitor<Vec<i32>> as AsyncTimeoutConditionWaiter>::async_wait_until_for(
+        <MockMonitor<Vec<i32>> as AsyncTimeoutConditionWaiter>::wait_until_for_async(
             monitor.as_ref(),
             Duration::ZERO,
             |items| !items.is_empty(),
@@ -386,7 +386,7 @@ async fn test_mock_monitor_async_traits_delegate_to_monitor_methods() {
         WaitTimeoutResult::Ready(3),
     );
     assert_eq!(
-        <MockMonitor<Vec<i32>> as AsyncTimeoutConditionWaiter>::async_wait_while_for(
+        <MockMonitor<Vec<i32>> as AsyncTimeoutConditionWaiter>::wait_while_for_async(
             monitor.as_ref(),
             Duration::ZERO,
             |items| items.is_empty(),
@@ -404,7 +404,7 @@ async fn test_mock_monitor_async_wait_while_waits_for_notification() {
     let waiter_monitor = Arc::clone(&monitor);
 
     let waiter = tokio::spawn(async move {
-        <MockMonitor<bool> as AsyncConditionWaiter>::async_wait_while(
+        <MockMonitor<bool> as AsyncConditionWaiter>::wait_while_async(
             waiter_monitor.as_ref(),
             |ready| !*ready,
             |ready| {
@@ -428,7 +428,7 @@ async fn test_mock_monitor_async_wait_while_for_waits_for_mock_change() {
     let waiter_monitor = Arc::clone(&monitor);
 
     let waiter = tokio::spawn(async move {
-        <MockMonitor<bool> as AsyncTimeoutConditionWaiter>::async_wait_while_for(
+        <MockMonitor<bool> as AsyncTimeoutConditionWaiter>::wait_while_for_async(
             waiter_monitor.as_ref(),
             Duration::from_secs(1),
             |ready| !*ready,
@@ -455,7 +455,7 @@ async fn test_mock_monitor_async_wait_until_for_times_out_on_mock_elapsed() {
     let monitor = MockMonitor::new(false);
 
     assert_eq!(
-        <MockMonitor<bool> as AsyncTimeoutConditionWaiter>::async_wait_until_for(
+        <MockMonitor<bool> as AsyncTimeoutConditionWaiter>::wait_until_for_async(
             &monitor,
             Duration::ZERO,
             |ready| *ready,
