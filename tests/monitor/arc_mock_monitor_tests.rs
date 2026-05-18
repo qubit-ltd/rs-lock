@@ -170,7 +170,7 @@ async fn test_arc_mock_monitor_async_traits_delegate_to_inner_monitor() {
     let waiter_monitor = monitor.clone();
 
     let waiter = tokio::spawn(async move {
-        <ArcMockMonitor<Vec<i32>> as AsyncNotificationWaiter>::async_wait(&waiter_monitor).await;
+        <ArcMockMonitor<Vec<i32>> as AsyncNotificationWaiter>::wait_async(&waiter_monitor).await;
     });
     tokio::task::yield_now().await;
     <ArcMockMonitor<Vec<i32>> as Notifier>::notify_all(&monitor);
@@ -179,7 +179,7 @@ async fn test_arc_mock_monitor_async_traits_delegate_to_inner_monitor() {
         .expect("async notification wait should complete")
         .expect("waiter task should finish");
 
-    let wait = <ArcMockMonitor<Vec<i32>> as AsyncTimeoutNotificationWaiter>::async_wait_for(
+    let wait = <ArcMockMonitor<Vec<i32>> as AsyncTimeoutNotificationWaiter>::wait_for_async(
         &monitor,
         Duration::from_secs(1),
     );
@@ -193,7 +193,7 @@ async fn test_arc_mock_monitor_async_traits_delegate_to_inner_monitor() {
     );
 
     assert_eq!(
-        <ArcMockMonitor<Vec<i32>> as AsyncConditionWaiter>::async_wait_until(
+        <ArcMockMonitor<Vec<i32>> as AsyncConditionWaiter>::wait_until_async(
             &monitor,
             |items| !items.is_empty(),
             |items| items.pop().expect("item should be ready"),
@@ -202,7 +202,7 @@ async fn test_arc_mock_monitor_async_traits_delegate_to_inner_monitor() {
         2,
     );
     assert_eq!(
-        <ArcMockMonitor<Vec<i32>> as AsyncConditionWaiter>::async_wait_while(
+        <ArcMockMonitor<Vec<i32>> as AsyncConditionWaiter>::wait_while_async(
             &monitor,
             |items| items.is_empty(),
             |items| {
@@ -214,7 +214,7 @@ async fn test_arc_mock_monitor_async_traits_delegate_to_inner_monitor() {
         2,
     );
     assert_eq!(
-        <ArcMockMonitor<Vec<i32>> as AsyncTimeoutConditionWaiter>::async_wait_until_for(
+        <ArcMockMonitor<Vec<i32>> as AsyncTimeoutConditionWaiter>::wait_until_for_async(
             &monitor,
             Duration::ZERO,
             |items| !items.is_empty(),
@@ -224,7 +224,7 @@ async fn test_arc_mock_monitor_async_traits_delegate_to_inner_monitor() {
         WaitTimeoutResult::Ready(3),
     );
     assert_eq!(
-        <ArcMockMonitor<Vec<i32>> as AsyncTimeoutConditionWaiter>::async_wait_while_for(
+        <ArcMockMonitor<Vec<i32>> as AsyncTimeoutConditionWaiter>::wait_while_for_async(
             &monitor,
             Duration::ZERO,
             |items| items.is_empty(),

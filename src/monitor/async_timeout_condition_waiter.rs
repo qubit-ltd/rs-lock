@@ -22,21 +22,24 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     /// Returns a future that waits until the predicate becomes true or times out.
     ///
     /// The timeout budget is measured from this method call.
-    fn async_wait_until_for<'a, R, P, F>(
+    fn wait_until_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
-        predicate: P,
+        mut predicate: P,
         action: F,
     ) -> AsyncMonitorFuture<'a, WaitTimeoutResult<R>>
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
-        F: FnOnce(&mut Self::State) -> R + Send + 'a;
+        F: FnOnce(&mut Self::State) -> R + Send + 'a,
+    {
+        self.wait_while_for_async(timeout, move |state| !predicate(state), action)
+    }
 
     /// Returns a future that waits while the predicate remains true or times out.
     ///
     /// The timeout budget is measured from this method call.
-    fn async_wait_while_for<'a, R, P, F>(
+    fn wait_while_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
         predicate: P,

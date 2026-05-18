@@ -19,20 +19,23 @@ pub trait AsyncConditionWaiter {
     /// Returns a future that waits until the predicate becomes true.
     ///
     /// The predicate and action run while the monitor state is locked.
-    fn async_wait_until<'a, R, P, F>(
+    fn wait_until_async<'a, R, P, F>(
         &'a self,
-        predicate: P,
+        mut predicate: P,
         action: F,
     ) -> AsyncMonitorFuture<'a, R>
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
-        F: FnOnce(&mut Self::State) -> R + Send + 'a;
+        F: FnOnce(&mut Self::State) -> R + Send + 'a,
+    {
+        self.wait_while_async(move |state| !predicate(state), action)
+    }
 
     /// Returns a future that waits while the predicate remains true.
     ///
     /// The predicate and action run while the monitor state is locked.
-    fn async_wait_while<'a, R, P, F>(
+    fn wait_while_async<'a, R, P, F>(
         &'a self,
         predicate: P,
         action: F,

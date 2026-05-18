@@ -71,7 +71,7 @@ async fn test_arc_tokio_monitor_traits_delegate_to_inner_monitor() {
     <ArcTokioMonitor<Vec<i32>> as Notifier>::notify_one(&monitor);
     <ArcTokioMonitor<Vec<i32>> as Notifier>::notify_all(&monitor);
 
-    let waiter = <ArcTokioMonitor<Vec<i32>> as AsyncNotificationWaiter>::async_wait(&monitor);
+    let waiter = <ArcTokioMonitor<Vec<i32>> as AsyncNotificationWaiter>::wait_async(&monitor);
     tokio::pin!(waiter);
     <ArcTokioMonitor<Vec<i32>> as Notifier>::notify_one(&monitor);
     tokio::time::timeout(Duration::from_millis(100), &mut waiter)
@@ -79,7 +79,7 @@ async fn test_arc_tokio_monitor_traits_delegate_to_inner_monitor() {
         .expect("async notification wait should complete");
 
     let timeout_wait =
-        <ArcTokioMonitor<Vec<i32>> as AsyncTimeoutNotificationWaiter>::async_wait_for(
+        <ArcTokioMonitor<Vec<i32>> as AsyncTimeoutNotificationWaiter>::wait_for_async(
             &monitor,
             Duration::from_secs(1),
         );
@@ -92,47 +92,68 @@ async fn test_arc_tokio_monitor_traits_delegate_to_inner_monitor() {
         WaitTimeoutStatus::Woken,
     );
 
-    assert_eq!(
-        <ArcTokioMonitor<Vec<i32>> as AsyncConditionWaiter>::async_wait_until(
+    monitor.async_write(|items| items.clear()).await;
+    let condition_until_wait =
+        <ArcTokioMonitor<Vec<i32>> as AsyncConditionWaiter>::wait_until_async(
             &monitor,
             |items| !items.is_empty(),
             |items| items.pop().expect("item should be ready"),
-        )
-        .await,
-        2,
+        );
+    tokio::pin!(condition_until_wait);
+    assert!(
+        tokio::time::timeout(Duration::from_millis(10), &mut condition_until_wait)
+            .await
+            .is_err()
     );
-    assert_eq!(
-        <ArcTokioMonitor<Vec<i32>> as AsyncConditionWaiter>::async_wait_while(
+    monitor.async_write_notify_one(|items| items.push(2)).await;
+    assert_eq!(condition_until_wait.await, 2);
+
+    let condition_while_wait =
+        <ArcTokioMonitor<Vec<i32>> as AsyncConditionWaiter>::wait_while_async(
             &monitor,
             |items| items.is_empty(),
             |items| items.pop().expect("item should be ready"),
-        )
-        .await,
-        1,
+        );
+    tokio::pin!(condition_while_wait);
+    assert!(
+        tokio::time::timeout(Duration::from_millis(10), &mut condition_while_wait)
+            .await
+            .is_err()
     );
+    monitor.async_write_notify_one(|items| items.push(1)).await;
+    assert_eq!(condition_while_wait.await, 1);
 
-    monitor.async_write(|items| items.push(3)).await;
-    assert_eq!(
-        <ArcTokioMonitor<Vec<i32>> as AsyncTimeoutConditionWaiter>::async_wait_until_for(
+    let timeout_until_wait =
+        <ArcTokioMonitor<Vec<i32>> as AsyncTimeoutConditionWaiter>::wait_until_for_async(
             &monitor,
-            Duration::ZERO,
+            Duration::from_secs(1),
             |items| !items.is_empty(),
             |items| items.pop().expect("item should be ready"),
-        )
-        .await,
-        WaitTimeoutResult::Ready(3),
+        );
+    tokio::pin!(timeout_until_wait);
+    assert!(
+        tokio::time::timeout(Duration::from_millis(10), &mut timeout_until_wait)
+            .await
+            .is_err()
     );
-    monitor.async_write(|items| items.push(4)).await;
-    assert_eq!(
-        <ArcTokioMonitor<Vec<i32>> as AsyncTimeoutConditionWaiter>::async_wait_while_for(
+    monitor.async_write_notify_one(|items| items.push(3)).await;
+    assert_eq!(timeout_until_wait.await, WaitTimeoutResult::Ready(3));
+
+    let timeout_while_wait =
+        <ArcTokioMonitor<Vec<i32>> as AsyncTimeoutConditionWaiter>::wait_while_for_async(
             &monitor,
-            Duration::ZERO,
+            Duration::from_secs(1),
             |items| items.is_empty(),
             |items| items.pop(),
-        )
-        .await,
-        WaitTimeoutResult::Ready(Some(4)),
+        );
+    tokio::pin!(timeout_while_wait);
+    assert!(
+        tokio::time::timeout(Duration::from_millis(10), &mut timeout_while_wait)
+            .await
+            .is_err()
     );
+    monitor.async_write_notify_all(|items| items.push(4)).await;
+    assert_eq!(timeout_while_wait.await, WaitTimeoutResult::Ready(Some(4)),);
 }
 
 #[tokio::test]
@@ -141,7 +162,7 @@ async fn test_arc_tokio_monitor_async_wait_until_for_times_out() {
 
     assert_eq!(
         monitor
-            .async_wait_until_for(Duration::from_millis(1), |ready| *ready, |_| 7)
+            .wait_until_for_async(Duration::from_millis(1), |ready| *ready, |_| 7)
             .await,
         WaitTimeoutResult::TimedOut,
     );

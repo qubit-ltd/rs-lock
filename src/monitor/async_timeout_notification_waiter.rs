@@ -28,6 +28,6 @@ pub trait AsyncTimeoutNotificationWaiter {
     /// # Returns
     ///
     /// A future resolving to the timeout status.
-    fn async_wait_for<'a>(&'a self, timeout: Duration)
+    fn wait_for_async<'a>(&'a self, timeout: Duration)
     -> AsyncMonitorFuture<'a, WaitTimeoutStatus>;
 }

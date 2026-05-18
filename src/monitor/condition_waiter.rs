@@ -26,10 +26,13 @@ pub trait ConditionWaiter {
     /// # Returns
     ///
     /// The value returned by `action`.
-    fn wait_until<R, P, F>(&self, predicate: P, action: F) -> R
+    fn wait_until<R, P, F>(&self, mut predicate: P, action: F) -> R
     where
         P: FnMut(&Self::State) -> bool,
-        F: FnOnce(&mut Self::State) -> R;
+        F: FnOnce(&mut Self::State) -> R,
+    {
+        self.wait_while(move |state| !predicate(state), action)
+    }
 
     /// Blocks while the predicate remains true, then runs an action.
     ///
