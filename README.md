@@ -26,7 +26,7 @@ Lock-focused utilities for the Qubit Rust libraries. The crate provides synchron
 
 ```toml
 [dependencies]
-qubit-lock = "0.8"
+qubit-lock = "0.9"
 ```
 
 The async wrappers use Tokio synchronization primitives and are enabled by
@@ -34,13 +34,27 @@ default. For sync-only users that want to avoid Tokio in the dependency graph:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.8", default-features = false }
+qubit-lock = { version = "0.9", default-features = false }
 ```
 
 If your application creates a Tokio runtime, enable the appropriate Tokio
 runtime features in your own `Cargo.toml`, such as `rt` or `rt-multi-thread`.
 `AsyncLock` returns `Send` futures: `ArcAsyncMutex<T>` implements it for
 `T: Send`, while `ArcAsyncRwLock<T>` implements it for `T: Send + Sync`.
+
+## Migration from 0.8
+
+Version `0.9` contains intentional async monitor API renames:
+
+- `AsyncNotificationWaiter::async_wait` is now `wait_async`.
+- `AsyncTimeoutNotificationWaiter::async_wait_for` is now `wait_for_async`.
+- `AsyncConditionWaiter::async_wait_until` and `async_wait_while` are now
+  `wait_until_async` and `wait_while_async`.
+- `AsyncTimeoutConditionWaiter::async_wait_until_for` and
+  `async_wait_while_for` are now `wait_until_for_async` and
+  `wait_while_for_async`.
+- Condition-wait traits provide default `wait_until*` implementations through
+  their corresponding `wait_while*` methods.
 
 ## Migration from 0.7
 
