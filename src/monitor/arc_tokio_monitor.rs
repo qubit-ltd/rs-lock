@@ -90,6 +90,151 @@ impl<T> ArcTokioMonitor<T> {
     pub fn notify_all(&self) {
         self.inner.notify_all();
     }
+
+    /// Returns a future that resolves after an async notification.
+    pub fn wait_async(&self) -> AsyncMonitorFuture<'_, ()>
+    where
+        T: Send,
+    {
+        <TokioMonitor<T> as AsyncNotificationWaiter>::wait_async(self.inner.as_ref())
+    }
+
+    /// Returns a future that resolves after notification or timeout.
+    ///
+    /// # Arguments
+    ///
+    /// * `timeout` - Maximum relative duration to wait.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to the timeout status.
+    pub fn wait_for_async(&self, timeout: Duration) -> AsyncMonitorFuture<'_, WaitTimeoutStatus>
+    where
+        T: Send,
+    {
+        <TokioMonitor<T> as AsyncTimeoutNotificationWaiter>::wait_for_async(
+            self.inner.as_ref(),
+            timeout,
+        )
+    }
+
+    /// Returns a future that waits until the predicate becomes true.
+    ///
+    /// # Arguments
+    ///
+    /// * `predicate` - Predicate that returns `true` when the state is ready.
+    /// * `action` - Action to run after the predicate becomes true.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to the action result.
+    pub fn wait_until_async<'a, R, P, F>(
+        &'a self,
+        predicate: P,
+        action: F,
+    ) -> AsyncMonitorFuture<'a, R>
+    where
+        T: Send,
+        R: Send + 'a,
+        P: FnMut(&T) -> bool + Send + 'a,
+        F: FnOnce(&mut T) -> R + Send + 'a,
+    {
+        <TokioMonitor<T> as AsyncConditionWaiter>::wait_until_async(
+            self.inner.as_ref(),
+            predicate,
+            action,
+        )
+    }
+
+    /// Returns a future that waits while the predicate remains true.
+    ///
+    /// # Arguments
+    ///
+    /// * `predicate` - Predicate that returns `true` while waiting should continue.
+    /// * `action` - Action to run after the predicate becomes false.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to the action result.
+    pub fn wait_while_async<'a, R, P, F>(
+        &'a self,
+        predicate: P,
+        action: F,
+    ) -> AsyncMonitorFuture<'a, R>
+    where
+        T: Send,
+        R: Send + 'a,
+        P: FnMut(&T) -> bool + Send + 'a,
+        F: FnOnce(&mut T) -> R + Send + 'a,
+    {
+        <TokioMonitor<T> as AsyncConditionWaiter>::wait_while_async(
+            self.inner.as_ref(),
+            predicate,
+            action,
+        )
+    }
+
+    /// Returns a future that waits until the predicate becomes true or times out.
+    ///
+    /// # Arguments
+    ///
+    /// * `timeout` - Maximum relative duration to wait.
+    /// * `predicate` - Predicate that returns `true` when the state is ready.
+    /// * `action` - Action to run after the predicate becomes true.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to the timed wait result.
+    pub fn wait_until_for_async<'a, R, P, F>(
+        &'a self,
+        timeout: Duration,
+        predicate: P,
+        action: F,
+    ) -> AsyncMonitorFuture<'a, WaitTimeoutResult<R>>
+    where
+        T: Send,
+        R: Send + 'a,
+        P: FnMut(&T) -> bool + Send + 'a,
+        F: FnOnce(&mut T) -> R + Send + 'a,
+    {
+        <TokioMonitor<T> as AsyncTimeoutConditionWaiter>::wait_until_for_async(
+            self.inner.as_ref(),
+            timeout,
+            predicate,
+            action,
+        )
+    }
+
+    /// Returns a future that waits while the predicate remains true or times out.
+    ///
+    /// # Arguments
+    ///
+    /// * `timeout` - Maximum relative duration to wait.
+    /// * `predicate` - Predicate that returns `true` while waiting should continue.
+    /// * `action` - Action to run after the predicate becomes false.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to the timed wait result.
+    pub fn wait_while_for_async<'a, R, P, F>(
+        &'a self,
+        timeout: Duration,
+        predicate: P,
+        action: F,
+    ) -> AsyncMonitorFuture<'a, WaitTimeoutResult<R>>
+    where
+        T: Send,
+        R: Send + 'a,
+        P: FnMut(&T) -> bool + Send + 'a,
+        F: FnOnce(&mut T) -> R + Send + 'a,
+    {
+        <TokioMonitor<T> as AsyncTimeoutConditionWaiter>::wait_while_for_async(
+            self.inner.as_ref(),
+            timeout,
+            predicate,
+            action,
+        )
+    }
 }
 
 impl<T> Notifier for ArcTokioMonitor<T> {

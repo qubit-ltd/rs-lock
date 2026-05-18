@@ -139,6 +139,49 @@ fn test_arc_mock_monitor_traits_delegate_to_inner_monitor() {
 }
 
 #[test]
+fn test_arc_mock_monitor_wait_methods_delegate_to_inner_monitor() {
+    let monitor = ArcMockMonitor::new(vec![1, 2]);
+
+    assert_eq!(
+        monitor.wait_for(Duration::ZERO),
+        WaitTimeoutStatus::TimedOut,
+    );
+    assert_eq!(
+        monitor.wait_until(
+            |items| !items.is_empty(),
+            |items| items.pop().expect("item should be ready"),
+        ),
+        2,
+    );
+    assert_eq!(
+        monitor.wait_while(
+            |items| items.is_empty(),
+            |items| {
+                items.push(3);
+                items.len()
+            },
+        ),
+        2,
+    );
+    assert_eq!(
+        monitor.wait_until_for(
+            Duration::ZERO,
+            |items| !items.is_empty(),
+            |items| items.pop().expect("item should be ready"),
+        ),
+        WaitTimeoutResult::Ready(3),
+    );
+    assert_eq!(
+        monitor.wait_while_for(
+            Duration::ZERO,
+            |items| items.is_empty(),
+            |items| items.pop(),
+        ),
+        WaitTimeoutResult::Ready(Some(1)),
+    );
+}
+
+#[test]
 fn test_arc_mock_monitor_notification_waiter_trait_wait_returns_after_notify() {
     let monitor = ArcMockMonitor::new(false);
     let waiter_monitor = monitor.clone();
@@ -152,6 +195,31 @@ fn test_arc_mock_monitor_notification_waiter_trait_wait_returns_after_notify() {
     let deadline = std::time::Instant::now() + Duration::from_secs(1);
     loop {
         <ArcMockMonitor<bool> as Notifier>::notify_all(&monitor);
+        if done_rx.recv_timeout(Duration::from_millis(5)).is_ok() {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "notification wait should complete before deadline",
+        );
+    }
+    waiter.join().expect("waiter should finish");
+}
+
+#[test]
+fn test_arc_mock_monitor_wait_returns_after_notify() {
+    let monitor = ArcMockMonitor::new(false);
+    let waiter_monitor = monitor.clone();
+    let (done_tx, done_rx) = mpsc::channel();
+
+    let waiter = thread::spawn(move || {
+        waiter_monitor.wait();
+        done_tx.send(()).expect("test should receive wait result");
+    });
+
+    let deadline = std::time::Instant::now() + Duration::from_secs(1);
+    loop {
+        monitor.notify_all();
         if done_rx.recv_timeout(Duration::from_millis(5)).is_ok() {
             break;
         }
@@ -231,6 +299,75 @@ async fn test_arc_mock_monitor_async_traits_delegate_to_inner_monitor() {
             |items| items.pop(),
         )
         .await,
+        WaitTimeoutResult::Ready(Some(1)),
+    );
+}
+
+#[cfg(feature = "async")]
+#[tokio::test]
+async fn test_arc_mock_monitor_async_wait_methods_delegate_to_inner_monitor() {
+    let monitor = ArcMockMonitor::new(vec![1, 2]);
+    let waiter_monitor = monitor.clone();
+
+    let waiter = tokio::spawn(async move {
+        waiter_monitor.wait_async().await;
+    });
+    tokio::task::yield_now().await;
+    monitor.notify_all();
+    tokio::time::timeout(Duration::from_millis(100), waiter)
+        .await
+        .expect("async notification wait should complete")
+        .expect("waiter task should finish");
+
+    let wait = monitor.wait_for_async(Duration::from_secs(1));
+    tokio::pin!(wait);
+    monitor.notify_one();
+    assert_eq!(
+        tokio::time::timeout(Duration::from_millis(100), &mut wait)
+            .await
+            .expect("async timeout notification wait should complete"),
+        WaitTimeoutStatus::Woken,
+    );
+
+    assert_eq!(
+        monitor
+            .wait_until_async(
+                |items| !items.is_empty(),
+                |items| items.pop().expect("item should be ready"),
+            )
+            .await,
+        2,
+    );
+    assert_eq!(
+        monitor
+            .wait_while_async(
+                |items| items.is_empty(),
+                |items| {
+                    items.push(3);
+                    items.len()
+                },
+            )
+            .await,
+        2,
+    );
+    assert_eq!(
+        monitor
+            .wait_until_for_async(
+                Duration::ZERO,
+                |items| !items.is_empty(),
+                |items| items.pop().expect("item should be ready"),
+            )
+            .await,
+        WaitTimeoutResult::Ready(3),
+    );
+    assert_eq!(
+        monitor
+            .wait_while_for_async(
+                Duration::ZERO,
+                |items| items.is_empty(),
+                |items| items.pop(),
+            )
+            .await,
         WaitTimeoutResult::Ready(Some(1)),
     );
 }
