@@ -26,19 +26,33 @@
 
 ```toml
 [dependencies]
-qubit-lock = "0.8"
+qubit-lock = "0.9"
 ```
 
 异步锁包装器使用 Tokio 同步原语，并默认启用。只需要同步锁与 ParkingLotMonitor、且希望依赖图中不包含 Tokio 的使用方，可以关闭默认特性：
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.8", default-features = false }
+qubit-lock = { version = "0.9", default-features = false }
 ```
 
 如果应用需要创建 Tokio runtime，请在应用自己的 `Cargo.toml` 中启用合适的 Tokio runtime 特性，例如 `rt` 或 `rt-multi-thread`。
 `AsyncLock` 返回 `Send` future：`ArcAsyncMutex<T>` 在 `T: Send` 时实现它，
 `ArcAsyncRwLock<T>` 在 `T: Send + Sync` 时实现它。
+
+## 从 0.8 迁移
+
+`0.9` 包含有意的异步 monitor API 重命名：
+
+- `AsyncNotificationWaiter::async_wait` 现在改为 `wait_async`。
+- `AsyncTimeoutNotificationWaiter::async_wait_for` 现在改为 `wait_for_async`。
+- `AsyncConditionWaiter::async_wait_until` 和 `async_wait_while` 现在改为
+  `wait_until_async` 和 `wait_while_async`。
+- `AsyncTimeoutConditionWaiter::async_wait_until_for` 和
+  `async_wait_while_for` 现在改为 `wait_until_for_async` 和
+  `wait_while_for_async`。
+- condition wait traits 通过对应的 `wait_while*` 方法提供默认
+  `wait_until*` 实现。
 
 ## 从 0.7 迁移
 
