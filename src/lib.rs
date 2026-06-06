@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! # Qubit Lock
 //!
 //! Lock utilities for the Qubit Rust libraries.
@@ -14,7 +12,8 @@
 //! The crate provides:
 //!
 //! - Synchronous lock wrappers with `Arc` integrated internally.
-//! - Optional asynchronous Tokio-based lock wrappers behind the `async` feature.
+//! - Optional asynchronous Tokio-based lock wrappers behind the `async`
+//!   feature.
 //! - Monitor-style coordination traits and concrete parking_lot,
 //!   standard-library, Tokio, and mock monitor implementations.
 //!

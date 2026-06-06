@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! README and lock documentation consistency tests.
 
 use semver::{
@@ -19,7 +17,8 @@ const README_EN: &str = include_str!("../../README.md");
 const README_ZH: &str = include_str!("../../README.zh_CN.md");
 const LIB_RS: &str = include_str!("../../src/lib.rs");
 const ARC_RW_LOCK_SRC: &str = include_str!("../../src/lock/arc_rw_lock.rs");
-const ARC_ASYNC_RW_LOCK_SRC: &str = include_str!("../../src/lock/arc_async_rw_lock.rs");
+const ARC_ASYNC_RW_LOCK_SRC: &str =
+    include_str!("../../src/lock/arc_async_rw_lock.rs");
 
 #[test]
 /// Ensures README files only reference the current lock method names.
@@ -31,7 +30,8 @@ fn test_readme_no_legacy_lock_api_names() {
 }
 
 #[test]
-/// Ensures README quick-start snippets import the trait needed for lock methods.
+/// Ensures README quick-start snippets import the trait needed for lock
+/// methods.
 fn test_readme_quick_start_imports_lock_trait() {
     assert!(README_EN.contains("use qubit_lock::{ArcMutex, Lock};"));
     assert!(README_ZH.contains("use qubit_lock::{ArcMutex, Lock};"));
@@ -60,7 +60,9 @@ fn test_readme_monitor_example_uses_write_notify_one() {
 fn test_readme_documents_root_only_public_api() {
     assert!(!README_EN.contains("from `qubit_lock::monitor`"));
     assert!(!README_ZH.contains("\u{6216} crate root"));
-    assert!(README_EN.contains("Import public types directly from the crate root."));
+    assert!(
+        README_EN.contains("Import public types directly from the crate root.")
+    );
     assert!(README_ZH.contains("crate root"));
     assert!(LIB_RS.contains("mod lock;"));
     assert!(LIB_RS.contains("mod monitor;"));
@@ -78,11 +80,13 @@ fn test_rw_lock_docs_use_current_trait_names() {
 }
 
 #[test]
-/// Ensures all README `qubit-lock` version requirements accept the crate version in Cargo.toml.
+/// Ensures all README `qubit-lock` version requirements accept the crate
+/// version in Cargo.toml.
 fn test_readme_dependency_versions_match_cargo_toml() {
-    let cargo_version =
-        extract_package_version(CARGO_TOML).expect("Failed to extract version from Cargo.toml");
-    let package_ver = Version::parse(cargo_version).expect("Invalid package version in Cargo.toml");
+    let cargo_version = extract_package_version(CARGO_TOML)
+        .expect("Failed to extract version from Cargo.toml");
+    let package_ver = Version::parse(cargo_version)
+        .expect("Invalid package version in Cargo.toml");
 
     let readme_en_reqs = extract_readme_dependency_versions(README_EN);
     let readme_zh_reqs = extract_readme_dependency_versions(README_ZH);
@@ -108,7 +112,12 @@ fn test_readme_dependency_versions_match_cargo_toml() {
         "README.zh_CN.md has qubit-lock dependency lines that were not parsed"
     );
 
-    assert_readme_versions_match("README.md", &readme_en_reqs, &package_ver, cargo_version);
+    assert_readme_versions_match(
+        "README.md",
+        &readme_en_reqs,
+        &package_ver,
+        cargo_version,
+    );
     assert_readme_versions_match(
         "README.zh_CN.md",
         &readme_zh_reqs,
@@ -135,8 +144,9 @@ fn assert_readme_versions_match(
     cargo_version: &str,
 ) {
     for (index, readme_req) in readme_reqs.iter().enumerate() {
-        let req = VersionReq::parse(readme_req)
-            .unwrap_or_else(|_| panic!("Invalid version req in {filename}: {readme_req}"));
+        let req = VersionReq::parse(readme_req).unwrap_or_else(|_| {
+            panic!("Invalid version req in {filename}: {readme_req}")
+        });
         assert!(
             req.matches(package_ver),
             "{filename} qubit-lock dependency #{index} = \"{readme_req}\" does not accept package version {cargo_version}"
