@@ -1,17 +1,14 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! # Asynchronous Lock Trait
 //!
 //! Defines an asynchronous lock abstraction that supports acquiring
 //! locks without blocking threads.
-//!
 use std::future::Future;
 
 use tokio::sync::{
@@ -74,8 +71,7 @@ use super::try_lock_error::TryLockError;
 /// ## Mutex-based async locks (ArcAsyncMutex, AsyncMutex)
 /// - `read`: Acquires exclusive lock, same performance as write
 /// - `write`: Acquires exclusive lock, same performance as read
-/// - **Use case**: When you need exclusive access or don't know access
-///   patterns
+/// - **Use case**: When you need exclusive access or don't know access patterns
 ///
 /// ## RwLock-based async locks (ArcAsyncRwLock, AsyncRwLock)
 /// - `read`: Acquires shared lock, allows concurrent readers
@@ -86,7 +82,6 @@ use super::try_lock_error::TryLockError;
 /// # Type Parameters
 ///
 /// * `T` - The type of data protected by the lock
-///
 pub trait AsyncLock<T: ?Sized> {
     /// Acquires a read lock asynchronously and executes a closure
     ///
@@ -100,21 +95,20 @@ pub trait AsyncLock<T: ?Sized> {
     /// # Use Cases
     ///
     /// - **Data inspection**: Reading values, checking state, validation
-    /// - **Read-only operations**: Computing derived values, formatting
-    ///   output
+    /// - **Read-only operations**: Computing derived values, formatting output
     /// - **Condition checking**: Evaluating predicates without modification
     /// - **Logging and debugging**: Accessing data for diagnostic purposes
     ///
     /// # Performance Notes
     ///
     /// - **Mutex-based async locks**: Same performance as write operations
-    /// - **RwLock-based async locks**: Allows concurrent readers, better
-    ///   for read-heavy async workloads
+    /// - **RwLock-based async locks**: Allows concurrent readers, better for
+    ///   read-heavy async workloads
     ///
     /// # Arguments
     ///
-    /// * `f` - Closure that receives an immutable reference (`&T`) to
-    ///   the protected data
+    /// * `f` - Closure that receives an immutable reference (`&T`) to the
+    ///   protected data
     ///
     /// # Returns
     ///
@@ -171,8 +165,8 @@ pub trait AsyncLock<T: ?Sized> {
     ///
     /// # Arguments
     ///
-    /// * `f` - Closure that receives a mutable reference (`&mut T`) to
-    ///   the protected data
+    /// * `f` - Closure that receives a mutable reference (`&mut T`) to the
+    ///   protected data
     ///
     /// # Returns
     ///
@@ -215,8 +209,8 @@ pub trait AsyncLock<T: ?Sized> {
     ///
     /// # Arguments
     ///
-    /// * `f` - Closure that receives an immutable reference (`&T`) to
-    ///   the protected data if the lock is successfully acquired
+    /// * `f` - Closure that receives an immutable reference (`&T`) to the
+    ///   protected data if the lock is successfully acquired
     ///
     /// # Returns
     ///
@@ -254,8 +248,8 @@ pub trait AsyncLock<T: ?Sized> {
     ///
     /// # Arguments
     ///
-    /// * `f` - Closure that receives a mutable reference (`&mut T`) to
-    ///   the protected data if the lock is successfully acquired
+    /// * `f` - Closure that receives a mutable reference (`&mut T`) to the
+    ///   protected data if the lock is successfully acquired
     ///
     /// # Returns
     ///
@@ -298,7 +292,6 @@ pub trait AsyncLock<T: ?Sized> {
 /// # Type Parameters
 ///
 /// * `T` - The type of data protected by the lock
-///
 impl<T: ?Sized + Send> AsyncLock<T> for AsyncMutex<T> {
     /// Acquires the mutex and executes a read-only closure.
     ///
@@ -390,7 +383,6 @@ impl<T: ?Sized + Send> AsyncLock<T> for AsyncMutex<T> {
 /// # Type Parameters
 ///
 /// * `T` - The type of data protected by the lock
-///
 impl<T: ?Sized + Send + Sync> AsyncLock<T> for AsyncRwLock<T> {
     /// Acquires a shared read lock and executes a closure.
     ///

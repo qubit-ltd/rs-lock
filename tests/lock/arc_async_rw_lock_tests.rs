@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 // qubit-style: allow explicit-imports
 //! # ArcAsyncRwLock Tests
 //!
@@ -295,7 +293,8 @@ mod arc_async_rw_lock_tests {
 
         let async_rw_lock_clone = Arc::clone(&async_rw_lock);
         let holder = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
+            let rt = tokio::runtime::Runtime::new()
+                .expect("failed to create Tokio runtime");
             rt.block_on(async {
                 let sum = async_rw_lock_clone
                     .read(move |data| {
@@ -317,7 +316,8 @@ mod arc_async_rw_lock_tests {
             .recv_timeout(Duration::from_secs(1))
             .expect("read lock should be held within timeout");
 
-        let concurrent_sum = async_rw_lock.try_read(|data| data.iter().sum::<i32>());
+        let concurrent_sum =
+            async_rw_lock.try_read(|data| data.iter().sum::<i32>());
         assert_eq!(concurrent_sum, Ok(15));
 
         release_tx
@@ -336,7 +336,8 @@ mod arc_async_rw_lock_tests {
         // Hold write lock in one task
         let async_rw_lock_clone = async_rw_lock.clone();
         let write_handle = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
+            let rt = tokio::runtime::Runtime::new()
+                .expect("failed to create Tokio runtime");
             rt.block_on(async {
                 async_rw_lock_clone
                     .write(move |value| {
@@ -445,18 +446,22 @@ mod arc_async_rw_lock_tests {
     }
 
     #[tokio::test]
-    async fn test_arc_async_rw_lock_try_read_returns_would_block_when_write_locked() {
+    async fn test_arc_async_rw_lock_try_read_returns_would_block_when_write_locked()
+     {
         let async_rw_lock = Arc::new(ArcAsyncRwLock::new(0));
         let (locked_tx, locked_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
 
         let lock_clone = async_rw_lock.clone();
         let handle = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
+            let rt = tokio::runtime::Runtime::new()
+                .expect("failed to create Tokio runtime");
             rt.block_on(async {
                 lock_clone
                     .write(move |_| {
-                        locked_tx.send(()).expect("test should observe held lock");
+                        locked_tx
+                            .send(())
+                            .expect("test should observe held lock");
                         release_rx
                             .recv_timeout(Duration::from_secs(1))
                             .expect("test should release held lock");
@@ -478,7 +483,8 @@ mod arc_async_rw_lock_tests {
     }
 
     #[tokio::test]
-    async fn test_arc_async_rw_lock_try_methods_cover_shared_function_pointer_paths() {
+    async fn test_arc_async_rw_lock_try_methods_cover_shared_function_pointer_paths()
+     {
         let async_rw_lock = Arc::new(ArcAsyncRwLock::new(0));
 
         assert_eq!(async_rw_lock.try_read(read_i32), Ok(0));
@@ -488,7 +494,8 @@ mod arc_async_rw_lock_tests {
         let (read_release_tx, read_release_rx) = mpsc::channel();
         let read_lock = async_rw_lock.clone();
         let read_holder = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
+            let rt = tokio::runtime::Runtime::new()
+                .expect("failed to create Tokio runtime");
             rt.block_on(async {
                 read_lock
                     .write(move |_| {
@@ -518,7 +525,8 @@ mod arc_async_rw_lock_tests {
         let (write_release_tx, write_release_rx) = mpsc::channel();
         let write_lock = async_rw_lock.clone();
         let write_holder = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
+            let rt = tokio::runtime::Runtime::new()
+                .expect("failed to create Tokio runtime");
             rt.block_on(async {
                 write_lock
                     .read(move |_| {
@@ -546,18 +554,22 @@ mod arc_async_rw_lock_tests {
     }
 
     #[tokio::test]
-    async fn test_arc_async_rw_lock_try_write_returns_would_block_when_read_locked() {
+    async fn test_arc_async_rw_lock_try_write_returns_would_block_when_read_locked()
+     {
         let async_rw_lock = Arc::new(ArcAsyncRwLock::new(0));
         let (locked_tx, locked_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
 
         let lock_clone = async_rw_lock.clone();
         let handle = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
+            let rt = tokio::runtime::Runtime::new()
+                .expect("failed to create Tokio runtime");
             rt.block_on(async {
                 lock_clone
                     .read(move |_| {
-                        locked_tx.send(()).expect("test should observe held lock");
+                        locked_tx
+                            .send(())
+                            .expect("test should observe held lock");
                         release_rx
                             .recv_timeout(Duration::from_secs(1))
                             .expect("test should release held lock");

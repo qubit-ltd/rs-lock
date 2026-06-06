@@ -1,16 +1,15 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 // qubit-style: allow explicit-imports
 //! # Lock Trait Tests
 //!
-//! Tests for the Lock trait and its implementations for std::sync::Mutex and std::sync::RwLock
+//! Tests for the Lock trait and its implementations for std::sync::Mutex and
+//! std::sync::RwLock
 
 use std::{
     sync::{
@@ -314,7 +313,8 @@ mod lock_trait_tests {
             .recv_timeout(Duration::from_secs(1))
             .expect("mutex should be held within timeout");
 
-        // Try to acquire read lock, should return WouldBlock since it's held by another thread
+        // Try to acquire read lock, should return WouldBlock since it's held by
+        // another thread
         let result = Lock::try_read(&*mutex, |value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
 
@@ -352,7 +352,8 @@ mod lock_trait_tests {
             .recv_timeout(Duration::from_secs(1))
             .expect("mutex should be held within timeout");
 
-        // Try to acquire write lock, should return WouldBlock since it's held by another thread
+        // Try to acquire write lock, should return WouldBlock since it's held
+        // by another thread
         let result = Lock::try_write(&*mutex, |value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
 
@@ -620,7 +621,8 @@ mod rwlock_trait_tests {
     fn test_rwlock_read_lock_returns_closure_result() {
         let rw_lock = ArcRwLock::new(vec![10, 20, 30]);
 
-        let result = rw_lock.read(|v| v.iter().map(|&x| x * 2).collect::<Vec<_>>());
+        let result =
+            rw_lock.read(|v| v.iter().map(|&x| x * 2).collect::<Vec<_>>());
 
         assert_eq!(result, vec![20, 40, 60]);
 
@@ -716,7 +718,8 @@ mod rwlock_trait_tests {
         let result = rw_lock.try_read(|value| *value);
         assert_eq!(result, Ok(0)); // Should succeed initially
 
-        // Now try to acquire write lock while read lock was held (but now released)
+        // Now try to acquire write lock while read lock was held (but now
+        // released)
         let result = rw_lock.try_write(|value| *value);
         assert_eq!(result, Ok(0)); // Should succeed since lock was released
     }
@@ -821,7 +824,8 @@ mod rwlock_trait_tests {
             .recv_timeout(Duration::from_secs(1))
             .expect("write lock should be held within timeout");
 
-        // Try to acquire read lock, should return WouldBlock since write lock is held by another thread
+        // Try to acquire read lock, should return WouldBlock since write lock
+        // is held by another thread
         let result = Lock::try_read(&*rwlock, |value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
 
@@ -838,7 +842,8 @@ mod rwlock_trait_tests {
     }
 
     #[test]
-    fn test_std_rwlock_try_write_returns_would_block_when_read_locked_short_path() {
+    fn test_std_rwlock_try_write_returns_would_block_when_read_locked_short_path()
+     {
         let rwlock = Arc::new(RwLock::new(0));
         let (locked_tx, locked_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
@@ -861,7 +866,8 @@ mod rwlock_trait_tests {
             .recv_timeout(Duration::from_secs(1))
             .expect("read lock should be held within timeout");
 
-        // Try to acquire write lock, should return WouldBlock since read lock is held by another thread
+        // Try to acquire write lock, should return WouldBlock since read lock
+        // is held by another thread
         let result = Lock::try_write(&*rwlock, |value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
 
@@ -904,7 +910,8 @@ mod rwlock_trait_tests {
             .recv_timeout(Duration::from_secs(1))
             .expect("write lock should be held within timeout");
 
-        // Try to acquire write lock, should return WouldBlock since write lock is held by another thread
+        // Try to acquire write lock, should return WouldBlock since write lock
+        // is held by another thread
         let result = Lock::try_write(&*rwlock, |value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
 

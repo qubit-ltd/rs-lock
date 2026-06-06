@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 // qubit-style: allow explicit-imports
 //! # ArcRwLock Tests
 //!
@@ -210,7 +208,8 @@ mod arc_rw_lock_tests {
     fn test_arc_rw_lock_read_lock_returns_closure_result() {
         let rw_lock = ArcRwLock::new(vec![10, 20, 30]);
 
-        let result = rw_lock.read(|v| v.iter().map(|&x| x * 2).collect::<Vec<_>>());
+        let result =
+            rw_lock.read(|v| v.iter().map(|&x| x * 2).collect::<Vec<_>>());
 
         assert_eq!(result, vec![20, 40, 60]);
 

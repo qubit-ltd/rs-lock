@@ -1,17 +1,14 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! # Standard Read-Write Lock Wrapper
 //!
 //! Provides an Arc-wrapped standard-library read-write lock for callers that
 //! need `std::sync::RwLock` poisoning semantics.
-//!
 
 use std::ops::Deref;
 use std::sync::{
@@ -158,8 +155,12 @@ impl<T> Lock<T> for ArcStdRwLock<T> {
     {
         match self.inner.try_read() {
             Ok(guard) => Ok(f(&*guard)),
-            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
-            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
+            Err(std::sync::TryLockError::WouldBlock) => {
+                Err(TryLockError::WouldBlock)
+            }
+            Err(std::sync::TryLockError::Poisoned(_)) => {
+                Err(TryLockError::Poisoned)
+            }
         }
     }
 
@@ -184,8 +185,12 @@ impl<T> Lock<T> for ArcStdRwLock<T> {
     {
         match self.inner.try_write() {
             Ok(mut guard) => Ok(f(&mut *guard)),
-            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
-            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
+            Err(std::sync::TryLockError::WouldBlock) => {
+                Err(TryLockError::WouldBlock)
+            }
+            Err(std::sync::TryLockError::Poisoned(_)) => {
+                Err(TryLockError::Poisoned)
+            }
         }
     }
 }

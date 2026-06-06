@@ -1,19 +1,16 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! # Lock Trait
 //!
-//! Defines an unified synchronous lock abstraction that supports acquiring locks
-//! and executing operations within the locked context. This trait allows locks to be
-//! used in a generic way through closures, avoiding the complexity of
-//! explicitly managing lock guards and their lifetimes.
-//!
+//! Defines an unified synchronous lock abstraction that supports acquiring
+//! locks and executing operations within the locked context. This trait allows
+//! locks to be used in a generic way through closures, avoiding the complexity
+//! of explicitly managing lock guards and their lifetimes.
 use std::sync::{
     Mutex,
     RwLock,
@@ -71,7 +68,6 @@ use super::try_lock_error::TryLockError;
 /// # Type Parameters
 ///
 /// * `T` - The type of data protected by the lock
-///
 pub trait Lock<T: ?Sized> {
     /// Acquires a read lock and executes a closure
     ///
@@ -286,7 +282,6 @@ pub trait Lock<T: ?Sized> {
 /// # Type Parameters
 ///
 /// * `T` - The type of data protected by the lock
-///
 impl<T: ?Sized> Lock<T> for Mutex<T> {
     /// Acquires the mutex and executes a read-only closure.
     ///
@@ -353,8 +348,12 @@ impl<T: ?Sized> Lock<T> for Mutex<T> {
     {
         match self.try_lock() {
             Ok(guard) => Ok(f(&*guard)),
-            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
-            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
+            Err(std::sync::TryLockError::WouldBlock) => {
+                Err(TryLockError::WouldBlock)
+            }
+            Err(std::sync::TryLockError::Poisoned(_)) => {
+                Err(TryLockError::Poisoned)
+            }
         }
     }
 
@@ -379,8 +378,12 @@ impl<T: ?Sized> Lock<T> for Mutex<T> {
     {
         match self.try_lock() {
             Ok(mut guard) => Ok(f(&mut *guard)),
-            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
-            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
+            Err(std::sync::TryLockError::WouldBlock) => {
+                Err(TryLockError::WouldBlock)
+            }
+            Err(std::sync::TryLockError::Poisoned(_)) => {
+                Err(TryLockError::Poisoned)
+            }
         }
     }
 }
@@ -395,7 +398,6 @@ impl<T: ?Sized> Lock<T> for Mutex<T> {
 /// # Type Parameters
 ///
 /// * `T` - The type of data protected by the lock
-///
 impl<T: ?Sized> Lock<T> for RwLock<T> {
     /// Acquires a shared read lock and executes a closure.
     ///
@@ -462,8 +464,12 @@ impl<T: ?Sized> Lock<T> for RwLock<T> {
     {
         match self.try_read() {
             Ok(guard) => Ok(f(&*guard)),
-            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
-            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
+            Err(std::sync::TryLockError::WouldBlock) => {
+                Err(TryLockError::WouldBlock)
+            }
+            Err(std::sync::TryLockError::Poisoned(_)) => {
+                Err(TryLockError::Poisoned)
+            }
         }
     }
 
@@ -488,8 +494,12 @@ impl<T: ?Sized> Lock<T> for RwLock<T> {
     {
         match self.try_write() {
             Ok(mut guard) => Ok(f(&mut *guard)),
-            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
-            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
+            Err(std::sync::TryLockError::WouldBlock) => {
+                Err(TryLockError::WouldBlock)
+            }
+            Err(std::sync::TryLockError::Poisoned(_)) => {
+                Err(TryLockError::Poisoned)
+            }
         }
     }
 }
@@ -512,7 +522,6 @@ impl<T: ?Sized> Lock<T> for RwLock<T> {
 /// - Better handling of contended locks
 /// - Reduced memory overhead
 /// - No risk of lock poisoning (panics don't poison the lock)
-///
 impl<T: ?Sized> Lock<T> for ParkingLotMutex<T> {
     /// Acquires the parking_lot mutex and executes a read-only closure.
     ///
@@ -599,7 +608,8 @@ impl<T: ?Sized> Lock<T> for ParkingLotMutex<T> {
     }
 }
 
-/// High-performance synchronous read-write lock implementation of the Lock trait.
+/// High-performance synchronous read-write lock implementation of the Lock
+/// trait.
 ///
 /// This implementation uses the `parking_lot` crate's `RwLock` type to provide
 /// a non-poisoning read-write lock. Read operations use shared locks allowing

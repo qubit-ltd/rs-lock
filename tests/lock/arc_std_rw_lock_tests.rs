@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 // qubit-style: allow explicit-imports
 //! # ArcStdRwLock Tests
 //!
@@ -73,7 +71,8 @@ mod arc_std_rw_lock_tests {
         let rw_lock = ArcStdRwLock::new(1);
 
         {
-            let guard = (*rw_lock).read().expect("rw lock should not be poisoned");
+            let guard =
+                (*rw_lock).read().expect("rw lock should not be poisoned");
             assert_eq!(*guard, 1);
         }
 

@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 // qubit-style: allow explicit-imports
 //! # ArcAsyncMutex Tests
 //!
@@ -120,14 +118,18 @@ mod arc_async_mutex_tests {
 
         let async_mutex_clone = async_mutex.clone();
 
-        // Hold the lock in another thread (note: using thread instead of tokio task)
+        // Hold the lock in another thread (note: using thread instead of tokio
+        // task)
         let handle = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
+            let rt = tokio::runtime::Runtime::new()
+                .expect("failed to create Tokio runtime");
             rt.block_on(async {
                 async_mutex_clone
                     .write(move |value| {
                         *value += 1;
-                        locked_tx.send(()).expect("test should observe held mutex");
+                        locked_tx
+                            .send(())
+                            .expect("test should observe held mutex");
                         release_rx
                             .recv_timeout(Duration::from_secs(1))
                             .expect("test should release held mutex");
@@ -332,12 +334,15 @@ mod arc_async_mutex_tests {
         let async_mutex_clone = async_mutex.clone();
 
         let holder = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
+            let rt = tokio::runtime::Runtime::new()
+                .expect("failed to create Tokio runtime");
             rt.block_on(async {
                 async_mutex_clone
                     .write(move |value| {
                         *value += 1;
-                        locked_tx.send(()).expect("test should observe held mutex");
+                        locked_tx
+                            .send(())
+                            .expect("test should observe held mutex");
                         release_rx
                             .recv_timeout(Duration::from_secs(1))
                             .expect("test should release held mutex");
@@ -406,7 +411,8 @@ mod arc_async_mutex_tests {
         let result = async_mutex.try_write(|value| *value);
         assert_eq!(result, Ok(0));
 
-        // Try again immediately, should still succeed since we released the lock
+        // Try again immediately, should still succeed since we released the
+        // lock
         let result = async_mutex.try_write(|value| {
             *value += 1;
             *value
@@ -415,7 +421,8 @@ mod arc_async_mutex_tests {
     }
 
     #[tokio::test]
-    async fn test_arc_async_mutex_try_methods_cover_shared_function_pointer_paths() {
+    async fn test_arc_async_mutex_try_methods_cover_shared_function_pointer_paths()
+     {
         use std::{
             sync::mpsc,
             time::Duration,
@@ -430,11 +437,14 @@ mod arc_async_mutex_tests {
         let (release_tx, release_rx) = mpsc::channel();
         let lock_clone = async_mutex.clone();
         let holder = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
+            let rt = tokio::runtime::Runtime::new()
+                .expect("failed to create Tokio runtime");
             rt.block_on(async {
                 lock_clone
                     .write(move |_| {
-                        locked_tx.send(()).expect("test should observe held mutex");
+                        locked_tx
+                            .send(())
+                            .expect("test should observe held mutex");
                         release_rx
                             .recv_timeout(Duration::from_secs(1))
                             .expect("test should release held mutex");

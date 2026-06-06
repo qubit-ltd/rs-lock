@@ -1,17 +1,14 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! # Synchronous Standard Mutex Wrapper
 //!
 //! Provides an Arc-wrapped synchronous mutex using std::sync::Mutex
 //! for protecting shared data in multi-threaded environments.
-//!
 
 use std::ops::Deref;
 use std::sync::{
@@ -35,8 +32,7 @@ use crate::lock::{
 /// - Synchronously acquires locks, may block threads
 /// - Supports trying to acquire locks (non-blocking)
 /// - Thread-safe, supports multi-threaded sharing
-/// - Automatic lock management through RAII ensures proper lock
-///   release
+/// - Automatic lock management through RAII ensures proper lock release
 /// - Implements [`Deref`] and [`AsRef`] to expose the underlying
 ///   [`std::sync::Mutex`] API when guard-based access is needed
 ///
@@ -58,8 +54,6 @@ use crate::lock::{
 ///     println!("Current value: {}", value);
 /// }
 /// ```
-///
-///
 pub struct ArcStdMutex<T> {
     /// Shared standard mutex protecting the wrapped value.
     inner: Arc<Mutex<T>>,
@@ -206,8 +200,10 @@ impl<T> Lock<T> for ArcStdMutex<T> {
     ///
     /// # Returns
     ///
-    /// * `Ok(R)` - If the lock was successfully acquired and the closure executed
-    /// * `Err(TryLockError::WouldBlock)` - If the lock is already held by another thread
+    /// * `Ok(R)` - If the lock was successfully acquired and the closure
+    ///   executed
+    /// * `Err(TryLockError::WouldBlock)` - If the lock is already held by
+    ///   another thread
     /// * `Err(TryLockError::Poisoned)` - If the lock is poisoned
     ///
     /// # Example
@@ -230,8 +226,12 @@ impl<T> Lock<T> for ArcStdMutex<T> {
     {
         match self.inner.try_lock() {
             Ok(guard) => Ok(f(&*guard)),
-            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
-            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
+            Err(std::sync::TryLockError::WouldBlock) => {
+                Err(TryLockError::WouldBlock)
+            }
+            Err(std::sync::TryLockError::Poisoned(_)) => {
+                Err(TryLockError::Poisoned)
+            }
         }
     }
 
@@ -246,8 +246,10 @@ impl<T> Lock<T> for ArcStdMutex<T> {
     ///
     /// # Returns
     ///
-    /// * `Ok(R)` - If the lock was successfully acquired and the closure executed
-    /// * `Err(TryLockError::WouldBlock)` - If the lock is already held by another thread
+    /// * `Ok(R)` - If the lock was successfully acquired and the closure
+    ///   executed
+    /// * `Err(TryLockError::WouldBlock)` - If the lock is already held by
+    ///   another thread
     /// * `Err(TryLockError::Poisoned)` - If the lock is poisoned
     ///
     /// # Example
@@ -273,8 +275,12 @@ impl<T> Lock<T> for ArcStdMutex<T> {
     {
         match self.inner.try_lock() {
             Ok(mut guard) => Ok(f(&mut *guard)),
-            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
-            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
+            Err(std::sync::TryLockError::WouldBlock) => {
+                Err(TryLockError::WouldBlock)
+            }
+            Err(std::sync::TryLockError::Poisoned(_)) => {
+                Err(TryLockError::Poisoned)
+            }
         }
     }
 }
