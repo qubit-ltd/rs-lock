@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Tests for [`ParkingLotMonitor`](qubit_lock::ParkingLotMonitor).
 
 use std::{
@@ -52,9 +50,9 @@ fn test_parking_lot_monitor_write_notify_one_updates_state_and_wakes_waiter() {
         let result = waiter_monitor.wait_until(
             move |ready| {
                 if !*ready && let Some(checked_tx) = checked_tx.take() {
-                    checked_tx
-                        .send(())
-                        .expect("test should observe waiter before notification");
+                    checked_tx.send(()).expect(
+                        "test should observe waiter before notification",
+                    );
                 }
                 *ready
             },
@@ -229,13 +227,16 @@ fn test_parking_lot_monitor_traits_delegate_to_monitor_methods() {
 }
 
 #[test]
-fn test_parking_lot_monitor_notification_waiter_trait_wait_returns_after_notify() {
+fn test_parking_lot_monitor_notification_waiter_trait_wait_returns_after_notify()
+ {
     let monitor = Arc::new(ParkingLotMonitor::new(false));
     let waiter_monitor = Arc::clone(&monitor);
     let (done_tx, done_rx) = mpsc::channel();
 
     let waiter = thread::spawn(move || {
-        <ParkingLotMonitor<bool> as NotificationWaiter>::wait(waiter_monitor.as_ref());
+        <ParkingLotMonitor<bool> as NotificationWaiter>::wait(
+            waiter_monitor.as_ref(),
+        );
         done_tx.send(()).expect("test should receive wait result");
     });
 
@@ -382,7 +383,11 @@ fn test_parking_lot_monitor_guard_wait_timeout_returns_woken_when_notified() {
 fn test_parking_lot_monitor_wait_while_for_returns_timed_out_when_timeout() {
     let monitor = ParkingLotMonitor::new(false);
 
-    let result = monitor.wait_while_for(Duration::from_millis(20), |ready| !*ready, |_| ());
+    let result = monitor.wait_while_for(
+        Duration::from_millis(20),
+        |ready| !*ready,
+        |_| (),
+    );
 
     assert_eq!(result, WaitTimeoutResult::TimedOut);
 }
@@ -391,13 +396,18 @@ fn test_parking_lot_monitor_wait_while_for_returns_timed_out_when_timeout() {
 fn test_parking_lot_monitor_wait_until_for_returns_timed_out_when_timeout() {
     let monitor = ParkingLotMonitor::new(false);
 
-    let result = monitor.wait_until_for(Duration::from_millis(20), |ready| *ready, |_| ());
+    let result = monitor.wait_until_for(
+        Duration::from_millis(20),
+        |ready| *ready,
+        |_| (),
+    );
 
     assert_eq!(result, WaitTimeoutResult::TimedOut);
 }
 
 #[test]
-fn test_parking_lot_monitor_wait_until_for_returns_result_when_predicate_true() {
+fn test_parking_lot_monitor_wait_until_for_returns_result_when_predicate_true()
+{
     let monitor = Arc::new(ParkingLotMonitor::new(false));
     let (started_tx, started_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
@@ -439,7 +449,8 @@ fn test_parking_lot_monitor_wait_until_for_returns_result_when_predicate_true() 
 }
 
 #[test]
-fn test_parking_lot_monitor_wait_until_ignores_notification_until_predicate_true() {
+fn test_parking_lot_monitor_wait_until_ignores_notification_until_predicate_true()
+ {
     let monitor = Arc::new(ParkingLotMonitor::new(false));
     let (checked_tx, checked_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();

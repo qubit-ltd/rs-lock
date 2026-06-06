@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Tokio-based asynchronous monitor.
 
 use std::time::{
@@ -238,7 +236,8 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
 }
 
 impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
-    /// Returns a future that waits until the predicate becomes true or times out.
+    /// Returns a future that waits until the predicate becomes true or times
+    /// out.
     fn wait_until_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
@@ -250,10 +249,15 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
-        self.wait_while_for_async(timeout, move |state| !predicate(state), action)
+        self.wait_while_for_async(
+            timeout,
+            move |state| !predicate(state),
+            action,
+        )
     }
 
-    /// Returns a future that waits while the predicate remains true or times out.
+    /// Returns a future that waits while the predicate remains true or times
+    /// out.
     fn wait_while_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,

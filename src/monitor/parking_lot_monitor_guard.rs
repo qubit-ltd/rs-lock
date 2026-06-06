@@ -1,19 +1,16 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! # ParkingLotMonitor Guard
 //!
-//! Provides the guard returned by [`ParkingLotMonitor::lock`](super::ParkingLotMonitor::lock).
-//! The guard wraps a parking_lot mutex guard and keeps a reference to the
-//! monitor that created it, so waiting operations can use the matching
-//! condition variable.
-//!
+//! Provides the guard returned by
+//! [`ParkingLotMonitor::lock`](super::ParkingLotMonitor::lock). The guard wraps
+//! a parking_lot mutex guard and keeps a reference to the monitor that created
+//! it, so waiting operations can use the matching condition variable.
 
 use std::{
     ops::{
@@ -30,7 +27,8 @@ use super::{
     wait_timeout_status::WaitTimeoutStatus,
 };
 
-/// Guard returned by [`ParkingLotMonitor::lock`](super::ParkingLotMonitor::lock).
+/// Guard returned by
+/// [`ParkingLotMonitor::lock`](super::ParkingLotMonitor::lock).
 ///
 /// `ParkingLotMonitorGuard` is the monitor-specific counterpart of
 /// [`parking_lot::MutexGuard`]. While it exists, the protected state is locked.
@@ -79,7 +77,10 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     /// A monitor guard that can access state and wait on the monitor's
     /// condition variable.
     #[inline]
-    pub(super) fn new(monitor: &'a ParkingLotMonitor<T>, inner: MutexGuard<'a, T>) -> Self {
+    pub(super) fn new(
+        monitor: &'a ParkingLotMonitor<T>,
+        inner: MutexGuard<'a, T>,
+    ) -> Self {
         Self { monitor, inner }
     }
 
@@ -135,7 +136,8 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
         self
     }
 
-    /// Waits for a notification or timeout while temporarily releasing the lock.
+    /// Waits for a notification or timeout while temporarily releasing the
+    /// lock.
     ///
     /// This method consumes the current guard, calls the underlying
     /// [`parking_lot::Condvar::wait_for`], and returns the guard after the
@@ -171,8 +173,12 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     /// assert_eq!(status, WaitTimeoutStatus::TimedOut);
     /// ```
     #[inline]
-    pub fn wait_timeout(mut self, timeout: Duration) -> (Self, WaitTimeoutStatus) {
-        let timeout_result = self.monitor.changed.wait_for(&mut self.inner, timeout);
+    pub fn wait_timeout(
+        mut self,
+        timeout: Duration,
+    ) -> (Self, WaitTimeoutStatus) {
+        let timeout_result =
+            self.monitor.changed.wait_for(&mut self.inner, timeout);
         let status = if timeout_result.timed_out() {
             WaitTimeoutStatus::TimedOut
         } else {

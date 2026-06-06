@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Tests for [`ArcMockMonitor`](qubit_lock::ArcMockMonitor).
 
 use std::{
@@ -96,7 +94,10 @@ fn test_arc_mock_monitor_traits_delegate_to_inner_monitor() {
     <ArcMockMonitor<Vec<i32>> as Notifier>::notify_all(&monitor);
 
     assert_eq!(
-        <ArcMockMonitor<Vec<i32>> as TimeoutNotificationWaiter>::wait_for(&monitor, Duration::ZERO,),
+        <ArcMockMonitor<Vec<i32>> as TimeoutNotificationWaiter>::wait_for(
+            &monitor,
+            Duration::ZERO,
+        ),
         WaitTimeoutStatus::TimedOut,
     );
     assert_eq!(
@@ -238,7 +239,10 @@ async fn test_arc_mock_monitor_async_traits_delegate_to_inner_monitor() {
     let waiter_monitor = monitor.clone();
 
     let waiter = tokio::spawn(async move {
-        <ArcMockMonitor<Vec<i32>> as AsyncNotificationWaiter>::wait_async(&waiter_monitor).await;
+        <ArcMockMonitor<Vec<i32>> as AsyncNotificationWaiter>::wait_async(
+            &waiter_monitor,
+        )
+        .await;
     });
     tokio::task::yield_now().await;
     <ArcMockMonitor<Vec<i32>> as Notifier>::notify_all(&monitor);

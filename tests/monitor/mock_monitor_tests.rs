@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Tests for [`MockMonitor`](qubit_lock::MockMonitor).
 
 use std::{
@@ -140,7 +138,10 @@ fn test_mock_monitor_traits_delegate_to_monitor_methods() {
     <MockMonitor<Vec<i32>> as Notifier>::notify_all(&monitor);
 
     assert_eq!(
-        <MockMonitor<Vec<i32>> as TimeoutNotificationWaiter>::wait_for(&monitor, Duration::ZERO,),
+        <MockMonitor<Vec<i32>> as TimeoutNotificationWaiter>::wait_for(
+            &monitor,
+            Duration::ZERO,
+        ),
         WaitTimeoutStatus::TimedOut,
     );
 
@@ -222,7 +223,9 @@ fn test_mock_monitor_notification_waiter_trait_wait_returns_after_notify() {
     let (done_tx, done_rx) = mpsc::channel();
 
     let waiter = thread::spawn(move || {
-        <MockMonitor<bool> as NotificationWaiter>::wait(waiter_monitor.as_ref());
+        <MockMonitor<bool> as NotificationWaiter>::wait(
+            waiter_monitor.as_ref(),
+        );
         done_tx.send(()).expect("test should receive wait result");
     });
 
@@ -247,8 +250,11 @@ fn test_mock_monitor_wait_until_for_times_out_on_mock_time() {
     let (done_tx, done_rx) = mpsc::channel();
 
     let waiter = thread::spawn(move || {
-        let result =
-            waiter_monitor.wait_until_for(Duration::from_millis(50), |ready| *ready, |_| 7);
+        let result = waiter_monitor.wait_until_for(
+            Duration::from_millis(50),
+            |ready| *ready,
+            |_| 7,
+        );
         done_tx
             .send(result)
             .expect("test should receive wait result");
@@ -331,8 +337,10 @@ async fn test_mock_monitor_async_traits_delegate_to_monitor_methods() {
 
     let waiter_monitor = Arc::clone(&monitor);
     let waiter = tokio::spawn(async move {
-        <MockMonitor<Vec<i32>> as AsyncNotificationWaiter>::wait_async(waiter_monitor.as_ref())
-            .await;
+        <MockMonitor<Vec<i32>> as AsyncNotificationWaiter>::wait_async(
+            waiter_monitor.as_ref(),
+        )
+        .await;
     });
     tokio::task::yield_now().await;
     <MockMonitor<Vec<i32>> as Notifier>::notify_all(monitor.as_ref());

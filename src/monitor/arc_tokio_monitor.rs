@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Arc-wrapped Tokio monitor.
 
 use std::{
@@ -96,7 +94,9 @@ impl<T> ArcTokioMonitor<T> {
     where
         T: Send,
     {
-        <TokioMonitor<T> as AsyncNotificationWaiter>::wait_async(self.inner.as_ref())
+        <TokioMonitor<T> as AsyncNotificationWaiter>::wait_async(
+            self.inner.as_ref(),
+        )
     }
 
     /// Returns a future that resolves after notification or timeout.
@@ -108,7 +108,10 @@ impl<T> ArcTokioMonitor<T> {
     /// # Returns
     ///
     /// A future resolving to the timeout status.
-    pub fn wait_for_async(&self, timeout: Duration) -> AsyncMonitorFuture<'_, WaitTimeoutStatus>
+    pub fn wait_for_async(
+        &self,
+        timeout: Duration,
+    ) -> AsyncMonitorFuture<'_, WaitTimeoutStatus>
     where
         T: Send,
     {
@@ -150,7 +153,8 @@ impl<T> ArcTokioMonitor<T> {
     ///
     /// # Arguments
     ///
-    /// * `predicate` - Predicate that returns `true` while waiting should continue.
+    /// * `predicate` - Predicate that returns `true` while waiting should
+    ///   continue.
     /// * `action` - Action to run after the predicate becomes false.
     ///
     /// # Returns
@@ -174,7 +178,8 @@ impl<T> ArcTokioMonitor<T> {
         )
     }
 
-    /// Returns a future that waits until the predicate becomes true or times out.
+    /// Returns a future that waits until the predicate becomes true or times
+    /// out.
     ///
     /// # Arguments
     ///
@@ -205,12 +210,14 @@ impl<T> ArcTokioMonitor<T> {
         )
     }
 
-    /// Returns a future that waits while the predicate remains true or times out.
+    /// Returns a future that waits while the predicate remains true or times
+    /// out.
     ///
     /// # Arguments
     ///
     /// * `timeout` - Maximum relative duration to wait.
-    /// * `predicate` - Predicate that returns `true` while waiting should continue.
+    /// * `predicate` - Predicate that returns `true` while waiting should
+    ///   continue.
     /// * `action` - Action to run after the predicate becomes false.
     ///
     /// # Returns
@@ -270,7 +277,11 @@ impl<T: Send> AsyncConditionWaiter for ArcTokioMonitor<T> {
     type State = T;
 
     /// Returns a future that waits while the predicate remains true.
-    fn wait_while_async<'a, R, P, F>(&'a self, predicate: P, action: F) -> AsyncMonitorFuture<'a, R>
+    fn wait_while_async<'a, R, P, F>(
+        &'a self,
+        predicate: P,
+        action: F,
+    ) -> AsyncMonitorFuture<'a, R>
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
@@ -281,7 +292,8 @@ impl<T: Send> AsyncConditionWaiter for ArcTokioMonitor<T> {
 }
 
 impl<T: Send> AsyncTimeoutConditionWaiter for ArcTokioMonitor<T> {
-    /// Returns a future that waits while the predicate remains true or times out.
+    /// Returns a future that waits while the predicate remains true or times
+    /// out.
     fn wait_while_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,

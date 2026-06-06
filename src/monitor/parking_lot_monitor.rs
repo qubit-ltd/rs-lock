@@ -1,28 +1,27 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! # ParkingLotMonitor
 //!
 //! Provides a synchronous monitor built from a mutex and a condition variable.
 //! A monitor protects one shared state value and binds that state to the
 //! condition variable used to wait for changes. This is the same low-level
-//! mechanism as using [`parking_lot::Mutex`] and [`parking_lot::Condvar`] directly,
-//! but packaged so callers do not have to keep a mutex and its matching
-//! condition variable as separate fields.
+//! mechanism as using [`parking_lot::Mutex`] and [`parking_lot::Condvar`]
+//! directly, but packaged so callers do not have to keep a mutex and its
+//! matching condition variable as separate fields.
 //!
-//! The high-level APIs ([`ParkingLotMonitor::read`], [`ParkingLotMonitor::write`],
-//! [`ParkingLotMonitor::wait_while`], and [`ParkingLotMonitor::wait_until`]) are intended for
-//! short critical sections and simple guarded-suspension flows. The lower-level
-//! [`ParkingLotMonitor::lock`] API returns a [`ParkingLotMonitorGuard`], which supports
-//! [`ParkingLotMonitorGuard::wait`] and [`ParkingLotMonitorGuard::wait_timeout`] for more complex
-//! state machines such as thread pools.
-//!
+//! The high-level APIs ([`ParkingLotMonitor::read`],
+//! [`ParkingLotMonitor::write`], [`ParkingLotMonitor::wait_while`], and
+//! [`ParkingLotMonitor::wait_until`]) are intended for short critical sections
+//! and simple guarded-suspension flows. The lower-level
+//! [`ParkingLotMonitor::lock`] API returns a [`ParkingLotMonitorGuard`], which
+//! supports [`ParkingLotMonitorGuard::wait`] and
+//! [`ParkingLotMonitorGuard::wait_timeout`] for more complex state machines
+//! such as thread pools.
 
 use std::time::{
     Duration,
@@ -47,10 +46,10 @@ use super::{
 
 /// Shared state protected by a mutex and a condition variable.
 ///
-/// `ParkingLotMonitor` is useful when callers need more than a short critical section.
-/// It models the classic monitor object pattern: one mutex protects the state,
-/// and one condition variable lets threads wait until that state changes. This
-/// is the same relationship used by `parking_lot::Mutex` and
+/// `ParkingLotMonitor` is useful when callers need more than a short critical
+/// section. It models the classic monitor object pattern: one mutex protects
+/// the state, and one condition variable lets threads wait until that state
+/// changes. This is the same relationship used by `parking_lot::Mutex` and
 /// `parking_lot::Condvar`, but represented as one object so the condition
 /// variable is not accidentally used with unrelated state.
 ///
@@ -59,8 +58,9 @@ use super::{
 /// * `read` and `write` acquire the mutex, run a closure, and release it.
 /// * `wait_while`, `wait_until`, and their timeout variants implement common
 ///   predicate-based waits.
-/// * `lock` returns a [`ParkingLotMonitorGuard`] for callers that need to write their own
-///   loop around [`ParkingLotMonitorGuard::wait`] or [`ParkingLotMonitorGuard::wait_timeout`].
+/// * `lock` returns a [`ParkingLotMonitorGuard`] for callers that need to write
+///   their own loop around [`ParkingLotMonitorGuard::wait`] or
+///   [`ParkingLotMonitorGuard::wait_timeout`].
 ///
 /// The underlying `parking_lot` mutex is not poisoned when a thread panics
 /// while holding the lock. This keeps monitor coordination state observable
@@ -80,10 +80,10 @@ use super::{
 /// }
 /// ```
 ///
-/// `ParkingLotMonitor<State>` stores the same pair internally. A [`ParkingLotMonitorGuard`] is a
-/// wrapper around the parking_lot `MutexGuard`; it keeps the protected
-/// state locked and knows which monitor it belongs to, so its wait methods use
-/// the matching condition variable.
+/// `ParkingLotMonitor<State>` stores the same pair internally. A
+/// [`ParkingLotMonitorGuard`] is a wrapper around the parking_lot `MutexGuard`;
+/// it keeps the protected state locked and knows which monitor it belongs to,
+/// so its wait methods use the matching condition variable.
 ///
 /// # Type Parameters
 ///
@@ -116,7 +116,6 @@ use super::{
 /// waiter.join().expect("waiter should finish");
 /// assert!(!monitor.read(|ready| *ready));
 /// ```
-///
 pub struct ParkingLotMonitor<T> {
     /// Mutex protecting the monitor state.
     state: Mutex<T>,
@@ -151,12 +150,14 @@ impl<T> ParkingLotMonitor<T> {
         }
     }
 
-    /// Acquires the monitor and returns a guard for explicit state-machine code.
+    /// Acquires the monitor and returns a guard for explicit state-machine
+    /// code.
     ///
-    /// The returned [`ParkingLotMonitorGuard`] keeps the monitor mutex locked until the
-    /// guard is dropped. It can also be passed through
-    /// [`ParkingLotMonitorGuard::wait`] or [`ParkingLotMonitorGuard::wait_timeout`] to temporarily
-    /// release the lock while waiting on this monitor's condition variable.
+    /// The returned [`ParkingLotMonitorGuard`] keeps the monitor mutex locked
+    /// until the guard is dropped. It can also be passed through
+    /// [`ParkingLotMonitorGuard::wait`] or
+    /// [`ParkingLotMonitorGuard::wait_timeout`] to temporarily release the
+    /// lock while waiting on this monitor's condition variable.
     ///
     /// # Returns
     ///
@@ -250,9 +251,9 @@ impl<T> ParkingLotMonitor<T> {
     /// Acquires the monitor, mutates the protected state, and wakes one waiter.
     ///
     /// The closure runs while the mutex is held. After the closure returns, the
-    /// mutex guard is dropped and one thread waiting on this monitor's condition
-    /// variable is notified. This is a convenience method for the common
-    /// "update state, then notify one waiter" pattern.
+    /// mutex guard is dropped and one thread waiting on this monitor's
+    /// condition variable is notified. This is a convenience method for the
+    /// common "update state, then notify one waiter" pattern.
     ///
     /// If `f` panics, the panic is propagated and no notification is sent.
     ///
@@ -287,12 +288,13 @@ impl<T> ParkingLotMonitor<T> {
         result
     }
 
-    /// Acquires the monitor, mutates the protected state, and wakes all waiters.
+    /// Acquires the monitor, mutates the protected state, and wakes all
+    /// waiters.
     ///
     /// The closure runs while the mutex is held. After the closure returns, the
-    /// mutex guard is dropped and all threads waiting on this monitor's condition
-    /// variable are notified. This is a convenience method for state changes that
-    /// may allow multiple waiters to make progress.
+    /// mutex guard is dropped and all threads waiting on this monitor's
+    /// condition variable are notified. This is a convenience method for
+    /// state changes that may allow multiple waiters to make progress.
     ///
     /// If `f` panics, the panic is propagated and no notification is sent.
     ///
@@ -395,8 +397,8 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// # Arguments
     ///
-    /// * `waiting` - Predicate that returns `true` while the caller should
-    ///   keep waiting.
+    /// * `waiting` - Predicate that returns `true` while the caller should keep
+    ///   waiting.
     /// * `f` - Closure that receives mutable access after waiting is no longer
     ///   required.
     ///

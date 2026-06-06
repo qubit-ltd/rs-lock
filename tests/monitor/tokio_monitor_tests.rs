@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Tests for [`TokioMonitor`](qubit_lock::TokioMonitor).
 
 use std::time::Duration;
@@ -69,7 +67,10 @@ async fn test_tokio_monitor_traits_delegate_to_monitor_methods() {
     <TokioMonitor<Vec<i32>> as Notifier>::notify_one(&monitor);
     <TokioMonitor<Vec<i32>> as Notifier>::notify_all(&monitor);
 
-    let waiter = <TokioMonitor<Vec<i32>> as AsyncNotificationWaiter>::wait_async(&monitor);
+    let waiter =
+        <TokioMonitor<Vec<i32>> as AsyncNotificationWaiter>::wait_async(
+            &monitor,
+        );
     tokio::pin!(waiter);
     <TokioMonitor<Vec<i32>> as Notifier>::notify_one(&monitor);
     tokio::time::timeout(Duration::from_millis(100), &mut waiter)
@@ -90,11 +91,12 @@ async fn test_tokio_monitor_traits_delegate_to_monitor_methods() {
     );
 
     monitor.async_write(|items| items.clear()).await;
-    let condition_wait = <TokioMonitor<Vec<i32>> as AsyncConditionWaiter>::wait_while_async(
-        &monitor,
-        |items| items.is_empty(),
-        |items| items.pop().expect("item should be ready"),
-    );
+    let condition_wait =
+        <TokioMonitor<Vec<i32>> as AsyncConditionWaiter>::wait_while_async(
+            &monitor,
+            |items| items.is_empty(),
+            |items| items.pop().expect("item should be ready"),
+        );
     tokio::pin!(condition_wait);
     assert!(
         tokio::time::timeout(Duration::from_millis(10), &mut condition_wait)
@@ -113,9 +115,12 @@ async fn test_tokio_monitor_traits_delegate_to_monitor_methods() {
         );
     tokio::pin!(timeout_condition_wait);
     assert!(
-        tokio::time::timeout(Duration::from_millis(10), &mut timeout_condition_wait)
-            .await
-            .is_err()
+        tokio::time::timeout(
+            Duration::from_millis(10),
+            &mut timeout_condition_wait
+        )
+        .await
+        .is_err()
     );
     monitor.async_write_notify_one(|items| items.push(1)).await;
     assert_eq!(timeout_condition_wait.await, WaitTimeoutResult::Ready(1),);
@@ -134,7 +139,11 @@ async fn test_tokio_monitor_async_wait_for_uses_call_time_budget() {
 #[tokio::test]
 async fn test_tokio_monitor_async_wait_while_for_uses_call_time_budget() {
     let monitor = TokioMonitor::new(false);
-    let wait = monitor.wait_while_for_async(Duration::from_millis(5), |ready| !*ready, |_| 7);
+    let wait = monitor.wait_while_for_async(
+        Duration::from_millis(5),
+        |ready| !*ready,
+        |_| 7,
+    );
 
     tokio::time::sleep(Duration::from_millis(10)).await;
 
@@ -194,7 +203,8 @@ async fn test_tokio_monitor_async_wait_while_for_returns_ready_after_notify() {
 }
 
 #[tokio::test]
-async fn test_tokio_monitor_async_wait_while_for_rechecks_state_after_timeout() {
+async fn test_tokio_monitor_async_wait_while_for_rechecks_state_after_timeout()
+{
     let monitor = std::sync::Arc::new(TokioMonitor::new(false));
     let waiter_monitor = std::sync::Arc::clone(&monitor);
 

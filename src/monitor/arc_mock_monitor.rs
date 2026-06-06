@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Arc-wrapped mock monitor.
 
 use std::{
@@ -141,7 +139,10 @@ impl<T> ArcMockMonitor<T> {
     ///
     /// A status describing whether notification or timeout completed the wait.
     pub fn wait_for(&self, timeout: Duration) -> WaitTimeoutStatus {
-        <MockMonitor<T> as TimeoutNotificationWaiter>::wait_for(self.inner.as_ref(), timeout)
+        <MockMonitor<T> as TimeoutNotificationWaiter>::wait_for(
+            self.inner.as_ref(),
+            timeout,
+        )
     }
 
     /// Blocks until the predicate becomes true, then runs the action.
@@ -159,14 +160,19 @@ impl<T> ArcMockMonitor<T> {
         P: FnMut(&T) -> bool,
         F: FnOnce(&mut T) -> R,
     {
-        <MockMonitor<T> as ConditionWaiter>::wait_until(self.inner.as_ref(), predicate, action)
+        <MockMonitor<T> as ConditionWaiter>::wait_until(
+            self.inner.as_ref(),
+            predicate,
+            action,
+        )
     }
 
     /// Blocks while the predicate remains true, then runs the action.
     ///
     /// # Arguments
     ///
-    /// * `predicate` - Predicate that returns `true` while waiting should continue.
+    /// * `predicate` - Predicate that returns `true` while waiting should
+    ///   continue.
     /// * `action` - Action to run after the predicate becomes false.
     ///
     /// # Returns
@@ -177,7 +183,11 @@ impl<T> ArcMockMonitor<T> {
         P: FnMut(&T) -> bool,
         F: FnOnce(&mut T) -> R,
     {
-        <MockMonitor<T> as ConditionWaiter>::wait_while(self.inner.as_ref(), predicate, action)
+        <MockMonitor<T> as ConditionWaiter>::wait_while(
+            self.inner.as_ref(),
+            predicate,
+            action,
+        )
     }
 
     /// Blocks until the predicate becomes true or mock timeout expires.
@@ -215,7 +225,8 @@ impl<T> ArcMockMonitor<T> {
     /// # Arguments
     ///
     /// * `timeout` - Maximum mock duration to wait.
-    /// * `predicate` - Predicate that returns `true` while waiting should continue.
+    /// * `predicate` - Predicate that returns `true` while waiting should
+    ///   continue.
     /// * `action` - Action to run after the predicate becomes false.
     ///
     /// # Returns
@@ -246,7 +257,9 @@ impl<T> ArcMockMonitor<T> {
     where
         T: Send,
     {
-        <MockMonitor<T> as AsyncNotificationWaiter>::wait_async(self.inner.as_ref())
+        <MockMonitor<T> as AsyncNotificationWaiter>::wait_async(
+            self.inner.as_ref(),
+        )
     }
 
     /// Returns a future that resolves after notification or mock timeout.
@@ -259,7 +272,10 @@ impl<T> ArcMockMonitor<T> {
     ///
     /// A future resolving to the timeout status.
     #[cfg(feature = "async")]
-    pub fn wait_for_async(&self, timeout: Duration) -> AsyncMonitorFuture<'_, WaitTimeoutStatus>
+    pub fn wait_for_async(
+        &self,
+        timeout: Duration,
+    ) -> AsyncMonitorFuture<'_, WaitTimeoutStatus>
     where
         T: Send,
     {
@@ -302,7 +318,8 @@ impl<T> ArcMockMonitor<T> {
     ///
     /// # Arguments
     ///
-    /// * `predicate` - Predicate that returns `true` while waiting should continue.
+    /// * `predicate` - Predicate that returns `true` while waiting should
+    ///   continue.
     /// * `action` - Action to run after the predicate becomes false.
     ///
     /// # Returns
@@ -327,7 +344,8 @@ impl<T> ArcMockMonitor<T> {
         )
     }
 
-    /// Returns a future that waits until the predicate becomes true or times out.
+    /// Returns a future that waits until the predicate becomes true or times
+    /// out.
     ///
     /// # Arguments
     ///
@@ -359,12 +377,14 @@ impl<T> ArcMockMonitor<T> {
         )
     }
 
-    /// Returns a future that waits while the predicate remains true or times out.
+    /// Returns a future that waits while the predicate remains true or times
+    /// out.
     ///
     /// # Arguments
     ///
     /// * `timeout` - Maximum mock duration to wait.
-    /// * `predicate` - Predicate that returns `true` while waiting should continue.
+    /// * `predicate` - Predicate that returns `true` while waiting should
+    ///   continue.
     /// * `action` - Action to run after the predicate becomes false.
     ///
     /// # Returns
@@ -471,7 +491,11 @@ impl<T: Send> AsyncConditionWaiter for ArcMockMonitor<T> {
     type State = T;
 
     /// Returns a future that waits while the predicate remains true.
-    fn wait_while_async<'a, R, P, F>(&'a self, predicate: P, action: F) -> AsyncMonitorFuture<'a, R>
+    fn wait_while_async<'a, R, P, F>(
+        &'a self,
+        predicate: P,
+        action: F,
+    ) -> AsyncMonitorFuture<'a, R>
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
@@ -483,7 +507,8 @@ impl<T: Send> AsyncConditionWaiter for ArcMockMonitor<T> {
 
 #[cfg(feature = "async")]
 impl<T: Send> AsyncTimeoutConditionWaiter for ArcMockMonitor<T> {
-    /// Returns a future that waits while the predicate remains true or times out.
+    /// Returns a future that waits while the predicate remains true or times
+    /// out.
     fn wait_while_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,

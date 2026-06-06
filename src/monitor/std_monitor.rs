@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! # StdMonitor
 //!
 //! Provides a synchronous monitor built from a mutex and a condition variable.
@@ -20,9 +18,8 @@
 //! [`StdMonitor::wait_while`], and [`StdMonitor::wait_until`]) are intended for
 //! short critical sections and simple guarded-suspension flows. The lower-level
 //! [`StdMonitor::lock`] API returns a [`StdMonitorGuard`], which supports
-//! [`StdMonitorGuard::wait`] and [`StdMonitorGuard::wait_timeout`] for more complex
-//! state machines such as thread pools.
-//!
+//! [`StdMonitorGuard::wait`] and [`StdMonitorGuard::wait_timeout`] for more
+//! complex state machines such as thread pools.
 
 use std::{
     sync::{
@@ -60,8 +57,9 @@ use super::{
 /// * `read` and `write` acquire the mutex, run a closure, and release it.
 /// * `wait_while`, `wait_until`, and their timeout variants implement common
 ///   predicate-based waits.
-/// * `lock` returns a [`StdMonitorGuard`] for callers that need to write their own
-///   loop around [`StdMonitorGuard::wait`] or [`StdMonitorGuard::wait_timeout`].
+/// * `lock` returns a [`StdMonitorGuard`] for callers that need to write their
+///   own loop around [`StdMonitorGuard::wait`] or
+///   [`StdMonitorGuard::wait_timeout`].
 ///
 /// A poisoned mutex is recovered by taking the inner state. This makes
 /// `StdMonitor` suitable for coordination state that should remain observable
@@ -81,10 +79,10 @@ use super::{
 /// }
 /// ```
 ///
-/// `StdMonitor<State>` stores the same pair internally. A [`StdMonitorGuard`] is a
-/// wrapper around the standard library's `MutexGuard`; it keeps the protected
-/// state locked and knows which monitor it belongs to, so its wait methods use
-/// the matching condition variable.
+/// `StdMonitor<State>` stores the same pair internally. A [`StdMonitorGuard`]
+/// is a wrapper around the standard library's `MutexGuard`; it keeps the
+/// protected state locked and knows which monitor it belongs to, so its wait
+/// methods use the matching condition variable.
 ///
 /// # Type Parameters
 ///
@@ -117,7 +115,6 @@ use super::{
 /// waiter.join().expect("waiter should finish");
 /// assert!(!monitor.read(|ready| *ready));
 /// ```
-///
 pub struct StdMonitor<T> {
     /// Mutex protecting the monitor state.
     state: Mutex<T>,
@@ -152,12 +149,14 @@ impl<T> StdMonitor<T> {
         }
     }
 
-    /// Acquires the monitor and returns a guard for explicit state-machine code.
+    /// Acquires the monitor and returns a guard for explicit state-machine
+    /// code.
     ///
-    /// The returned [`StdMonitorGuard`] keeps the monitor mutex locked until the
-    /// guard is dropped. It can also be passed through
-    /// [`StdMonitorGuard::wait`] or [`StdMonitorGuard::wait_timeout`] to temporarily
-    /// release the lock while waiting on this monitor's condition variable.
+    /// The returned [`StdMonitorGuard`] keeps the monitor mutex locked until
+    /// the guard is dropped. It can also be passed through
+    /// [`StdMonitorGuard::wait`] or [`StdMonitorGuard::wait_timeout`] to
+    /// temporarily release the lock while waiting on this monitor's
+    /// condition variable.
     ///
     /// If the mutex is poisoned, this method recovers the inner state and still
     /// returns a guard.
@@ -265,9 +264,9 @@ impl<T> StdMonitor<T> {
     /// Acquires the monitor, mutates the protected state, and wakes one waiter.
     ///
     /// The closure runs while the mutex is held. After the closure returns, the
-    /// mutex guard is dropped and one thread waiting on this monitor's condition
-    /// variable is notified. This is a convenience method for the common
-    /// "update state, then notify one waiter" pattern.
+    /// mutex guard is dropped and one thread waiting on this monitor's
+    /// condition variable is notified. This is a convenience method for the
+    /// common "update state, then notify one waiter" pattern.
     ///
     /// If the mutex is poisoned, this method recovers the inner state before
     /// running the closure. If `f` panics, the panic is propagated and no
@@ -304,12 +303,13 @@ impl<T> StdMonitor<T> {
         result
     }
 
-    /// Acquires the monitor, mutates the protected state, and wakes all waiters.
+    /// Acquires the monitor, mutates the protected state, and wakes all
+    /// waiters.
     ///
     /// The closure runs while the mutex is held. After the closure returns, the
-    /// mutex guard is dropped and all threads waiting on this monitor's condition
-    /// variable are notified. This is a convenience method for state changes that
-    /// may allow multiple waiters to make progress.
+    /// mutex guard is dropped and all threads waiting on this monitor's
+    /// condition variable are notified. This is a convenience method for
+    /// state changes that may allow multiple waiters to make progress.
     ///
     /// If the mutex is poisoned, this method recovers the inner state before
     /// running the closure. If `f` panics, the panic is propagated and no
@@ -425,8 +425,8 @@ impl<T> StdMonitor<T> {
     ///
     /// # Arguments
     ///
-    /// * `waiting` - Predicate that returns `true` while the caller should
-    ///   keep waiting.
+    /// * `waiting` - Predicate that returns `true` while the caller should keep
+    ///   waiting.
     /// * `f` - Closure that receives mutable access after waiting is no longer
     ///   required.
     ///
