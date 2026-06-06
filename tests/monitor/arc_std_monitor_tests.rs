@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Tests for [`ArcStdMonitor`](qubit_lock::ArcStdMonitor).
 
 use std::{
@@ -126,7 +124,10 @@ fn test_arc_std_monitor_traits_delegate_to_monitor_methods() {
     <ArcStdMonitor<Vec<i32>> as Notifier>::notify_all(&monitor);
 
     assert_eq!(
-        <ArcStdMonitor<Vec<i32>> as TimeoutNotificationWaiter>::wait_for(&monitor, Duration::ZERO,),
+        <ArcStdMonitor<Vec<i32>> as TimeoutNotificationWaiter>::wait_for(
+            &monitor,
+            Duration::ZERO,
+        ),
         WaitTimeoutStatus::TimedOut,
     );
     assert_eq!(

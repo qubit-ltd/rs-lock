@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Tests for [`ArcParkingLotMonitor`](qubit_lock::ArcParkingLotMonitor).
 
 use std::{
@@ -172,13 +170,16 @@ fn test_arc_parking_lot_monitor_traits_delegate_to_monitor_methods() {
 }
 
 #[test]
-fn test_arc_parking_lot_monitor_notification_waiter_trait_wait_returns_after_notify() {
+fn test_arc_parking_lot_monitor_notification_waiter_trait_wait_returns_after_notify()
+ {
     let monitor = ArcParkingLotMonitor::new(false);
     let waiter_monitor = monitor.clone();
     let (done_tx, done_rx) = mpsc::channel();
 
     let waiter = thread::spawn(move || {
-        <ArcParkingLotMonitor<bool> as NotificationWaiter>::wait(&waiter_monitor);
+        <ArcParkingLotMonitor<bool> as NotificationWaiter>::wait(
+            &waiter_monitor,
+        );
         done_tx.send(()).expect("test should receive wait result");
     });
 
@@ -339,7 +340,8 @@ fn test_arc_parking_lot_monitor_wait_while_delegates_to_monitor() {
 }
 
 #[test]
-fn test_arc_parking_lot_monitor_wait_while_for_returns_ready_when_predicate_clears() {
+fn test_arc_parking_lot_monitor_wait_while_for_returns_ready_when_predicate_clears()
+ {
     let monitor = ArcParkingLotMonitor::new(Vec::<i32>::new());
     let (started_tx, started_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();

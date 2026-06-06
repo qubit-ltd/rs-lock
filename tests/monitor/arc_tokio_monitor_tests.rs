@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Tests for [`ArcTokioMonitor`](qubit_lock::ArcTokioMonitor).
 
 use std::time::Duration;
@@ -33,7 +31,8 @@ async fn test_arc_tokio_monitor_clone_shares_state() {
 }
 
 #[tokio::test]
-async fn test_arc_tokio_monitor_helpers_and_conversions_delegate_to_inner_monitor() {
+async fn test_arc_tokio_monitor_helpers_and_conversions_delegate_to_inner_monitor()
+ {
     let monitor = ArcTokioMonitor::from(vec![1]);
 
     monitor.async_write(|items| items.push(2)).await;
@@ -71,7 +70,10 @@ async fn test_arc_tokio_monitor_traits_delegate_to_inner_monitor() {
     <ArcTokioMonitor<Vec<i32>> as Notifier>::notify_one(&monitor);
     <ArcTokioMonitor<Vec<i32>> as Notifier>::notify_all(&monitor);
 
-    let waiter = <ArcTokioMonitor<Vec<i32>> as AsyncNotificationWaiter>::wait_async(&monitor);
+    let waiter =
+        <ArcTokioMonitor<Vec<i32>> as AsyncNotificationWaiter>::wait_async(
+            &monitor,
+        );
     tokio::pin!(waiter);
     <ArcTokioMonitor<Vec<i32>> as Notifier>::notify_one(&monitor);
     tokio::time::timeout(Duration::from_millis(100), &mut waiter)
@@ -101,9 +103,12 @@ async fn test_arc_tokio_monitor_traits_delegate_to_inner_monitor() {
         );
     tokio::pin!(condition_until_wait);
     assert!(
-        tokio::time::timeout(Duration::from_millis(10), &mut condition_until_wait)
-            .await
-            .is_err()
+        tokio::time::timeout(
+            Duration::from_millis(10),
+            &mut condition_until_wait
+        )
+        .await
+        .is_err()
     );
     monitor.async_write_notify_one(|items| items.push(2)).await;
     assert_eq!(condition_until_wait.await, 2);
@@ -116,9 +121,12 @@ async fn test_arc_tokio_monitor_traits_delegate_to_inner_monitor() {
         );
     tokio::pin!(condition_while_wait);
     assert!(
-        tokio::time::timeout(Duration::from_millis(10), &mut condition_while_wait)
-            .await
-            .is_err()
+        tokio::time::timeout(
+            Duration::from_millis(10),
+            &mut condition_while_wait
+        )
+        .await
+        .is_err()
     );
     monitor.async_write_notify_one(|items| items.push(1)).await;
     assert_eq!(condition_while_wait.await, 1);
@@ -132,9 +140,12 @@ async fn test_arc_tokio_monitor_traits_delegate_to_inner_monitor() {
         );
     tokio::pin!(timeout_until_wait);
     assert!(
-        tokio::time::timeout(Duration::from_millis(10), &mut timeout_until_wait)
-            .await
-            .is_err()
+        tokio::time::timeout(
+            Duration::from_millis(10),
+            &mut timeout_until_wait
+        )
+        .await
+        .is_err()
     );
     monitor.async_write_notify_one(|items| items.push(3)).await;
     assert_eq!(timeout_until_wait.await, WaitTimeoutResult::Ready(3));
@@ -148,9 +159,12 @@ async fn test_arc_tokio_monitor_traits_delegate_to_inner_monitor() {
         );
     tokio::pin!(timeout_while_wait);
     assert!(
-        tokio::time::timeout(Duration::from_millis(10), &mut timeout_while_wait)
-            .await
-            .is_err()
+        tokio::time::timeout(
+            Duration::from_millis(10),
+            &mut timeout_while_wait
+        )
+        .await
+        .is_err()
     );
     monitor.async_write_notify_all(|items| items.push(4)).await;
     assert_eq!(timeout_while_wait.await, WaitTimeoutResult::Ready(Some(4)),);
@@ -184,9 +198,12 @@ async fn test_arc_tokio_monitor_wait_methods_delegate_to_inner_monitor() {
     );
     tokio::pin!(condition_until_wait);
     assert!(
-        tokio::time::timeout(Duration::from_millis(10), &mut condition_until_wait)
-            .await
-            .is_err()
+        tokio::time::timeout(
+            Duration::from_millis(10),
+            &mut condition_until_wait
+        )
+        .await
+        .is_err()
     );
     monitor.async_write_notify_one(|items| items.push(2)).await;
     assert_eq!(condition_until_wait.await, 2);
@@ -197,9 +214,12 @@ async fn test_arc_tokio_monitor_wait_methods_delegate_to_inner_monitor() {
     );
     tokio::pin!(condition_while_wait);
     assert!(
-        tokio::time::timeout(Duration::from_millis(10), &mut condition_while_wait)
-            .await
-            .is_err()
+        tokio::time::timeout(
+            Duration::from_millis(10),
+            &mut condition_while_wait
+        )
+        .await
+        .is_err()
     );
     monitor.async_write_notify_one(|items| items.push(1)).await;
     assert_eq!(condition_while_wait.await, 1);
@@ -211,9 +231,12 @@ async fn test_arc_tokio_monitor_wait_methods_delegate_to_inner_monitor() {
     );
     tokio::pin!(timeout_until_wait);
     assert!(
-        tokio::time::timeout(Duration::from_millis(10), &mut timeout_until_wait)
-            .await
-            .is_err()
+        tokio::time::timeout(
+            Duration::from_millis(10),
+            &mut timeout_until_wait
+        )
+        .await
+        .is_err()
     );
     monitor.async_write_notify_one(|items| items.push(3)).await;
     assert_eq!(timeout_until_wait.await, WaitTimeoutResult::Ready(3));
@@ -225,9 +248,12 @@ async fn test_arc_tokio_monitor_wait_methods_delegate_to_inner_monitor() {
     );
     tokio::pin!(timeout_while_wait);
     assert!(
-        tokio::time::timeout(Duration::from_millis(10), &mut timeout_while_wait)
-            .await
-            .is_err()
+        tokio::time::timeout(
+            Duration::from_millis(10),
+            &mut timeout_while_wait
+        )
+        .await
+        .is_err()
     );
     monitor.async_write_notify_all(|items| items.push(4)).await;
     assert_eq!(timeout_while_wait.await, WaitTimeoutResult::Ready(Some(4)),);
@@ -239,7 +265,11 @@ async fn test_arc_tokio_monitor_async_wait_until_for_times_out() {
 
     assert_eq!(
         monitor
-            .wait_until_for_async(Duration::from_millis(1), |ready| *ready, |_| 7)
+            .wait_until_for_async(
+                Duration::from_millis(1),
+                |ready| *ready,
+                |_| 7
+            )
             .await,
         WaitTimeoutResult::TimedOut,
     );

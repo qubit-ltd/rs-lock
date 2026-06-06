@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Mock monitor with manually controlled timeout time.
 
 use std::sync::{
@@ -312,7 +310,8 @@ impl<T> NotificationWaiter for MockMonitor<T> {
 }
 
 impl<T> TimeoutNotificationWaiter for MockMonitor<T> {
-    /// Blocks until a notification happens or mock elapsed time reaches timeout.
+    /// Blocks until a notification happens or mock elapsed time reaches
+    /// timeout.
     fn wait_for(&self, timeout: Duration) -> WaitTimeoutStatus {
         let mut state = self.lock_state();
         let observed_epoch = state.notification_epoch;
@@ -353,7 +352,8 @@ impl<T> ConditionWaiter for MockMonitor<T> {
 }
 
 impl<T> TimeoutConditionWaiter for MockMonitor<T> {
-    /// Blocks while the predicate remains true or until mock elapsed time reaches timeout.
+    /// Blocks while the predicate remains true or until mock elapsed time
+    /// reaches timeout.
     fn wait_while_for<R, P, F>(
         &self,
         timeout: Duration,
@@ -457,7 +457,8 @@ impl<T: Send> AsyncConditionWaiter for MockMonitor<T> {
 
 #[cfg(feature = "async")]
 impl<T: Send> AsyncTimeoutConditionWaiter for MockMonitor<T> {
-    /// Returns a future that waits while the predicate remains true or times out.
+    /// Returns a future that waits while the predicate remains true or times
+    /// out.
     fn wait_while_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
@@ -476,7 +477,9 @@ impl<T: Send> AsyncTimeoutConditionWaiter for MockMonitor<T> {
                 {
                     let mut state = self.lock_state();
                     if !predicate(&state.value) {
-                        return WaitTimeoutResult::Ready(action(&mut state.value));
+                        return WaitTimeoutResult::Ready(action(
+                            &mut state.value,
+                        ));
                     }
                     if state.elapsed >= target_elapsed {
                         return WaitTimeoutResult::TimedOut;

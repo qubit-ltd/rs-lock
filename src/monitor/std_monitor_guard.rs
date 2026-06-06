@@ -1,19 +1,16 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! # StdMonitor Guard
 //!
-//! Provides the guard returned by [`StdMonitor::lock`](super::StdMonitor::lock).
-//! The guard wraps a standard-library mutex guard and keeps a reference to the
-//! monitor that created it, so waiting operations can use the matching
-//! condition variable.
-//!
+//! Provides the guard returned by
+//! [`StdMonitor::lock`](super::StdMonitor::lock). The guard wraps a
+//! standard-library mutex guard and keeps a reference to the monitor that
+//! created it, so waiting operations can use the matching condition variable.
 
 use std::{
     ops::{
@@ -78,7 +75,10 @@ impl<'a, T> StdMonitorGuard<'a, T> {
     /// A monitor guard that can access state and wait on the monitor's
     /// condition variable.
     #[inline]
-    pub(super) fn new(monitor: &'a StdMonitor<T>, inner: MutexGuard<'a, T>) -> Self {
+    pub(super) fn new(
+        monitor: &'a StdMonitor<T>,
+        inner: MutexGuard<'a, T>,
+    ) -> Self {
         Self { monitor, inner }
     }
 
@@ -141,7 +141,8 @@ impl<'a, T> StdMonitorGuard<'a, T> {
         Self { monitor, inner }
     }
 
-    /// Waits for a notification or timeout while temporarily releasing the lock.
+    /// Waits for a notification or timeout while temporarily releasing the
+    /// lock.
     ///
     /// This method consumes the current guard, calls the underlying
     /// [`std::sync::Condvar::wait_timeout`], and returns a new guard after the

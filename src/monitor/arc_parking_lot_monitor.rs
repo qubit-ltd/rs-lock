@@ -1,17 +1,14 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! # Arc ParkingLotMonitor
 //!
 //! Provides an Arc-wrapped synchronous monitor for condition-based state
 //! coordination across threads.
-//!
 
 use std::{
     ops::Deref,
@@ -33,11 +30,12 @@ use super::{
 
 /// Arc-wrapped monitor for shared condition-based state coordination.
 ///
-/// `ArcParkingLotMonitor` stores a [`ParkingLotMonitor`] behind an [`Arc`], so callers can clone
-/// the monitor handle directly without writing `Arc::new(ParkingLotMonitor::new(...))`.
-/// It preserves the same guard-based waiting and predicate-based waiting
-/// semantics as [`ParkingLotMonitor`]. It implements [`Deref`] and [`AsRef`] so callers
-/// can pass it to APIs that expect a [`ParkingLotMonitor`] reference.
+/// `ArcParkingLotMonitor` stores a [`ParkingLotMonitor`] behind an [`Arc`], so
+/// callers can clone the monitor handle directly without writing
+/// `Arc::new(ParkingLotMonitor::new(...))`. It preserves the same guard-based
+/// waiting and predicate-based waiting semantics as [`ParkingLotMonitor`]. It
+/// implements [`Deref`] and [`AsRef`] so callers can pass it to APIs that
+/// expect a [`ParkingLotMonitor`] reference.
 ///
 /// # Type Parameters
 ///
@@ -70,7 +68,6 @@ use super::{
 /// waiter.join().expect("waiter should finish");
 /// assert!(!monitor.read(|ready| *ready));
 /// ```
-///
 pub struct ArcParkingLotMonitor<T> {
     /// Shared monitor instance.
     inner: Arc<ParkingLotMonitor<T>>,
@@ -95,9 +92,10 @@ impl<T> ArcParkingLotMonitor<T> {
 
     /// Acquires the shared monitor and returns a guard.
     ///
-    /// This delegates to [`ParkingLotMonitor::lock`]. The returned [`ParkingLotMonitorGuard`]
-    /// keeps the monitor mutex locked until it is dropped. It can also wait on
-    /// the monitor's condition variable through [`ParkingLotMonitorGuard::wait`] or
+    /// This delegates to [`ParkingLotMonitor::lock`]. The returned
+    /// [`ParkingLotMonitorGuard`] keeps the monitor mutex locked until it
+    /// is dropped. It can also wait on the monitor's condition variable
+    /// through [`ParkingLotMonitorGuard::wait`] or
     /// [`ParkingLotMonitorGuard::wait_timeout`].
     ///
     /// # Returns
@@ -124,8 +122,9 @@ impl<T> ArcParkingLotMonitor<T> {
 
     /// Acquires the monitor and reads the protected state.
     ///
-    /// This delegates to [`ParkingLotMonitor::read`]. The closure runs while the monitor
-    /// mutex is held, so keep it short and avoid long blocking work.
+    /// This delegates to [`ParkingLotMonitor::read`]. The closure runs while
+    /// the monitor mutex is held, so keep it short and avoid long blocking
+    /// work.
     ///
     /// # Arguments
     ///
@@ -144,9 +143,9 @@ impl<T> ArcParkingLotMonitor<T> {
 
     /// Acquires the monitor and mutates the protected state.
     ///
-    /// This delegates to [`ParkingLotMonitor::write`]. Callers should explicitly invoke
-    /// [`Self::notify_one`] or [`Self::notify_all`] after changing state that a
-    /// waiting thread may observe.
+    /// This delegates to [`ParkingLotMonitor::write`]. Callers should
+    /// explicitly invoke [`Self::notify_one`] or [`Self::notify_all`] after
+    /// changing state that a waiting thread may observe.
     ///
     /// # Arguments
     ///
@@ -165,10 +164,10 @@ impl<T> ArcParkingLotMonitor<T> {
 
     /// Mutates the protected state and wakes one waiter.
     ///
-    /// This delegates to [`ParkingLotMonitor::write_notify_one`]. The closure runs while
-    /// the monitor mutex is held; after it returns, the lock is released and one
-    /// waiter is notified. If `f` panics, the panic is propagated and no
-    /// notification is sent.
+    /// This delegates to [`ParkingLotMonitor::write_notify_one`]. The closure
+    /// runs while the monitor mutex is held; after it returns, the lock is
+    /// released and one waiter is notified. If `f` panics, the panic is
+    /// propagated and no notification is sent.
     ///
     /// # Arguments
     ///
@@ -187,10 +186,10 @@ impl<T> ArcParkingLotMonitor<T> {
 
     /// Mutates the protected state and wakes all waiters.
     ///
-    /// This delegates to [`ParkingLotMonitor::write_notify_all`]. The closure runs while
-    /// the monitor mutex is held; after it returns, the lock is released and all
-    /// waiters are notified. If `f` panics, the panic is propagated and no
-    /// notification is sent.
+    /// This delegates to [`ParkingLotMonitor::write_notify_all`]. The closure
+    /// runs while the monitor mutex is held; after it returns, the lock is
+    /// released and all waiters are notified. If `f` panics, the panic is
+    /// propagated and no notification is sent.
     ///
     /// # Arguments
     ///
@@ -252,17 +251,17 @@ impl<T> ArcParkingLotMonitor<T> {
 
     /// Waits while a predicate remains true, then mutates the protected state.
     ///
-    /// This delegates to [`ParkingLotMonitor::wait_while`]. The predicate is evaluated
-    /// while holding the monitor mutex, and the closure runs while the mutex is
-    /// still held after the predicate stops blocking.
+    /// This delegates to [`ParkingLotMonitor::wait_while`]. The predicate is
+    /// evaluated while holding the monitor mutex, and the closure runs
+    /// while the mutex is still held after the predicate stops blocking.
     ///
     /// This method may block indefinitely if no thread changes the state so
     /// that `waiting` becomes false and sends a notification.
     ///
     /// # Arguments
     ///
-    /// * `waiting` - Predicate that returns `true` while the caller should
-    ///   keep waiting.
+    /// * `waiting` - Predicate that returns `true` while the caller should keep
+    ///   waiting.
     /// * `f` - Closure that receives mutable access after waiting is no longer
     ///   required.
     ///
@@ -303,9 +302,9 @@ impl<T> ArcParkingLotMonitor<T> {
 
     /// Waits until the protected state satisfies a predicate, then mutates it.
     ///
-    /// This delegates to [`ParkingLotMonitor::wait_until`]. It may block indefinitely if
-    /// no thread changes the state to satisfy the predicate and sends a
-    /// notification.
+    /// This delegates to [`ParkingLotMonitor::wait_until`]. It may block
+    /// indefinitely if no thread changes the state to satisfy the predicate
+    /// and sends a notification.
     ///
     /// # Arguments
     ///
@@ -326,9 +325,10 @@ impl<T> ArcParkingLotMonitor<T> {
 
     /// Waits while a predicate remains true, with an overall time limit.
     ///
-    /// This delegates to [`ParkingLotMonitor::wait_while_for`]. If `waiting` becomes
-    /// false before `timeout` expires, `f` runs while the monitor lock is still
-    /// held. If the timeout expires first, the closure is not called.
+    /// This delegates to [`ParkingLotMonitor::wait_while_for`]. If `waiting`
+    /// becomes false before `timeout` expires, `f` runs while the monitor
+    /// lock is still held. If the timeout expires first, the closure is not
+    /// called.
     ///
     /// # Arguments
     ///
@@ -376,9 +376,10 @@ impl<T> ArcParkingLotMonitor<T> {
 
     /// Waits until a predicate becomes true, with an overall time limit.
     ///
-    /// This delegates to [`ParkingLotMonitor::wait_until_for`]. If `ready` becomes
-    /// true before `timeout` expires, `f` runs while the monitor lock is still
-    /// held. If the timeout expires first, the closure is not called.
+    /// This delegates to [`ParkingLotMonitor::wait_until_for`]. If `ready`
+    /// becomes true before `timeout` expires, `f` runs while the monitor
+    /// lock is still held. If the timeout expires first, the closure is not
+    /// called.
     ///
     /// # Arguments
     ///
@@ -425,7 +426,12 @@ impl<T> ArcParkingLotMonitor<T> {
     /// );
     /// ```
     #[inline]
-    pub fn wait_until_for<R, P, F>(&self, timeout: Duration, ready: P, f: F) -> WaitTimeoutResult<R>
+    pub fn wait_until_for<R, P, F>(
+        &self,
+        timeout: Duration,
+        ready: P,
+        f: F,
+    ) -> WaitTimeoutResult<R>
     where
         P: FnMut(&T) -> bool,
         F: FnOnce(&mut T) -> R,
@@ -457,8 +463,9 @@ impl<T> ArcParkingLotMonitor<T> {
 impl<T> AsRef<ParkingLotMonitor<T>> for ArcParkingLotMonitor<T> {
     /// Returns a reference to the underlying monitor.
     ///
-    /// This is useful when callers need an explicit [`ParkingLotMonitor`] reference while
-    /// keeping the cloneable [`ArcParkingLotMonitor`] handle.
+    /// This is useful when callers need an explicit [`ParkingLotMonitor`]
+    /// reference while keeping the cloneable [`ArcParkingLotMonitor`]
+    /// handle.
     #[inline]
     fn as_ref(&self) -> &ParkingLotMonitor<T> {
         self.inner.as_ref()
@@ -531,8 +538,9 @@ impl<T> Deref for ArcParkingLotMonitor<T> {
 
     /// Dereferences this wrapper to the underlying monitor.
     ///
-    /// Method-call dereferencing lets callers use native [`ParkingLotMonitor`] APIs
-    /// directly, while this wrapper still provides cloneable ownership.
+    /// Method-call dereferencing lets callers use native [`ParkingLotMonitor`]
+    /// APIs directly, while this wrapper still provides cloneable
+    /// ownership.
     #[inline]
     fn deref(&self) -> &Self::Target {
         self.inner.as_ref()

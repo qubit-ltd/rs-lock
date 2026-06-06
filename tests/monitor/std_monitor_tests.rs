@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Tests for [`StdMonitor`](qubit_lock::StdMonitor).
 
 use std::{
@@ -52,9 +50,9 @@ fn test_std_monitor_write_notify_one_updates_state_and_wakes_waiter() {
         let result = waiter_monitor.wait_until(
             move |ready| {
                 if !*ready && let Some(checked_tx) = checked_tx.take() {
-                    checked_tx
-                        .send(())
-                        .expect("test should observe waiter before notification");
+                    checked_tx.send(()).expect(
+                        "test should observe waiter before notification",
+                    );
                 }
                 *ready
             },
@@ -183,7 +181,10 @@ fn test_std_monitor_traits_delegate_to_monitor_methods() {
     <StdMonitor<Vec<i32>> as Notifier>::notify_all(&monitor);
 
     assert_eq!(
-        <StdMonitor<Vec<i32>> as TimeoutNotificationWaiter>::wait_for(&monitor, Duration::ZERO,),
+        <StdMonitor<Vec<i32>> as TimeoutNotificationWaiter>::wait_for(
+            &monitor,
+            Duration::ZERO,
+        ),
         WaitTimeoutStatus::TimedOut,
     );
     assert_eq!(
@@ -379,7 +380,11 @@ fn test_std_monitor_guard_wait_timeout_returns_woken_when_notified() {
 fn test_std_monitor_wait_while_for_returns_timed_out_when_timeout() {
     let monitor = StdMonitor::new(false);
 
-    let result = monitor.wait_while_for(Duration::from_millis(20), |ready| !*ready, |_| ());
+    let result = monitor.wait_while_for(
+        Duration::from_millis(20),
+        |ready| !*ready,
+        |_| (),
+    );
 
     assert_eq!(result, WaitTimeoutResult::TimedOut);
 }
@@ -388,7 +393,11 @@ fn test_std_monitor_wait_while_for_returns_timed_out_when_timeout() {
 fn test_std_monitor_wait_until_for_returns_timed_out_when_timeout() {
     let monitor = StdMonitor::new(false);
 
-    let result = monitor.wait_until_for(Duration::from_millis(20), |ready| *ready, |_| ());
+    let result = monitor.wait_until_for(
+        Duration::from_millis(20),
+        |ready| *ready,
+        |_| (),
+    );
 
     assert_eq!(result, WaitTimeoutResult::TimedOut);
 }

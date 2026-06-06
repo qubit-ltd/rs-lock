@@ -1,17 +1,14 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! # Monitor Module
 //!
 //! Provides monitor capability traits and concrete monitor implementations
 //! built on parking_lot, standard-library, Tokio, and mock primitives.
-//!
 
 // The nested `monitor` module owns the `Monitor` trait; the repeated name is
 // intentional so each public trait can live in its matching source file.

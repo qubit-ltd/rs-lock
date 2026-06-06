@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! Tests for monitor aggregate traits.
 
 use std::time::Duration;
@@ -68,7 +66,11 @@ where
 {
     assert_eq!(
         monitor
-            .wait_until_for_async(Duration::from_millis(1), |ready| *ready, |_| 7)
+            .wait_until_for_async(
+                Duration::from_millis(1),
+                |ready| *ready,
+                |_| 7
+            )
             .await,
         WaitTimeoutResult::TimedOut,
     );
