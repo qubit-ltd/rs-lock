@@ -1,18 +1,15 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 
 //! # Synchronous Mutex Wrapper (Parking Lot)
 //!
 //! Provides an Arc-wrapped synchronous mutex using parking_lot::Mutex
 //! for protecting shared data in multi-threaded environments.
-//!
 
 use std::{
     ops::Deref,
@@ -39,8 +36,7 @@ use crate::lock::{
 /// - Synchronously acquires locks, may block threads
 /// - Supports trying to acquire locks (non-blocking)
 /// - Thread-safe, supports multi-threaded sharing
-/// - Automatic lock management through RAII ensures proper lock
-///   release
+/// - Automatic lock management through RAII ensures proper lock release
 /// - Better performance compared to std::sync::Mutex
 /// - More ergonomic API with no unwrap() calls
 /// - Implements [`Deref`] and [`AsRef`] to expose the underlying
@@ -64,8 +60,6 @@ use crate::lock::{
 ///     println!("Current value: {}", value);
 /// }
 /// ```
-///
-///
 pub struct ArcMutex<T> {
     /// Shared parking_lot mutex protecting the wrapped value.
     inner: Arc<Mutex<T>>,
@@ -204,8 +198,10 @@ impl<T> Lock<T> for ArcMutex<T> {
     ///
     /// # Returns
     ///
-    /// * `Ok(R)` - If the lock was successfully acquired and the closure executed
-    /// * `Err(TryLockError::WouldBlock)` - If the lock is already held by another thread
+    /// * `Ok(R)` - If the lock was successfully acquired and the closure
+    ///   executed
+    /// * `Err(TryLockError::WouldBlock)` - If the lock is already held by
+    ///   another thread
     ///
     /// # Example
     ///
@@ -242,8 +238,10 @@ impl<T> Lock<T> for ArcMutex<T> {
     ///
     /// # Returns
     ///
-    /// * `Ok(R)` - If the lock was successfully acquired and the closure executed
-    /// * `Err(TryLockError::WouldBlock)` - If the lock is already held by another thread
+    /// * `Ok(R)` - If the lock was successfully acquired and the closure
+    ///   executed
+    /// * `Err(TryLockError::WouldBlock)` - If the lock is already held by
+    ///   another thread
     ///
     /// # Example
     ///

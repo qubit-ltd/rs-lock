@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 // qubit-style: allow explicit-imports
 //! # Parking Lot Mutex Tests
 //!
@@ -187,7 +185,8 @@ mod parking_lot_mutex_tests {
     }
 
     #[test]
-    fn test_parking_lot_mutex_try_methods_cover_shared_function_pointer_paths() {
+    fn test_parking_lot_mutex_try_methods_cover_shared_function_pointer_paths()
+    {
         let mutex = Arc::new(ParkingLotMutex::new(0));
 
         assert_eq!(Lock::try_read(&*mutex, read_i32), Ok(0));

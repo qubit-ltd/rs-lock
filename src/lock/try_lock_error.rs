@@ -1,16 +1,13 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! # Try Lock Error
 //!
 //! Error type for non-blocking lock acquisition.
-//!
 
 use std::fmt;
 
@@ -22,7 +19,8 @@ use std::fmt;
 /// support poisoning.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TryLockError {
-    /// The lock could not be acquired immediately because another guard is active.
+    /// The lock could not be acquired immediately because another guard is
+    /// active.
     WouldBlock,
     /// The lock implementation reports a poisoned state.
     Poisoned,

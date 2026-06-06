@@ -1,18 +1,15 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! # Asynchronous Read-Write Lock Wrapper
 //!
 //! Provides an Arc-wrapped asynchronous read-write lock for
 //! protecting shared data with multiple concurrent readers or a
 //! single writer in async environments.
-//!
 use std::{
     ops::Deref,
     sync::Arc,
@@ -35,12 +32,11 @@ use crate::lock::{
 /// # Features
 ///
 /// - Supports multiple concurrent read operations
-/// - Write operations have exclusive access, mutually exclusive with
-///   read operations
+/// - Write operations have exclusive access, mutually exclusive with read
+///   operations
 /// - Asynchronously acquires locks, does not block threads
 /// - Thread-safe, supports multi-threaded sharing
-/// - Automatic lock management through RAII ensures proper lock
-///   release
+/// - Automatic lock management through RAII ensures proper lock release
 /// - Implements [`AsyncLock`] when the protected value is `Send + Sync`
 /// - Implements [`Deref`] and [`AsRef`] to expose the underlying
 ///   [`tokio::sync::RwLock`] API when guard-based access is needed
@@ -74,8 +70,6 @@ use crate::lock::{
 ///     }).await;
 /// });
 /// ```
-///
-///
 pub struct ArcAsyncRwLock<T> {
     /// Shared Tokio read-write lock protecting the wrapped value.
     inner: Arc<AsyncRwLock<T>>,
@@ -146,8 +140,8 @@ where
     ///
     /// # Arguments
     ///
-    /// * `f` - The closure to be executed while holding the read
-    ///   lock, can only read data
+    /// * `f` - The closure to be executed while holding the read lock, can only
+    ///   read data
     ///
     /// # Returns
     ///
@@ -189,8 +183,8 @@ where
     ///
     /// # Arguments
     ///
-    /// * `f` - The closure to be executed while holding the write
-    ///   lock, can modify data
+    /// * `f` - The closure to be executed while holding the write lock, can
+    ///   modify data
     ///
     /// # Returns
     ///

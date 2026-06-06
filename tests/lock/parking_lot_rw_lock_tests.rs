@@ -1,12 +1,10 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 // qubit-style: allow explicit-imports
 //! # Parking Lot RwLock Tests
 //!
@@ -52,7 +50,8 @@ mod parking_lot_rw_lock_tests {
     }
 
     #[test]
-    fn test_parking_lot_rw_lock_try_read_returns_would_block_when_write_locked() {
+    fn test_parking_lot_rw_lock_try_read_returns_would_block_when_write_locked()
+    {
         let rw_lock = Arc::new(ParkingLotRwLock::new(0));
         let (locked_tx, locked_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
@@ -88,7 +87,8 @@ mod parking_lot_rw_lock_tests {
     }
 
     #[test]
-    fn test_parking_lot_rw_lock_try_write_returns_would_block_when_read_locked() {
+    fn test_parking_lot_rw_lock_try_write_returns_would_block_when_read_locked()
+    {
         let rw_lock = Arc::new(ParkingLotRwLock::new(0));
         let (locked_tx, locked_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();

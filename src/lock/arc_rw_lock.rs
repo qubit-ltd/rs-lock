@@ -1,17 +1,14 @@
-/*******************************************************************************
- *
- *    Copyright (c) 2025 - 2026 Haixing Hu.
- *
- *    SPDX-License-Identifier: Apache-2.0
- *
- *    Licensed under the Apache License, Version 2.0.
- *
- ******************************************************************************/
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
 //! # Synchronous Read-Write Lock Wrapper
 //!
 //! Provides an Arc-wrapped parking_lot read-write lock for protecting
 //! shared data with multiple concurrent readers or a single writer.
-//!
 
 use std::ops::Deref;
 use std::sync::Arc;
@@ -25,19 +22,18 @@ use crate::lock::{
 
 /// Parking-lot read-write lock wrapper.
 ///
-/// Provides an Arc-wrapped [`parking_lot::RwLock`] for synchronous shared state.
-/// Read operations can execute concurrently, while write operations have
+/// Provides an Arc-wrapped [`parking_lot::RwLock`] for synchronous shared
+/// state. Read operations can execute concurrently, while write operations have
 /// exclusive access.
 ///
 /// # Features
 ///
 /// - Supports multiple concurrent read operations
-/// - Write operations have exclusive access, mutually exclusive with
-///   read operations
+/// - Write operations have exclusive access, mutually exclusive with read
+///   operations
 /// - Synchronously acquires locks, may block threads
 /// - Thread-safe, supports multi-threaded sharing
-/// - Automatic lock management through RAII ensures proper lock
-///   release
+/// - Automatic lock management through RAII ensures proper lock release
 /// - Does not use lock poisoning; panic while holding the lock does not make
 ///   future acquisitions fail
 /// - Implements [`Deref`] and [`AsRef`] to expose the underlying
@@ -66,8 +62,6 @@ use crate::lock::{
 ///     println!("Write: {}", s);
 /// });
 /// ```
-///
-///
 pub struct ArcRwLock<T> {
     /// Shared parking_lot read-write lock protecting the wrapped value.
     inner: Arc<RwLock<T>>,
@@ -136,8 +130,8 @@ impl<T> Lock<T> for ArcRwLock<T> {
     ///
     /// # Arguments
     ///
-    /// * `f` - The closure to be executed while holding the read
-    ///   lock, can only read data
+    /// * `f` - The closure to be executed while holding the read lock, can only
+    ///   read data
     ///
     /// # Returns
     ///
@@ -171,8 +165,8 @@ impl<T> Lock<T> for ArcRwLock<T> {
     ///
     /// # Arguments
     ///
-    /// * `f` - The closure to be executed while holding the write
-    ///   lock, can modify data
+    /// * `f` - The closure to be executed while holding the write lock, can
+    ///   modify data
     ///
     /// # Returns
     ///
@@ -210,8 +204,10 @@ impl<T> Lock<T> for ArcRwLock<T> {
     ///
     /// # Returns
     ///
-    /// * `Ok(R)` - If the lock was successfully acquired and the closure executed
-    /// * `Err(TryLockError::WouldBlock)` - If the lock is currently held in write mode
+    /// * `Ok(R)` - If the lock was successfully acquired and the closure
+    ///   executed
+    /// * `Err(TryLockError::WouldBlock)` - If the lock is currently held in
+    ///   write mode
     ///
     /// # Example
     ///
@@ -248,7 +244,8 @@ impl<T> Lock<T> for ArcRwLock<T> {
     ///
     /// # Returns
     ///
-    /// * `Ok(R)` - If the lock was successfully acquired and the closure executed
+    /// * `Ok(R)` - If the lock was successfully acquired and the closure
+    ///   executed
     /// * `Err(TryLockError::WouldBlock)` - If the lock is unavailable
     ///
     /// # Example
