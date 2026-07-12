@@ -33,6 +33,7 @@ mod async_timeout_condition_waiter;
 mod async_timeout_notification_waiter;
 mod condition_waiter;
 mod mock_monitor;
+mod mock_monitor_waiter_guard;
 mod monitor;
 mod notification_waiter;
 mod notifier;

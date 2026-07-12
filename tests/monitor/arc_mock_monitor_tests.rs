@@ -13,6 +13,7 @@ use std::{
     time::Duration,
 };
 
+use qubit_clock::ManualMonotonicClock;
 use qubit_lock::{
     ArcMockMonitor,
     ConditionWaiter,
@@ -37,16 +38,35 @@ fn test_arc_mock_monitor_clone_shares_state_and_mock_time() {
     let cloned = monitor.clone();
 
     cloned.write(|items| items.push(7));
-    monitor.advance(Duration::from_millis(5));
+    monitor
+        .monotonic_clock()
+        .advance(Duration::from_millis(5))
+        .expect("manual clock should advance");
 
     assert_eq!(monitor.read(|items| items.clone()), vec![7]);
     assert_eq!(cloned.elapsed(), Duration::from_millis(5));
 }
 
 #[test]
+fn test_arc_mock_monitor_from_clock_shares_external_clock() {
+    let clock = std::sync::Arc::new(ManualMonotonicClock::new());
+    let monitor =
+        ArcMockMonitor::from_clock(false, std::sync::Arc::clone(&clock));
+
+    clock
+        .advance(Duration::from_secs(2))
+        .expect("manual clock should advance");
+
+    assert_eq!(Duration::from_secs(2), monitor.elapsed());
+}
+
+#[test]
 fn test_arc_mock_monitor_wait_for_times_out_after_advance() {
     let monitor = ArcMockMonitor::new(false);
-    monitor.advance(Duration::from_millis(10));
+    monitor
+        .monotonic_clock()
+        .advance(Duration::from_millis(10))
+        .expect("manual clock should advance");
 
     assert_eq!(
         monitor.wait_for(Duration::from_millis(0)),
@@ -55,14 +75,32 @@ fn test_arc_mock_monitor_wait_for_times_out_after_advance() {
 }
 
 #[test]
+fn test_arc_mock_monitor_timeout_waiter_helpers_delegate_to_inner_monitor() {
+    let monitor = ArcMockMonitor::new(false);
+    let waiter_monitor = monitor.clone();
+    let waiter =
+        thread::spawn(move || waiter_monitor.wait_for(Duration::from_secs(1)));
+
+    assert!(monitor.wait_for_timeout_waiters(1, Duration::from_secs(1)));
+    assert_eq!(1, monitor.pending_timeout_waiters());
+    monitor
+        .monotonic_clock()
+        .advance(Duration::from_secs(1))
+        .expect("manual clock should advance");
+
+    assert_eq!(WaitTimeoutStatus::TimedOut, waiter.join().unwrap());
+    assert_eq!(0, monitor.pending_timeout_waiters());
+}
+
+#[test]
 fn test_arc_mock_monitor_helpers_and_conversions_delegate_to_inner_monitor() {
     let monitor = ArcMockMonitor::from(false);
 
-    monitor.set_elapsed(Duration::from_millis(7));
+    monitor
+        .monotonic_clock()
+        .advance(Duration::from_millis(7))
+        .expect("manual clock should advance");
     assert_eq!(monitor.elapsed(), Duration::from_millis(7));
-
-    monitor.reset_elapsed();
-    assert_eq!(monitor.elapsed(), Duration::ZERO);
 
     let one_result = monitor.write_notify_one(|ready| {
         *ready = true;
@@ -79,8 +117,8 @@ fn test_arc_mock_monitor_helpers_and_conversions_delegate_to_inner_monitor() {
 
     monitor.notify_one();
     monitor.notify_all();
-    assert_eq!(monitor.as_ref().elapsed(), Duration::ZERO);
-    assert_eq!((*monitor).elapsed(), Duration::ZERO);
+    assert_eq!(monitor.as_ref().elapsed(), Duration::from_millis(7));
+    assert_eq!((*monitor).elapsed(), Duration::from_millis(7));
 
     let default_monitor = ArcMockMonitor::<Vec<i32>>::default();
     assert!(default_monitor.read(|items| items.is_empty()));

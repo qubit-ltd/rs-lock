@@ -17,6 +17,10 @@ use std::{
 };
 
 #[cfg(feature = "async")]
+use std::task::Poll;
+
+use qubit_clock::ManualMonotonicClock;
+#[cfg(feature = "async")]
 use qubit_lock::{
     AsyncConditionWaiter,
     AsyncNotificationWaiter,
@@ -35,6 +39,119 @@ use qubit_lock::{
 };
 
 #[test]
+fn test_mock_monitor_from_clock_uses_shared_manual_time() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    let monitor = Arc::new(MockMonitor::from_clock(false, Arc::clone(&clock)));
+    let waiter_monitor = Arc::clone(&monitor);
+    let (done_tx, done_rx) = mpsc::channel();
+    let waiter = thread::spawn(move || {
+        done_tx
+            .send(waiter_monitor.wait_for(Duration::from_secs(10)))
+            .expect("test should receive wait status");
+    });
+
+    assert!(monitor.wait_for_timeout_waiters(1, Duration::from_secs(1)));
+    clock
+        .advance(Duration::from_secs(10))
+        .expect("manual clock should advance");
+
+    assert_eq!(
+        WaitTimeoutStatus::TimedOut,
+        done_rx
+            .recv_timeout(Duration::from_millis(100))
+            .expect("shared clock should wake mock monitor"),
+    );
+    waiter.join().expect("waiter should finish");
+}
+
+#[test]
+fn test_shared_clock_drives_multiple_mock_monitors() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    let first = Arc::new(MockMonitor::from_clock((), Arc::clone(&clock)));
+    let second = Arc::new(MockMonitor::from_clock((), Arc::clone(&clock)));
+    let (done_tx, done_rx) = mpsc::channel();
+
+    let first_waiter = {
+        let monitor = Arc::clone(&first);
+        let done_tx = done_tx.clone();
+        thread::spawn(move || {
+            done_tx
+                .send(monitor.wait_for(Duration::from_secs(5)))
+                .expect("first status should be received");
+        })
+    };
+    let second_waiter = {
+        let monitor = Arc::clone(&second);
+        thread::spawn(move || {
+            done_tx
+                .send(monitor.wait_for(Duration::from_secs(5)))
+                .expect("second status should be received");
+        })
+    };
+
+    assert!(first.wait_for_timeout_waiters(1, Duration::from_secs(1)));
+    assert!(second.wait_for_timeout_waiters(1, Duration::from_secs(1)));
+    clock
+        .advance(Duration::from_secs(5))
+        .expect("shared manual clock should advance");
+
+    for _ in 0..2 {
+        assert_eq!(
+            WaitTimeoutStatus::TimedOut,
+            done_rx
+                .recv_timeout(Duration::from_millis(100))
+                .expect("both monitors should observe the shared clock"),
+        );
+    }
+    first_waiter.join().expect("first waiter should finish");
+    second_waiter.join().expect("second waiter should finish");
+}
+
+#[cfg(feature = "async")]
+#[tokio::test]
+async fn test_mock_monitor_async_timeout_uses_shared_manual_time() {
+    let clock = Arc::new(ManualMonotonicClock::new());
+    let monitor = MockMonitor::from_clock(false, Arc::clone(&clock));
+    let mut wait = monitor.wait_for_async(Duration::from_secs(10));
+    assert_eq!(0, monitor.pending_timeout_waiters());
+    assert!(
+        std::future::poll_fn(|context| {
+            Poll::Ready(wait.as_mut().poll(context))
+        })
+        .await
+        .is_pending(),
+    );
+    assert_eq!(1, monitor.pending_timeout_waiters());
+
+    clock
+        .advance(Duration::from_secs(10))
+        .expect("manual clock should advance");
+
+    assert_eq!(WaitTimeoutStatus::TimedOut, wait.await);
+    assert_eq!(0, monitor.pending_timeout_waiters());
+}
+
+#[cfg(feature = "async")]
+#[tokio::test]
+async fn test_mock_monitor_cancelled_async_timeout_unregisters_waiter() {
+    let monitor = MockMonitor::new(false);
+    let mut wait = monitor.wait_for_async(Duration::from_secs(10));
+    assert_eq!(0, monitor.pending_timeout_waiters());
+    assert!(
+        std::future::poll_fn(|context| {
+            Poll::Ready(wait.as_mut().poll(context))
+        })
+        .await
+        .is_pending(),
+    );
+    assert_eq!(1, monitor.pending_timeout_waiters());
+
+    drop(wait);
+
+    assert_eq!(0, monitor.pending_timeout_waiters());
+}
+
+#[test]
 fn test_mock_monitor_wait_for_uses_mock_elapsed_time() {
     let monitor = Arc::new(MockMonitor::new(false));
     let waiter_monitor = Arc::clone(&monitor);
@@ -47,13 +164,19 @@ fn test_mock_monitor_wait_for_uses_mock_elapsed_time() {
             .expect("test should receive wait status");
     });
 
-    thread::sleep(Duration::from_millis(20));
+    assert!(monitor.wait_for_timeout_waiters(1, Duration::from_secs(1)));
     assert!(done_rx.try_recv().is_err());
 
-    monitor.advance(Duration::from_millis(99));
+    monitor
+        .monotonic_clock()
+        .advance(Duration::from_millis(99))
+        .expect("manual clock should advance");
     assert!(done_rx.try_recv().is_err());
 
-    monitor.advance(Duration::from_millis(1));
+    monitor
+        .monotonic_clock()
+        .advance(Duration::from_millis(1))
+        .expect("manual clock should advance");
     assert_eq!(
         done_rx
             .recv_timeout(Duration::from_millis(100))
@@ -76,7 +199,7 @@ fn test_mock_monitor_wait_for_returns_woken_after_notification() {
             .expect("test should receive wait status");
     });
 
-    thread::sleep(Duration::from_millis(10));
+    assert!(monitor.wait_for_timeout_waiters(1, Duration::from_secs(1)));
     monitor.notify_one();
 
     assert_eq!(
@@ -113,11 +236,11 @@ fn test_mock_monitor_wait_blocks_until_notification() {
 fn test_mock_monitor_elapsed_helpers_and_conversions() {
     let monitor = MockMonitor::from(false);
 
-    monitor.set_elapsed(Duration::from_millis(7));
+    monitor
+        .monotonic_clock()
+        .advance(Duration::from_millis(7))
+        .expect("manual clock should advance");
     assert_eq!(monitor.elapsed(), Duration::from_millis(7));
-
-    monitor.reset_elapsed();
-    assert_eq!(monitor.elapsed(), Duration::ZERO);
 
     let result = monitor.write_notify_all(|ready| {
         *ready = true;
@@ -260,10 +383,13 @@ fn test_mock_monitor_wait_until_for_times_out_on_mock_time() {
             .expect("test should receive wait result");
     });
 
-    thread::sleep(Duration::from_millis(10));
+    assert!(monitor.wait_for_timeout_waiters(1, Duration::from_secs(1)));
     assert!(done_rx.try_recv().is_err());
 
-    monitor.advance(Duration::from_millis(50));
+    monitor
+        .monotonic_clock()
+        .advance(Duration::from_millis(50))
+        .expect("manual clock should advance");
     assert_eq!(
         done_rx
             .recv_timeout(Duration::from_millis(100))
@@ -293,7 +419,7 @@ fn test_mock_monitor_wait_until_runs_action_after_notification() {
             .expect("test should receive wait result");
     });
 
-    thread::sleep(Duration::from_millis(10));
+    assert!(monitor.wait_for_timeout_waiters(1, Duration::from_secs(1)));
     monitor.write_notify_one(|ready| *ready = true);
 
     assert_eq!(
@@ -310,10 +436,19 @@ fn test_mock_monitor_wait_until_runs_action_after_notification() {
 #[tokio::test]
 async fn test_mock_monitor_async_wait_for_uses_mock_elapsed_time() {
     let monitor = MockMonitor::new(false);
-    let wait = monitor.wait_for_async(Duration::from_millis(100));
-    tokio::pin!(wait);
+    let mut wait = monitor.wait_for_async(Duration::from_millis(100));
+    assert!(
+        std::future::poll_fn(|context| {
+            Poll::Ready(wait.as_mut().poll(context))
+        })
+        .await
+        .is_pending(),
+    );
 
-    monitor.advance(Duration::from_millis(99));
+    monitor
+        .monotonic_clock()
+        .advance(Duration::from_millis(99))
+        .expect("manual clock should advance");
     assert!(
         tokio::time::timeout(Duration::from_millis(20), &mut wait)
             .await
@@ -321,7 +456,10 @@ async fn test_mock_monitor_async_wait_for_uses_mock_elapsed_time() {
         "mock async timeout should not use real elapsed time",
     );
 
-    monitor.advance(Duration::from_millis(1));
+    monitor
+        .monotonic_clock()
+        .advance(Duration::from_millis(1))
+        .expect("manual clock should advance");
     assert_eq!(
         tokio::time::timeout(Duration::from_millis(50), &mut wait)
             .await
