@@ -16,7 +16,8 @@ Lock-focused utilities for the Qubit Rust libraries. The crate provides synchron
 - `ArcAsyncMutex`, `ArcAsyncRwLock`: Tokio-based asynchronous lock wrappers enabled by the default `async` feature.
 - `ParkingLotMonitor`, `ArcParkingLotMonitor`, `ParkingLotMonitorGuard`: parking_lot-based condition coordination.
 - `StdMonitor`, `ArcStdMonitor`, `StdMonitorGuard`: std-based condition coordination.
-- `MockMonitor`, `ArcMockMonitor`: deterministic monitor testing with manually advanced timeout time.
+- `MockMonitor`, `ArcMockMonitor`: deterministic monitor testing driven by a
+  shared `qubit_clock::ManualMonotonicClock`.
 - `TokioMonitor`, `ArcTokioMonitor`: async monitor coordination with Tokio.
 - Closure-based APIs that keep lock acquisition and release scoped to one call.
 - `Arc*` wrappers implement `Deref` and `AsRef`, so the native guard-based
@@ -42,6 +43,36 @@ runtime features in your own `Cargo.toml`, such as `rt` or `rt-multi-thread`.
 `AsyncLock` returns `Send` futures: `ArcAsyncMutex<T>` implements it for
 `T: Send`, while `ArcAsyncRwLock<T>` implements it for `T: Send + Sync`.
 
+### Deterministic monitor time
+
+`MockMonitor::new` creates an independent `ManualMonotonicClock`. Use
+`monotonic_clock()` to advance it explicitly. When several test components
+must observe the same time domain, construct them from the same clock with
+`MockMonitor::from_clock` or `ArcMockMonitor::from_clock`:
+
+```rust
+use std::{sync::Arc, time::Duration};
+
+use qubit_clock::ManualMonotonicClock;
+use qubit_lock::ArcMockMonitor;
+
+let clock = Arc::new(ManualMonotonicClock::new());
+let monitor = ArcMockMonitor::from_clock(false, Arc::clone(&clock));
+
+clock.advance(Duration::from_secs(10)).unwrap();
+assert_eq!(monitor.elapsed(), Duration::from_secs(10));
+```
+
+Advancing the clock wakes blocking and asynchronous timeout waiters; no wall
+clock delay is involved. Blocking tests can call
+`wait_for_timeout_waiters(expected_count, real_timeout)` before advancing mock
+time instead of guessing waiter registration with a real sleep.
+`pending_timeout_waiters()` counts blocking and asynchronous timeout waits that
+are ready to observe changes. An async wait starts contributing after its future
+is first polled, and unregisters automatically when cancelled. Do not advance
+the clock from inside a closure that currently holds the same monitor's state
+lock.
+
 ## Migration from 0.8
 
 Version `0.9` contains intentional async monitor API renames:
@@ -64,8 +95,8 @@ Version `0.8` contains intentional breaking API cleanup:
 - The concrete parking_lot monitor is now `ParkingLotMonitor`; its cloneable
   handle is `ArcParkingLotMonitor`.
 - Timeout condition methods are named `wait_until_for` and `wait_while_for`.
-- `MockMonitor` and `ArcMockMonitor` provide manually advanced timeout time for
-  deterministic tests.
+- `MockMonitor` and `ArcMockMonitor` use a `ManualMonotonicClock` for
+  deterministic timeout tests.
 - With the default `async` feature, `TokioMonitor` and `ArcTokioMonitor`
   provide async monitor operations.
 - `qubit_lock::lock` and `qubit_lock::monitor` are no longer public modules.

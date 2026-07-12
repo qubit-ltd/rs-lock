@@ -16,7 +16,8 @@
 - `ArcAsyncMutex`、`ArcAsyncRwLock`：默认 `async` 特性启用的 Tokio 异步锁包装器。
 - `ParkingLotMonitor`、`ArcParkingLotMonitor`、`ParkingLotMonitorGuard`：基于 parking_lot 的条件变量协调工具。
 - `StdMonitor`、`ArcStdMonitor`、`StdMonitorGuard`：基于标准库的条件变量协调工具。
-- `MockMonitor`、`ArcMockMonitor`：使用手动推进 timeout 时间的确定性测试 monitor。
+- `MockMonitor`、`ArcMockMonitor`：由共享的
+  `qubit_clock::ManualMonotonicClock` 驱动的确定性测试 monitor。
 - `TokioMonitor`、`ArcTokioMonitor`：基于 Tokio 的异步 monitor 协调工具。
 - 基于闭包的访问接口，让加锁和释放始终局限在一次调用内部。
 - `Arc*` 包装器实现了 `Deref` 和 `AsRef`，需要时仍可使用底层同步原语的
@@ -40,6 +41,31 @@ qubit-lock = { version = "0.9", default-features = false }
 `AsyncLock` 返回 `Send` future：`ArcAsyncMutex<T>` 在 `T: Send` 时实现它，
 `ArcAsyncRwLock<T>` 在 `T: Send + Sync` 时实现它。
 
+### 确定性的 monitor 时间
+
+`MockMonitor::new` 会创建一个独立的 `ManualMonotonicClock`，测试通过
+`monotonic_clock()` 显式推进它。如果多个测试组件需要处于同一个时间域，使用同一个
+clock 调用 `MockMonitor::from_clock` 或 `ArcMockMonitor::from_clock` 构造：
+
+```rust
+use std::{sync::Arc, time::Duration};
+
+use qubit_clock::ManualMonotonicClock;
+use qubit_lock::ArcMockMonitor;
+
+let clock = Arc::new(ManualMonotonicClock::new());
+let monitor = ArcMockMonitor::from_clock(false, Arc::clone(&clock));
+
+clock.advance(Duration::from_secs(10)).unwrap();
+assert_eq!(monitor.elapsed(), Duration::from_secs(10));
+```
+
+推进 clock 会唤醒阻塞和异步 timeout waiter，不会产生真实时间等待。阻塞测试可在推进
+mock time 前调用 `wait_for_timeout_waiters(expected_count, real_timeout)`，不再用真实
+sleep 猜测 waiter 是否已经注册。`pending_timeout_waiters()` 汇总已经能够观察变化的
+同步和异步 timeout wait；异步 wait 的 future 首次被 poll 后才计数，被取消时会自动
+注销。不要在持有同一个 monitor 状态锁的闭包内推进该 clock。
+
 ## 从 0.8 迁移
 
 `0.9` 包含有意的异步 monitor API 重命名：
@@ -62,7 +88,8 @@ qubit-lock = { version = "0.9", default-features = false }
 - 基于 parking_lot 的具体实现改为 `ParkingLotMonitor`，其可克隆共享句柄改为
   `ArcParkingLotMonitor`。
 - 带超时的 condition wait 方法改名为 `wait_until_for` 和 `wait_while_for`。
-- `MockMonitor` 和 `ArcMockMonitor` 提供手动推进的 timeout 时间，便于确定性测试。
+- `MockMonitor` 和 `ArcMockMonitor` 使用 `ManualMonotonicClock` 实现确定性的
+  timeout 测试。
 - 默认 `async` 特性下，`TokioMonitor` 和 `ArcTokioMonitor` 提供异步 monitor 操作。
 - `qubit_lock::lock` 和 `qubit_lock::monitor` 不再作为公开模块暴露。
   请直接从 crate root 导入公开类型。
