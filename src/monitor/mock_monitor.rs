@@ -7,6 +7,7 @@
 // =============================================================================
 //! Mock monitor with timeout time driven by a manual monotonic clock.
 
+use std::collections::BTreeMap;
 use std::sync::{
     Arc,
     Condvar,
@@ -23,10 +24,7 @@ use qubit_clock::{
 };
 
 #[cfg(feature = "async")]
-use tokio::sync::{
-    Notify,
-    watch,
-};
+use tokio::sync::watch;
 
 use super::mock_monitor_waiter_guard::MockMonitorWaiterGuard;
 #[cfg(feature = "async")]
@@ -64,10 +62,7 @@ pub struct MockMonitor<T> {
     changed: Arc<Condvar>,
     /// Condition variable used to observe timeout-waiter registrations.
     timeout_waiters_changed: Condvar,
-    /// Tokio notification primitive used by async notification waiters.
-    #[cfg(feature = "async")]
-    async_notification: Notify,
-    /// Broadcasts mock state or mock time changes to async timeout waiters.
+    /// Broadcasts mock notifications and time changes to async waiters.
     #[cfg(feature = "async")]
     async_change_sender: watch::Sender<u64>,
 }
@@ -76,12 +71,23 @@ pub struct MockMonitor<T> {
 struct MockMonitorState<T> {
     /// User-visible protected value.
     value: T,
-    /// Epoch incremented only by notification calls.
-    notification_epoch: u64,
     /// Epoch incremented by notifications and mock time changes.
     change_epoch: u64,
+    /// Identifier assigned to the next registered waiter.
+    next_waiter_id: u64,
+    /// Registered waiters and their individually assigned notification state.
+    waiters: BTreeMap<u64, MockWaiterState>,
     /// Number of active blocking and asynchronous timeout waits.
     timeout_waiters: usize,
+}
+
+/// Notification state assigned to one active mock-monitor waiter.
+struct MockWaiterState {
+    /// Whether this waiter owns an unconsumed notification.
+    notified: bool,
+    /// Whether the waiter future has started polling or the blocking waiter is
+    /// ready to sleep.
+    active: bool,
 }
 
 impl<T: Send + 'static> MockMonitor<T> {
@@ -114,8 +120,9 @@ impl<T: Send + 'static> MockMonitor<T> {
     pub fn from_clock(state: T, clock: Arc<ManualMonotonicClock>) -> Self {
         let state = Arc::new(Mutex::new(MockMonitorState {
             value: state,
-            notification_epoch: 0,
             change_epoch: 0,
+            next_waiter_id: 0,
+            waiters: BTreeMap::new(),
             timeout_waiters: 0,
         }));
         let changed = Arc::new(Condvar::new());
@@ -147,8 +154,6 @@ impl<T: Send + 'static> MockMonitor<T> {
             state,
             changed,
             timeout_waiters_changed: Condvar::new(),
-            #[cfg(feature = "async")]
-            async_notification: Notify::new(),
             #[cfg(feature = "async")]
             async_change_sender,
         }
@@ -220,7 +225,7 @@ impl<T: Send + 'static> MockMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
-    pub fn read<R, F>(&self, f: F) -> R
+    pub fn with_read<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R,
     {
@@ -239,7 +244,7 @@ impl<T: Send + 'static> MockMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
-    pub fn write<R, F>(&self, f: F) -> R
+    pub fn with_write<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
@@ -256,11 +261,11 @@ impl<T: Send + 'static> MockMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
-    pub fn write_notify_one<R, F>(&self, f: F) -> R
+    pub fn with_write_notify_one<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
-        let result = self.write(f);
+        let result = self.with_write(f);
         self.notify_one();
         result
     }
@@ -274,30 +279,51 @@ impl<T: Send + 'static> MockMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
-    pub fn write_notify_all<R, F>(&self, f: F) -> R
+    pub fn with_write_notify_all<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
-        let result = self.write(f);
+        let result = self.with_write(f);
         self.notify_all();
         result
     }
 
     /// Wakes one waiter if one is blocked.
     pub fn notify_one(&self) {
-        let change_epoch = self.advance_notification_epoch();
-        self.changed.notify_one();
-        #[cfg(feature = "async")]
-        self.async_notification.notify_one();
+        let change_epoch = {
+            let mut state = self.lock_state();
+            let waiter_id = state
+                .waiters
+                .iter()
+                .find_map(|(waiter_id, waiter)| {
+                    (waiter.active && !waiter.notified).then_some(*waiter_id)
+                })
+                .or_else(|| {
+                    state.waiters.iter().find_map(|(waiter_id, waiter)| {
+                        (!waiter.notified).then_some(*waiter_id)
+                    })
+                });
+            if let Some(waiter) = waiter_id
+                .and_then(|waiter_id| state.waiters.get_mut(&waiter_id))
+            {
+                waiter.notified = true;
+            }
+            Self::advance_change_epoch(&mut state)
+        };
+        self.changed.notify_all();
         self.notify_async_change(change_epoch);
     }
 
     /// Wakes all waiters.
     pub fn notify_all(&self) {
-        let change_epoch = self.advance_notification_epoch();
+        let change_epoch = {
+            let mut state = self.lock_state();
+            for waiter in state.waiters.values_mut() {
+                waiter.notified = true;
+            }
+            Self::advance_change_epoch(&mut state)
+        };
         self.changed.notify_all();
-        #[cfg(feature = "async")]
-        self.async_notification.notify_waiters();
         self.notify_async_change(change_epoch);
     }
 
@@ -312,31 +338,173 @@ impl<T: Send + 'static> MockMonitor<T> {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
-    /// Registers one active timeout wait and wakes registration observers.
-    pub(super) fn register_timeout_waiter(&self) {
+    /// Activates an already registered async waiter.
+    ///
+    /// # Arguments
+    ///
+    /// * `waiter_id` - Identifier assigned when the future was created.
+    /// * `timeout_waiter` - Whether activation should increment the timeout
+    ///   waiter count.
+    #[cfg(feature = "async")]
+    pub(super) fn activate_waiter(&self, waiter_id: u64, timeout_waiter: bool) {
         let mut state = self.lock_state();
-        state.timeout_waiters = state
-            .timeout_waiters
+        let waiter = state
+            .waiters
+            .get_mut(&waiter_id)
+            .expect("mock monitor waiter should remain registered");
+        assert!(!waiter.active, "mock monitor waiter activated twice");
+        waiter.active = true;
+        if timeout_waiter {
+            state.timeout_waiters = state
+                .timeout_waiters
+                .checked_add(1)
+                .expect("mock monitor timeout waiter count overflowed");
+        }
+        drop(state);
+        if timeout_waiter {
+            self.timeout_waiters_changed.notify_all();
+        }
+    }
+
+    /// Unregisters one active waiter and wakes timeout registration observers
+    /// when necessary.
+    ///
+    /// # Arguments
+    ///
+    /// * `waiter_id` - Identifier assigned when the waiter registered.
+    /// * `timeout_waiter` - Whether the waiter contributes to the timeout
+    ///   waiter count.
+    pub(super) fn unregister_waiter(
+        &self,
+        waiter_id: u64,
+        timeout_waiter: bool,
+    ) {
+        let mut state = self.lock_state();
+        state
+            .waiters
+            .remove(&waiter_id)
+            .expect("mock monitor waiter should remain registered");
+        if timeout_waiter {
+            state.timeout_waiters = state
+                .timeout_waiters
+                .checked_sub(1)
+                .expect("mock monitor timeout waiter count underflowed");
+        }
+        drop(state);
+        if timeout_waiter {
+            self.timeout_waiters_changed.notify_all();
+        }
+    }
+
+    /// Registers a waiter while the monitor state is already locked.
+    ///
+    /// # Arguments
+    ///
+    /// * `state` - Locked internal monitor state.
+    /// * `timeout_waiter` - Whether the waiter contributes to the timeout
+    ///   waiter count.
+    /// * `active` - Whether the waiter is immediately eligible to be woken.
+    ///
+    /// # Returns
+    ///
+    /// The identifier assigned to the waiter.
+    fn register_waiter_locked(
+        state: &mut MockMonitorState<T>,
+        timeout_waiter: bool,
+        active: bool,
+    ) -> u64 {
+        let waiter_id = state.next_waiter_id;
+        state.next_waiter_id = state
+            .next_waiter_id
             .checked_add(1)
-            .expect("mock monitor timeout waiter count overflowed");
-        drop(state);
-        self.timeout_waiters_changed.notify_all();
+            .expect("mock monitor waiter identifier overflowed");
+        let previous = state.waiters.insert(
+            waiter_id,
+            MockWaiterState {
+                notified: false,
+                active,
+            },
+        );
+        assert!(previous.is_none(), "mock monitor waiter identifier reused");
+        if timeout_waiter && active {
+            state.timeout_waiters = state
+                .timeout_waiters
+                .checked_add(1)
+                .expect("mock monitor timeout waiter count overflowed");
+        }
+        waiter_id
     }
 
-    /// Unregisters one active timeout wait and wakes registration observers.
-    pub(super) fn unregister_timeout_waiter(&self) {
-        let mut state = self.lock_state();
-        state.timeout_waiters = state
-            .timeout_waiters
-            .checked_sub(1)
-            .expect("mock monitor timeout waiter count underflowed");
-        drop(state);
-        self.timeout_waiters_changed.notify_all();
+    /// Creates an RAII waiter registration.
+    ///
+    /// # Arguments
+    ///
+    /// * `timeout_waiter` - Whether the waiter contributes to the timeout
+    ///   waiter count.
+    /// * `active` - Whether the waiter is immediately eligible to be woken.
+    ///
+    /// # Returns
+    ///
+    /// A guard that unregisters the waiter on return, cancellation, or panic.
+    fn waiter_guard(
+        &self,
+        timeout_waiter: bool,
+        active: bool,
+    ) -> MockMonitorWaiterGuard<'_, T> {
+        let waiter_id = {
+            let mut state = self.lock_state();
+            Self::register_waiter_locked(&mut state, timeout_waiter, active)
+        };
+        self.waiter_guard_from_registered(
+            waiter_id,
+            timeout_waiter && active,
+            active,
+        )
     }
 
-    /// Creates an RAII registration for one timeout wait operation.
-    fn timeout_waiter_guard(&self) -> MockMonitorWaiterGuard<'_, T> {
-        MockMonitorWaiterGuard::new(self)
+    /// Creates an RAII guard for a waiter registered under an existing lock.
+    ///
+    /// # Arguments
+    ///
+    /// * `waiter_id` - Identifier assigned to the registered waiter.
+    /// * `timeout_waiter` - Whether the waiter contributes to the timeout
+    ///   waiter count.
+    /// * `active` - Whether the waiter is immediately eligible to be woken.
+    ///
+    /// # Returns
+    ///
+    /// A guard that unregisters the waiter on return, cancellation, or panic.
+    fn waiter_guard_from_registered(
+        &self,
+        waiter_id: u64,
+        timeout_waiter: bool,
+        active: bool,
+    ) -> MockMonitorWaiterGuard<'_, T> {
+        if timeout_waiter {
+            self.timeout_waiters_changed.notify_all();
+        }
+        MockMonitorWaiterGuard::new(self, waiter_id, timeout_waiter, active)
+    }
+
+    /// Consumes the notification assigned to one waiter.
+    ///
+    /// # Arguments
+    ///
+    /// * `state` - Locked internal monitor state.
+    /// * `waiter_id` - Identifier of the waiter checking its notification.
+    ///
+    /// # Returns
+    ///
+    /// `true` when the waiter owned an unconsumed notification.
+    fn take_notification(
+        state: &mut MockMonitorState<T>,
+        waiter_id: u64,
+    ) -> bool {
+        let waiter = state
+            .waiters
+            .get_mut(&waiter_id)
+            .expect("mock monitor waiter should remain registered");
+        std::mem::take(&mut waiter.notified)
     }
 
     /// Increments the change epoch.
@@ -353,18 +521,7 @@ impl<T: Send + 'static> MockMonitor<T> {
         state.change_epoch
     }
 
-    /// Increments the notification and change epochs.
-    ///
-    /// # Returns
-    ///
-    /// The new change epoch.
-    fn advance_notification_epoch(&self) -> u64 {
-        let mut state = self.lock_state();
-        state.notification_epoch = state.notification_epoch.wrapping_add(1);
-        Self::advance_change_epoch(&mut state)
-    }
-
-    /// Notifies asynchronous timeout waiters about a state or time change.
+    /// Notifies asynchronous waiters about a notification or time change.
     ///
     /// # Arguments
     ///
@@ -394,9 +551,10 @@ impl<T: Send + 'static> Notifier for MockMonitor<T> {
 impl<T: Send + 'static> NotificationWaiter for MockMonitor<T> {
     /// Blocks until a notification happens after this call starts.
     fn wait(&self) {
+        let waiter_guard = self.waiter_guard(false, true);
+        let waiter_id = waiter_guard.waiter_id();
         let mut state = self.lock_state();
-        let observed_epoch = state.notification_epoch;
-        while state.notification_epoch == observed_epoch {
+        while !Self::take_notification(&mut state, waiter_id) {
             state = self
                 .changed
                 .wait(state)
@@ -410,11 +568,11 @@ impl<T: Send + 'static> TimeoutNotificationWaiter for MockMonitor<T> {
     /// timeout.
     fn wait_for(&self, timeout: Duration) -> WaitTimeoutStatus {
         let target_elapsed = self.elapsed().saturating_add(timeout);
-        let _waiter_guard = self.timeout_waiter_guard();
+        let waiter_guard = self.waiter_guard(true, true);
+        let waiter_id = waiter_guard.waiter_id();
         let mut state = self.lock_state();
-        let observed_epoch = state.notification_epoch;
         loop {
-            if state.notification_epoch != observed_epoch {
+            if Self::take_notification(&mut state, waiter_id) {
                 return WaitTimeoutStatus::Woken;
             }
             if self.elapsed() >= target_elapsed {
@@ -437,14 +595,27 @@ impl<T: Send + 'static> ConditionWaiter for MockMonitor<T> {
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,
     {
+        let waiter_id = {
+            let mut state = self.lock_state();
+            if !predicate(&state.value) {
+                return action(&mut state.value);
+            }
+            Self::register_waiter_locked(&mut state, false, true)
+        };
+        let _waiter_guard =
+            self.waiter_guard_from_registered(waiter_id, false, true);
         let mut state = self.lock_state();
-        while predicate(&state.value) {
-            state = self
-                .changed
-                .wait(state)
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+        loop {
+            while !Self::take_notification(&mut state, waiter_id) {
+                state = self
+                    .changed
+                    .wait(state)
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
+            }
+            if !predicate(&state.value) {
+                return action(&mut state.value);
+            }
         }
-        action(&mut state.value)
     }
 }
 
@@ -462,14 +633,29 @@ impl<T: Send + 'static> TimeoutConditionWaiter for MockMonitor<T> {
         F: FnOnce(&mut Self::State) -> R,
     {
         let target_elapsed = self.elapsed().saturating_add(timeout);
-        let _waiter_guard = self.timeout_waiter_guard();
-        let mut state = self.lock_state();
-        loop {
+        let waiter_id = {
+            let mut state = self.lock_state();
             if !predicate(&state.value) {
                 return WaitTimeoutResult::Ready(action(&mut state.value));
             }
             if self.elapsed() >= target_elapsed {
                 return WaitTimeoutResult::TimedOut;
+            }
+            Self::register_waiter_locked(&mut state, true, true)
+        };
+        let _waiter_guard =
+            self.waiter_guard_from_registered(waiter_id, true, true);
+        let mut state = self.lock_state();
+        loop {
+            let notified = Self::take_notification(&mut state, waiter_id);
+            let timed_out = self.elapsed() >= target_elapsed;
+            if notified || timed_out {
+                if !predicate(&state.value) {
+                    return WaitTimeoutResult::Ready(action(&mut state.value));
+                }
+                if timed_out {
+                    return WaitTimeoutResult::TimedOut;
+                }
             }
             state = self
                 .changed
@@ -483,8 +669,23 @@ impl<T: Send + 'static> TimeoutConditionWaiter for MockMonitor<T> {
 impl<T: Send + 'static> AsyncNotificationWaiter for MockMonitor<T> {
     /// Returns a future that resolves after an async notification.
     fn wait_async<'a>(&'a self) -> AsyncMonitorFuture<'a, ()> {
-        let notified = self.async_notification.notified();
-        Box::pin(notified)
+        let mut waiter_guard = self.waiter_guard(false, false);
+        let mut change_receiver = self.async_change_sender.subscribe();
+        Box::pin(async move {
+            waiter_guard.activate_waiter(false);
+            let waiter_id = waiter_guard.waiter_id();
+            loop {
+                {
+                    let mut state = self.lock_state();
+                    if Self::take_notification(&mut state, waiter_id) {
+                        return;
+                    }
+                }
+                change_receiver.changed().await.expect(
+                    "mock monitor sender should live while the monitor is borrowed",
+                );
+            }
+        })
     }
 }
 
@@ -495,20 +696,16 @@ impl<T: Send + 'static> AsyncTimeoutNotificationWaiter for MockMonitor<T> {
         &'a self,
         timeout: Duration,
     ) -> AsyncMonitorFuture<'a, WaitTimeoutStatus> {
+        let target_elapsed = self.elapsed().saturating_add(timeout);
+        let mut waiter_guard = self.waiter_guard(false, false);
         let mut change_receiver = self.async_change_sender.subscribe();
-        let (observed_epoch, target_elapsed) = {
-            let state = self.lock_state();
-            (
-                state.notification_epoch,
-                self.elapsed().saturating_add(timeout),
-            )
-        };
         Box::pin(async move {
-            let _waiter_guard = self.timeout_waiter_guard();
+            waiter_guard.activate_waiter(true);
+            let waiter_id = waiter_guard.waiter_id();
             loop {
                 {
-                    let state = self.lock_state();
-                    if state.notification_epoch != observed_epoch {
+                    let mut state = self.lock_state();
+                    if Self::take_notification(&mut state, waiter_id) {
                         return WaitTimeoutStatus::Woken;
                     }
                     if self.elapsed() >= target_elapsed {
@@ -539,16 +736,29 @@ impl<T: Send + 'static> AsyncConditionWaiter for MockMonitor<T> {
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
+        let mut change_receiver = self.async_change_sender.subscribe();
         Box::pin(async move {
+            let waiter_id = {
+                let mut state = self.lock_state();
+                if !predicate(&state.value) {
+                    return action(&mut state.value);
+                }
+                Self::register_waiter_locked(&mut state, false, true)
+            };
+            let _waiter_guard =
+                self.waiter_guard_from_registered(waiter_id, false, true);
             loop {
-                let notified = {
+                {
                     let mut state = self.lock_state();
-                    if !predicate(&state.value) {
+                    if Self::take_notification(&mut state, waiter_id)
+                        && !predicate(&state.value)
+                    {
                         return action(&mut state.value);
                     }
-                    self.async_notification.notified()
-                };
-                notified.await;
+                }
+                change_receiver.changed().await.expect(
+                    "mock monitor sender should live while the monitor is borrowed",
+                );
             }
         })
     }
@@ -572,17 +782,33 @@ impl<T: Send + 'static> AsyncTimeoutConditionWaiter for MockMonitor<T> {
         let mut change_receiver = self.async_change_sender.subscribe();
         let target_elapsed = self.elapsed().saturating_add(timeout);
         Box::pin(async move {
-            let _waiter_guard = self.timeout_waiter_guard();
+            let waiter_id = {
+                let mut state = self.lock_state();
+                if !predicate(&state.value) {
+                    return WaitTimeoutResult::Ready(action(&mut state.value));
+                }
+                if self.elapsed() >= target_elapsed {
+                    return WaitTimeoutResult::TimedOut;
+                }
+                Self::register_waiter_locked(&mut state, true, true)
+            };
+            let _waiter_guard =
+                self.waiter_guard_from_registered(waiter_id, true, true);
             loop {
                 {
                     let mut state = self.lock_state();
-                    if !predicate(&state.value) {
-                        return WaitTimeoutResult::Ready(action(
-                            &mut state.value,
-                        ));
-                    }
-                    if self.elapsed() >= target_elapsed {
-                        return WaitTimeoutResult::TimedOut;
+                    let notified =
+                        Self::take_notification(&mut state, waiter_id);
+                    let timed_out = self.elapsed() >= target_elapsed;
+                    if notified || timed_out {
+                        if !predicate(&state.value) {
+                            return WaitTimeoutResult::Ready(action(
+                                &mut state.value,
+                            ));
+                        }
+                        if timed_out {
+                            return WaitTimeoutResult::TimedOut;
+                        }
                     }
                 }
                 change_receiver

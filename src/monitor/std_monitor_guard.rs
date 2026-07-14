@@ -53,7 +53,7 @@ use super::{
 ///     items.push("first");
 /// }
 ///
-/// assert_eq!(monitor.read(|items| items.len()), 1);
+/// assert_eq!(monitor.with_read(|items| items.len()), 1);
 /// ```
 pub struct StdMonitorGuard<'a, T> {
     /// StdMonitor that owns the mutex and condition variable.
@@ -129,7 +129,7 @@ impl<'a, T> StdMonitorGuard<'a, T> {
     /// monitor.notify_one();
     ///
     /// waiter.join().expect("waiter should finish");
-    /// assert!(!monitor.read(|ready| *ready));
+    /// assert!(!monitor.with_read(|ready| *ready));
     /// ```
     #[inline]
     pub fn wait(self) -> Self {

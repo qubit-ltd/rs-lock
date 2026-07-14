@@ -14,8 +14,8 @@
 //! directly, but packaged so callers do not have to keep a mutex and its
 //! matching condition variable as separate fields.
 //!
-//! The high-level APIs ([`ParkingLotMonitor::read`],
-//! [`ParkingLotMonitor::write`], [`ParkingLotMonitor::wait_while`], and
+//! The high-level APIs ([`ParkingLotMonitor::with_read`],
+//! [`ParkingLotMonitor::with_write`], [`ParkingLotMonitor::wait_while`], and
 //! [`ParkingLotMonitor::wait_until`]) are intended for short critical sections
 //! and simple guarded-suspension flows. The lower-level
 //! [`ParkingLotMonitor::lock`] API returns a [`ParkingLotMonitorGuard`], which
@@ -55,7 +55,8 @@ use super::{
 ///
 /// `ParkingLotMonitor` deliberately has two levels of API:
 ///
-/// * `read` and `write` acquire the mutex, run a closure, and release it.
+/// * `with_read` and `with_write` acquire the mutex, run a closure, and release
+///   it.
 /// * `wait_while`, `wait_until`, and their timeout variants implement common
 ///   predicate-based waits.
 /// * `lock` returns a [`ParkingLotMonitorGuard`] for callers that need to write
@@ -108,13 +109,13 @@ use super::{
 ///     );
 /// });
 ///
-/// monitor.write(|ready| {
+/// monitor.with_write(|ready| {
 ///     *ready = true;
 /// });
 /// monitor.notify_all();
 ///
 /// waiter.join().expect("waiter should finish");
-/// assert!(!monitor.read(|ready| *ready));
+/// assert!(!monitor.with_read(|ready| *ready));
 /// ```
 pub struct ParkingLotMonitor<T> {
     /// Mutex protecting the monitor state.
@@ -140,7 +141,7 @@ impl<T> ParkingLotMonitor<T> {
     /// use qubit_lock::ParkingLotMonitor;
     ///
     /// let monitor = ParkingLotMonitor::new(0_u32);
-    /// assert_eq!(monitor.read(|n| *n), 0);
+    /// assert_eq!(monitor.with_read(|n| *n), 0);
     /// ```
     #[inline]
     pub fn new(state: T) -> Self {
@@ -174,7 +175,7 @@ impl<T> ParkingLotMonitor<T> {
     ///     *value += 1;
     /// }
     ///
-    /// assert_eq!(monitor.read(|value| *value), 2);
+    /// assert_eq!(monitor.with_read(|value| *value), 2);
     /// ```
     #[inline]
     pub fn lock(&self) -> ParkingLotMonitorGuard<'_, T> {
@@ -200,11 +201,11 @@ impl<T> ParkingLotMonitor<T> {
     /// use qubit_lock::ParkingLotMonitor;
     ///
     /// let monitor = ParkingLotMonitor::new(10_i32);
-    /// let n = monitor.read(|x| *x);
+    /// let n = monitor.with_read(|x| *x);
     /// assert_eq!(n, 10);
     /// ```
     #[inline]
-    pub fn read<R, F>(&self, f: F) -> R
+    pub fn with_read<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R,
     {
@@ -233,14 +234,14 @@ impl<T> ParkingLotMonitor<T> {
     /// use qubit_lock::ParkingLotMonitor;
     ///
     /// let monitor = ParkingLotMonitor::new(String::new());
-    /// let len = monitor.write(|s| {
+    /// let len = monitor.with_write(|s| {
     ///     s.push_str("hi");
     ///     s.len()
     /// });
     /// assert_eq!(len, 2);
     /// ```
     #[inline]
-    pub fn write<R, F>(&self, f: F) -> R
+    pub fn with_write<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
@@ -271,7 +272,7 @@ impl<T> ParkingLotMonitor<T> {
     /// use qubit_lock::ParkingLotMonitor;
     ///
     /// let monitor = ParkingLotMonitor::new(Vec::<i32>::new());
-    /// let len = monitor.write_notify_one(|items| {
+    /// let len = monitor.with_write_notify_one(|items| {
     ///     items.push(7);
     ///     items.len()
     /// });
@@ -279,11 +280,11 @@ impl<T> ParkingLotMonitor<T> {
     /// assert_eq!(len, 1);
     /// ```
     #[inline]
-    pub fn write_notify_one<R, F>(&self, f: F) -> R
+    pub fn with_write_notify_one<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
-        let result = self.write(f);
+        let result = self.with_write(f);
         self.notify_one();
         result
     }
@@ -312,7 +313,7 @@ impl<T> ParkingLotMonitor<T> {
     /// use qubit_lock::ParkingLotMonitor;
     ///
     /// let monitor = ParkingLotMonitor::new(false);
-    /// let ready = monitor.write_notify_all(|ready| {
+    /// let ready = monitor.with_write_notify_all(|ready| {
     ///     *ready = true;
     ///     *ready
     /// });
@@ -320,11 +321,11 @@ impl<T> ParkingLotMonitor<T> {
     /// assert!(ready);
     /// ```
     #[inline]
-    pub fn write_notify_all<R, F>(&self, f: F) -> R
+    pub fn with_write_notify_all<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
-        let result = self.write(f);
+        let result = self.with_write(f);
         self.notify_all();
         result
     }
@@ -426,7 +427,7 @@ impl<T> ParkingLotMonitor<T> {
     ///     )
     /// });
     ///
-    /// monitor.write(|items| items.push(7));
+    /// monitor.with_write(|items| items.push(7));
     /// monitor.notify_one();
     ///
     /// assert_eq!(worker.join().expect("worker should finish"), 7);
@@ -488,7 +489,7 @@ impl<T> ParkingLotMonitor<T> {
     ///     )
     /// });
     ///
-    /// monitor.write(|ready| *ready = true);
+    /// monitor.with_write(|ready| *ready = true);
     /// monitor.notify_one();
     ///
     /// assert_eq!(waiter.join().expect("waiter should finish"), "done");
@@ -619,7 +620,7 @@ impl<T> ParkingLotMonitor<T> {
     ///     )
     /// });
     ///
-    /// monitor.write(|ready| *ready = true);
+    /// monitor.with_write(|ready| *ready = true);
     /// monitor.notify_one();
     ///
     /// assert_eq!(
@@ -664,7 +665,7 @@ impl<T> ParkingLotMonitor<T> {
     ///     })
     /// };
     ///
-    /// monitor.write(|n| *n = 1);
+    /// monitor.with_write(|n| *n = 1);
     /// monitor.notify_one();
     /// waiter.join().expect("waiter should finish");
     /// ```
@@ -695,7 +696,7 @@ impl<T> ParkingLotMonitor<T> {
     ///     }));
     /// }
     ///
-    /// monitor.write(|ready| *ready = true);
+    /// monitor.with_write(|ready| *ready = true);
     /// monitor.notify_all();
     /// for h in handles {
     ///     h.join().expect("waiter should finish");
@@ -797,7 +798,7 @@ impl<T: Default> Default for ParkingLotMonitor<T> {
     /// use qubit_lock::ParkingLotMonitor;
     ///
     /// let monitor: ParkingLotMonitor<String> = ParkingLotMonitor::default();
-    /// assert!(monitor.read(|s| s.is_empty()));
+    /// assert!(monitor.with_read(|s| s.is_empty()));
     /// ```
     #[inline]
     fn default() -> Self {

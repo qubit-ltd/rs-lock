@@ -28,25 +28,25 @@ use qubit_lock::{
 fn test_arc_parking_lot_monitor_new_read_write_updates_state() {
     let monitor = ArcParkingLotMonitor::new(vec![1, 2, 3]);
 
-    monitor.write(|items| {
+    monitor.with_write(|items| {
         items.push(4);
     });
 
-    assert_eq!(monitor.read(|items| items.clone()), vec![1, 2, 3, 4]);
+    assert_eq!(monitor.with_read(|items| items.clone()), vec![1, 2, 3, 4]);
 }
 
 #[test]
 fn test_arc_parking_lot_monitor_default_uses_default_value() {
     let monitor = ArcParkingLotMonitor::<Vec<i32>>::default();
 
-    assert!(monitor.read(|items| items.is_empty()));
+    assert!(monitor.with_read(|items| items.is_empty()));
 }
 
 #[test]
 fn test_arc_parking_lot_monitor_from_uses_supplied_value() {
     let monitor = ArcParkingLotMonitor::from(vec![1, 2, 3]);
 
-    assert_eq!(monitor.read(|items| items.len()), 3);
+    assert_eq!(monitor.with_read(|items| items.len()), 3);
 }
 
 #[test]
@@ -54,37 +54,37 @@ fn test_arc_parking_lot_monitor_clone_shares_state() {
     let monitor = ArcParkingLotMonitor::new(1usize);
     let cloned = monitor.clone();
 
-    cloned.write(|value| {
+    cloned.with_write(|value| {
         *value += 1;
     });
 
-    assert_eq!(monitor.read(|value| *value), 2);
+    assert_eq!(monitor.with_read(|value| *value), 2);
 }
 
 #[test]
 fn test_arc_parking_lot_monitor_write_notify_one_updates_state() {
     let monitor = ArcParkingLotMonitor::new(Vec::<i32>::new());
 
-    let len = monitor.write_notify_one(|items| {
+    let len = monitor.with_write_notify_one(|items| {
         items.push(7);
         items.len()
     });
 
     assert_eq!(len, 1);
-    assert_eq!(monitor.read(|items| items.clone()), vec![7]);
+    assert_eq!(monitor.with_read(|items| items.clone()), vec![7]);
 }
 
 #[test]
 fn test_arc_parking_lot_monitor_write_notify_all_updates_state() {
     let monitor = ArcParkingLotMonitor::new(false);
 
-    let ready = monitor.write_notify_all(|ready| {
+    let ready = monitor.with_write_notify_all(|ready| {
         *ready = true;
         *ready
     });
 
     assert!(ready);
-    assert!(monitor.read(|ready| *ready));
+    assert!(monitor.with_read(|ready| *ready));
 }
 
 #[test]
@@ -97,7 +97,7 @@ fn test_arc_parking_lot_monitor_lock_guard_updates_state() {
         items.push(2);
     }
 
-    assert_eq!(monitor.read(|items| items.clone()), vec![1, 2]);
+    assert_eq!(monitor.with_read(|items| items.clone()), vec![1, 2]);
 }
 
 #[test]
@@ -109,11 +109,11 @@ fn test_arc_parking_lot_monitor_deref_and_as_ref_expose_monitor_api() {
         *value += 1;
     }
 
-    monitor.as_ref().write(|value| {
+    monitor.as_ref().with_write(|value| {
         *value += 1;
     });
 
-    assert_eq!(monitor.read(|value| *value), 3);
+    assert_eq!(monitor.with_read(|value| *value), 3);
 }
 
 #[test]
@@ -230,7 +230,7 @@ fn test_arc_parking_lot_monitor_wait_until_blocks_until_notify_one() {
         .expect("waiter should check the initial state within timeout");
     drop(monitor.lock());
 
-    monitor.write(|ready| {
+    monitor.with_write(|ready| {
         *ready = true;
     });
     monitor.notify_one();
@@ -242,7 +242,7 @@ fn test_arc_parking_lot_monitor_wait_until_blocks_until_notify_one() {
         42,
     );
     waiter.join().expect("waiter should not panic");
-    assert!(!monitor.read(|ready| *ready));
+    assert!(!monitor.with_read(|ready| *ready));
 }
 
 #[test]
@@ -283,7 +283,7 @@ fn test_arc_parking_lot_monitor_wait_until_for_delegates_to_monitor() {
         .recv_timeout(Duration::from_secs(1))
         .expect("waiter should start within timeout");
 
-    monitor.write(|ready| *ready = true);
+    monitor.with_write(|ready| *ready = true);
     monitor.notify_all();
 
     assert_eq!(
@@ -327,7 +327,7 @@ fn test_arc_parking_lot_monitor_wait_while_delegates_to_monitor() {
         .expect("waiter should check the initial state within timeout");
     drop(monitor.lock());
 
-    monitor.write(|items| items.push(7));
+    monitor.with_write(|items| items.push(7));
     monitor.notify_one();
 
     assert_eq!(
@@ -365,7 +365,7 @@ fn test_arc_parking_lot_monitor_wait_while_for_returns_ready_when_predicate_clea
         .recv_timeout(Duration::from_secs(1))
         .expect("waiter should start within timeout");
 
-    monitor.write(|items| items.push(9));
+    monitor.with_write(|items| items.push(9));
     monitor.notify_all();
 
     assert_eq!(
@@ -431,7 +431,7 @@ fn test_arc_parking_lot_monitor_notify_all_wakes_multiple_waiters() {
         Err(mpsc::TryRecvError::Empty),
     ));
 
-    monitor.write(|ready| {
+    monitor.with_write(|ready| {
         *ready = true;
     });
     monitor.notify_all();

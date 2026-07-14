@@ -48,35 +48,35 @@ impl<T> ArcTokioMonitor<T> {
     }
 
     /// Reads protected state asynchronously.
-    pub async fn async_read<R, F>(&self, f: F) -> R
+    pub async fn with_read_async<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R,
     {
-        self.inner.async_read(f).await
+        self.inner.with_read_async(f).await
     }
 
     /// Mutates protected state asynchronously without notifying.
-    pub async fn async_write<R, F>(&self, f: F) -> R
+    pub async fn with_write_async<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
-        self.inner.async_write(f).await
+        self.inner.with_write_async(f).await
     }
 
     /// Mutates protected state asynchronously and wakes one waiter.
-    pub async fn async_write_notify_one<R, F>(&self, f: F) -> R
+    pub async fn with_write_notify_one_async<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
-        self.inner.async_write_notify_one(f).await
+        self.inner.with_write_notify_one_async(f).await
     }
 
     /// Mutates protected state asynchronously and wakes all waiters.
-    pub async fn async_write_notify_all<R, F>(&self, f: F) -> R
+    pub async fn with_write_notify_all_async<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
-        self.inner.async_write_notify_all(f).await
+        self.inner.with_write_notify_all_async(f).await
     }
 
     /// Wakes one async waiter.

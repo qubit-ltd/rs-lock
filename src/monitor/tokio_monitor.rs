@@ -7,15 +7,13 @@
 // =============================================================================
 //! Tokio-based asynchronous monitor.
 
-use std::time::{
-    Duration,
-    Instant,
-};
+use std::time::Duration;
 
 use tokio::sync::{
     Mutex,
     Notify,
 };
+use tokio::time::Instant;
 
 use super::{
     AsyncConditionWaiter,
@@ -66,7 +64,7 @@ impl<T> TokioMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
-    pub async fn async_read<R, F>(&self, f: F) -> R
+    pub async fn with_read_async<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R,
     {
@@ -85,7 +83,7 @@ impl<T> TokioMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
-    pub async fn async_write<R, F>(&self, f: F) -> R
+    pub async fn with_write_async<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
@@ -102,11 +100,11 @@ impl<T> TokioMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
-    pub async fn async_write_notify_one<R, F>(&self, f: F) -> R
+    pub async fn with_write_notify_one_async<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
-        let result = self.async_write(f).await;
+        let result = self.with_write_async(f).await;
         self.notify_one();
         result
     }
@@ -120,11 +118,11 @@ impl<T> TokioMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
-    pub async fn async_write_notify_all<R, F>(&self, f: F) -> R
+    pub async fn with_write_notify_all_async<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
-        let result = self.async_write(f).await;
+        let result = self.with_write_async(f).await;
         self.notify_all();
         result
     }

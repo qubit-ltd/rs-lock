@@ -102,35 +102,35 @@ impl<T: Send + 'static> ArcMockMonitor<T> {
     }
 
     /// Reads protected state.
-    pub fn read<R, F>(&self, f: F) -> R
+    pub fn with_read<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R,
     {
-        self.inner.read(f)
+        self.inner.with_read(f)
     }
 
     /// Mutates protected state without notifying.
-    pub fn write<R, F>(&self, f: F) -> R
+    pub fn with_write<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
-        self.inner.write(f)
+        self.inner.with_write(f)
     }
 
     /// Mutates protected state and wakes one waiter.
-    pub fn write_notify_one<R, F>(&self, f: F) -> R
+    pub fn with_write_notify_one<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
-        self.inner.write_notify_one(f)
+        self.inner.with_write_notify_one(f)
     }
 
     /// Mutates protected state and wakes all waiters.
-    pub fn write_notify_all<R, F>(&self, f: F) -> R
+    pub fn with_write_notify_all<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
-        self.inner.write_notify_all(f)
+        self.inner.with_write_notify_all(f)
     }
 
     /// Wakes one waiter.
