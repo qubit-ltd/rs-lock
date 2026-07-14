@@ -38,6 +38,34 @@ use qubit_lock::{
     WaitTimeoutStatus,
 };
 
+/// Verifies that advancing a shared clock from a state closure does not
+/// re-enter the monitor state lock indefinitely.
+#[test]
+fn test_mock_monitor_clock_can_advance_inside_state_closure() {
+    const REAL_TIMEOUT: Duration = Duration::from_millis(100);
+
+    let clock = Arc::new(ManualMonotonicClock::new());
+    let monitor = Arc::new(MockMonitor::from_clock((), Arc::clone(&clock)));
+    let worker_monitor = Arc::clone(&monitor);
+    let worker_clock = Arc::clone(&clock);
+    let (done_tx, done_rx) = mpsc::channel();
+    let worker = thread::spawn(move || {
+        worker_monitor.with_write(|_| {
+            worker_clock
+                .advance(Duration::from_millis(1))
+                .expect("manual clock should advance inside state closure");
+        });
+        done_tx
+            .send(())
+            .expect("test should receive closure completion");
+    });
+
+    done_rx
+        .recv_timeout(REAL_TIMEOUT)
+        .expect("clock advance inside state closure should not deadlock");
+    worker.join().expect("state closure worker should finish");
+}
+
 #[test]
 fn test_mock_monitor_from_clock_uses_shared_manual_time() {
     let clock = Arc::new(ManualMonotonicClock::new());
