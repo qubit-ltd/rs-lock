@@ -24,7 +24,7 @@ fn test_parking_lot_monitor_guard_updates_state() {
         items.push(2);
     }
 
-    assert_eq!(monitor.read(|items| items.clone()), vec![1, 2]);
+    assert_eq!(monitor.with_read(|items| items.clone()), vec![1, 2]);
 }
 
 #[test]

@@ -37,13 +37,13 @@ fn test_arc_mock_monitor_clone_shares_state_and_mock_time() {
     let monitor = ArcMockMonitor::new(Vec::<i32>::new());
     let cloned = monitor.clone();
 
-    cloned.write(|items| items.push(7));
+    cloned.with_write(|items| items.push(7));
     monitor
         .monotonic_clock()
         .advance(Duration::from_millis(5))
         .expect("manual clock should advance");
 
-    assert_eq!(monitor.read(|items| items.clone()), vec![7]);
+    assert_eq!(monitor.with_read(|items| items.clone()), vec![7]);
     assert_eq!(cloned.elapsed(), Duration::from_millis(5));
 }
 
@@ -102,18 +102,18 @@ fn test_arc_mock_monitor_helpers_and_conversions_delegate_to_inner_monitor() {
         .expect("manual clock should advance");
     assert_eq!(monitor.elapsed(), Duration::from_millis(7));
 
-    let one_result = monitor.write_notify_one(|ready| {
+    let one_result = monitor.with_write_notify_one(|ready| {
         *ready = true;
         1
     });
     assert_eq!(one_result, 1);
 
-    let all_result = monitor.write_notify_all(|ready| {
+    let all_result = monitor.with_write_notify_all(|ready| {
         *ready = false;
         2
     });
     assert_eq!(all_result, 2);
-    assert!(!monitor.read(|ready| *ready));
+    assert!(!monitor.with_read(|ready| *ready));
 
     monitor.notify_one();
     monitor.notify_all();
@@ -121,7 +121,7 @@ fn test_arc_mock_monitor_helpers_and_conversions_delegate_to_inner_monitor() {
     assert_eq!((*monitor).elapsed(), Duration::from_millis(7));
 
     let default_monitor = ArcMockMonitor::<Vec<i32>>::default();
-    assert!(default_monitor.read(|items| items.is_empty()));
+    assert!(default_monitor.with_read(|items| items.is_empty()));
 }
 
 #[test]

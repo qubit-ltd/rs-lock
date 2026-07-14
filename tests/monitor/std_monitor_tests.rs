@@ -31,11 +31,11 @@ use qubit_lock::{
 fn test_std_monitor_new_read_write_updates_state() {
     let monitor = StdMonitor::new(vec![1, 2, 3]);
 
-    monitor.write(|items| {
+    monitor.with_write(|items| {
         items.push(4);
     });
 
-    assert_eq!(monitor.read(|items| items.clone()), vec![1, 2, 3, 4]);
+    assert_eq!(monitor.with_read(|items| items.clone()), vec![1, 2, 3, 4]);
 }
 
 #[test]
@@ -71,7 +71,7 @@ fn test_std_monitor_write_notify_one_updates_state_and_wakes_waiter() {
         .expect("waiter should check state before notification");
     drop(monitor.lock());
 
-    let write_result = monitor.write_notify_one(|ready| {
+    let write_result = monitor.with_write_notify_one(|ready| {
         *ready = true;
         5
     });
@@ -80,11 +80,11 @@ fn test_std_monitor_write_notify_one_updates_state_and_wakes_waiter() {
     assert_eq!(
         done_rx
             .recv_timeout(Duration::from_secs(1))
-            .expect("waiter should finish after write_notify_one"),
+            .expect("waiter should finish after with_write_notify_one"),
         7,
     );
     waiter.join().expect("waiter should not panic");
-    assert!(!monitor.read(|ready| *ready));
+    assert!(!monitor.with_read(|ready| *ready));
 }
 
 #[test]
@@ -141,7 +141,7 @@ fn test_std_monitor_write_notify_all_wakes_all_waiters() {
         .expect("second waiter should check state before notification");
     drop(monitor.lock());
 
-    let write_result = monitor.write_notify_all(|ready| {
+    let write_result = monitor.with_write_notify_all(|ready| {
         *ready = true;
         2
     });
@@ -149,10 +149,10 @@ fn test_std_monitor_write_notify_all_wakes_all_waiters() {
     assert_eq!(write_result, 2);
     done_rx
         .recv_timeout(Duration::from_secs(1))
-        .expect("first waiter should finish after write_notify_all");
+        .expect("first waiter should finish after with_write_notify_all");
     done_rx
         .recv_timeout(Duration::from_secs(1))
-        .expect("second waiter should finish after write_notify_all");
+        .expect("second waiter should finish after with_write_notify_all");
     first_waiter.join().expect("first waiter should not panic");
     second_waiter
         .join()
@@ -163,14 +163,14 @@ fn test_std_monitor_write_notify_all_wakes_all_waiters() {
 fn test_std_monitor_default_uses_default_value() {
     let monitor = StdMonitor::<Vec<i32>>::default();
 
-    assert!(monitor.read(|items| items.is_empty()));
+    assert!(monitor.with_read(|items| items.is_empty()));
 }
 
 #[test]
 fn test_std_monitor_from_uses_supplied_value() {
     let monitor = StdMonitor::from(vec![1, 2, 3]);
 
-    assert_eq!(monitor.read(|items| items.len()), 3);
+    assert_eq!(monitor.with_read(|items| items.len()), 3);
 }
 
 #[test]
@@ -264,7 +264,7 @@ fn test_std_monitor_wait_until_returns_when_predicate_is_ready() {
     );
 
     assert_eq!(result, 4);
-    assert_eq!(monitor.read(|value| *value), 4);
+    assert_eq!(monitor.with_read(|value| *value), 4);
 }
 
 #[test]
@@ -280,7 +280,7 @@ fn test_std_monitor_wait_while_returns_when_predicate_is_false() {
     );
 
     assert_eq!(result, 4);
-    assert_eq!(monitor.read(|items| items.clone()), vec![1, 2, 3, 4]);
+    assert_eq!(monitor.with_read(|items| items.clone()), vec![1, 2, 3, 4]);
 }
 
 #[test]
@@ -316,7 +316,7 @@ fn test_std_monitor_wait_until_blocks_until_notify_one() {
         .expect("waiter should check the initial state within timeout");
     drop(monitor.lock());
 
-    monitor.write(|ready| {
+    monitor.with_write(|ready| {
         *ready = true;
     });
     monitor.notify_one();
@@ -328,7 +328,7 @@ fn test_std_monitor_wait_until_blocks_until_notify_one() {
         42,
     );
     waiter.join().expect("waiter should not panic");
-    assert!(!monitor.read(|ready| *ready));
+    assert!(!monitor.with_read(|ready| *ready));
 }
 
 #[test]
@@ -429,7 +429,7 @@ fn test_std_monitor_wait_until_for_returns_result_when_predicate_true() {
     started_rx
         .recv_timeout(Duration::from_secs(1))
         .expect("waiter should start within timeout");
-    monitor.write(|ready| {
+    monitor.with_write(|ready| {
         *ready = true;
     });
     monitor.notify_one();
@@ -441,7 +441,7 @@ fn test_std_monitor_wait_until_for_returns_result_when_predicate_true() {
         WaitTimeoutResult::Ready(7),
     );
     waiter.join().expect("waiter should not panic");
-    assert!(!monitor.read(|ready| *ready));
+    assert!(!monitor.with_read(|ready| *ready));
 }
 
 #[test]
@@ -478,7 +478,7 @@ fn test_std_monitor_wait_until_ignores_notification_until_predicate_true() {
         .expect("waiter should recheck after notification");
     drop(monitor.lock());
 
-    monitor.write(|ready| {
+    monitor.with_write(|ready| {
         *ready = true;
     });
     monitor.notify_all();
@@ -522,7 +522,7 @@ fn test_std_monitor_notify_all_wakes_all_ready_waiters() {
             .expect("waiter should start within timeout");
     }
 
-    monitor.write(|permits| {
+    monitor.with_write(|permits| {
         *permits = WAITER_COUNT;
     });
     monitor.notify_all();
@@ -535,7 +535,7 @@ fn test_std_monitor_notify_all_wakes_all_ready_waiters() {
     for waiter in waiters {
         waiter.join().expect("waiter should not panic");
     }
-    assert_eq!(monitor.read(|permits| *permits), 0);
+    assert_eq!(monitor.with_read(|permits| *permits), 0);
 }
 
 #[test]
@@ -544,20 +544,20 @@ fn test_std_monitor_remains_usable_after_panic_while_locked() {
     let poison_monitor = Arc::clone(&monitor);
 
     let poisoner = thread::spawn(move || {
-        poison_monitor.write(|value| {
+        poison_monitor.with_write(|value| {
             *value = 7;
             panic!("intentional panic while holding monitor");
         });
     });
 
     assert!(poisoner.join().is_err());
-    assert_eq!(monitor.read(|value| *value), 7);
+    assert_eq!(monitor.with_read(|value| *value), 7);
 
-    monitor.write(|value| {
+    monitor.with_write(|value| {
         *value += 1;
     });
 
-    assert_eq!(monitor.read(|value| *value), 8);
+    assert_eq!(monitor.with_read(|value| *value), 8);
 }
 
 #[test]
@@ -566,7 +566,7 @@ fn test_std_monitor_wait_until_continues_after_panic_while_locked() {
     let poison_monitor = Arc::clone(&monitor);
 
     let poisoner = thread::spawn(move || {
-        poison_monitor.write(|ready| {
+        poison_monitor.with_write(|ready| {
             *ready = false;
             panic!("intentional panic while holding monitor");
         });
@@ -599,7 +599,7 @@ fn test_std_monitor_wait_until_continues_after_panic_while_locked() {
         .expect("waiter should check the initial state within timeout");
     drop(monitor.lock());
 
-    monitor.write(|ready| {
+    monitor.with_write(|ready| {
         *ready = true;
     });
     monitor.notify_all();
@@ -608,5 +608,5 @@ fn test_std_monitor_wait_until_continues_after_panic_while_locked() {
         .recv_timeout(Duration::from_secs(1))
         .expect("waiter should finish after monitor remains usable");
     waiter.join().expect("waiter should not panic");
-    assert!(!monitor.read(|ready| *ready));
+    assert!(!monitor.with_read(|ready| *ready));
 }

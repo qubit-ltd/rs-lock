@@ -41,4 +41,4 @@ qubit-clock = { version = "0.9", path = "../rs-clock" }
 
 [dev-dependencies]
 semver = { version = "1.0", default-features = false }
-tokio = { version = "1.52", default-features = false, features = ["macros", "rt-multi-thread", "time"] }
+tokio = { version = "1.52", default-features = false, features = ["macros", "rt-multi-thread", "test-util", "time"] }

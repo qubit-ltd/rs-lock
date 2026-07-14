@@ -20,7 +20,7 @@ use qubit_lock::{
     WaitTimeoutStatus,
 };
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_for_times_out() {
     let monitor = TokioMonitor::new(false);
 
@@ -30,15 +30,18 @@ async fn test_tokio_monitor_async_wait_for_times_out() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_helpers_and_conversions_delegate_to_state() {
     let monitor = TokioMonitor::from(vec![1]);
 
-    monitor.async_write(|items| items.push(2)).await;
-    assert_eq!(monitor.async_read(|items| items.clone()).await, vec![1, 2]);
+    monitor.with_write_async(|items| items.push(2)).await;
+    assert_eq!(
+        monitor.with_read_async(|items| items.clone()).await,
+        vec![1, 2],
+    );
 
     let one_result = monitor
-        .async_write_notify_one(|items| {
+        .with_write_notify_one_async(|items| {
             items.push(3);
             items.len()
         })
@@ -46,7 +49,7 @@ async fn test_tokio_monitor_helpers_and_conversions_delegate_to_state() {
     assert_eq!(one_result, 3);
 
     let all_result = monitor
-        .async_write_notify_all(|items| {
+        .with_write_notify_all_async(|items| {
             items.push(4);
             items.len()
         })
@@ -57,10 +60,14 @@ async fn test_tokio_monitor_helpers_and_conversions_delegate_to_state() {
     monitor.notify_all();
 
     let default_monitor = TokioMonitor::<Vec<i32>>::default();
-    assert!(default_monitor.async_read(|items| items.is_empty()).await);
+    assert!(
+        default_monitor
+            .with_read_async(|items| items.is_empty())
+            .await
+    );
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_traits_delegate_to_monitor_methods() {
     let monitor = TokioMonitor::new(vec![1, 2]);
 
@@ -90,7 +97,7 @@ async fn test_tokio_monitor_traits_delegate_to_monitor_methods() {
         WaitTimeoutStatus::Woken,
     );
 
-    monitor.async_write(|items| items.clear()).await;
+    monitor.with_write_async(|items| items.clear()).await;
     let condition_wait =
         <TokioMonitor<Vec<i32>> as AsyncConditionWaiter>::wait_while_async(
             &monitor,
@@ -103,7 +110,9 @@ async fn test_tokio_monitor_traits_delegate_to_monitor_methods() {
             .await
             .is_err()
     );
-    monitor.async_write_notify_one(|items| items.push(2)).await;
+    monitor
+        .with_write_notify_one_async(|items| items.push(2))
+        .await;
     assert_eq!(condition_wait.await, 2);
 
     let timeout_condition_wait =
@@ -122,35 +131,41 @@ async fn test_tokio_monitor_traits_delegate_to_monitor_methods() {
         .await
         .is_err()
     );
-    monitor.async_write_notify_one(|items| items.push(1)).await;
+    monitor
+        .with_write_notify_one_async(|items| items.push(1))
+        .await;
     assert_eq!(timeout_condition_wait.await, WaitTimeoutResult::Ready(1),);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_for_uses_call_time_budget() {
     let monitor = TokioMonitor::new(false);
+    let start = tokio::time::Instant::now();
     let wait = monitor.wait_for_async(Duration::from_millis(5));
 
-    tokio::time::sleep(Duration::from_millis(10)).await;
+    tokio::time::advance(Duration::from_millis(10)).await;
 
     assert_eq!(wait.await, WaitTimeoutStatus::TimedOut);
+    assert_eq!(start.elapsed(), Duration::from_millis(10));
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_while_for_uses_call_time_budget() {
     let monitor = TokioMonitor::new(false);
+    let start = tokio::time::Instant::now();
     let wait = monitor.wait_while_for_async(
         Duration::from_millis(5),
         |ready| !*ready,
         |_| 7,
     );
 
-    tokio::time::sleep(Duration::from_millis(10)).await;
+    tokio::time::advance(Duration::from_millis(10)).await;
 
     assert_eq!(wait.await, WaitTimeoutResult::TimedOut);
+    assert_eq!(start.elapsed(), Duration::from_millis(10));
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_until_runs_action_after_notify() {
     let monitor = std::sync::Arc::new(TokioMonitor::new(false));
     let waiter_monitor = std::sync::Arc::clone(&monitor);
@@ -168,13 +183,15 @@ async fn test_tokio_monitor_async_wait_until_runs_action_after_notify() {
     });
 
     tokio::task::yield_now().await;
-    monitor.async_write_notify_one(|ready| *ready = true).await;
+    monitor
+        .with_write_notify_one_async(|ready| *ready = true)
+        .await;
 
     assert_eq!(waiter.await.expect("waiter task should finish"), 7);
-    assert!(!monitor.async_read(|ready| *ready).await);
+    assert!(!monitor.with_read_async(|ready| *ready).await);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_while_for_returns_ready_after_notify() {
     let monitor = std::sync::Arc::new(TokioMonitor::new(false));
     let waiter_monitor = std::sync::Arc::clone(&monitor);
@@ -193,7 +210,7 @@ async fn test_tokio_monitor_async_wait_while_for_returns_ready_after_notify() {
     });
 
     tokio::task::yield_now().await;
-    monitor.async_write(|ready| *ready = true).await;
+    monitor.with_write_async(|ready| *ready = true).await;
     monitor.notify_one();
 
     assert_eq!(
@@ -202,7 +219,7 @@ async fn test_tokio_monitor_async_wait_while_for_returns_ready_after_notify() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_while_for_rechecks_state_after_timeout()
 {
     let monitor = std::sync::Arc::new(TokioMonitor::new(false));
@@ -221,8 +238,8 @@ async fn test_tokio_monitor_async_wait_while_for_rechecks_state_after_timeout()
             .await
     });
 
-    tokio::time::sleep(Duration::from_millis(5)).await;
-    monitor.async_write(|ready| *ready = true).await;
+    tokio::time::advance(Duration::from_millis(5)).await;
+    monitor.with_write_async(|ready| *ready = true).await;
 
     assert_eq!(
         waiter.await.expect("waiter task should finish"),

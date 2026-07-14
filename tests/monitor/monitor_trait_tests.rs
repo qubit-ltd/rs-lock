@@ -9,8 +9,9 @@
 
 use std::time::Duration;
 
+#[cfg(feature = "mock")]
+use qubit_lock::ArcMockMonitor;
 use qubit_lock::{
-    ArcMockMonitor,
     ArcParkingLotMonitor,
     Monitor,
     SharedMonitor,
@@ -51,6 +52,15 @@ fn test_monitor_trait_accepts_parking_lot_monitor() {
 }
 
 #[test]
+fn test_shared_monitor_trait_accepts_parking_lot_monitor_handle() {
+    let monitor = ArcParkingLotMonitor::new(false);
+    let cloned = require_shared_monitor(monitor);
+
+    assert_eq!(cloned.wait_for(Duration::ZERO), WaitTimeoutStatus::TimedOut);
+}
+
+#[test]
+#[cfg(feature = "mock")]
 fn test_shared_monitor_trait_accepts_mock_monitor_handle() {
     let monitor = ArcMockMonitor::new(false);
     let cloned = require_shared_monitor(monitor);
@@ -86,7 +96,7 @@ where
 }
 
 #[cfg(feature = "async")]
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn test_async_monitor_trait_accepts_tokio_monitor() {
     let monitor = ArcTokioMonitor::new(false);
 
@@ -94,10 +104,10 @@ async fn test_async_monitor_trait_accepts_tokio_monitor() {
 }
 
 #[cfg(feature = "async")]
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn test_shared_async_monitor_trait_accepts_tokio_monitor_handle() {
     let monitor = ArcTokioMonitor::new(false);
     let cloned = require_shared_async_monitor(monitor);
 
-    assert!(!cloned.async_read(|ready| *ready).await);
+    assert!(!cloned.with_read_async(|ready| *ready).await);
 }

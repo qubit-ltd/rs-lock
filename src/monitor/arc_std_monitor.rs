@@ -60,13 +60,13 @@ use super::{
 ///     );
 /// });
 ///
-/// monitor.write(|ready| {
+/// monitor.with_write(|ready| {
 ///     *ready = true;
 /// });
 /// monitor.notify_all();
 ///
 /// waiter.join().expect("waiter should finish");
-/// assert!(!monitor.read(|ready| *ready));
+/// assert!(!monitor.with_read(|ready| *ready));
 /// ```
 pub struct ArcStdMonitor<T> {
     /// Shared monitor instance.
@@ -115,7 +115,7 @@ impl<T> ArcStdMonitor<T> {
     ///     *value += 1;
     /// }
     ///
-    /// assert_eq!(monitor.read(|value| *value), 2);
+    /// assert_eq!(monitor.with_read(|value| *value), 2);
     /// ```
     #[inline]
     pub fn lock(&self) -> StdMonitorGuard<'_, T> {
@@ -124,9 +124,8 @@ impl<T> ArcStdMonitor<T> {
 
     /// Acquires the monitor and reads the protected state.
     ///
-    /// This delegates to [`StdMonitor::read`]. The closure runs while the
-    /// monitor mutex is held, so keep it short and avoid long blocking
-    /// work.
+    /// This delegates to [`StdMonitor::with_read`]. The closure runs while the
+    /// monitor mutex is held, so keep it short and avoid long blocking work.
     ///
     /// # Arguments
     ///
@@ -136,16 +135,16 @@ impl<T> ArcStdMonitor<T> {
     ///
     /// The value returned by `f`.
     #[inline]
-    pub fn read<R, F>(&self, f: F) -> R
+    pub fn with_read<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R,
     {
-        self.inner.read(f)
+        self.inner.with_read(f)
     }
 
     /// Acquires the monitor and mutates the protected state.
     ///
-    /// This delegates to [`StdMonitor::write`]. Callers should explicitly
+    /// This delegates to [`StdMonitor::with_write`]. Callers should explicitly
     /// invoke [`Self::notify_one`] or [`Self::notify_all`] after changing
     /// state that a waiting thread may observe.
     ///
@@ -157,19 +156,19 @@ impl<T> ArcStdMonitor<T> {
     ///
     /// The value returned by `f`.
     #[inline]
-    pub fn write<R, F>(&self, f: F) -> R
+    pub fn with_write<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
-        self.inner.write(f)
+        self.inner.with_write(f)
     }
 
     /// Mutates the protected state and wakes one waiter.
     ///
-    /// This delegates to [`StdMonitor::write_notify_one`]. The closure runs
-    /// while the monitor mutex is held; after it returns, the lock is released
-    /// and one waiter is notified. If `f` panics, the panic is propagated and
-    /// no notification is sent.
+    /// This delegates to [`StdMonitor::with_write_notify_one`]. The closure
+    /// runs while the monitor mutex is held; after it returns, the lock is
+    /// released and one waiter is notified. If `f` panics, the panic is
+    /// propagated and no notification is sent.
     ///
     /// # Arguments
     ///
@@ -179,19 +178,19 @@ impl<T> ArcStdMonitor<T> {
     ///
     /// The value returned by `f`.
     #[inline]
-    pub fn write_notify_one<R, F>(&self, f: F) -> R
+    pub fn with_write_notify_one<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
-        self.inner.write_notify_one(f)
+        self.inner.with_write_notify_one(f)
     }
 
     /// Mutates the protected state and wakes all waiters.
     ///
-    /// This delegates to [`StdMonitor::write_notify_all`]. The closure runs
-    /// while the monitor mutex is held; after it returns, the lock is released
-    /// and all waiters are notified. If `f` panics, the panic is propagated and
-    /// no notification is sent.
+    /// This delegates to [`StdMonitor::with_write_notify_all`]. The closure
+    /// runs while the monitor mutex is held; after it returns, the lock is
+    /// released and all waiters are notified. If `f` panics, the panic is
+    /// propagated and no notification is sent.
     ///
     /// # Arguments
     ///
@@ -201,11 +200,11 @@ impl<T> ArcStdMonitor<T> {
     ///
     /// The value returned by `f`.
     #[inline]
-    pub fn write_notify_all<R, F>(&self, f: F) -> R
+    pub fn with_write_notify_all<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
-        self.inner.write_notify_all(f)
+        self.inner.with_write_notify_all(f)
     }
 
     /// Waits for a notification without checking state.
@@ -289,7 +288,7 @@ impl<T> ArcStdMonitor<T> {
     ///     )
     /// });
     ///
-    /// monitor.write(|items| items.push(7));
+    /// monitor.with_write(|items| items.push(7));
     /// monitor.notify_one();
     ///
     /// assert_eq!(worker.join().expect("worker should finish"), 7);
@@ -418,7 +417,7 @@ impl<T> ArcStdMonitor<T> {
     ///     )
     /// });
     ///
-    /// monitor.write(|ready| *ready = true);
+    /// monitor.with_write(|ready| *ready = true);
     /// monitor.notify_one();
     ///
     /// assert_eq!(
