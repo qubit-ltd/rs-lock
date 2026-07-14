@@ -22,11 +22,15 @@ const ARC_ASYNC_RW_LOCK_SRC: &str =
 
 #[test]
 /// Ensures README files only reference the current lock method names.
-fn test_readme_no_legacy_lock_api_names() {
+fn test_readme_uses_with_lock_api_names() {
     assert!(!README_EN.contains("with_lock"));
     assert!(!README_EN.contains("try_with_lock"));
     assert!(!README_ZH.contains("with_lock"));
     assert!(!README_ZH.contains("try_with_lock"));
+    assert!(README_EN.contains("with_read"));
+    assert!(README_EN.contains("with_write"));
+    assert!(README_ZH.contains("with_read"));
+    assert!(README_ZH.contains("with_write"));
 }
 
 #[test]
@@ -42,17 +46,30 @@ fn test_readme_quick_start_imports_lock_trait() {
 fn test_readme_documents_deref_and_as_ref_support() {
     assert!(README_EN.contains("Deref"));
     assert!(README_EN.contains("AsRef"));
+    assert!(README_EN.contains("`lock.read()`"));
     assert!(README_ZH.contains("Deref"));
     assert!(README_ZH.contains("AsRef"));
+    assert!(README_ZH.contains("`lock.read()`"));
 }
 
 #[test]
 /// Ensures README monitor snippets show the combined write-and-notify API.
-fn test_readme_monitor_example_uses_write_notify_one() {
+fn test_readme_monitor_example_uses_with_write_notify_one() {
     assert!(README_EN.contains("use qubit_lock::ArcParkingLotMonitor;"));
-    assert!(README_EN.contains("write_notify_one"));
+    assert!(README_EN.contains("with_write_notify_one"));
     assert!(README_ZH.contains("use qubit_lock::ArcParkingLotMonitor;"));
-    assert!(README_ZH.contains("write_notify_one"));
+    assert!(README_ZH.contains("with_write_notify_one"));
+}
+
+#[test]
+/// Ensures README files document the default, async, and mock feature tiers.
+fn test_readme_documents_feature_tiers() {
+    assert!(README_EN.contains("default feature set"));
+    assert!(README_EN.contains("`async`"));
+    assert!(README_EN.contains("`mock`"));
+    assert!(README_ZH.contains("默认特性集"));
+    assert!(README_ZH.contains("`async`"));
+    assert!(README_ZH.contains("`mock`"));
 }
 
 #[test]

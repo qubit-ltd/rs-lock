@@ -13,12 +13,14 @@
 
 - `ArcMutex`、`ArcRwLock`：基于 parking_lot、内部已集成 `Arc` 的同步锁包装器。
 - `ArcStdMutex`、`ArcStdRwLock`：基于标准库、保留 poison 语义的同步锁包装器。
-- `ArcAsyncMutex`、`ArcAsyncRwLock`：默认 `async` 特性启用的 Tokio 异步锁包装器。
+- `ArcAsyncMutex`、`ArcAsyncRwLock`：由可选 `async` 特性启用的 Tokio
+  异步锁包装器。
 - `ParkingLotMonitor`、`ArcParkingLotMonitor`、`ParkingLotMonitorGuard`：基于 parking_lot 的条件变量协调工具。
 - `StdMonitor`、`ArcStdMonitor`、`StdMonitorGuard`：基于标准库的条件变量协调工具。
-- `MockMonitor`、`ArcMockMonitor`：由共享的
+- `MockMonitor`、`ArcMockMonitor`：由可选 `mock` 特性启用、共享的
   `qubit_clock::ManualMonotonicClock` 驱动的确定性测试 monitor。
-- `TokioMonitor`、`ArcTokioMonitor`：基于 Tokio 的异步 monitor 协调工具。
+- `TokioMonitor`、`ArcTokioMonitor`：由可选 `async` 特性启用的 Tokio
+  异步 monitor 协调工具。
 - 基于闭包的访问接口，让加锁和释放始终局限在一次调用内部。
 - `Arc*` 包装器实现了 `Deref` 和 `AsRef`，需要时仍可使用底层同步原语的
   guard 风格原生接口。
@@ -27,14 +29,14 @@
 
 ```toml
 [dependencies]
-qubit-lock = "0.9"
+qubit-lock = "0.10"
 ```
 
-异步锁包装器使用 Tokio 同步原语，并默认启用。只需要同步锁与 ParkingLotMonitor、且希望依赖图中不包含 Tokio 的使用方，可以关闭默认特性：
+默认特性集只包含同步锁与同步 monitor。需要异步能力或确定性测试能力时，显式启用对应特性：
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.9", default-features = false }
+qubit-lock = { version = "0.10", features = ["async", "mock"] }
 ```
 
 如果应用需要创建 Tokio runtime，请在应用自己的 `Cargo.toml` 中启用合适的 Tokio runtime 特性，例如 `rt` 或 `rt-multi-thread`。
@@ -43,9 +45,11 @@ qubit-lock = { version = "0.9", default-features = false }
 
 ### 确定性的 monitor 时间
 
+使用 `MockMonitor` 和 `ArcMockMonitor` 前需要启用 `mock` 特性。
 `MockMonitor::new` 会创建一个独立的 `ManualMonotonicClock`，测试通过
 `monotonic_clock()` 显式推进它。如果多个测试组件需要处于同一个时间域，使用同一个
-clock 调用 `MockMonitor::from_clock` 或 `ArcMockMonitor::from_clock` 构造：
+clock 调用 `MockMonitor::from_clock` 或 `ArcMockMonitor::from_clock` 构造。
+直接构造共享 clock 的代码还需要显式声明直接依赖 `qubit-clock = "0.9"`：
 
 ```rust
 use std::{sync::Arc, time::Duration};
@@ -65,6 +69,25 @@ mock time 前调用 `wait_for_timeout_waiters(expected_count, real_timeout)`，�
 sleep 猜测 waiter 是否已经注册。`pending_timeout_waiters()` 汇总已经能够观察变化的
 同步和异步 timeout wait；异步 wait 的 future 首次被 poll 后才计数，被取消时会自动
 注销。不要在持有同一个 monitor 状态锁的闭包内推进该 clock。
+
+## 从 0.9 迁移
+
+`0.10` 有意调整了特性与闭包方法命名：
+
+- 默认特性集现在只包含同步能力。Tokio 锁与 monitor 类型需要显式启用
+  `async`。
+- `MockMonitor`、`ArcMockMonitor` 和 `qubit-clock` 依赖由新的 `mock`
+  特性控制；异步 mock wait 需要同时启用 `async` 和 `mock`。
+- 闭包式锁方法已重命名：`read` 改为 `with_read`，`write` 改为
+  `with_write`，`try_read` 改为 `try_with_read`，`try_write` 改为
+  `try_with_write`。
+- 同步 monitor 状态方法已重命名：`read` 改为 `with_read`，`write` 改为
+  `with_write`，`write_notify_one` 改为 `with_write_notify_one`，
+  `write_notify_all` 改为 `with_write_notify_all`。
+- Tokio monitor 状态方法统一使用 `_async` 后缀：`async_read` 改为
+  `with_read_async`，`async_write` 改为 `with_write_async`，
+  `async_write_notify_one` 改为 `with_write_notify_one_async`，
+  `async_write_notify_all` 改为 `with_write_notify_all_async`。
 
 ## 从 0.8 迁移
 
@@ -90,7 +113,8 @@ sleep 猜测 waiter 是否已经注册。`pending_timeout_waiters()` 汇总已�
 - 带超时的 condition wait 方法改名为 `wait_until_for` 和 `wait_while_for`。
 - `MockMonitor` 和 `ArcMockMonitor` 使用 `ManualMonotonicClock` 实现确定性的
   timeout 测试。
-- 默认 `async` 特性下，`TokioMonitor` 和 `ArcTokioMonitor` 提供异步 monitor 操作。
+- 启用 `async` 特性后，`TokioMonitor` 和 `ArcTokioMonitor` 提供异步
+  monitor 操作。
 - `qubit_lock::lock` 和 `qubit_lock::monitor` 不再作为公开模块暴露。
   请直接从 crate root 导入公开类型。
 
@@ -103,8 +127,8 @@ use qubit_lock::{ArcMutex, Lock};
 
 fn main() {
     let counter = ArcMutex::new(0);
-    counter.write(|value| *value += 1);
-    assert_eq!(counter.read(|value| *value), 1);
+    counter.with_write(|value| *value += 1);
+    assert_eq!(counter.with_read(|value| *value), 1);
 }
 ```
 
@@ -123,14 +147,14 @@ fn main() {
         *guard += 1;
     }
 
-    counter.write(|value| *value += 1);
-    assert_eq!(counter.read(|value| *value), 2);
+    counter.with_write(|value| *value += 1);
+    assert_eq!(counter.with_read(|value| *value), 2);
 }
 ```
 
-对 `ArcRwLock` 和 `ArcAsyncRwLock`，闭包式 `read` / `write` 与底层
-guard 风格方法同名。当 `Lock` 或 `AsyncLock` 在作用域中时，如果要调用底层
-guard API，请使用 `lock.as_ref().read()`，或用 `(*lock).read()` 显式解引用。
+`with_read` 和 `with_write` 将闭包式访问与原生 guard 获取明确区分开。
+因此，读写锁包装器可直接通过 `lock.read()` 或 `lock.write()` 获取原生 guard；
+需要显式指定底层类型时仍可使用 `lock.as_ref()`。
 
 ### ParkingLotMonitor
 
@@ -148,7 +172,7 @@ fn main() {
         )
     });
 
-    monitor.write_notify_one(|items| items.push(7));
+    monitor.with_write_notify_one(|items| items.push(7));
 
     assert_eq!(worker.join().expect("worker should finish"), 7);
 }

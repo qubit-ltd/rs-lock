@@ -1,6 +1,6 @@
 [package]
 name = "qubit-lock"
-version = "0.9.0"
+version = "0.10.0"
 edition = "2024"
 rust-version = "1.94"
 authors = ["Haixing Hu <starfish.hu@gmail.com>"]
@@ -31,13 +31,14 @@ name = "qubit_lock"
 doctest = true
 
 [features]
-default = ["async"]
+default = []
 async = ["dep:tokio"]
+mock = ["dep:qubit-clock"]
 
 [dependencies]
 parking_lot = "0.12"
 tokio = { version = "1.52", default-features = false, features = ["sync", "time"], optional = true }
-qubit-clock = { version = "0.9", path = "../rs-clock" }
+qubit-clock = { version = "0.9", path = "../rs-clock", optional = true }
 
 [dev-dependencies]
 semver = { version = "1.0", default-features = false }

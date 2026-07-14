@@ -14,8 +14,9 @@
 //! - Synchronous lock wrappers with `Arc` integrated internally.
 //! - Optional asynchronous Tokio-based lock wrappers behind the `async`
 //!   feature.
-//! - Monitor-style coordination traits and concrete parking_lot,
-//!   standard-library, Tokio, and mock monitor implementations.
+//! - Blocking parking_lot and standard-library monitor implementations.
+//! - Tokio monitors behind `async`, and deterministic mock monitors behind
+//!   `mock`. Enable both features for asynchronous mock waits.
 //!
 //! Public API items are re-exported from the crate root. The internal
 //! `lock` and `monitor` modules are implementation details and are not public
@@ -45,12 +46,15 @@ pub use lock::{
     Lock,
     TryLockError,
 };
+#[cfg(feature = "mock")]
 pub use monitor::{
     ArcMockMonitor,
+    MockMonitor,
+};
+pub use monitor::{
     ArcParkingLotMonitor,
     ArcStdMonitor,
     ConditionWaiter,
-    MockMonitor,
     Monitor,
     NotificationWaiter,
     Notifier,
