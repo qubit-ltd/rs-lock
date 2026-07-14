@@ -42,7 +42,7 @@ mod async_lock_trait_tests {
 
         // Test basic lock and modify
         let result = async_mutex
-            .write(|value| {
+            .with_write(|value| {
                 *value += 1;
                 *value
             })
@@ -50,7 +50,7 @@ mod async_lock_trait_tests {
         assert_eq!(result, 1);
 
         // Verify the value was persisted
-        let result = async_mutex.read(|value| *value).await;
+        let result = async_mutex.with_read(|value| *value).await;
         assert_eq!(result, 1);
     }
 
@@ -58,10 +58,10 @@ mod async_lock_trait_tests {
     async fn test_async_mutex_read_returns_closure_result() {
         let async_mutex = ArcAsyncMutex::new(vec![1, 2, 3]);
 
-        let length = async_mutex.read(|v| v.len()).await;
+        let length = async_mutex.with_read(|v| v.len()).await;
         assert_eq!(length, 3);
 
-        let sum = async_mutex.read(|v| v.iter().sum::<i32>()).await;
+        let sum = async_mutex.with_read(|v| v.iter().sum::<i32>()).await;
         assert_eq!(sum, 6);
     }
 
@@ -70,11 +70,11 @@ mod async_lock_trait_tests {
         let async_mutex = ArcAsyncMutex::new(42);
 
         // Should successfully acquire the lock
-        let result = async_mutex.try_read(|value| *value);
+        let result = async_mutex.try_with_read(|value| *value);
         assert_eq!(result, Ok(42));
 
         // Should be able to modify
-        let result = async_mutex.try_write(|value| {
+        let result = async_mutex.try_with_write(|value| {
             *value += 1;
             *value
         });
@@ -105,7 +105,7 @@ mod async_lock_trait_tests {
                 .expect("failed to create Tokio runtime");
             rt.block_on(async {
                 async_mutex_clone
-                    .write(move |_| {
+                    .with_write(move |_| {
                         locked_tx
                             .send(())
                             .expect("test should observe held mutex");
@@ -123,7 +123,7 @@ mod async_lock_trait_tests {
             .expect("mutex should be held within timeout");
 
         // Try to acquire lock while it's held, should report contention.
-        let result = async_mutex.try_read(|value| *value);
+        let result = async_mutex.try_with_read(|value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
 
         release_tx
@@ -134,7 +134,7 @@ mod async_lock_trait_tests {
         handle.join().expect("holder thread should not panic");
 
         // Now should be able to successfully acquire the lock
-        let result = async_mutex.try_read(|value| *value);
+        let result = async_mutex.try_with_read(|value| *value);
         assert_eq!(result, Ok(0));
     }
 
@@ -150,7 +150,7 @@ mod async_lock_trait_tests {
             let async_mutex = Arc::clone(&async_mutex);
             let handle = tokio::spawn(async move {
                 async_mutex
-                    .write(|value| {
+                    .with_write(|value| {
                         *value += 1;
                     })
                     .await;
@@ -164,7 +164,7 @@ mod async_lock_trait_tests {
         }
 
         // Verify final value
-        let result = async_mutex.read(|value| *value).await;
+        let result = async_mutex.with_read(|value| *value).await;
         assert_eq!(result, 10);
     }
 
@@ -173,12 +173,12 @@ mod async_lock_trait_tests {
         let async_mutex = ArcAsyncMutex::new(String::from("Hello"));
 
         async_mutex
-            .write(|s| {
+            .with_write(|s| {
                 s.push_str(" World");
             })
             .await;
 
-        let result = async_mutex.read(|s| s.clone()).await;
+        let result = async_mutex.with_read(|s| s.clone()).await;
         assert_eq!(result, "Hello World");
     }
 
@@ -187,7 +187,7 @@ mod async_lock_trait_tests {
         let async_mutex = ArcAsyncMutex::new(vec![1, 2, 3]);
 
         let result = async_mutex
-            .write(|v| {
+            .with_write(|v| {
                 v.push(4);
                 v.push(5);
                 v.iter().map(|&x| x * 2).collect::<Vec<_>>()
@@ -197,7 +197,7 @@ mod async_lock_trait_tests {
         assert_eq!(result, vec![2, 4, 6, 8, 10]);
 
         // Verify original was modified
-        let original = async_mutex.read(|v| v.clone()).await;
+        let original = async_mutex.with_read(|v| v.clone()).await;
         assert_eq!(original, vec![1, 2, 3, 4, 5]);
     }
 
@@ -213,7 +213,7 @@ mod async_lock_trait_tests {
             let async_mutex = Arc::clone(&async_mutex);
             let handle = tokio::spawn(async move {
                 async_mutex
-                    .write(|v| {
+                    .with_write(|v| {
                         v.push(i);
                     })
                     .await;
@@ -227,7 +227,7 @@ mod async_lock_trait_tests {
         }
 
         // Verify all tasks completed
-        let result = async_mutex.read(|v| v.len()).await;
+        let result = async_mutex.with_read(|v| v.len()).await;
         assert_eq!(result, 5);
     }
 
@@ -252,7 +252,7 @@ mod async_lock_trait_tests {
                 .expect("failed to create Tokio runtime");
             rt.block_on(async {
                 async_mutex_clone
-                    .write(move |value| {
+                    .with_write(move |value| {
                         *value += 1;
                         locked_tx
                             .send(())
@@ -275,7 +275,7 @@ mod async_lock_trait_tests {
                 .send(())
                 .expect("test should observe contended writer attempt");
             async_mutex_clone2
-                .write(|value| {
+                .with_write(|value| {
                     *value += 1;
                 })
                 .await;
@@ -285,7 +285,7 @@ mod async_lock_trait_tests {
             .await
             .expect("contended writer should attempt to acquire the mutex");
         assert_eq!(
-            async_mutex.try_read(|value| *value),
+            async_mutex.try_with_read(|value| *value),
             Err(TryLockError::WouldBlock),
         );
 
@@ -295,7 +295,7 @@ mod async_lock_trait_tests {
         holder.join().expect("holder thread should not panic");
         writer.await.unwrap();
 
-        let result = async_mutex.read(|value| *value).await;
+        let result = async_mutex.with_read(|value| *value).await;
         assert_eq!(result, 2);
     }
 
@@ -304,7 +304,7 @@ mod async_lock_trait_tests {
         let async_mutex = ArcAsyncMutex::new(10);
 
         let result = async_mutex
-            .read(|value| -> Result<i32, &str> {
+            .with_read(|value| -> Result<i32, &str> {
                 if *value > 0 {
                     Ok(*value * 2)
                 } else {
@@ -320,14 +320,14 @@ mod async_lock_trait_tests {
     #[tokio::test]
     async fn test_tokio_async_mutex_read() {
         let mutex = AsyncMutex::new(42);
-        let result = AsyncLock::read(&mutex, |value| *value).await;
+        let result = AsyncLock::with_read(&mutex, |value| *value).await;
         assert_eq!(result, 42);
     }
 
     #[tokio::test]
     async fn test_tokio_async_mutex_write() {
         let mutex = AsyncMutex::new(0);
-        let result = AsyncLock::write(&mutex, |value| {
+        let result = AsyncLock::with_write(&mutex, |value| {
             *value += 1;
             *value
         })
@@ -338,14 +338,14 @@ mod async_lock_trait_tests {
     #[tokio::test]
     async fn test_tokio_async_mutex_try_read_success() {
         let mutex = AsyncMutex::new(42);
-        let result = AsyncLock::try_read(&mutex, |value| *value);
+        let result = AsyncLock::try_with_read(&mutex, |value| *value);
         assert_eq!(result, Ok(42));
     }
 
     #[tokio::test]
     async fn test_tokio_async_mutex_try_write_success() {
         let mutex = AsyncMutex::new(42);
-        let result = AsyncLock::try_write(&mutex, |value| {
+        let result = AsyncLock::try_with_write(&mutex, |value| {
             *value += 1;
             *value
         });
@@ -357,11 +357,11 @@ mod async_lock_trait_tests {
         let mutex = AsyncMutex::new(0);
 
         // Hold the lock in current task first to ensure it's locked
-        let result = AsyncLock::try_write(&mutex, |value| *value);
+        let result = AsyncLock::try_with_write(&mutex, |value| *value);
         assert_eq!(result, Ok(0)); // Should succeed initially
 
         // Now try again while it's not locked (since we're in the same task)
-        let result = AsyncLock::try_write(&mutex, |value| *value);
+        let result = AsyncLock::try_with_write(&mutex, |value| *value);
         assert_eq!(result, Ok(0)); // Should succeed again since lock was released
     }
 
@@ -372,7 +372,7 @@ mod async_lock_trait_tests {
             .try_lock()
             .expect("failed to acquire initial mutex guard");
 
-        let result = AsyncLock::try_read(&mutex, |value| *value);
+        let result = AsyncLock::try_with_read(&mutex, |value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
     }
 
@@ -384,7 +384,7 @@ mod async_lock_trait_tests {
             .try_lock()
             .expect("failed to acquire initial mutex guard");
 
-        let result = AsyncLock::try_write(&mutex, |value| *value);
+        let result = AsyncLock::try_with_write(&mutex, |value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
     }
 
@@ -393,18 +393,18 @@ mod async_lock_trait_tests {
      {
         let mutex = AsyncMutex::new(0);
 
-        assert_eq!(AsyncLock::try_read(&mutex, read_i32), Ok(0));
-        assert_eq!(AsyncLock::try_write(&mutex, increment_i32), Ok(1));
+        assert_eq!(AsyncLock::try_with_read(&mutex, read_i32), Ok(0));
+        assert_eq!(AsyncLock::try_with_write(&mutex, increment_i32), Ok(1));
 
         let guard = mutex
             .try_lock()
             .expect("failed to acquire initial mutex guard");
         assert_eq!(
-            AsyncLock::try_read(&mutex, read_i32),
+            AsyncLock::try_with_read(&mutex, read_i32),
             Err(TryLockError::WouldBlock),
         );
         assert_eq!(
-            AsyncLock::try_write(&mutex, increment_i32),
+            AsyncLock::try_with_write(&mutex, increment_i32),
             Err(TryLockError::WouldBlock),
         );
         drop(guard);
@@ -419,7 +419,7 @@ mod async_rwlock_trait_tests {
     async fn test_async_rwlock_read_basic() {
         let async_rw_lock = ArcAsyncRwLock::new(42);
 
-        let result = async_rw_lock.read(|value| *value).await;
+        let result = async_rw_lock.with_read(|value| *value).await;
         assert_eq!(result, 42);
     }
 
@@ -428,7 +428,7 @@ mod async_rwlock_trait_tests {
         let async_rw_lock = ArcAsyncRwLock::new(0);
 
         let result = async_rw_lock
-            .write(|value| {
+            .with_write(|value| {
                 *value += 1;
                 *value
             })
@@ -436,7 +436,7 @@ mod async_rwlock_trait_tests {
         assert_eq!(result, 1);
 
         // Verify the value was persisted
-        let result = async_rw_lock.read(|value| *value).await;
+        let result = async_rw_lock.with_read(|value| *value).await;
         assert_eq!(result, 1);
     }
 
@@ -452,7 +452,7 @@ mod async_rwlock_trait_tests {
             let async_rw_lock = Arc::clone(&async_rw_lock);
             let handle = tokio::spawn(async move {
                 async_rw_lock
-                    .read(|data| {
+                    .with_read(|data| {
                         // Simulate some read operation
                         data.iter().sum::<i32>()
                     })
@@ -480,7 +480,7 @@ mod async_rwlock_trait_tests {
             let async_rw_lock = Arc::clone(&async_rw_lock);
             let handle = tokio::spawn(async move {
                 async_rw_lock
-                    .write(|value| {
+                    .with_write(|value| {
                         *value += 1;
                     })
                     .await;
@@ -494,7 +494,7 @@ mod async_rwlock_trait_tests {
         }
 
         // Verify final value (should be 10 if writes are exclusive)
-        let result = async_rw_lock.read(|value| *value).await;
+        let result = async_rw_lock.with_read(|value| *value).await;
         assert_eq!(result, 10);
     }
 
@@ -504,13 +504,13 @@ mod async_rwlock_trait_tests {
 
         // Write operation
         async_rw_lock
-            .write(|s| {
+            .with_write(|s| {
                 s.push_str(" World");
             })
             .await;
 
         // Read operation should see the change
-        let result = async_rw_lock.read(|s| s.clone()).await;
+        let result = async_rw_lock.with_read(|s| s.clone()).await;
         assert_eq!(result, "Hello World");
     }
 
@@ -519,19 +519,19 @@ mod async_rwlock_trait_tests {
         let async_rw_lock = ArcAsyncRwLock::new(vec![1, 2, 3]);
 
         // Multiple readers can access concurrently
-        let len = async_rw_lock.read(|v| v.len()).await;
+        let len = async_rw_lock.with_read(|v| v.len()).await;
         assert_eq!(len, 3);
 
         // Writer modifies the data
         async_rw_lock
-            .write(|v| {
+            .with_write(|v| {
                 v.push(4);
                 v.push(5);
             })
             .await;
 
         // Reader sees the updated data
-        let sum = async_rw_lock.read(|v| v.iter().sum::<i32>()).await;
+        let sum = async_rw_lock.with_read(|v| v.iter().sum::<i32>()).await;
         assert_eq!(sum, 15);
     }
 
@@ -540,13 +540,13 @@ mod async_rwlock_trait_tests {
         let async_rw_lock = ArcAsyncRwLock::new(vec![10, 20, 30]);
 
         let result = async_rw_lock
-            .read(|v| v.iter().map(|&x| x * 2).collect::<Vec<_>>())
+            .with_read(|v| v.iter().map(|&x| x * 2).collect::<Vec<_>>())
             .await;
 
         assert_eq!(result, vec![20, 40, 60]);
 
         // Original should be unchanged
-        let original = async_rw_lock.read(|v| v.clone()).await;
+        let original = async_rw_lock.with_read(|v| v.clone()).await;
         assert_eq!(original, vec![10, 20, 30]);
     }
 
@@ -555,7 +555,7 @@ mod async_rwlock_trait_tests {
         let async_rw_lock = ArcAsyncRwLock::new(5);
 
         let result = async_rw_lock
-            .write(|value| {
+            .with_write(|value| {
                 *value *= 2;
                 *value
             })
@@ -564,7 +564,7 @@ mod async_rwlock_trait_tests {
         assert_eq!(result, 10);
 
         // Verify the value was actually modified
-        let current = async_rw_lock.read(|value| *value).await;
+        let current = async_rw_lock.with_read(|value| *value).await;
         assert_eq!(current, 10);
     }
 
@@ -573,7 +573,7 @@ mod async_rwlock_trait_tests {
         let async_rw_lock = ArcAsyncRwLock::new(42);
 
         // Should successfully acquire the read lock
-        let result = async_rw_lock.try_read(|value| *value);
+        let result = async_rw_lock.try_with_read(|value| *value);
         assert_eq!(result, Ok(42));
     }
 
@@ -582,7 +582,7 @@ mod async_rwlock_trait_tests {
         let async_rw_lock = ArcAsyncRwLock::new(42);
 
         // Should successfully acquire the write lock
-        let result = async_rw_lock.try_write(|value| {
+        let result = async_rw_lock.try_with_write(|value| {
             *value += 1;
             *value
         });
@@ -602,7 +602,7 @@ mod async_rwlock_trait_tests {
             let handle = tokio::spawn(async move {
                 for _ in 0..10 {
                     async_rw_lock
-                        .read(|value| {
+                        .with_read(|value| {
                             let _ = *value;
                         })
                         .await;
@@ -617,7 +617,7 @@ mod async_rwlock_trait_tests {
             let handle = tokio::spawn(async move {
                 for _ in 0..10 {
                     async_rw_lock
-                        .write(|value| {
+                        .with_write(|value| {
                             *value += 1;
                         })
                         .await;
@@ -632,7 +632,7 @@ mod async_rwlock_trait_tests {
         }
 
         // Verify final value
-        let result = async_rw_lock.read(|value| *value).await;
+        let result = async_rw_lock.with_read(|value| *value).await;
         assert_eq!(result, 50); // 5 writers × 10 increments each
     }
 
@@ -640,14 +640,14 @@ mod async_rwlock_trait_tests {
     #[tokio::test]
     async fn test_tokio_async_rwlock_read() {
         let rwlock = AsyncRwLock::new(42);
-        let result = AsyncLock::read(&rwlock, |value| *value).await;
+        let result = AsyncLock::with_read(&rwlock, |value| *value).await;
         assert_eq!(result, 42);
     }
 
     #[tokio::test]
     async fn test_tokio_async_rwlock_write() {
         let rwlock = AsyncRwLock::new(0);
-        let result = AsyncLock::write(&rwlock, |value| {
+        let result = AsyncLock::with_write(&rwlock, |value| {
             *value += 1;
             *value
         })
@@ -658,14 +658,14 @@ mod async_rwlock_trait_tests {
     #[tokio::test]
     async fn test_tokio_async_rwlock_try_read_success() {
         let rwlock = AsyncRwLock::new(42);
-        let result = AsyncLock::try_read(&rwlock, |value| *value);
+        let result = AsyncLock::try_with_read(&rwlock, |value| *value);
         assert_eq!(result, Ok(42));
     }
 
     #[tokio::test]
     async fn test_tokio_async_rwlock_try_write_success() {
         let rwlock = AsyncRwLock::new(42);
-        let result = AsyncLock::try_write(&rwlock, |value| {
+        let result = AsyncLock::try_with_write(&rwlock, |value| {
             *value += 1;
             *value
         });
@@ -678,12 +678,12 @@ mod async_rwlock_trait_tests {
         let rwlock = AsyncRwLock::new(0);
 
         // First acquire write lock to ensure it's locked
-        let result = AsyncLock::try_write(&rwlock, |value| *value);
+        let result = AsyncLock::try_with_write(&rwlock, |value| *value);
         assert_eq!(result, Ok(0)); // Should succeed initially
 
         // Now try to acquire read lock while write lock was held (but now
         // released)
-        let result = AsyncLock::try_read(&rwlock, |value| *value);
+        let result = AsyncLock::try_with_read(&rwlock, |value| *value);
         assert_eq!(result, Ok(0)); // Should succeed since lock was released
     }
 
@@ -693,12 +693,12 @@ mod async_rwlock_trait_tests {
         let rwlock = AsyncRwLock::new(0);
 
         // First acquire read lock to ensure it's locked
-        let result = AsyncLock::try_read(&rwlock, |value| *value);
+        let result = AsyncLock::try_with_read(&rwlock, |value| *value);
         assert_eq!(result, Ok(0)); // Should succeed initially
 
         // Now try to acquire write lock while read lock was held (but now
         // released)
-        let result = AsyncLock::try_write(&rwlock, |value| *value);
+        let result = AsyncLock::try_with_write(&rwlock, |value| *value);
         assert_eq!(result, Ok(0)); // Should succeed since lock was released
     }
 
@@ -710,7 +710,7 @@ mod async_rwlock_trait_tests {
             .try_write()
             .expect("failed to acquire initial write guard");
 
-        let result = AsyncLock::try_read(&rwlock, |value| *value);
+        let result = AsyncLock::try_with_read(&rwlock, |value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
     }
 
@@ -722,7 +722,7 @@ mod async_rwlock_trait_tests {
             .try_read()
             .expect("failed to acquire initial read guard");
 
-        let result = AsyncLock::try_write(&rwlock, |value| *value);
+        let result = AsyncLock::try_with_write(&rwlock, |value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
     }
 
@@ -731,14 +731,14 @@ mod async_rwlock_trait_tests {
      {
         let rwlock = AsyncRwLock::new(0);
 
-        assert_eq!(AsyncLock::try_read(&rwlock, read_i32), Ok(0));
-        assert_eq!(AsyncLock::try_write(&rwlock, increment_i32), Ok(1));
+        assert_eq!(AsyncLock::try_with_read(&rwlock, read_i32), Ok(0));
+        assert_eq!(AsyncLock::try_with_write(&rwlock, increment_i32), Ok(1));
 
         let write_guard = rwlock
             .try_write()
             .expect("failed to acquire initial write guard");
         assert_eq!(
-            AsyncLock::try_read(&rwlock, read_i32),
+            AsyncLock::try_with_read(&rwlock, read_i32),
             Err(TryLockError::WouldBlock),
         );
         drop(write_guard);
@@ -747,7 +747,7 @@ mod async_rwlock_trait_tests {
             .try_read()
             .expect("failed to acquire initial read guard");
         assert_eq!(
-            AsyncLock::try_write(&rwlock, increment_i32),
+            AsyncLock::try_with_write(&rwlock, increment_i32),
             Err(TryLockError::WouldBlock),
         );
         drop(read_guard);

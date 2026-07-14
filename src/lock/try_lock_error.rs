@@ -13,8 +13,8 @@ use std::fmt;
 
 /// Non-blocking lock acquisition error.
 ///
-/// This error type is used by `try_read` and `try_write` to distinguish
-/// immediate lock contention from poisoned lock states. The
+/// This error type is used by `try_with_read` and `try_with_write` to
+/// distinguish immediate lock contention from poisoned lock states. The
 /// [`Self::Poisoned`] variant is returned only by lock implementations that
 /// support poisoning.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

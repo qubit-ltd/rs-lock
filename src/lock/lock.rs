@@ -55,13 +55,13 @@ use super::try_lock_error::TryLockError;
 /// Different lock implementations have different performance characteristics:
 ///
 /// ## Mutex-based locks (ArcMutex, ArcStdMutex, Mutex)
-/// - `read`: Acquires exclusive lock, same performance as write
-/// - `write`: Acquires exclusive lock, same performance as read
+/// - `with_read`: Acquires exclusive lock, same performance as write
+/// - `with_write`: Acquires exclusive lock, same performance as read
 /// - **Use case**: When you need exclusive access or don't know access patterns
 ///
 /// ## RwLock-based locks (ArcRwLock, ArcStdRwLock, RwLock)
-/// - `read`: Acquires shared lock, allows concurrent readers
-/// - `write`: Acquires exclusive lock, blocks all other operations
+/// - `with_read`: Acquires shared lock, allows concurrent readers
+/// - `with_write`: Acquires exclusive lock, blocks all other operations
 /// - **Use case**: Read-heavy workloads where multiple readers can proceed
 ///   concurrently
 ///
@@ -119,14 +119,14 @@ pub trait Lock<T: ?Sized> {
     /// let lock = ArcRwLock::new(vec![1, 2, 3]);
     ///
     /// // Read operation - allows concurrent readers with RwLock
-    /// let len = lock.read(|data| data.len());
+    /// let len = lock.with_read(|data| data.len());
     /// assert_eq!(len, 3);
     ///
     /// // Multiple concurrent readers possible with RwLock
-    /// let sum = lock.read(|data| data.iter().sum::<i32>());
+    /// let sum = lock.with_read(|data| data.iter().sum::<i32>());
     /// assert_eq!(sum, 6);
     /// ```
-    fn read<R, F>(&self, f: F) -> R
+    fn with_read<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R;
 
@@ -178,16 +178,16 @@ pub trait Lock<T: ?Sized> {
     /// let lock = ArcRwLock::new(vec![1, 2, 3]);
     ///
     /// // Write operation - exclusive access
-    /// lock.write(|data| {
+    /// lock.with_write(|data| {
     ///     data.push(4);
     ///     data.sort();
     /// });
     ///
     /// // Verify the changes
-    /// let result = lock.read(|data| data.clone());
+    /// let result = lock.with_read(|data| data.clone());
     /// assert_eq!(result, vec![1, 2, 3, 4]);
     /// ```
-    fn write<R, F>(&self, f: F) -> R
+    fn with_write<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R;
 
@@ -220,13 +220,13 @@ pub trait Lock<T: ?Sized> {
     /// use qubit_lock::{Lock, ArcRwLock};
     ///
     /// let lock = ArcRwLock::new(42);
-    /// if let Ok(value) = lock.try_read(|data| *data) {
+    /// if let Ok(value) = lock.try_with_read(|data| *data) {
     ///     println!("Got value: {}", value);
     /// } else {
     ///     println!("Lock is unavailable");
     /// }
     /// ```
-    fn try_read<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&T) -> R;
 
@@ -259,7 +259,7 @@ pub trait Lock<T: ?Sized> {
     /// use qubit_lock::{Lock, ArcMutex};
     ///
     /// let lock = ArcMutex::new(42);
-    /// if let Ok(result) = lock.try_write(|data| {
+    /// if let Ok(result) = lock.try_with_write(|data| {
     ///     *data += 1;
     ///     *data
     /// }) {
@@ -268,7 +268,7 @@ pub trait Lock<T: ?Sized> {
     ///     println!("Lock is unavailable");
     /// }
     /// ```
-    fn try_write<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&mut T) -> R;
 }
@@ -297,7 +297,7 @@ impl<T: ?Sized> Lock<T> for Mutex<T> {
     ///
     /// Panics if the mutex is poisoned.
     #[inline]
-    fn read<R, F>(&self, f: F) -> R
+    fn with_read<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R,
     {
@@ -319,7 +319,7 @@ impl<T: ?Sized> Lock<T> for Mutex<T> {
     ///
     /// Panics if the mutex is poisoned.
     #[inline]
-    fn write<R, F>(&self, f: F) -> R
+    fn with_write<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
@@ -342,7 +342,7 @@ impl<T: ?Sized> Lock<T> for Mutex<T> {
     /// Returns [`TryLockError::WouldBlock`] when the mutex is held by another
     /// thread, or [`TryLockError::Poisoned`] when the mutex is poisoned.
     #[inline]
-    fn try_read<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&T) -> R,
     {
@@ -372,7 +372,7 @@ impl<T: ?Sized> Lock<T> for Mutex<T> {
     /// Returns [`TryLockError::WouldBlock`] when the mutex is held by another
     /// thread, or [`TryLockError::Poisoned`] when the mutex is poisoned.
     #[inline]
-    fn try_write<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&mut T) -> R,
     {
@@ -413,7 +413,7 @@ impl<T: ?Sized> Lock<T> for RwLock<T> {
     ///
     /// Panics if the read-write lock is poisoned.
     #[inline]
-    fn read<R, F>(&self, f: F) -> R
+    fn with_read<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R,
     {
@@ -435,7 +435,7 @@ impl<T: ?Sized> Lock<T> for RwLock<T> {
     ///
     /// Panics if the read-write lock is poisoned.
     #[inline]
-    fn write<R, F>(&self, f: F) -> R
+    fn with_write<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
@@ -458,7 +458,7 @@ impl<T: ?Sized> Lock<T> for RwLock<T> {
     /// Returns [`TryLockError::WouldBlock`] when the lock is unavailable, or
     /// [`TryLockError::Poisoned`] when the lock is poisoned.
     #[inline]
-    fn try_read<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&T) -> R,
     {
@@ -488,7 +488,7 @@ impl<T: ?Sized> Lock<T> for RwLock<T> {
     /// Returns [`TryLockError::WouldBlock`] when the lock is unavailable, or
     /// [`TryLockError::Poisoned`] when the lock is poisoned.
     #[inline]
-    fn try_write<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&mut T) -> R,
     {
@@ -533,7 +533,7 @@ impl<T: ?Sized> Lock<T> for ParkingLotMutex<T> {
     ///
     /// The value returned by `f`.
     #[inline]
-    fn read<R, F>(&self, f: F) -> R
+    fn with_read<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R,
     {
@@ -551,7 +551,7 @@ impl<T: ?Sized> Lock<T> for ParkingLotMutex<T> {
     ///
     /// The value returned by `f`.
     #[inline]
-    fn write<R, F>(&self, f: F) -> R
+    fn with_write<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
@@ -574,7 +574,7 @@ impl<T: ?Sized> Lock<T> for ParkingLotMutex<T> {
     /// Returns [`TryLockError::WouldBlock`] when the mutex is held by another
     /// thread. parking_lot mutexes are not poisoned.
     #[inline]
-    fn try_read<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&T) -> R,
     {
@@ -598,7 +598,7 @@ impl<T: ?Sized> Lock<T> for ParkingLotMutex<T> {
     /// Returns [`TryLockError::WouldBlock`] when the mutex is held by another
     /// thread. parking_lot mutexes are not poisoned.
     #[inline]
-    fn try_write<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&mut T) -> R,
     {
@@ -629,7 +629,7 @@ impl<T: ?Sized> Lock<T> for ParkingLotRwLock<T> {
     ///
     /// The value returned by `f`.
     #[inline]
-    fn read<R, F>(&self, f: F) -> R
+    fn with_read<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R,
     {
@@ -647,7 +647,7 @@ impl<T: ?Sized> Lock<T> for ParkingLotRwLock<T> {
     ///
     /// The value returned by `f`.
     #[inline]
-    fn write<R, F>(&self, f: F) -> R
+    fn with_write<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
@@ -670,7 +670,7 @@ impl<T: ?Sized> Lock<T> for ParkingLotRwLock<T> {
     /// Returns [`TryLockError::WouldBlock`] when the lock is unavailable.
     /// parking_lot read-write locks are not poisoned.
     #[inline]
-    fn try_read<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&T) -> R,
     {
@@ -694,7 +694,7 @@ impl<T: ?Sized> Lock<T> for ParkingLotRwLock<T> {
     /// Returns [`TryLockError::WouldBlock`] when the lock is unavailable.
     /// parking_lot read-write locks are not poisoned.
     #[inline]
-    fn try_write<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&mut T) -> R,
     {

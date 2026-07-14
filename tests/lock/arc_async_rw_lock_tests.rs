@@ -41,17 +41,17 @@ mod arc_async_rw_lock_tests {
     #[tokio::test]
     async fn test_arc_async_rw_lock_new() {
         let async_rw_lock = ArcAsyncRwLock::new(42);
-        let result = async_rw_lock.read(|value| *value).await;
+        let result = async_rw_lock.with_read(|value| *value).await;
         assert_eq!(result, 42);
     }
 
     #[tokio::test]
     async fn test_arc_async_rw_lock_from_and_default() {
         let from_value = ArcAsyncRwLock::from(42);
-        assert_eq!(from_value.read(|value| *value).await, 42);
+        assert_eq!(from_value.with_read(|value| *value).await, 42);
 
         let default_value = ArcAsyncRwLock::<Vec<i32>>::default();
-        assert!(default_value.read(|items| items.is_empty()).await);
+        assert!(default_value.with_read(|items| items.is_empty()).await);
     }
 
     #[tokio::test]
@@ -59,7 +59,7 @@ mod arc_async_rw_lock_tests {
         let async_rw_lock = ArcAsyncRwLock::new(1);
 
         {
-            let guard = (*async_rw_lock).read().await;
+            let guard = async_rw_lock.read().await;
             assert_eq!(*guard, 1);
         }
 
@@ -68,7 +68,7 @@ mod arc_async_rw_lock_tests {
             *guard += 1;
         }
 
-        assert_eq!(async_rw_lock.read(|value| *value).await, 2);
+        assert_eq!(async_rw_lock.with_read(|value| *value).await, 2);
     }
 
     #[tokio::test]
@@ -76,7 +76,7 @@ mod arc_async_rw_lock_tests {
         let async_rw_lock = ArcAsyncRwLock::new(0);
 
         // Test read lock
-        let result = async_rw_lock.read(|value| *value).await;
+        let result = async_rw_lock.with_read(|value| *value).await;
         assert_eq!(result, 0);
     }
 
@@ -86,7 +86,7 @@ mod arc_async_rw_lock_tests {
 
         // Test write lock
         let result = async_rw_lock
-            .write(|value| {
+            .with_write(|value| {
                 *value += 1;
                 *value
             })
@@ -101,7 +101,7 @@ mod arc_async_rw_lock_tests {
 
         // Test cloned async read-write lock
         let result = async_rw_lock_clone
-            .write(|value| {
+            .with_write(|value| {
                 *value += 1;
                 *value
             })
@@ -109,7 +109,7 @@ mod arc_async_rw_lock_tests {
         assert_eq!(result, 1);
 
         // Verify that original lock can see changes
-        let result = async_rw_lock.read(|value| *value).await;
+        let result = async_rw_lock.with_read(|value| *value).await;
         assert_eq!(result, 1);
     }
 
@@ -124,7 +124,7 @@ mod arc_async_rw_lock_tests {
             let async_rw_lock = Arc::clone(&async_rw_lock);
             let handle = tokio::spawn(async move {
                 async_rw_lock
-                    .read(|data| {
+                    .with_read(|data| {
                         // Simulate some read operation
                         data.iter().sum::<i32>()
                     })
@@ -151,7 +151,7 @@ mod arc_async_rw_lock_tests {
             let async_rw_lock = Arc::clone(&async_rw_lock);
             let handle = tokio::spawn(async move {
                 async_rw_lock
-                    .write(|value| {
+                    .with_write(|value| {
                         *value += 1;
                     })
                     .await;
@@ -165,7 +165,7 @@ mod arc_async_rw_lock_tests {
         }
 
         // Verify final value (should be 10 if writes are exclusive)
-        let result = async_rw_lock.read(|value| *value).await;
+        let result = async_rw_lock.with_read(|value| *value).await;
         assert_eq!(result, 10);
     }
 
@@ -175,13 +175,13 @@ mod arc_async_rw_lock_tests {
 
         // Write operation
         async_rw_lock
-            .write(|s| {
+            .with_write(|s| {
                 s.push_str(" World");
             })
             .await;
 
         // Read operation should see the change
-        let result = async_rw_lock.read(|s| s.clone()).await;
+        let result = async_rw_lock.with_read(|s| s.clone()).await;
         assert_eq!(result, "Hello World");
     }
 
@@ -190,19 +190,19 @@ mod arc_async_rw_lock_tests {
         let async_rw_lock = ArcAsyncRwLock::new(vec![1, 2, 3]);
 
         // Multiple readers can access concurrently
-        let len = async_rw_lock.read(|v| v.len()).await;
+        let len = async_rw_lock.with_read(|v| v.len()).await;
         assert_eq!(len, 3);
 
         // Writer modifies the data
         async_rw_lock
-            .write(|v| {
+            .with_write(|v| {
                 v.push(4);
                 v.push(5);
             })
             .await;
 
         // Reader sees the updated data
-        let sum = async_rw_lock.read(|v| v.iter().sum::<i32>()).await;
+        let sum = async_rw_lock.with_read(|v| v.iter().sum::<i32>()).await;
         assert_eq!(sum, 15);
     }
 
@@ -211,13 +211,13 @@ mod arc_async_rw_lock_tests {
         let async_rw_lock = ArcAsyncRwLock::new(vec![10, 20, 30]);
 
         let result = async_rw_lock
-            .read(|v| v.iter().map(|&x| x * 2).collect::<Vec<_>>())
+            .with_read(|v| v.iter().map(|&x| x * 2).collect::<Vec<_>>())
             .await;
 
         assert_eq!(result, vec![20, 40, 60]);
 
         // Original should be unchanged
-        let original = async_rw_lock.read(|v| v.clone()).await;
+        let original = async_rw_lock.with_read(|v| v.clone()).await;
         assert_eq!(original, vec![10, 20, 30]);
     }
 
@@ -226,7 +226,7 @@ mod arc_async_rw_lock_tests {
         let async_rw_lock = ArcAsyncRwLock::new(5);
 
         let result = async_rw_lock
-            .write(|value| {
+            .with_write(|value| {
                 *value *= 2;
                 *value
             })
@@ -235,7 +235,7 @@ mod arc_async_rw_lock_tests {
         assert_eq!(result, 10);
 
         // Verify the value was actually modified
-        let current = async_rw_lock.read(|value| *value).await;
+        let current = async_rw_lock.with_read(|value| *value).await;
         assert_eq!(current, 10);
     }
 
@@ -251,7 +251,7 @@ mod arc_async_rw_lock_tests {
             let handle = tokio::spawn(async move {
                 for _ in 0..10 {
                     async_rw_lock
-                        .read(|value| {
+                        .with_read(|value| {
                             let _ = *value;
                         })
                         .await;
@@ -266,7 +266,7 @@ mod arc_async_rw_lock_tests {
             let handle = tokio::spawn(async move {
                 for _ in 0..10 {
                     async_rw_lock
-                        .write(|value| {
+                        .with_write(|value| {
                             *value += 1;
                         })
                         .await;
@@ -281,7 +281,7 @@ mod arc_async_rw_lock_tests {
         }
 
         // Verify final value
-        let result = async_rw_lock.read(|value| *value).await;
+        let result = async_rw_lock.with_read(|value| *value).await;
         assert_eq!(result, 50); // 5 writers × 10 increments each
     }
 
@@ -297,7 +297,7 @@ mod arc_async_rw_lock_tests {
                 .expect("failed to create Tokio runtime");
             rt.block_on(async {
                 let sum = async_rw_lock_clone
-                    .read(move |data| {
+                    .with_read(move |data| {
                         locked_tx
                             .send(())
                             .expect("test should observe held read lock");
@@ -317,7 +317,7 @@ mod arc_async_rw_lock_tests {
             .expect("read lock should be held within timeout");
 
         let concurrent_sum =
-            async_rw_lock.try_read(|data| data.iter().sum::<i32>());
+            async_rw_lock.try_with_read(|data| data.iter().sum::<i32>());
         assert_eq!(concurrent_sum, Ok(15));
 
         release_tx
@@ -340,7 +340,7 @@ mod arc_async_rw_lock_tests {
                 .expect("failed to create Tokio runtime");
             rt.block_on(async {
                 async_rw_lock_clone
-                    .write(move |value| {
+                    .with_write(move |value| {
                         *value += 1;
                         locked_tx
                             .send(())
@@ -360,7 +360,7 @@ mod arc_async_rw_lock_tests {
         // Try to read (should wait for write to complete)
         let read_handle = tokio::spawn({
             let async_rw_lock = async_rw_lock.clone();
-            async move { async_rw_lock.read(|value| *value).await }
+            async move { async_rw_lock.with_read(|value| *value).await }
         });
 
         release_tx
@@ -383,7 +383,7 @@ mod arc_async_rw_lock_tests {
         let handle1 = tokio::spawn(async move {
             for _ in 0..50 {
                 async_rw_lock1
-                    .write(|value| {
+                    .with_write(|value| {
                         *value += 1;
                     })
                     .await;
@@ -394,7 +394,7 @@ mod arc_async_rw_lock_tests {
         let handle2 = tokio::spawn(async move {
             for _ in 0..50 {
                 async_rw_lock2
-                    .write(|value| {
+                    .with_write(|value| {
                         *value += 1;
                     })
                     .await;
@@ -404,7 +404,7 @@ mod arc_async_rw_lock_tests {
         handle1.await.unwrap();
         handle2.await.unwrap();
 
-        let result = async_rw_lock.read(|value| *value).await;
+        let result = async_rw_lock.with_read(|value| *value).await;
         assert_eq!(result, 100);
     }
 
@@ -415,16 +415,20 @@ mod arc_async_rw_lock_tests {
         let async_rw_lock = ArcAsyncRwLock::new(HashMap::new());
 
         async_rw_lock
-            .write(|map| {
+            .with_write(|map| {
                 map.insert("key1", 10);
                 map.insert("key2", 20);
             })
             .await;
 
-        let value1 = async_rw_lock.read(|map| map.get("key1").copied()).await;
+        let value1 = async_rw_lock
+            .with_read(|map| map.get("key1").copied())
+            .await;
         assert_eq!(value1, Some(10));
 
-        let value2 = async_rw_lock.read(|map| map.get("key2").copied()).await;
+        let value2 = async_rw_lock
+            .with_read(|map| map.get("key2").copied())
+            .await;
         assert_eq!(value2, Some(20));
     }
 
@@ -433,7 +437,7 @@ mod arc_async_rw_lock_tests {
         let async_rw_lock = ArcAsyncRwLock::new(10);
 
         let result = async_rw_lock
-            .read(|value| -> Result<i32, &str> {
+            .with_read(|value| -> Result<i32, &str> {
                 if *value > 0 {
                     Ok(*value * 2)
                 } else {
@@ -458,7 +462,7 @@ mod arc_async_rw_lock_tests {
                 .expect("failed to create Tokio runtime");
             rt.block_on(async {
                 lock_clone
-                    .write(move |_| {
+                    .with_write(move |_| {
                         locked_tx
                             .send(())
                             .expect("test should observe held lock");
@@ -473,7 +477,7 @@ mod arc_async_rw_lock_tests {
         locked_rx
             .recv_timeout(Duration::from_secs(1))
             .expect("write lock should be held within timeout");
-        let result = async_rw_lock.try_read(|value| *value);
+        let result = async_rw_lock.try_with_read(|value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
 
         release_tx
@@ -487,8 +491,8 @@ mod arc_async_rw_lock_tests {
      {
         let async_rw_lock = Arc::new(ArcAsyncRwLock::new(0));
 
-        assert_eq!(async_rw_lock.try_read(read_i32), Ok(0));
-        assert_eq!(async_rw_lock.try_write(increment_i32), Ok(1));
+        assert_eq!(async_rw_lock.try_with_read(read_i32), Ok(0));
+        assert_eq!(async_rw_lock.try_with_write(increment_i32), Ok(1));
 
         let (read_locked_tx, read_locked_rx) = mpsc::channel();
         let (read_release_tx, read_release_rx) = mpsc::channel();
@@ -498,7 +502,7 @@ mod arc_async_rw_lock_tests {
                 .expect("failed to create Tokio runtime");
             rt.block_on(async {
                 read_lock
-                    .write(move |_| {
+                    .with_write(move |_| {
                         read_locked_tx
                             .send(())
                             .expect("test should observe held write lock");
@@ -513,7 +517,7 @@ mod arc_async_rw_lock_tests {
             .recv_timeout(Duration::from_secs(1))
             .expect("write lock should be held within timeout");
         assert_eq!(
-            async_rw_lock.try_read(read_i32),
+            async_rw_lock.try_with_read(read_i32),
             Err(TryLockError::WouldBlock),
         );
         read_release_tx
@@ -529,7 +533,7 @@ mod arc_async_rw_lock_tests {
                 .expect("failed to create Tokio runtime");
             rt.block_on(async {
                 write_lock
-                    .read(move |_| {
+                    .with_read(move |_| {
                         write_locked_tx
                             .send(())
                             .expect("test should observe held read lock");
@@ -544,7 +548,7 @@ mod arc_async_rw_lock_tests {
             .recv_timeout(Duration::from_secs(1))
             .expect("read lock should be held within timeout");
         assert_eq!(
-            async_rw_lock.try_write(increment_i32),
+            async_rw_lock.try_with_write(increment_i32),
             Err(TryLockError::WouldBlock),
         );
         write_release_tx
@@ -566,7 +570,7 @@ mod arc_async_rw_lock_tests {
                 .expect("failed to create Tokio runtime");
             rt.block_on(async {
                 lock_clone
-                    .read(move |_| {
+                    .with_read(move |_| {
                         locked_tx
                             .send(())
                             .expect("test should observe held lock");
@@ -581,7 +585,7 @@ mod arc_async_rw_lock_tests {
         locked_rx
             .recv_timeout(Duration::from_secs(1))
             .expect("read lock should be held within timeout");
-        let result = async_rw_lock.try_write(|value| *value);
+        let result = async_rw_lock.try_with_write(|value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
 
         release_tx

@@ -43,10 +43,10 @@ mod parking_lot_rw_lock_tests {
     fn test_parking_lot_rw_lock_read_write_and_try_success() {
         let rw_lock = ParkingLotRwLock::new(0);
 
-        assert_eq!(Lock::read(&rw_lock, read_i32), 0);
-        assert_eq!(Lock::write(&rw_lock, increment_i32), 1);
-        assert_eq!(Lock::try_read(&rw_lock, read_i32), Ok(1));
-        assert_eq!(Lock::try_write(&rw_lock, increment_i32), Ok(2));
+        assert_eq!(Lock::with_read(&rw_lock, read_i32), 0);
+        assert_eq!(Lock::with_write(&rw_lock, increment_i32), 1);
+        assert_eq!(Lock::try_with_read(&rw_lock, read_i32), Ok(1));
+        assert_eq!(Lock::try_with_write(&rw_lock, increment_i32), Ok(2));
     }
 
     #[test]
@@ -58,7 +58,7 @@ mod parking_lot_rw_lock_tests {
 
         let lock_clone = rw_lock.clone();
         let holder = thread::spawn(move || {
-            Lock::write(&*lock_clone, |_| {
+            Lock::with_write(&*lock_clone, |_| {
                 locked_tx
                     .send(())
                     .expect("test should observe held write lock");
@@ -72,11 +72,11 @@ mod parking_lot_rw_lock_tests {
             .recv_timeout(Duration::from_secs(1))
             .expect("write lock should be held within timeout");
         assert_eq!(
-            Lock::try_read(&*rw_lock, read_i32),
+            Lock::try_with_read(&*rw_lock, read_i32),
             Err(TryLockError::WouldBlock),
         );
         assert_eq!(
-            Lock::try_write(&*rw_lock, increment_i32),
+            Lock::try_with_write(&*rw_lock, increment_i32),
             Err(TryLockError::WouldBlock),
         );
 
@@ -95,7 +95,7 @@ mod parking_lot_rw_lock_tests {
 
         let lock_clone = rw_lock.clone();
         let holder = thread::spawn(move || {
-            Lock::read(&*lock_clone, |_| {
+            Lock::with_read(&*lock_clone, |_| {
                 locked_tx
                     .send(())
                     .expect("test should observe held read lock");
@@ -108,9 +108,9 @@ mod parking_lot_rw_lock_tests {
         locked_rx
             .recv_timeout(Duration::from_secs(1))
             .expect("read lock should be held within timeout");
-        assert_eq!(Lock::try_read(&*rw_lock, read_i32), Ok(0));
+        assert_eq!(Lock::try_with_read(&*rw_lock, read_i32), Ok(0));
         assert_eq!(
-            Lock::try_write(&*rw_lock, increment_i32),
+            Lock::try_with_write(&*rw_lock, increment_i32),
             Err(TryLockError::WouldBlock),
         );
 
@@ -125,7 +125,7 @@ mod parking_lot_rw_lock_tests {
         let rw_lock = Arc::new(ParkingLotRwLock::new(0));
         let lock_clone = rw_lock.clone();
         let handle = thread::spawn(move || {
-            Lock::write(&*lock_clone, |value| {
+            Lock::with_write(&*lock_clone, |value| {
                 *value += 1;
                 panic!("intentional panic while holding the lock");
             });
@@ -133,7 +133,7 @@ mod parking_lot_rw_lock_tests {
 
         let _ = handle.join();
 
-        assert_eq!(Lock::read(&*rw_lock, read_i32), 1);
-        assert_eq!(Lock::try_write(&*rw_lock, increment_i32), Ok(2));
+        assert_eq!(Lock::with_read(&*rw_lock, read_i32), 1);
+        assert_eq!(Lock::try_with_write(&*rw_lock, increment_i32), Ok(2));
     }
 }

@@ -47,8 +47,8 @@ use super::try_lock_error::TryLockError;
 /// - Performance optimization through appropriate lock selection
 /// - Non-blocking async operations
 ///
-/// Only lock acquisition is asynchronous. The closure passed to `read` or
-/// `write` executes synchronously while the guard is held, so it cannot
+/// Only lock acquisition is asynchronous. The closure passed to `with_read` or
+/// `with_write` executes synchronously while the guard is held, so it cannot
 /// `.await` and should not perform blocking or long-running work. Compute
 /// expensive values before acquiring the lock, or move blocking work to a
 /// dedicated blocking task and keep the locked closure short.
@@ -59,9 +59,9 @@ use super::try_lock_error::TryLockError;
 /// `rt-multi-thread`.
 ///
 /// The trait intentionally returns `Send` futures. Closures and return values
-/// passed to `read` and `write` must be `Send`; Tokio mutex implementations
-/// require `T: Send`, and Tokio read-write lock implementations require
-/// `T: Send + Sync`.
+/// passed to `with_read` and `with_write` must be `Send`; Tokio mutex
+/// implementations require `T: Send`, and Tokio read-write lock implementations
+/// require `T: Send + Sync`.
 ///
 /// # Performance Characteristics
 ///
@@ -69,13 +69,13 @@ use super::try_lock_error::TryLockError;
 /// characteristics:
 ///
 /// ## Mutex-based async locks (ArcAsyncMutex, AsyncMutex)
-/// - `read`: Acquires exclusive lock, same performance as write
-/// - `write`: Acquires exclusive lock, same performance as read
+/// - `with_read`: Acquires exclusive lock, same performance as write
+/// - `with_write`: Acquires exclusive lock, same performance as read
 /// - **Use case**: When you need exclusive access or don't know access patterns
 ///
 /// ## RwLock-based async locks (ArcAsyncRwLock, AsyncRwLock)
-/// - `read`: Acquires shared lock, allows concurrent readers
-/// - `write`: Acquires exclusive lock, blocks all other operations
+/// - `with_read`: Acquires shared lock, allows concurrent readers
+/// - `with_write`: Acquires exclusive lock, blocks all other operations
 /// - **Use case**: Read-heavy async workloads where multiple readers can
 ///   proceed concurrently
 ///
@@ -127,17 +127,17 @@ pub trait AsyncLock<T: ?Sized> {
     ///     let lock = ArcAsyncRwLock::new(vec![1, 2, 3]);
     ///
     ///     // Read operation - allows concurrent readers with RwLock
-    ///     let len = lock.read(|data| data.len()).await;
+    ///     let len = lock.with_read(|data| data.len()).await;
     ///     assert_eq!(len, 3);
     ///
     ///     // Multiple concurrent readers possible with RwLock
-    ///     let sum = lock.read(|data|
+    ///     let sum = lock.with_read(|data|
     ///         data.iter().sum::<i32>()
     ///     ).await;
     ///     assert_eq!(sum, 6);
     /// });
     /// ```
-    fn read<R, F>(&self, f: F) -> impl Future<Output = R> + Send
+    fn with_read<R, F>(&self, f: F) -> impl Future<Output = R> + Send
     where
         F: FnOnce(&T) -> R + Send,
         R: Send;
@@ -185,17 +185,17 @@ pub trait AsyncLock<T: ?Sized> {
     ///     let lock = ArcAsyncRwLock::new(vec![1, 2, 3]);
     ///
     ///     // Write operation - exclusive access
-    ///     lock.write(|data| {
+    ///     lock.with_write(|data| {
     ///         data.push(4);
     ///         data.sort();
     ///     }).await;
     ///
     ///     // Verify the changes
-    ///     let result = lock.read(|data| data.clone()).await;
+    ///     let result = lock.with_read(|data| data.clone()).await;
     ///     assert_eq!(result, vec![1, 2, 3, 4]);
     /// });
     /// ```
-    fn write<R, F>(&self, f: F) -> impl Future<Output = R> + Send
+    fn with_write<R, F>(&self, f: F) -> impl Future<Output = R> + Send
     where
         F: FnOnce(&mut T) -> R + Send,
         R: Send;
@@ -229,13 +229,13 @@ pub trait AsyncLock<T: ?Sized> {
     /// use qubit_lock::{AsyncLock, ArcAsyncRwLock};
     ///
     /// let lock = ArcAsyncRwLock::new(42);
-    /// if let Ok(value) = lock.try_read(|data| *data) {
+    /// if let Ok(value) = lock.try_with_read(|data| *data) {
     ///     println!("Got value: {}", value);
     /// } else {
     ///     println!("Lock is unavailable");
     /// }
     /// ```
-    fn try_read<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&T) -> R;
 
@@ -268,7 +268,7 @@ pub trait AsyncLock<T: ?Sized> {
     /// use qubit_lock::{AsyncLock, ArcAsyncMutex};
     ///
     /// let lock = ArcAsyncMutex::new(42);
-    /// if let Ok(result) = lock.try_write(|data| {
+    /// if let Ok(result) = lock.try_with_write(|data| {
     ///     *data += 1;
     ///     *data
     /// }) {
@@ -277,7 +277,7 @@ pub trait AsyncLock<T: ?Sized> {
     ///     println!("Lock is busy");
     /// }
     /// ```
-    fn try_write<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&mut T) -> R;
 }
@@ -303,7 +303,7 @@ impl<T: ?Sized + Send> AsyncLock<T> for AsyncMutex<T> {
     ///
     /// A future resolving to the value returned by `f`.
     #[inline]
-    async fn read<R, F>(&self, f: F) -> R
+    async fn with_read<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R + Send,
         R: Send,
@@ -322,7 +322,7 @@ impl<T: ?Sized + Send> AsyncLock<T> for AsyncMutex<T> {
     ///
     /// A future resolving to the value returned by `f`.
     #[inline]
-    async fn write<R, F>(&self, f: F) -> R
+    async fn with_write<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R + Send,
         R: Send,
@@ -342,7 +342,7 @@ impl<T: ?Sized + Send> AsyncLock<T> for AsyncMutex<T> {
     /// `Ok(result)` if the mutex is acquired, or
     /// [`TryLockError::WouldBlock`] if it is busy.
     #[inline]
-    fn try_read<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&T) -> R,
     {
@@ -362,7 +362,7 @@ impl<T: ?Sized + Send> AsyncLock<T> for AsyncMutex<T> {
     /// `Ok(result)` if the mutex is acquired, or
     /// [`TryLockError::WouldBlock`] if it is busy.
     #[inline]
-    fn try_write<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&mut T) -> R,
     {
@@ -394,7 +394,7 @@ impl<T: ?Sized + Send + Sync> AsyncLock<T> for AsyncRwLock<T> {
     ///
     /// A future resolving to the value returned by `f`.
     #[inline]
-    async fn read<R, F>(&self, f: F) -> R
+    async fn with_read<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R + Send,
         R: Send,
@@ -413,7 +413,7 @@ impl<T: ?Sized + Send + Sync> AsyncLock<T> for AsyncRwLock<T> {
     ///
     /// A future resolving to the value returned by `f`.
     #[inline]
-    async fn write<R, F>(&self, f: F) -> R
+    async fn with_write<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R + Send,
         R: Send,
@@ -434,7 +434,7 @@ impl<T: ?Sized + Send + Sync> AsyncLock<T> for AsyncRwLock<T> {
     /// `Ok(result)` if a read lock is acquired, or
     /// [`TryLockError::WouldBlock`] if it is busy.
     #[inline]
-    fn try_read<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&T) -> R,
     {
@@ -455,7 +455,7 @@ impl<T: ?Sized + Send + Sync> AsyncLock<T> for AsyncRwLock<T> {
     /// `Ok(result)` if a write lock is acquired, or
     /// [`TryLockError::WouldBlock`] if it is busy.
     #[inline]
-    fn try_write<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&mut T) -> R,
     {

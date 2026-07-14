@@ -33,17 +33,17 @@ mod arc_mutex_tests {
     #[test]
     fn test_arc_mutex_new() {
         let mutex = ArcMutex::new(42);
-        let result = mutex.read(|value| *value);
+        let result = mutex.with_read(|value| *value);
         assert_eq!(result, 42);
     }
 
     #[test]
     fn test_arc_mutex_from_and_default() {
         let from_value = ArcMutex::from(42);
-        assert_eq!(from_value.read(|value| *value), 42);
+        assert_eq!(from_value.with_read(|value| *value), 42);
 
         let default_value = ArcMutex::<Vec<i32>>::default();
-        assert!(default_value.read(|items| items.is_empty()));
+        assert!(default_value.with_read(|items| items.is_empty()));
     }
 
     #[test]
@@ -63,7 +63,7 @@ mod arc_mutex_tests {
             *guard += 1;
         }
 
-        assert_eq!(mutex.read(|value| *value), 3);
+        assert_eq!(mutex.with_read(|value| *value), 3);
     }
 
     #[test]
@@ -71,14 +71,14 @@ mod arc_mutex_tests {
         let mutex = ArcMutex::new(0);
 
         // Test basic lock and modify
-        let result = mutex.write(|value| {
+        let result = mutex.with_write(|value| {
             *value += 1;
             *value
         });
         assert_eq!(result, 1);
 
         // Verify the value was persisted
-        let result = mutex.read(|value| *value);
+        let result = mutex.with_read(|value| *value);
         assert_eq!(result, 1);
     }
 
@@ -86,7 +86,7 @@ mod arc_mutex_tests {
     fn test_arc_mutex_try_read_write_success() {
         let mutex = ArcMutex::new(42);
 
-        let result = mutex.try_read(|value| *value).unwrap();
+        let result = mutex.try_with_read(|value| *value).unwrap();
         assert_eq!(result, 42);
     }
 
@@ -96,14 +96,14 @@ mod arc_mutex_tests {
         let mutex_clone = mutex.clone();
 
         // Test that cloned lock shares data
-        let result = mutex_clone.write(|value| {
+        let result = mutex_clone.with_write(|value| {
             *value += 1;
             *value
         });
         assert_eq!(result, 1);
 
         // Verify that original lock can see changes
-        let result = mutex.read(|value| *value);
+        let result = mutex.with_read(|value| *value);
         assert_eq!(result, 1);
     }
 
@@ -117,7 +117,7 @@ mod arc_mutex_tests {
 
         // Hold the lock in another thread
         let handle = thread::spawn(move || {
-            mutex_clone.write(|value| {
+            mutex_clone.with_write(|value| {
                 *value += 1;
                 locked_tx.send(()).expect("test should observe held mutex");
                 release_rx
@@ -132,7 +132,7 @@ mod arc_mutex_tests {
             .expect("mutex should be held within timeout");
 
         // Try to acquire lock, should return WouldBlock
-        let result = mutex.try_read(|value| *value);
+        let result = mutex.try_with_read(|value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
 
         release_tx
@@ -143,7 +143,7 @@ mod arc_mutex_tests {
         handle.join().unwrap();
 
         // Now should be able to successfully acquire the lock
-        let result = mutex.try_read(|value| *value);
+        let result = mutex.try_with_read(|value| *value);
         assert_eq!(result, Ok(1));
     }
 
@@ -157,7 +157,7 @@ mod arc_mutex_tests {
 
         // Hold the lock in another thread
         let handle = thread::spawn(move || {
-            mutex_clone.write(|value| {
+            mutex_clone.with_write(|value| {
                 *value += 1;
                 locked_tx.send(()).expect("test should observe held mutex");
                 release_rx
@@ -172,7 +172,7 @@ mod arc_mutex_tests {
             .expect("mutex should be held within timeout");
 
         // Try to acquire write lock, should return WouldBlock
-        let result = mutex.try_write(|value| {
+        let result = mutex.try_with_write(|value| {
             *value += 1;
             *value
         });
@@ -186,7 +186,7 @@ mod arc_mutex_tests {
         handle.join().unwrap();
 
         // Now should be able to successfully acquire the write lock
-        let result = mutex.try_write(|value| {
+        let result = mutex.try_with_write(|value| {
             *value += 1;
             *value
         });
@@ -204,7 +204,7 @@ mod arc_mutex_tests {
         for _ in 0..10 {
             let mutex = Arc::clone(&mutex);
             let handle = thread::spawn(move || {
-                mutex.write(|value| {
+                mutex.with_write(|value| {
                     *value += 1;
                 });
             });
@@ -217,7 +217,7 @@ mod arc_mutex_tests {
         }
 
         // Verify final value
-        let result = mutex.read(|value| *value);
+        let result = mutex.with_read(|value| *value);
         assert_eq!(result, 10);
     }
 
@@ -225,11 +225,11 @@ mod arc_mutex_tests {
     fn test_arc_mutex_with_complex_types() {
         let mutex = ArcMutex::new(String::from("Hello"));
 
-        mutex.write(|s| {
+        mutex.with_write(|s| {
             s.push_str(" World");
         });
 
-        let result = mutex.read(|s| s.clone());
+        let result = mutex.with_read(|s| s.clone());
         assert_eq!(result, "Hello World");
     }
 
@@ -237,15 +237,15 @@ mod arc_mutex_tests {
     fn test_arc_mutex_multiple_modifications() {
         let mutex = ArcMutex::new(vec![1, 2, 3]);
 
-        mutex.write(|v| {
+        mutex.with_write(|v| {
             v.push(4);
         });
 
-        mutex.write(|v| {
+        mutex.with_write(|v| {
             v.push(5);
         });
 
-        let result = mutex.read(|v| v.clone());
+        let result = mutex.with_read(|v| v.clone());
         assert_eq!(result, vec![1, 2, 3, 4, 5]);
     }
 
@@ -253,13 +253,13 @@ mod arc_mutex_tests {
     fn test_arc_mutex_return_values() {
         let mutex = ArcMutex::new(vec![1, 2, 3, 4, 5]);
 
-        let sum = mutex.read(|v| v.iter().sum::<i32>());
+        let sum = mutex.with_read(|v| v.iter().sum::<i32>());
         assert_eq!(sum, 15);
 
-        let len = mutex.read(|v| v.len());
+        let len = mutex.with_read(|v| v.len());
         assert_eq!(len, 5);
 
-        let first = mutex.read(|v| v[0]);
+        let first = mutex.with_read(|v| v[0]);
         assert_eq!(first, 1);
     }
 
@@ -270,7 +270,7 @@ mod arc_mutex_tests {
         let mutex1 = mutex.clone();
         let handle1 = thread::spawn(move || {
             for _ in 0..100 {
-                mutex1.write(|value| {
+                mutex1.with_write(|value| {
                     *value += 1;
                 });
             }
@@ -279,7 +279,7 @@ mod arc_mutex_tests {
         let mutex2 = mutex.clone();
         let handle2 = thread::spawn(move || {
             for _ in 0..100 {
-                mutex2.write(|value| {
+                mutex2.with_write(|value| {
                     *value += 1;
                 });
             }
@@ -288,7 +288,7 @@ mod arc_mutex_tests {
         handle1.join().unwrap();
         handle2.join().unwrap();
 
-        let result = mutex.read(|value| *value);
+        let result = mutex.with_read(|value| *value);
         assert_eq!(result, 200);
     }
 
@@ -298,15 +298,15 @@ mod arc_mutex_tests {
 
         let mutex = ArcMutex::new(HashMap::new());
 
-        mutex.write(|map| {
+        mutex.with_write(|map| {
             map.insert("key1", 10);
             map.insert("key2", 20);
         });
 
-        let value1 = mutex.read(|map| map.get("key1").copied());
+        let value1 = mutex.with_read(|map| map.get("key1").copied());
         assert_eq!(value1, Some(10));
 
-        let value2 = mutex.read(|map| map.get("key2").copied());
+        let value2 = mutex.with_read(|map| map.get("key2").copied());
         assert_eq!(value2, Some(20));
     }
 
@@ -315,16 +315,16 @@ mod arc_mutex_tests {
         let mutex = ArcMutex::new(0);
 
         // Multiple reads should work
-        let read1 = mutex.read(|v| *v);
-        let read2 = mutex.read(|v| *v);
+        let read1 = mutex.with_read(|v| *v);
+        let read2 = mutex.with_read(|v| *v);
         assert_eq!(read1, 0);
         assert_eq!(read2, 0);
 
         // Write should change the value
-        mutex.write(|v| *v = 42);
+        mutex.with_write(|v| *v = 42);
 
         // Subsequent reads should see the change
-        let read3 = mutex.read(|v| *v);
+        let read3 = mutex.with_read(|v| *v);
         assert_eq!(read3, 42);
     }
 
@@ -333,18 +333,18 @@ mod arc_mutex_tests {
         let mutex = ArcMutex::new(0);
 
         // Try read should work
-        let result = mutex.try_read(|v| *v);
+        let result = mutex.try_with_read(|v| *v);
         assert_eq!(result, Ok(0));
 
         // Try write should work
-        let result = mutex.try_write(|v| {
+        let result = mutex.try_with_write(|v| {
             *v = 42;
             *v
         });
         assert_eq!(result, Ok(42));
 
         // Verify the change
-        let result = mutex.try_read(|v| *v);
+        let result = mutex.try_with_read(|v| *v);
         assert_eq!(result, Ok(42));
     }
 
@@ -355,10 +355,10 @@ mod arc_mutex_tests {
 
         let mutex = ArcMutex::new(ZeroSized);
 
-        let result = mutex.read(|z| *z);
+        let result = mutex.with_read(|z| *z);
         assert_eq!(result, ZeroSized);
 
-        mutex.write(|z| {
+        mutex.with_write(|z| {
             // Zero-sized types can't be modified, but we can verify access
             let _ = z;
         });
@@ -368,14 +368,14 @@ mod arc_mutex_tests {
     fn test_arc_mutex_with_option() {
         let mutex = ArcMutex::new(Some(42));
 
-        let result = mutex.read(|opt| opt.as_ref().copied());
+        let result = mutex.with_read(|opt| opt.as_ref().copied());
         assert_eq!(result, Some(42));
 
-        mutex.write(|opt| {
+        mutex.with_write(|opt| {
             *opt = None;
         });
 
-        let result = mutex.read(|opt| opt.as_ref().copied());
+        let result = mutex.with_read(|opt| opt.as_ref().copied());
         assert_eq!(result, None);
     }
 
@@ -383,32 +383,26 @@ mod arc_mutex_tests {
     fn test_arc_mutex_with_result() {
         let mutex = ArcMutex::new(Ok::<i32, &str>(42));
 
-        let result = mutex.read(|r| *r);
+        let result = mutex.with_read(|r| *r);
         assert_eq!(result, Ok(42));
 
-        mutex.write(|r| {
+        mutex.with_write(|r| {
             *r = Err("error");
         });
 
-        let result = mutex.read(|r| *r);
+        let result = mutex.with_read(|r| *r);
         assert_eq!(result, Err("error"));
     }
 
     #[test]
-    fn test_arc_mutex_performance_comparison() {
-        // This test ensures ArcMutex performs basic operations without issues
-        // In a real performance test, we'd use criterion or similar
+    fn test_arc_mutex_repeated_read_write_operations() {
         let mutex = ArcMutex::new(0);
 
-        let start = std::time::Instant::now();
-
         for i in 0..1000 {
-            mutex.write(|v| *v = i);
-            let _ = mutex.read(|v| *v);
+            mutex.with_write(|v| *v = i);
+            let _ = mutex.with_read(|v| *v);
         }
 
-        let elapsed = start.elapsed();
-        // Just ensure it completes in reasonable time (less than 1 second)
-        assert!(elapsed < std::time::Duration::from_secs(1));
+        assert_eq!(mutex.with_read(|value| *value), 999);
     }
 }

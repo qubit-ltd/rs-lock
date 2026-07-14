@@ -35,17 +35,17 @@ mod arc_async_mutex_tests {
     #[tokio::test]
     async fn test_arc_async_mutex_new() {
         let async_mutex = ArcAsyncMutex::new(42);
-        let result = async_mutex.read(|value| *value).await;
+        let result = async_mutex.with_read(|value| *value).await;
         assert_eq!(result, 42);
     }
 
     #[tokio::test]
     async fn test_arc_async_mutex_from_and_default() {
         let from_value = ArcAsyncMutex::from(42);
-        assert_eq!(from_value.read(|value| *value).await, 42);
+        assert_eq!(from_value.with_read(|value| *value).await, 42);
 
         let default_value = ArcAsyncMutex::<Vec<i32>>::default();
-        assert!(default_value.read(|items| items.is_empty()).await);
+        assert!(default_value.with_read(|items| items.is_empty()).await);
     }
 
     #[tokio::test]
@@ -65,7 +65,7 @@ mod arc_async_mutex_tests {
             *guard += 1;
         }
 
-        assert_eq!(async_mutex.read(|value| *value).await, 3);
+        assert_eq!(async_mutex.with_read(|value| *value).await, 3);
     }
 
     #[tokio::test]
@@ -74,7 +74,7 @@ mod arc_async_mutex_tests {
 
         // Test async lock
         let result = async_mutex
-            .write(|value| {
+            .with_write(|value| {
                 *value += 1;
                 *value
             })
@@ -82,7 +82,7 @@ mod arc_async_mutex_tests {
         assert_eq!(result, 1);
 
         // Test trying to acquire lock
-        let result = async_mutex.try_read(|value| *value).unwrap();
+        let result = async_mutex.try_with_read(|value| *value).unwrap();
         assert_eq!(result, 1);
     }
 
@@ -93,7 +93,7 @@ mod arc_async_mutex_tests {
 
         // Test cloned async lock
         let result = async_mutex_clone
-            .write(|value| {
+            .with_write(|value| {
                 *value += 1;
                 *value
             })
@@ -101,7 +101,7 @@ mod arc_async_mutex_tests {
         assert_eq!(result, 1);
 
         // Verify that original lock can see changes
-        let result = async_mutex.read(|value| *value).await;
+        let result = async_mutex.with_read(|value| *value).await;
         assert_eq!(result, 1);
     }
 
@@ -125,7 +125,7 @@ mod arc_async_mutex_tests {
                 .expect("failed to create Tokio runtime");
             rt.block_on(async {
                 async_mutex_clone
-                    .write(move |value| {
+                    .with_write(move |value| {
                         *value += 1;
                         locked_tx
                             .send(())
@@ -144,7 +144,7 @@ mod arc_async_mutex_tests {
             .expect("mutex should be held within timeout");
 
         // Try to acquire lock, should report contention.
-        let result = async_mutex.try_read(|value| *value);
+        let result = async_mutex.try_with_read(|value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
 
         release_tx
@@ -155,7 +155,7 @@ mod arc_async_mutex_tests {
         handle.join().expect("holder thread should not panic");
 
         // Now should be able to successfully acquire the lock
-        let result = async_mutex.try_read(|value| *value);
+        let result = async_mutex.try_with_read(|value| *value);
         assert_eq!(result, Ok(1));
     }
 
@@ -170,7 +170,7 @@ mod arc_async_mutex_tests {
             let async_mutex = Arc::clone(&async_mutex);
             let handle = tokio::spawn(async move {
                 async_mutex
-                    .write(|value| {
+                    .with_write(|value| {
                         *value += 1;
                     })
                     .await;
@@ -184,7 +184,7 @@ mod arc_async_mutex_tests {
         }
 
         // Verify final value
-        let result = async_mutex.read(|value| *value).await;
+        let result = async_mutex.with_read(|value| *value).await;
         assert_eq!(result, 10);
     }
 
@@ -193,12 +193,12 @@ mod arc_async_mutex_tests {
         let async_mutex = ArcAsyncMutex::new(String::from("Hello"));
 
         async_mutex
-            .write(|s| {
+            .with_write(|s| {
                 s.push_str(" World");
             })
             .await;
 
-        let result = async_mutex.read(|s| s.clone()).await;
+        let result = async_mutex.with_read(|s| s.clone()).await;
         assert_eq!(result, "Hello World");
     }
 
@@ -207,18 +207,18 @@ mod arc_async_mutex_tests {
         let async_mutex = ArcAsyncMutex::new(vec![1, 2, 3]);
 
         async_mutex
-            .write(|v| {
+            .with_write(|v| {
                 v.push(4);
             })
             .await;
 
         async_mutex
-            .write(|v| {
+            .with_write(|v| {
                 v.push(5);
             })
             .await;
 
-        let result = async_mutex.read(|v| v.clone()).await;
+        let result = async_mutex.with_read(|v| v.clone()).await;
         assert_eq!(result, vec![1, 2, 3, 4, 5]);
     }
 
@@ -226,13 +226,13 @@ mod arc_async_mutex_tests {
     async fn test_arc_async_mutex_return_values() {
         let async_mutex = ArcAsyncMutex::new(vec![1, 2, 3, 4, 5]);
 
-        let sum = async_mutex.read(|v| v.iter().sum::<i32>()).await;
+        let sum = async_mutex.with_read(|v| v.iter().sum::<i32>()).await;
         assert_eq!(sum, 15);
 
-        let len = async_mutex.read(|v| v.len()).await;
+        let len = async_mutex.with_read(|v| v.len()).await;
         assert_eq!(len, 5);
 
-        let first = async_mutex.read(|v| v[0]).await;
+        let first = async_mutex.with_read(|v| v[0]).await;
         assert_eq!(first, 1);
     }
 
@@ -244,7 +244,7 @@ mod arc_async_mutex_tests {
         let handle1 = tokio::spawn(async move {
             for _ in 0..100 {
                 async_mutex1
-                    .write(|value| {
+                    .with_write(|value| {
                         *value += 1;
                     })
                     .await;
@@ -255,7 +255,7 @@ mod arc_async_mutex_tests {
         let handle2 = tokio::spawn(async move {
             for _ in 0..100 {
                 async_mutex2
-                    .write(|value| {
+                    .with_write(|value| {
                         *value += 1;
                     })
                     .await;
@@ -265,7 +265,7 @@ mod arc_async_mutex_tests {
         handle1.await.unwrap();
         handle2.await.unwrap();
 
-        let result = async_mutex.read(|value| *value).await;
+        let result = async_mutex.with_read(|value| *value).await;
         assert_eq!(result, 200);
     }
 
@@ -276,16 +276,18 @@ mod arc_async_mutex_tests {
         let async_mutex = ArcAsyncMutex::new(HashMap::new());
 
         async_mutex
-            .write(|map| {
+            .with_write(|map| {
                 map.insert("key1", 10);
                 map.insert("key2", 20);
             })
             .await;
 
-        let value1 = async_mutex.read(|map| map.get("key1").copied()).await;
+        let value1 =
+            async_mutex.with_read(|map| map.get("key1").copied()).await;
         assert_eq!(value1, Some(10));
 
-        let value2 = async_mutex.read(|map| map.get("key2").copied()).await;
+        let value2 =
+            async_mutex.with_read(|map| map.get("key2").copied()).await;
         assert_eq!(value2, Some(20));
     }
 
@@ -300,7 +302,7 @@ mod arc_async_mutex_tests {
             let async_mutex = Arc::clone(&async_mutex);
             let handle = tokio::spawn(async move {
                 async_mutex
-                    .write(|v| {
+                    .with_write(|v| {
                         v.push(i);
                     })
                     .await;
@@ -314,7 +316,7 @@ mod arc_async_mutex_tests {
         }
 
         // Verify all tasks completed
-        let result = async_mutex.read(|v| v.len()).await;
+        let result = async_mutex.with_read(|v| v.len()).await;
         assert_eq!(result, 5);
     }
 
@@ -338,7 +340,7 @@ mod arc_async_mutex_tests {
                 .expect("failed to create Tokio runtime");
             rt.block_on(async {
                 async_mutex_clone
-                    .write(move |value| {
+                    .with_write(move |value| {
                         *value += 1;
                         locked_tx
                             .send(())
@@ -361,7 +363,7 @@ mod arc_async_mutex_tests {
                 .send(())
                 .expect("test should observe contended writer attempt");
             async_mutex_clone2
-                .write(|value| {
+                .with_write(|value| {
                     *value += 1;
                 })
                 .await;
@@ -371,7 +373,7 @@ mod arc_async_mutex_tests {
             .await
             .expect("contended writer should attempt to acquire the mutex");
         assert_eq!(
-            async_mutex.try_read(|value| *value),
+            async_mutex.try_with_read(|value| *value),
             Err(TryLockError::WouldBlock),
         );
 
@@ -381,7 +383,7 @@ mod arc_async_mutex_tests {
         holder.join().expect("holder thread should not panic");
         writer.await.unwrap();
 
-        let result = async_mutex.read(|value| *value).await;
+        let result = async_mutex.with_read(|value| *value).await;
         assert_eq!(result, 2);
     }
 
@@ -390,7 +392,7 @@ mod arc_async_mutex_tests {
         let async_mutex = ArcAsyncMutex::new(10);
 
         let result = async_mutex
-            .read(|value| -> Result<i32, &str> {
+            .with_read(|value| -> Result<i32, &str> {
                 if *value > 0 {
                     Ok(*value * 2)
                 } else {
@@ -408,12 +410,12 @@ mod arc_async_mutex_tests {
 
         // For async mutex, try_write will succeed when the lock is not held
         // This test verifies that try_write works correctly in the normal case
-        let result = async_mutex.try_write(|value| *value);
+        let result = async_mutex.try_with_write(|value| *value);
         assert_eq!(result, Ok(0));
 
         // Try again immediately, should still succeed since we released the
         // lock
-        let result = async_mutex.try_write(|value| {
+        let result = async_mutex.try_with_write(|value| {
             *value += 1;
             *value
         });
@@ -430,8 +432,8 @@ mod arc_async_mutex_tests {
 
         let async_mutex = Arc::new(ArcAsyncMutex::new(0));
 
-        assert_eq!(async_mutex.try_read(read_i32), Ok(0));
-        assert_eq!(async_mutex.try_write(increment_i32), Ok(1));
+        assert_eq!(async_mutex.try_with_read(read_i32), Ok(0));
+        assert_eq!(async_mutex.try_with_write(increment_i32), Ok(1));
 
         let (locked_tx, locked_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
@@ -441,7 +443,7 @@ mod arc_async_mutex_tests {
                 .expect("failed to create Tokio runtime");
             rt.block_on(async {
                 lock_clone
-                    .write(move |_| {
+                    .with_write(move |_| {
                         locked_tx
                             .send(())
                             .expect("test should observe held mutex");
@@ -457,11 +459,11 @@ mod arc_async_mutex_tests {
             .recv_timeout(Duration::from_secs(1))
             .expect("mutex should be held within timeout");
         assert_eq!(
-            async_mutex.try_read(read_i32),
+            async_mutex.try_with_read(read_i32),
             Err(TryLockError::WouldBlock),
         );
         assert_eq!(
-            async_mutex.try_write(increment_i32),
+            async_mutex.try_with_write(increment_i32),
             Err(TryLockError::WouldBlock),
         );
         release_tx
@@ -474,16 +476,16 @@ mod arc_async_mutex_tests {
     async fn test_arc_async_mutex_zero_sized_types() {
         let async_mutex = ArcAsyncMutex::new(());
 
-        let result = async_mutex.read(|_| "read_result").await;
+        let result = async_mutex.with_read(|_| "read_result").await;
         assert_eq!(result, "read_result");
 
-        let result = async_mutex.write(|_| "write_result").await;
+        let result = async_mutex.with_write(|_| "write_result").await;
         assert_eq!(result, "write_result");
 
-        let result = async_mutex.try_read(|_| "try_read_result");
+        let result = async_mutex.try_with_read(|_| "try_read_result");
         assert_eq!(result, Ok("try_read_result"));
 
-        let result = async_mutex.try_write(|_| "try_write_result");
+        let result = async_mutex.try_with_write(|_| "try_write_result");
         assert_eq!(result, Ok("try_write_result"));
     }
 
@@ -491,32 +493,34 @@ mod arc_async_mutex_tests {
     async fn test_arc_async_mutex_with_option() {
         let async_mutex = ArcAsyncMutex::new(Some(42));
 
-        let result = async_mutex.read(|opt| opt.as_ref().map(|&x| x * 2)).await;
+        let result = async_mutex
+            .with_read(|opt| opt.as_ref().map(|&x| x * 2))
+            .await;
         assert_eq!(result, Some(84));
 
         async_mutex
-            .write(|opt| {
+            .with_write(|opt| {
                 *opt = None;
             })
             .await;
 
-        let result = async_mutex.read(|opt| opt.is_none()).await;
+        let result = async_mutex.with_read(|opt| opt.is_none()).await;
         assert!(result);
     }
 
     #[tokio::test]
-    async fn test_arc_async_mutex_performance_comparison() {
+    async fn test_arc_async_mutex_repeated_operations() {
         let async_mutex1 = ArcAsyncMutex::new(0);
         let async_mutex2 = ArcAsyncMutex::new(0);
 
         // Test that multiple operations work correctly
         for i in 0..5 {
-            async_mutex1.write(|val| *val += i).await;
-            async_mutex2.write(|val| *val += i * 2).await;
+            async_mutex1.with_write(|val| *val += i).await;
+            async_mutex2.with_write(|val| *val += i * 2).await;
         }
 
-        let sum1 = async_mutex1.read(|val| *val).await;
-        let sum2 = async_mutex2.read(|val| *val).await;
+        let sum1 = async_mutex1.with_read(|val| *val).await;
+        let sum2 = async_mutex2.with_read(|val| *val).await;
 
         // sum1 = 0+1+2+3+4 = 10
         // sum2 = 0+2+4+6+8 = 20

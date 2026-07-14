@@ -19,12 +19,12 @@ fn main() {
     println!("Demonstrating rs-lock wrapper boundaries...");
 
     let cache = ArcRwLock::from(Vec::<String>::new());
-    cache.write(|items| items.push(String::from("ready")));
-    assert_eq!(cache.read(|items| items.len()), 1);
+    cache.with_write(|items| items.push(String::from("ready")));
+    assert_eq!(cache.with_read(|items| items.len()), 1);
 
     let std_state = ArcStdRwLock::new(String::from("std semantics"));
     assert_eq!(
-        std_state.read(|value| value.clone()),
+        std_state.with_read(|value| value.clone()),
         String::from("std semantics"),
     );
 
@@ -36,7 +36,7 @@ fn main() {
     );
     assert!(result.is_timed_out());
 
-    monitor.write(|items| items.push(7));
+    monitor.with_write(|items| items.push(7));
     monitor.notify_one();
     let result = monitor.wait_until_for(
         Duration::from_millis(1),

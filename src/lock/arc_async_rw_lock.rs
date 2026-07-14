@@ -59,12 +59,12 @@ use crate::lock::{
 ///     let data = ArcAsyncRwLock::new(String::from("Hello"));
 ///
 ///     // Multiple read operations can execute concurrently
-///     data.read(|s| {
+///     data.with_read(|s| {
 ///         println!("Read: {}", s);
 ///     }).await;
 ///
 ///     // Write operations have exclusive access
-///     data.write(|s| {
+///     data.with_write(|s| {
 ///         s.push_str(" World!");
 ///         println!("Write: {}", s);
 ///     }).await;
@@ -118,10 +118,11 @@ impl<T> Deref for ArcAsyncRwLock<T> {
 
     /// Dereferences this wrapper to the underlying Tokio read-write lock.
     ///
-    /// When [`AsyncLock`] is in scope, `read` and `write` with closure
-    /// arguments still call the trait methods on this wrapper. Use explicit
-    /// dereferencing or [`AsRef::as_ref`] when you want the native guard-based
-    /// [`AsyncRwLock`] methods.
+    /// [`AsyncLock::with_read`] and [`AsyncLock::with_write`] provide
+    /// closure-scoped access. The native guard-based [`AsyncRwLock::read`] and
+    /// [`AsyncRwLock::write`] methods remain directly available through this
+    /// dereference; use [`AsRef::as_ref`] when the target type should be
+    /// explicit.
     #[inline]
     fn deref(&self) -> &Self::Target {
         self.inner.as_ref()
@@ -160,12 +161,12 @@ where
     /// rt.block_on(async {
     ///     let data = ArcAsyncRwLock::new(vec![1, 2, 3]);
     ///
-    ///     let length = data.read(|v| v.len()).await;
+    ///     let length = data.with_read(|v| v.len()).await;
     ///     println!("Vector length: {}", length);
     /// });
     /// ```
     #[inline]
-    async fn read<R, F>(&self, f: F) -> R
+    async fn with_read<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R + Send,
         R: Send,
@@ -203,14 +204,14 @@ where
     /// rt.block_on(async {
     ///     let data = ArcAsyncRwLock::new(vec![1, 2, 3]);
     ///
-    ///     data.write(|v| {
+    ///     data.with_write(|v| {
     ///         v.push(4);
     ///         println!("Added element, new length: {}", v.len());
     ///     }).await;
     /// });
     /// ```
     #[inline]
-    async fn write<R, F>(&self, f: F) -> R
+    async fn with_write<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R + Send,
         R: Send,
@@ -231,7 +232,7 @@ where
     /// `Ok(result)` if a read lock was acquired, or
     /// [`TryLockError::WouldBlock`] if the lock was busy.
     #[inline]
-    fn try_read<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&T) -> R,
     {
@@ -252,7 +253,7 @@ where
     /// `Ok(result)` if a write lock was acquired, or
     /// [`TryLockError::WouldBlock`] if the lock was busy.
     #[inline]
-    fn try_write<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&mut T) -> R,
     {
