@@ -13,12 +13,15 @@ Lock-focused utilities for the Qubit Rust libraries. The crate provides synchron
 
 - `ArcMutex`, `ArcRwLock`: parking_lot-based synchronous lock wrappers with `Arc` built in.
 - `ArcStdMutex`, `ArcStdRwLock`: standard-library lock wrappers for callers that need poison semantics.
-- `ArcAsyncMutex`, `ArcAsyncRwLock`: Tokio-based asynchronous lock wrappers enabled by the default `async` feature.
+- `ArcAsyncMutex`, `ArcAsyncRwLock`: Tokio-based asynchronous lock wrappers
+  behind the optional `async` feature.
 - `ParkingLotMonitor`, `ArcParkingLotMonitor`, `ParkingLotMonitorGuard`: parking_lot-based condition coordination.
 - `StdMonitor`, `ArcStdMonitor`, `StdMonitorGuard`: std-based condition coordination.
-- `MockMonitor`, `ArcMockMonitor`: deterministic monitor testing driven by a
-  shared `qubit_clock::ManualMonotonicClock`.
-- `TokioMonitor`, `ArcTokioMonitor`: async monitor coordination with Tokio.
+- `MockMonitor`, `ArcMockMonitor`: deterministic monitor testing behind the
+  optional `mock` feature, driven by a shared
+  `qubit_clock::ManualMonotonicClock`.
+- `TokioMonitor`, `ArcTokioMonitor`: async monitor coordination behind the
+  optional `async` feature.
 - Closure-based APIs that keep lock acquisition and release scoped to one call.
 - `Arc*` wrappers implement `Deref` and `AsRef`, so the native guard-based
   APIs of the wrapped primitive remain available when needed.
@@ -27,15 +30,15 @@ Lock-focused utilities for the Qubit Rust libraries. The crate provides synchron
 
 ```toml
 [dependencies]
-qubit-lock = "0.9"
+qubit-lock = "0.10"
 ```
 
-The async wrappers use Tokio synchronization primitives and are enabled by
-default. For sync-only users that want to avoid Tokio in the dependency graph:
+The default feature set contains the synchronous locks and monitors only.
+Enable asynchronous or deterministic-test support explicitly when needed:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.9", default-features = false }
+qubit-lock = { version = "0.10", features = ["async", "mock"] }
 ```
 
 If your application creates a Tokio runtime, enable the appropriate Tokio
@@ -45,10 +48,13 @@ runtime features in your own `Cargo.toml`, such as `rt` or `rt-multi-thread`.
 
 ### Deterministic monitor time
 
+Enable the `mock` feature to use `MockMonitor` and `ArcMockMonitor`.
 `MockMonitor::new` creates an independent `ManualMonotonicClock`. Use
 `monotonic_clock()` to advance it explicitly. When several test components
 must observe the same time domain, construct them from the same clock with
-`MockMonitor::from_clock` or `ArcMockMonitor::from_clock`:
+`MockMonitor::from_clock` or `ArcMockMonitor::from_clock`. Code that constructs
+the shared clock directly must also declare `qubit-clock = "0.9"` as a direct
+dependency:
 
 ```rust
 use std::{sync::Arc, time::Duration};
@@ -72,6 +78,25 @@ are ready to observe changes. An async wait starts contributing after its future
 is first polled, and unregisters automatically when cancelled. Do not advance
 the clock from inside a closure that currently holds the same monitor's state
 lock.
+
+## Migration from 0.9
+
+Version `0.10` intentionally changes features and closure-method names:
+
+- The default feature set is now synchronous only. Enable `async` explicitly
+  for Tokio lock and monitor types.
+- `MockMonitor`, `ArcMockMonitor`, and the `qubit-clock` dependency are behind
+  the new `mock` feature. Enable both `async` and `mock` for async mock waits.
+- Closure-scoped lock methods were renamed: `read` to `with_read`, `write` to
+  `with_write`, `try_read` to `try_with_read`, and `try_write` to
+  `try_with_write`.
+- Synchronous monitor state helpers were renamed: `read` to `with_read`,
+  `write` to `with_write`, `write_notify_one` to `with_write_notify_one`, and
+  `write_notify_all` to `with_write_notify_all`.
+- Tokio monitor state helpers now use the `_async` suffix consistently:
+  `async_read` to `with_read_async`, `async_write` to `with_write_async`,
+  `async_write_notify_one` to `with_write_notify_one_async`, and
+  `async_write_notify_all` to `with_write_notify_all_async`.
 
 ## Migration from 0.8
 
@@ -97,8 +122,8 @@ Version `0.8` contains intentional breaking API cleanup:
 - Timeout condition methods are named `wait_until_for` and `wait_while_for`.
 - `MockMonitor` and `ArcMockMonitor` use a `ManualMonotonicClock` for
   deterministic timeout tests.
-- With the default `async` feature, `TokioMonitor` and `ArcTokioMonitor`
-  provide async monitor operations.
+- With the `async` feature, `TokioMonitor` and `ArcTokioMonitor` provide async
+  monitor operations.
 - `qubit_lock::lock` and `qubit_lock::monitor` are no longer public modules.
   Import public types directly from the crate root.
 
@@ -111,8 +136,8 @@ use qubit_lock::{ArcMutex, Lock};
 
 fn main() {
     let counter = ArcMutex::new(0);
-    counter.write(|value| *value += 1);
-    assert_eq!(counter.read(|value| *value), 1);
+    counter.with_write(|value| *value += 1);
+    assert_eq!(counter.with_read(|value| *value), 1);
 }
 ```
 
@@ -132,15 +157,15 @@ fn main() {
         *guard += 1;
     }
 
-    counter.write(|value| *value += 1);
-    assert_eq!(counter.read(|value| *value), 2);
+    counter.with_write(|value| *value += 1);
+    assert_eq!(counter.with_read(|value| *value), 2);
 }
 ```
 
-For `ArcRwLock` and `ArcAsyncRwLock`, the closure-based `read` and `write`
-methods have the same names as the native guard-based methods. When `Lock` or
-`AsyncLock` is in scope, use `lock.as_ref().read()` or explicit dereferencing
-such as `(*lock).read()` to call the native guard API.
+The `with_read` and `with_write` names distinguish closure-scoped access from
+native guard acquisition. A read-write-lock wrapper can therefore acquire a
+native guard directly with `lock.read()` or `lock.write()`; `lock.as_ref()`
+remains available when the wrapped type should be explicit.
 
 ### ParkingLotMonitor
 
@@ -158,7 +183,7 @@ fn main() {
         )
     });
 
-    monitor.write_notify_one(|items| items.push(7));
+    monitor.with_write_notify_one(|items| items.push(7));
 
     assert_eq!(worker.join().expect("worker should finish"), 7);
 }

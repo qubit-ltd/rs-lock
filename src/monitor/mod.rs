@@ -14,6 +14,7 @@
 // intentional so each public trait can live in its matching source file.
 #![allow(clippy::module_inception)]
 
+#[cfg(feature = "mock")]
 mod arc_mock_monitor;
 mod arc_parking_lot_monitor;
 mod arc_std_monitor;
@@ -32,7 +33,9 @@ mod async_timeout_condition_waiter;
 #[cfg(feature = "async")]
 mod async_timeout_notification_waiter;
 mod condition_waiter;
+#[cfg(feature = "mock")]
 mod mock_monitor;
+#[cfg(feature = "mock")]
 mod mock_monitor_waiter_guard;
 mod monitor;
 mod notification_waiter;
@@ -51,6 +54,7 @@ mod tokio_monitor;
 mod wait_timeout_result;
 mod wait_timeout_status;
 
+#[cfg(feature = "mock")]
 pub use arc_mock_monitor::ArcMockMonitor;
 pub use arc_parking_lot_monitor::ArcParkingLotMonitor;
 pub use arc_std_monitor::ArcStdMonitor;
@@ -69,6 +73,7 @@ pub use async_timeout_condition_waiter::AsyncTimeoutConditionWaiter;
 #[cfg(feature = "async")]
 pub use async_timeout_notification_waiter::AsyncTimeoutNotificationWaiter;
 pub use condition_waiter::ConditionWaiter;
+#[cfg(feature = "mock")]
 pub use mock_monitor::MockMonitor;
 pub use monitor::Monitor;
 pub use notification_waiter::NotificationWaiter;

@@ -9,11 +9,13 @@
 //!
 //! Covers behavior corresponding to `src/monitor`.
 
+#[cfg(feature = "mock")]
 mod arc_mock_monitor_tests;
 mod arc_parking_lot_monitor_tests;
 mod arc_std_monitor_tests;
 #[cfg(feature = "async")]
 mod arc_tokio_monitor_tests;
+#[cfg(feature = "mock")]
 mod mock_monitor_tests;
 mod monitor_trait_tests;
 mod parking_lot_monitor_guard_tests;
