@@ -50,13 +50,13 @@ use crate::lock::{
 /// let counter = ArcMutex::new(0);
 ///
 /// // Synchronously modify data
-/// counter.write(|c| {
+/// counter.with_write(|c| {
 ///     *c += 1;
 ///     println!("Counter: {}", *c);
 /// });
 ///
 /// // Try to acquire lock
-/// if let Ok(value) = counter.try_read(|c| *c) {
+/// if let Ok(value) = counter.try_with_read(|c| *c) {
 ///     println!("Current value: {}", value);
 /// }
 /// ```
@@ -138,11 +138,11 @@ impl<T> Lock<T> for ArcMutex<T> {
     ///
     /// let counter = ArcMutex::new(42);
     ///
-    /// let value = counter.read(|c| *c);
+    /// let value = counter.with_read(|c| *c);
     /// println!("Current value: {}", value);
     /// ```
     #[inline]
-    fn read<R, F>(&self, f: F) -> R
+    fn with_read<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R,
     {
@@ -171,7 +171,7 @@ impl<T> Lock<T> for ArcMutex<T> {
     ///
     /// let counter = ArcMutex::new(0);
     ///
-    /// let result = counter.write(|c| {
+    /// let result = counter.with_write(|c| {
     ///     *c += 1;
     ///     *c
     /// });
@@ -179,7 +179,7 @@ impl<T> Lock<T> for ArcMutex<T> {
     /// println!("Counter value: {}", result);
     /// ```
     #[inline]
-    fn write<R, F>(&self, f: F) -> R
+    fn with_write<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
@@ -210,14 +210,14 @@ impl<T> Lock<T> for ArcMutex<T> {
     ///
     /// let counter = ArcMutex::new(42);
     ///
-    /// if let Ok(value) = counter.try_read(|c| *c) {
+    /// if let Ok(value) = counter.try_with_read(|c| *c) {
     ///     println!("Current value: {}", value);
     /// } else {
     ///     println!("Lock is unavailable");
     /// }
     /// ```
     #[inline]
-    fn try_read<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&T) -> R,
     {
@@ -250,7 +250,7 @@ impl<T> Lock<T> for ArcMutex<T> {
     ///
     /// let counter = ArcMutex::new(0);
     ///
-    /// if let Ok(result) = counter.try_write(|c| {
+    /// if let Ok(result) = counter.try_with_write(|c| {
     ///     *c += 1;
     ///     *c
     /// }) {
@@ -260,7 +260,7 @@ impl<T> Lock<T> for ArcMutex<T> {
     /// }
     /// ```
     #[inline]
-    fn try_write<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&mut T) -> R,
     {

@@ -79,10 +79,10 @@ impl<T> Deref for ArcStdRwLock<T> {
 
     /// Dereferences this wrapper to the underlying standard read-write lock.
     ///
-    /// When [`Lock`] is in scope, `read` and `write` with closure arguments
-    /// still call the trait methods on this wrapper. Use explicit
-    /// dereferencing or [`AsRef::as_ref`] when you want the native guard-based
-    /// [`RwLock`] methods.
+    /// [`Lock::with_read`] and [`Lock::with_write`] provide closure-scoped
+    /// access. The native guard-based [`RwLock::read`] and [`RwLock::write`]
+    /// methods remain directly available through this dereference; use
+    /// [`AsRef::as_ref`] when the target type should be explicit.
     #[inline]
     fn deref(&self) -> &Self::Target {
         self.inner.as_ref()
@@ -104,7 +104,7 @@ impl<T> Lock<T> for ArcStdRwLock<T> {
     ///
     /// Panics if the underlying standard read-write lock is poisoned.
     #[inline]
-    fn read<R, F>(&self, f: F) -> R
+    fn with_read<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R,
     {
@@ -126,7 +126,7 @@ impl<T> Lock<T> for ArcStdRwLock<T> {
     ///
     /// Panics if the underlying standard read-write lock is poisoned.
     #[inline]
-    fn write<R, F>(&self, f: F) -> R
+    fn with_write<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
     {
@@ -149,7 +149,7 @@ impl<T> Lock<T> for ArcStdRwLock<T> {
     /// Returns [`TryLockError::WouldBlock`] when the lock is unavailable, or
     /// [`TryLockError::Poisoned`] when the lock is poisoned.
     #[inline]
-    fn try_read<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&T) -> R,
     {
@@ -179,7 +179,7 @@ impl<T> Lock<T> for ArcStdRwLock<T> {
     /// Returns [`TryLockError::WouldBlock`] when the lock is unavailable, or
     /// [`TryLockError::Poisoned`] when the lock is poisoned.
     #[inline]
-    fn try_write<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&mut T) -> R,
     {

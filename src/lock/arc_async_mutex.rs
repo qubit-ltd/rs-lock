@@ -51,13 +51,13 @@ use crate::lock::{
 ///     let counter = ArcAsyncMutex::new(0);
 ///
 ///     // Asynchronously modify data
-///     counter.write(|c| {
+///     counter.with_write(|c| {
 ///         *c += 1;
 ///         println!("Counter: {}", *c);
 ///     }).await;
 ///
 ///     // Try to acquire lock
-///     if let Ok(value) = counter.try_read(|c| *c) {
+///     if let Ok(value) = counter.try_with_read(|c| *c) {
 ///         println!("Current value: {}", value);
 ///     }
 /// });
@@ -133,7 +133,7 @@ where
     ///
     /// A future resolving to the closure result.
     #[inline]
-    async fn read<R, F>(&self, f: F) -> R
+    async fn with_read<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R + Send,
         R: Send,
@@ -152,7 +152,7 @@ where
     ///
     /// A future resolving to the closure result.
     #[inline]
-    async fn write<R, F>(&self, f: F) -> R
+    async fn with_write<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R + Send,
         R: Send,
@@ -172,7 +172,7 @@ where
     /// `Ok(result)` if the mutex was acquired, or
     /// [`TryLockError::WouldBlock`] if it was busy.
     #[inline]
-    fn try_read<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&T) -> R,
     {
@@ -193,7 +193,7 @@ where
     /// `Ok(result)` if the mutex was acquired, or
     /// [`TryLockError::WouldBlock`] if it was busy.
     #[inline]
-    fn try_write<R, F>(&self, f: F) -> Result<R, TryLockError>
+    fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&mut T) -> R,
     {

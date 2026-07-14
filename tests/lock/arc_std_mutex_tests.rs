@@ -43,17 +43,17 @@ mod arc_std_mutex_tests {
     #[test]
     fn test_arc_mutex_new() {
         let mutex = ArcStdMutex::new(42);
-        let result = mutex.read(|value| *value);
+        let result = mutex.with_read(|value| *value);
         assert_eq!(result, 42);
     }
 
     #[test]
     fn test_arc_std_mutex_from_and_default() {
         let from_value = ArcStdMutex::from(42);
-        assert_eq!(from_value.read(|value| *value), 42);
+        assert_eq!(from_value.with_read(|value| *value), 42);
 
         let default_value = ArcStdMutex::<Vec<i32>>::default();
-        assert!(default_value.read(|items| items.is_empty()));
+        assert!(default_value.with_read(|items| items.is_empty()));
     }
 
     #[test]
@@ -73,7 +73,7 @@ mod arc_std_mutex_tests {
             *guard += 1;
         }
 
-        assert_eq!(mutex.read(|value| *value), 3);
+        assert_eq!(mutex.with_read(|value| *value), 3);
     }
 
     #[test]
@@ -81,14 +81,14 @@ mod arc_std_mutex_tests {
         let mutex = ArcStdMutex::new(0);
 
         // Test basic lock and modify
-        let result = mutex.write(|value| {
+        let result = mutex.with_write(|value| {
             *value += 1;
             *value
         });
         assert_eq!(result, 1);
 
         // Verify the value was persisted
-        let result = mutex.read(|value| *value);
+        let result = mutex.with_read(|value| *value);
         assert_eq!(result, 1);
     }
 
@@ -96,7 +96,7 @@ mod arc_std_mutex_tests {
     fn test_arc_mutex_try_read_write_success() {
         let mutex = ArcStdMutex::new(42);
 
-        let result = mutex.try_read(|value| *value).unwrap();
+        let result = mutex.try_with_read(|value| *value).unwrap();
         assert_eq!(result, 42);
     }
 
@@ -106,14 +106,14 @@ mod arc_std_mutex_tests {
         let mutex_clone = mutex.clone();
 
         // Test that cloned lock shares data
-        let result = mutex_clone.write(|value| {
+        let result = mutex_clone.with_write(|value| {
             *value += 1;
             *value
         });
         assert_eq!(result, 1);
 
         // Verify that original lock can see changes
-        let result = mutex.read(|value| *value);
+        let result = mutex.with_read(|value| *value);
         assert_eq!(result, 1);
     }
 
@@ -122,22 +122,22 @@ mod arc_std_mutex_tests {
         // Test Clone with String
         let string_mutex = ArcStdMutex::new(String::from("hello"));
         let string_clone = string_mutex.clone();
-        string_clone.write(|s| s.push_str(" world"));
-        let result = string_mutex.read(|s| s.clone());
+        string_clone.with_write(|s| s.push_str(" world"));
+        let result = string_mutex.with_read(|s| s.clone());
         assert_eq!(result, "hello world");
 
         // Test Clone with Vec
         let vec_mutex = ArcStdMutex::new(vec![1, 2, 3]);
         let vec_clone = vec_mutex.clone();
-        vec_clone.write(|v| v.push(4));
-        let result = vec_mutex.read(|v| v.clone());
+        vec_clone.with_write(|v| v.push(4));
+        let result = vec_mutex.with_read(|v| v.clone());
         assert_eq!(result, vec![1, 2, 3, 4]);
 
         // Test Clone with Option
         let option_mutex = ArcStdMutex::new(Some(42));
         let option_clone = option_mutex.clone();
-        option_clone.write(|opt| *opt = Some(84));
-        let result = option_mutex.read(|opt| *opt);
+        option_clone.with_write(|opt| *opt = Some(84));
+        let result = option_mutex.with_read(|opt| *opt);
         assert_eq!(result, Some(84));
     }
 
@@ -153,7 +153,7 @@ mod arc_std_mutex_tests {
         for _ in 0..5 {
             let mutex_clone = Arc::clone(&mutex);
             let handle = thread::spawn(move || {
-                mutex_clone.write(|value| {
+                mutex_clone.with_write(|value| {
                     *value += 1;
                 });
             });
@@ -166,7 +166,7 @@ mod arc_std_mutex_tests {
         }
 
         // Verify final value through original mutex
-        let result = mutex.read(|value| *value);
+        let result = mutex.with_read(|value| *value);
         assert_eq!(result, 5);
     }
 
@@ -180,7 +180,7 @@ mod arc_std_mutex_tests {
 
         // Hold the lock in another thread
         let handle = thread::spawn(move || {
-            mutex_clone.write(|value| {
+            mutex_clone.with_write(|value| {
                 *value += 1;
                 locked_tx.send(()).expect("test should observe held mutex");
                 release_rx
@@ -195,7 +195,7 @@ mod arc_std_mutex_tests {
             .expect("mutex should be held within timeout");
 
         // Try to acquire lock, should return WouldBlock
-        let result = mutex.try_read(|value| *value);
+        let result = mutex.try_with_read(|value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
 
         release_tx
@@ -206,7 +206,7 @@ mod arc_std_mutex_tests {
         handle.join().unwrap();
 
         // Now should be able to successfully acquire the lock
-        let result = mutex.try_read(|value| *value);
+        let result = mutex.try_with_read(|value| *value);
         assert_eq!(result, Ok(1));
     }
 
@@ -220,7 +220,7 @@ mod arc_std_mutex_tests {
 
         // Hold the lock and panic in another thread
         let handle = thread::spawn(move || {
-            mutex_clone.write(|value| {
+            mutex_clone.with_write(|value| {
                 *value += 1;
                 // Notify main thread that lock has been acquired
                 barrier_clone.wait();
@@ -236,7 +236,7 @@ mod arc_std_mutex_tests {
         let _ = handle.join();
 
         // Try to acquire poisoned lock, should return Poisoned
-        let result = mutex.try_read(|value| *value);
+        let result = mutex.try_with_read(|value| *value);
         assert_eq!(result, Err(TryLockError::Poisoned));
     }
 
@@ -244,14 +244,14 @@ mod arc_std_mutex_tests {
     fn test_arc_mutex_try_methods_cover_shared_function_pointer_paths() {
         let mutex = Arc::new(ArcStdMutex::new(0));
 
-        assert_eq!(mutex.try_read(read_i32), Ok(0));
-        assert_eq!(mutex.try_write(increment_i32), Ok(1));
+        assert_eq!(mutex.try_with_read(read_i32), Ok(0));
+        assert_eq!(mutex.try_with_write(increment_i32), Ok(1));
 
         let (locked_tx, locked_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
         let mutex_clone = mutex.clone();
         let holder = thread::spawn(move || {
-            mutex_clone.write(|_| {
+            mutex_clone.with_write(|_| {
                 locked_tx.send(()).expect("test should observe held mutex");
                 release_rx
                     .recv_timeout(Duration::from_secs(1))
@@ -261,9 +261,12 @@ mod arc_std_mutex_tests {
         locked_rx
             .recv_timeout(Duration::from_secs(1))
             .expect("mutex should be held within timeout");
-        assert_eq!(mutex.try_read(read_i32), Err(TryLockError::WouldBlock));
         assert_eq!(
-            mutex.try_write(increment_i32),
+            mutex.try_with_read(read_i32),
+            Err(TryLockError::WouldBlock)
+        );
+        assert_eq!(
+            mutex.try_with_write(increment_i32),
             Err(TryLockError::WouldBlock),
         );
         release_tx
@@ -274,16 +277,19 @@ mod arc_std_mutex_tests {
         let poisoned = Arc::new(ArcStdMutex::new(0));
         let poisoned_clone = poisoned.clone();
         let handle = thread::spawn(move || {
-            poisoned_clone.write(|value| {
+            poisoned_clone.with_write(|value| {
                 *value += 1;
                 panic!("intentional panic to poison the lock");
             });
         });
         let _ = handle.join();
 
-        assert_eq!(poisoned.try_read(read_i32), Err(TryLockError::Poisoned));
         assert_eq!(
-            poisoned.try_write(increment_i32),
+            poisoned.try_with_read(read_i32),
+            Err(TryLockError::Poisoned)
+        );
+        assert_eq!(
+            poisoned.try_with_write(increment_i32),
             Err(TryLockError::Poisoned),
         );
     }
@@ -297,7 +303,7 @@ mod arc_std_mutex_tests {
         let mutex_clone = mutex.clone();
 
         let handle = thread::spawn(move || {
-            mutex_clone.write(|value| {
+            mutex_clone.with_write(|value| {
                 *value += 1;
                 locked_tx.send(()).expect("test should observe held mutex");
                 release_rx
@@ -309,7 +315,7 @@ mod arc_std_mutex_tests {
         locked_rx
             .recv_timeout(Duration::from_secs(1))
             .expect("mutex should be held within timeout");
-        let result = mutex.try_read(|value| *value);
+        let result = mutex.try_with_read(|value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
 
         release_tx
@@ -327,7 +333,7 @@ mod arc_std_mutex_tests {
         let barrier_clone = barrier.clone();
 
         let handle = thread::spawn(move || {
-            mutex_clone.write(|value| {
+            mutex_clone.with_write(|value| {
                 *value += 1;
                 barrier_clone.wait();
                 panic!("intentional panic to poison the lock");
@@ -337,7 +343,7 @@ mod arc_std_mutex_tests {
         barrier.wait();
         let _ = handle.join();
 
-        let result = mutex.try_read(|value| *value);
+        let result = mutex.try_with_read(|value| *value);
         assert_eq!(result, Err(TryLockError::Poisoned));
     }
 
@@ -350,7 +356,7 @@ mod arc_std_mutex_tests {
         let barrier_clone = barrier.clone();
 
         let handle = thread::spawn(move || {
-            mutex_clone.write(|value| {
+            mutex_clone.with_write(|value| {
                 *value += 1;
                 barrier_clone.wait();
                 panic!("intentional panic to poison the lock");
@@ -360,7 +366,7 @@ mod arc_std_mutex_tests {
         barrier.wait();
         let _ = handle.join();
 
-        let result = mutex.try_write(|value| *value);
+        let result = mutex.try_with_write(|value| *value);
         assert_eq!(result, Err(TryLockError::Poisoned));
     }
 
@@ -375,7 +381,7 @@ mod arc_std_mutex_tests {
 
         // Hold the lock and panic in another thread
         let handle = thread::spawn(move || {
-            mutex_clone.write(|value| {
+            mutex_clone.with_write(|value| {
                 *value += 1;
                 // Notify main thread that lock has been acquired
                 barrier_clone.wait();
@@ -392,7 +398,7 @@ mod arc_std_mutex_tests {
 
         // Try to acquire poisoned lock with read (not try_read)
         // This should panic because read uses unwrap()
-        mutex.read(|_| {});
+        mutex.with_read(|_| {});
     }
 
     #[test]
@@ -406,7 +412,7 @@ mod arc_std_mutex_tests {
         for _ in 0..10 {
             let mutex = Arc::clone(&mutex);
             let handle = thread::spawn(move || {
-                mutex.write(|value| {
+                mutex.with_write(|value| {
                     *value += 1;
                 });
             });
@@ -419,7 +425,7 @@ mod arc_std_mutex_tests {
         }
 
         // Verify final value
-        let result = mutex.read(|value| *value);
+        let result = mutex.with_read(|value| *value);
         assert_eq!(result, 10);
     }
 
@@ -427,11 +433,11 @@ mod arc_std_mutex_tests {
     fn test_arc_mutex_with_complex_types() {
         let mutex = ArcStdMutex::new(String::from("Hello"));
 
-        mutex.write(|s| {
+        mutex.with_write(|s| {
             s.push_str(" World");
         });
 
-        let result = mutex.read(|s| s.clone());
+        let result = mutex.with_read(|s| s.clone());
         assert_eq!(result, "Hello World");
     }
 
@@ -439,15 +445,15 @@ mod arc_std_mutex_tests {
     fn test_arc_mutex_multiple_modifications() {
         let mutex = ArcStdMutex::new(vec![1, 2, 3]);
 
-        mutex.write(|v| {
+        mutex.with_write(|v| {
             v.push(4);
         });
 
-        mutex.write(|v| {
+        mutex.with_write(|v| {
             v.push(5);
         });
 
-        let result = mutex.read(|v| v.clone());
+        let result = mutex.with_read(|v| v.clone());
         assert_eq!(result, vec![1, 2, 3, 4, 5]);
     }
 
@@ -455,13 +461,13 @@ mod arc_std_mutex_tests {
     fn test_arc_mutex_return_values() {
         let mutex = ArcStdMutex::new(vec![1, 2, 3, 4, 5]);
 
-        let sum = mutex.read(|v| v.iter().sum::<i32>());
+        let sum = mutex.with_read(|v| v.iter().sum::<i32>());
         assert_eq!(sum, 15);
 
-        let len = mutex.read(|v| v.len());
+        let len = mutex.with_read(|v| v.len());
         assert_eq!(len, 5);
 
-        let first = mutex.read(|v| v[0]);
+        let first = mutex.with_read(|v| v[0]);
         assert_eq!(first, 1);
     }
 
@@ -472,7 +478,7 @@ mod arc_std_mutex_tests {
         let mutex1 = mutex.clone();
         let handle1 = thread::spawn(move || {
             for _ in 0..100 {
-                mutex1.write(|value| {
+                mutex1.with_write(|value| {
                     *value += 1;
                 });
             }
@@ -481,7 +487,7 @@ mod arc_std_mutex_tests {
         let mutex2 = mutex.clone();
         let handle2 = thread::spawn(move || {
             for _ in 0..100 {
-                mutex2.write(|value| {
+                mutex2.with_write(|value| {
                     *value += 1;
                 });
             }
@@ -490,7 +496,7 @@ mod arc_std_mutex_tests {
         handle1.join().unwrap();
         handle2.join().unwrap();
 
-        let result = mutex.read(|value| *value);
+        let result = mutex.with_read(|value| *value);
         assert_eq!(result, 200);
     }
 
@@ -500,15 +506,15 @@ mod arc_std_mutex_tests {
 
         let mutex = ArcStdMutex::new(HashMap::new());
 
-        mutex.write(|map| {
+        mutex.with_write(|map| {
             map.insert("key1", 10);
             map.insert("key2", 20);
         });
 
-        let value1 = mutex.read(|map| map.get("key1").copied());
+        let value1 = mutex.with_read(|map| map.get("key1").copied());
         assert_eq!(value1, Some(10));
 
-        let value2 = mutex.read(|map| map.get("key2").copied());
+        let value2 = mutex.with_read(|map| map.get("key2").copied());
         assert_eq!(value2, Some(20));
     }
 
@@ -522,7 +528,7 @@ mod arc_std_mutex_tests {
 
         // Hold the lock in another thread
         let handle = thread::spawn(move || {
-            mutex_clone.write(|value| {
+            mutex_clone.with_write(|value| {
                 *value += 1;
                 locked_tx.send(()).expect("test should observe held mutex");
                 release_rx
@@ -537,7 +543,7 @@ mod arc_std_mutex_tests {
             .expect("mutex should be held within timeout");
 
         // Try to acquire write lock, should return WouldBlock
-        let result = mutex.try_write(|value| *value);
+        let result = mutex.try_with_write(|value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
 
         release_tx
@@ -548,7 +554,7 @@ mod arc_std_mutex_tests {
         handle.join().unwrap();
 
         // Now should be able to successfully acquire the lock
-        let result = mutex.try_write(|value| *value);
+        let result = mutex.try_with_write(|value| *value);
         assert_eq!(result, Ok(1));
     }
 
@@ -556,16 +562,16 @@ mod arc_std_mutex_tests {
     fn test_arc_mutex_zero_sized_types() {
         let mutex = ArcStdMutex::new(());
 
-        let result = mutex.read(|_| "read_result");
+        let result = mutex.with_read(|_| "read_result");
         assert_eq!(result, "read_result");
 
-        let result = mutex.write(|_| "write_result");
+        let result = mutex.with_write(|_| "write_result");
         assert_eq!(result, "write_result");
 
-        let result = mutex.try_read(|_| "try_read_result");
+        let result = mutex.try_with_read(|_| "try_read_result");
         assert_eq!(result, Ok("try_read_result"));
 
-        let result = mutex.try_write(|_| "try_write_result");
+        let result = mutex.try_with_write(|_| "try_write_result");
         assert_eq!(result, Ok("try_write_result"));
     }
 
@@ -573,14 +579,14 @@ mod arc_std_mutex_tests {
     fn test_arc_mutex_with_option() {
         let mutex = ArcStdMutex::new(Some(42));
 
-        let result = mutex.read(|opt| opt.as_ref().map(|&x| x * 2));
+        let result = mutex.with_read(|opt| opt.as_ref().map(|&x| x * 2));
         assert_eq!(result, Some(84));
 
-        mutex.write(|opt| {
+        mutex.with_write(|opt| {
             *opt = None;
         });
 
-        let result = mutex.read(|opt| opt.is_none());
+        let result = mutex.with_read(|opt| opt.is_none());
         assert!(result);
     }
 
@@ -588,7 +594,7 @@ mod arc_std_mutex_tests {
     fn test_arc_mutex_with_result() {
         let mutex = ArcStdMutex::new(Ok::<i32, &str>(42));
 
-        let result = mutex.write(|res| match res {
+        let result = mutex.with_write(|res| match res {
             Ok(val) => {
                 *val *= 2;
                 Ok(*val)
@@ -597,27 +603,27 @@ mod arc_std_mutex_tests {
         });
         assert_eq!(result, Ok(84));
 
-        mutex.write(|res| {
+        mutex.with_write(|res| {
             *res = Err("test error");
         });
 
-        let result = mutex.read(|res| *res);
+        let result = mutex.with_read(|res| *res);
         assert_eq!(result, Err("test error"));
     }
 
     #[test]
-    fn test_arc_mutex_performance_comparison() {
+    fn test_arc_std_mutex_repeated_operations() {
         let mutex1 = ArcStdMutex::new(0);
         let mutex2 = ArcStdMutex::new(0);
 
         // Test that multiple operations work correctly
         for i in 0..10 {
-            mutex1.write(|val| *val += i);
-            mutex2.write(|val| *val += i * 2);
+            mutex1.with_write(|val| *val += i);
+            mutex2.with_write(|val| *val += i * 2);
         }
 
-        let sum1 = mutex1.read(|val| *val);
-        let sum2 = mutex2.read(|val| *val);
+        let sum1 = mutex1.with_read(|val| *val);
+        let sum2 = mutex2.with_read(|val| *val);
 
         // sum1 = 0+1+2+...+9 = 45
         // sum2 = 0+2+4+...+18 = 90
@@ -630,18 +636,18 @@ mod arc_std_mutex_tests {
         let mutex = ArcStdMutex::new(42);
 
         // Test successful try_read
-        let result = mutex.try_read(|val| *val);
+        let result = mutex.try_with_read(|val| *val);
         assert_eq!(result, Ok(42));
 
         // Test successful try_write
-        let result = mutex.try_write(|val| {
+        let result = mutex.try_with_write(|val| {
             *val += 1;
             *val
         });
         assert_eq!(result, Ok(43));
 
         // Verify the change
-        let result = mutex.try_read(|val| *val);
+        let result = mutex.try_with_read(|val| *val);
         assert_eq!(result, Ok(43));
     }
 }
