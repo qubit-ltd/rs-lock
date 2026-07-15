@@ -512,7 +512,10 @@ impl<T: Send + 'static> ConditionWaiter for MockMonitor<T> {
 
 impl<T: Send + 'static> TimeoutConditionWaiter for MockMonitor<T> {
     /// Blocks while the predicate remains true or until mock elapsed time
-    /// reaches timeout.
+    /// reaches timeout. The fixed target is established after the initial
+    /// locked predicate check, excluding initial lock contention. At the
+    /// target, readiness wins the final locked predicate check; zero timeout
+    /// still checks the predicate once.
     fn wait_while_for<R, P, F>(
         &self,
         timeout: Duration,
@@ -523,16 +526,19 @@ impl<T: Send + 'static> TimeoutConditionWaiter for MockMonitor<T> {
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,
     {
-        let target_elapsed = self.elapsed().saturating_add(timeout);
-        let waiter_id = {
+        let (waiter_id, target_elapsed) = {
             let mut state = self.lock_state();
             if !predicate(&state.value) {
                 return WaitTimeoutResult::Ready(action(&mut state.value));
             }
+            let target_elapsed = self.elapsed().saturating_add(timeout);
             if self.elapsed() >= target_elapsed {
                 return WaitTimeoutResult::TimedOut;
             }
-            Self::register_waiter_locked(&mut state, true)
+            (
+                Self::register_waiter_locked(&mut state, true),
+                target_elapsed,
+            )
         };
         let _waiter_guard =
             self.waiter_guard_from_registered(waiter_id, true);
@@ -606,7 +612,10 @@ impl<T: Send + 'static> AsyncConditionWaiter for MockMonitor<T> {
 #[cfg(feature = "async")]
 impl<T: Send + 'static> AsyncTimeoutConditionWaiter for MockMonitor<T> {
     /// Returns a future that waits while the predicate remains true or times
-    /// out.
+    /// out. The future is lazy, and its fixed manual-clock target is
+    /// established after the initial locked predicate check. Initial lock
+    /// contention is excluded. At the target, readiness wins the final locked
+    /// predicate check; zero timeout still checks the predicate once.
     #[allow(
         clippy::manual_async_fn,
         reason = "the explicit Send bound is part of the trait contract"
@@ -623,17 +632,20 @@ impl<T: Send + 'static> AsyncTimeoutConditionWaiter for MockMonitor<T> {
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
         let mut change_receiver = self.async_change_sender.subscribe();
-        let target_elapsed = self.elapsed().saturating_add(timeout);
         async move {
-            let waiter_id = {
+            let (waiter_id, target_elapsed) = {
                 let mut state = self.lock_state();
                 if !predicate(&state.value) {
                     return WaitTimeoutResult::Ready(action(&mut state.value));
                 }
+                let target_elapsed = self.elapsed().saturating_add(timeout);
                 if self.elapsed() >= target_elapsed {
                     return WaitTimeoutResult::TimedOut;
                 }
-                Self::register_waiter_locked(&mut state, true)
+                (
+                    Self::register_waiter_locked(&mut state, true),
+                    target_elapsed,
+                )
             };
             let _waiter_guard =
                 self.waiter_guard_from_registered(waiter_id, true);

@@ -478,6 +478,13 @@ impl<T> StdMonitor<T> {
     /// timeout expires, `f` runs while the lock is still held. If the timeout
     /// expires first, the closure is not called.
     ///
+    /// The timeout budget starts after the monitor lock is acquired and the
+    /// initial predicate check still requires waiting, immediately before the
+    /// first condition suspension. Initial lock contention and that predicate
+    /// check do not consume the budget. One fixed deadline is reused across
+    /// wakeups. At the deadline, readiness wins one final locked predicate
+    /// check. A zero timeout still checks the predicate once.
+    ///
     /// Condition variables may wake spuriously, and timeout status alone is not
     /// used as proof that the predicate is still true; the predicate is always
     /// rechecked under the lock.
@@ -527,12 +534,11 @@ impl<T> StdMonitor<T> {
         F: FnOnce(&mut T) -> R,
     {
         let mut guard = self.lock();
+        if !waiting(&*guard) {
+            return WaitTimeoutResult::Ready(f(&mut *guard));
+        }
         let start = Instant::now();
         loop {
-            if !waiting(&*guard) {
-                return WaitTimeoutResult::Ready(f(&mut *guard));
-            }
-
             let elapsed = start.elapsed();
             let remaining = timeout.checked_sub(elapsed).unwrap_or_default();
             if remaining.is_zero() {
@@ -541,6 +547,9 @@ impl<T> StdMonitor<T> {
 
             let (next_guard, _status) = guard.wait_timeout(remaining);
             guard = next_guard;
+            if !waiting(&*guard) {
+                return WaitTimeoutResult::Ready(f(&mut *guard));
+            }
         }
     }
 
@@ -550,6 +559,13 @@ impl<T> StdMonitor<T> {
     /// [`Self::wait_while_for`]. If `ready` becomes true before the timeout
     /// expires, `f` runs while the monitor lock is still held. If the timeout
     /// expires first, the closure is not called.
+    ///
+    /// The timeout budget starts after the monitor lock is acquired and the
+    /// initial predicate check still requires waiting, immediately before the
+    /// first condition suspension. Initial lock contention and that predicate
+    /// check do not consume the budget. One fixed deadline is reused across
+    /// wakeups. At the deadline, readiness wins one final locked predicate
+    /// check. A zero timeout still checks the predicate once.
     ///
     /// Condition variables may wake spuriously, and timeout status alone is not
     /// used as proof that the predicate is still false; the predicate is always
