@@ -25,6 +25,7 @@ fn assert_send<F: Future + Send>(future: F) -> F {
     future
 }
 
+/// Verifies that all Tokio condition-wait trait methods return `Send` futures.
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_condition_wait_futures_are_send() {
     let monitor = TokioMonitor::new(true);
