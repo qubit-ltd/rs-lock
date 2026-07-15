@@ -79,9 +79,9 @@
 //! ```compile_fail
 //! use std::time::Duration;
 //!
-//! use qubit_lock::{AsyncTimeoutNotificationWaiter, TokioMonitor};
+//! use qubit_lock::ArcTokioMonitor;
 //!
-//! async fn wait_for_notification(monitor: &TokioMonitor<bool>) {
+//! async fn wait_for_notification(monitor: &ArcTokioMonitor<bool>) {
 //!     let _ = monitor.wait_for_async(Duration::ZERO).await;
 //! }
 //! ```
