@@ -20,7 +20,6 @@ use super::{
     ConditionWaiter,
     Notifier,
     ParkingLotMonitor,
-    ParkingLotMonitorGuard,
     TimeoutConditionWaiter,
     WaitTimeoutResult,
 };
@@ -87,331 +86,40 @@ impl<T> ArcParkingLotMonitor<T> {
         }
     }
 
-    /// Acquires the shared monitor and returns a guard.
-    ///
-    /// This delegates to [`ParkingLotMonitor::lock`]. The returned
-    /// [`ParkingLotMonitorGuard`] keeps the monitor mutex locked until it
-    /// is dropped. It can also wait on the monitor's condition variable
-    /// through [`ParkingLotMonitorGuard::wait`] or
-    /// [`ParkingLotMonitorGuard::wait_timeout`].
-    ///
-    /// # Returns
-    ///
-    /// A guard that provides read and write access to the protected state.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use qubit_lock::ArcParkingLotMonitor;
-    ///
-    /// let monitor = ArcParkingLotMonitor::new(1);
-    /// {
-    ///     let mut value = monitor.lock();
-    ///     *value += 1;
-    /// }
-    ///
-    /// assert_eq!(monitor.with_read(|value| *value), 2);
-    /// ```
-    #[inline]
-    pub fn lock(&self) -> ParkingLotMonitorGuard<'_, T> {
-        self.inner.lock()
-    }
-
-    /// Acquires the monitor and reads the protected state.
-    ///
-    /// This delegates to [`ParkingLotMonitor::with_read`]. The closure runs
-    /// while the monitor mutex is held, so keep it short and avoid long
-    /// blocking work.
+    /// Creates a shared handle from an existing Arc-wrapped monitor.
     ///
     /// # Arguments
     ///
-    /// * `f` - Closure that receives an immutable reference to the state.
+    /// * `inner` - Existing shared monitor allocation to wrap.
     ///
     /// # Returns
     ///
-    /// The value returned by `f`.
+    /// A handle that preserves the identity and ownership of `inner`.
     #[inline]
-    pub fn with_read<R, F>(&self, f: F) -> R
-    where
-        F: FnOnce(&T) -> R,
-    {
-        self.inner.with_read(f)
+    pub fn from_arc(inner: Arc<ParkingLotMonitor<T>>) -> Self {
+        Self { inner }
     }
 
-    /// Acquires the monitor and mutates the protected state.
-    ///
-    /// This delegates to [`ParkingLotMonitor::with_write`]. Callers should
-    /// explicitly invoke [`Self::notify_one`] or [`Self::notify_all`] after
-    /// changing state that a waiting thread may observe.
-    ///
-    /// # Arguments
-    ///
-    /// * `f` - Closure that receives a mutable reference to the state.
+    /// Borrows the Arc that owns the wrapped monitor.
     ///
     /// # Returns
     ///
-    /// The value returned by `f`.
+    /// The existing Arc without changing its strong reference count.
     #[inline]
-    pub fn with_write<R, F>(&self, f: F) -> R
-    where
-        F: FnOnce(&mut T) -> R,
-    {
-        self.inner.with_write(f)
+    pub fn as_arc(&self) -> &Arc<ParkingLotMonitor<T>> {
+        &self.inner
     }
 
-    /// Mutates the protected state and wakes one waiter.
-    ///
-    /// This delegates to [`ParkingLotMonitor::with_write_notify_one`]. The
-    /// closure runs while the monitor mutex is held; after it returns, the
-    /// lock is released and one waiter is notified. If `f` panics, the
-    /// panic is propagated and no notification is sent.
-    ///
-    /// # Arguments
-    ///
-    /// * `f` - Closure that receives a mutable reference to the state.
+    /// Consumes this handle and returns the Arc that owns the monitor.
     ///
     /// # Returns
     ///
-    /// The value returned by `f`.
+    /// The existing Arc, preserving the wrapped monitor allocation.
     #[inline]
-    pub fn with_write_notify_one<R, F>(&self, f: F) -> R
-    where
-        F: FnOnce(&mut T) -> R,
-    {
-        self.inner.with_write_notify_one(f)
+    pub fn into_arc(self) -> Arc<ParkingLotMonitor<T>> {
+        self.inner
     }
 
-    /// Mutates the protected state and wakes all waiters.
-    ///
-    /// This delegates to [`ParkingLotMonitor::with_write_notify_all`]. The
-    /// closure runs while the monitor mutex is held; after it returns, the
-    /// lock is released and all waiters are notified. If `f` panics, the
-    /// panic is propagated and no notification is sent.
-    ///
-    /// # Arguments
-    ///
-    /// * `f` - Closure that receives a mutable reference to the state.
-    ///
-    /// # Returns
-    ///
-    /// The value returned by `f`.
-    #[inline]
-    pub fn with_write_notify_all<R, F>(&self, f: F) -> R
-    where
-        F: FnOnce(&mut T) -> R,
-    {
-        self.inner.with_write_notify_all(f)
-    }
-
-    /// Waits while a predicate remains true, then mutates the protected state.
-    ///
-    /// This delegates to [`ParkingLotMonitor::wait_while`]. The predicate is
-    /// evaluated while holding the monitor mutex, and the closure runs
-    /// while the mutex is still held after the predicate stops blocking.
-    ///
-    /// This method may block indefinitely if no thread changes the state so
-    /// that `waiting` becomes false and sends a notification.
-    ///
-    /// # Arguments
-    ///
-    /// * `waiting` - Predicate that returns `true` while the caller should keep
-    ///   waiting.
-    /// * `f` - Closure that receives mutable access after waiting is no longer
-    ///   required.
-    ///
-    /// # Returns
-    ///
-    /// The value returned by `f`.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use std::thread;
-    ///
-    /// use qubit_lock::ArcParkingLotMonitor;
-    ///
-    /// let monitor = ArcParkingLotMonitor::new(Vec::<i32>::new());
-    /// let worker_monitor = monitor.clone();
-    ///
-    /// let worker = thread::spawn(move || {
-    ///     worker_monitor.wait_while(
-    ///         |items| items.is_empty(),
-    ///         |items| items.pop().expect("item should be ready"),
-    ///     )
-    /// });
-    ///
-    /// monitor.with_write(|items| items.push(7));
-    /// monitor.notify_one();
-    ///
-    /// assert_eq!(worker.join().expect("worker should finish"), 7);
-    /// ```
-    #[inline]
-    pub fn wait_while<R, P, F>(&self, waiting: P, f: F) -> R
-    where
-        P: FnMut(&T) -> bool,
-        F: FnOnce(&mut T) -> R,
-    {
-        self.inner.wait_while(waiting, f)
-    }
-
-    /// Waits until the protected state satisfies a predicate, then mutates it.
-    ///
-    /// This delegates to [`ParkingLotMonitor::wait_until`]. It may block
-    /// indefinitely if no thread changes the state to satisfy the predicate
-    /// and sends a notification.
-    ///
-    /// # Arguments
-    ///
-    /// * `ready` - Predicate that returns `true` when the state is ready.
-    /// * `f` - Closure that receives mutable access to the ready state.
-    ///
-    /// # Returns
-    ///
-    /// The value returned by `f`.
-    #[inline]
-    pub fn wait_until<R, P, F>(&self, ready: P, f: F) -> R
-    where
-        P: FnMut(&T) -> bool,
-        F: FnOnce(&mut T) -> R,
-    {
-        self.inner.wait_until(ready, f)
-    }
-
-    /// Waits while a predicate remains true, with an overall time limit.
-    ///
-    /// This delegates to [`ParkingLotMonitor::wait_while_for`]. If `waiting`
-    /// becomes false before `timeout` expires, `f` runs while the monitor
-    /// lock is still held. If the timeout expires first, the closure is not
-    /// called.
-    ///
-    /// # Arguments
-    ///
-    /// * `timeout` - Maximum total duration to wait.
-    /// * `waiting` - Predicate that returns `true` while the caller should
-    ///   continue waiting.
-    /// * `f` - Closure that receives mutable access when waiting is no longer
-    ///   required.
-    ///
-    /// # Returns
-    ///
-    /// [`WaitTimeoutResult::Ready`] with the value returned by `f` when the
-    /// predicate stops blocking before the timeout. Returns
-    /// [`WaitTimeoutResult::TimedOut`] when the timeout expires first.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use std::time::Duration;
-    ///
-    /// use qubit_lock::{ArcParkingLotMonitor, WaitTimeoutResult};
-    ///
-    /// let monitor = ArcParkingLotMonitor::new(Vec::<i32>::new());
-    /// let result = monitor.wait_while_for(
-    ///     Duration::from_millis(1),
-    ///     |items| items.is_empty(),
-    ///     |items| items.pop(),
-    /// );
-    ///
-    /// assert_eq!(result, WaitTimeoutResult::TimedOut);
-    /// ```
-    #[inline]
-    pub fn wait_while_for<R, P, F>(
-        &self,
-        timeout: Duration,
-        waiting: P,
-        f: F,
-    ) -> WaitTimeoutResult<R>
-    where
-        P: FnMut(&T) -> bool,
-        F: FnOnce(&mut T) -> R,
-    {
-        self.inner.wait_while_for(timeout, waiting, f)
-    }
-
-    /// Waits until a predicate becomes true, with an overall time limit.
-    ///
-    /// This delegates to [`ParkingLotMonitor::wait_until_for`]. If `ready`
-    /// becomes true before `timeout` expires, `f` runs while the monitor
-    /// lock is still held. If the timeout expires first, the closure is not
-    /// called.
-    ///
-    /// # Arguments
-    ///
-    /// * `timeout` - Maximum total duration to wait.
-    /// * `ready` - Predicate that returns `true` when the caller may continue.
-    /// * `f` - Closure that receives mutable access to the ready state.
-    ///
-    /// # Returns
-    ///
-    /// [`WaitTimeoutResult::Ready`] with the value returned by `f` when the
-    /// predicate becomes true before the timeout. Returns
-    /// [`WaitTimeoutResult::TimedOut`] when the timeout expires first.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use std::{
-    ///     thread,
-    ///     time::Duration,
-    /// };
-    ///
-    /// use qubit_lock::{ArcParkingLotMonitor, WaitTimeoutResult};
-    ///
-    /// let monitor = ArcParkingLotMonitor::new(false);
-    /// let worker_monitor = monitor.clone();
-    ///
-    /// let worker = thread::spawn(move || {
-    ///     worker_monitor.wait_until_for(
-    ///         Duration::from_secs(1),
-    ///         |ready| *ready,
-    ///         |ready| {
-    ///             *ready = false;
-    ///             5
-    ///         },
-    ///     )
-    /// });
-    ///
-    /// monitor.with_write(|ready| *ready = true);
-    /// monitor.notify_one();
-    ///
-    /// assert_eq!(
-    ///     worker.join().expect("worker should finish"),
-    ///     WaitTimeoutResult::Ready(5),
-    /// );
-    /// ```
-    #[inline]
-    pub fn wait_until_for<R, P, F>(
-        &self,
-        timeout: Duration,
-        ready: P,
-        f: F,
-    ) -> WaitTimeoutResult<R>
-    where
-        P: FnMut(&T) -> bool,
-        F: FnOnce(&mut T) -> R,
-    {
-        self.inner.wait_until_for(timeout, ready, f)
-    }
-
-    /// Wakes one thread waiting on this monitor's condition variable.
-    ///
-    /// Notifications do not carry state by themselves. A waiting thread only
-    /// proceeds safely after rechecking the protected state. Call this after
-    /// changing state that may make one waiter able to continue.
-    #[inline]
-    pub fn notify_one(&self) {
-        self.inner.notify_one();
-    }
-
-    /// Wakes all threads waiting on this monitor's condition variable.
-    ///
-    /// Notifications do not carry state by themselves. Every awakened thread
-    /// must recheck the protected state before continuing. Call this after a
-    /// state change that may allow multiple waiters to make progress.
-    #[inline]
-    pub fn notify_all(&self) {
-        self.inner.notify_all();
-    }
 }
 
 impl<T> AsRef<ParkingLotMonitor<T>> for ArcParkingLotMonitor<T> {
@@ -430,13 +138,13 @@ impl<T> Notifier for ArcParkingLotMonitor<T> {
     /// Wakes one thread waiting on this monitor.
     #[inline]
     fn notify_one(&self) {
-        Self::notify_one(self);
+        self.inner.notify_one();
     }
 
     /// Wakes all threads waiting on this monitor.
     #[inline]
     fn notify_all(&self) {
-        Self::notify_all(self);
+        self.inner.notify_all();
     }
 }
 
@@ -450,7 +158,11 @@ impl<T> ConditionWaiter for ArcParkingLotMonitor<T> {
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,
     {
-        Self::wait_while(self, predicate, action)
+        <ParkingLotMonitor<T> as ConditionWaiter>::wait_while(
+            self.inner.as_ref(),
+            predicate,
+            action,
+        )
     }
 }
 
@@ -467,7 +179,12 @@ impl<T> TimeoutConditionWaiter for ArcParkingLotMonitor<T> {
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,
     {
-        Self::wait_while_for(self, timeout, predicate, action)
+        <ParkingLotMonitor<T> as TimeoutConditionWaiter>::wait_while_for(
+            self.inner.as_ref(),
+            timeout,
+            predicate,
+            action,
+        )
     }
 }
 
