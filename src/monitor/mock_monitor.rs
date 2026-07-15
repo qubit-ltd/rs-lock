@@ -6,6 +6,8 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 // qubit-style: allow inline-tests
+// Inline tests are limited to deterministic race regressions that require
+// private timeout-initialization and change-boundary hooks.
 //! Mock monitor with timeout time driven by a manual monotonic clock.
 
 use std::collections::BTreeMap;
