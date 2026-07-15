@@ -525,9 +525,7 @@ impl<T: Send + 'static> MockMonitor<T> {
             .next_waiter_id
             .checked_add(1)
             .expect("mock monitor waiter identifier overflowed");
-        let previous = state
-            .waiters
-            .insert(waiter_id, MockWaiterState::new());
+        let previous = state.waiters.insert(waiter_id, MockWaiterState::new());
         assert!(previous.is_none(), "mock monitor waiter identifier reused");
         if timeout_waiter {
             state.timeout_waiters = state
