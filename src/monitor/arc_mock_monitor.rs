@@ -130,7 +130,6 @@ impl<T: Send + 'static> ArcMockMonitor<T> {
         self.inner
             .wait_for_timeout_waiters(expected_count, real_timeout)
     }
-
 }
 
 impl<T: Send + 'static> Notifier for ArcMockMonitor<T> {

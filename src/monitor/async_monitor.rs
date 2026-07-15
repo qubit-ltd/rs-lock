@@ -13,14 +13,6 @@ use crate::monitor::{
 };
 
 /// Aggregate trait for asynchronous monitor-style synchronization.
-pub trait AsyncMonitor:
-    Notifier
-    + AsyncTimeoutConditionWaiter
-{
-}
+pub trait AsyncMonitor: Notifier + AsyncTimeoutConditionWaiter {}
 
-impl<T> AsyncMonitor for T where
-    T: Notifier
-        + AsyncTimeoutConditionWaiter
-{
-}
+impl<T> AsyncMonitor for T where T: Notifier + AsyncTimeoutConditionWaiter {}

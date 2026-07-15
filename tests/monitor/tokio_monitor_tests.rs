@@ -203,7 +203,7 @@ async fn test_tokio_monitor_async_wait_while_for_uses_condition_wait_budget() {
 /// Verifies that initial mutex contention does not consume timeout budget.
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_while_for_excludes_initial_lock_contention_from_timeout()
-{
+ {
     let monitor = Arc::new(TokioMonitor::new(false));
     let holder_monitor = Arc::clone(&monitor);
     let (holding_tx, holding_rx) = mpsc::sync_channel(1);
@@ -295,7 +295,7 @@ async fn test_tokio_monitor_async_wait_while_for_reuses_fixed_timeout_deadline()
 /// Verifies that zero timeout evaluates the initial predicate exactly once.
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_while_for_zero_timeout_checks_predicate_once()
-{
+ {
     let checks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let predicate_checks = Arc::clone(&checks);
     let monitor = TokioMonitor::new(false);
@@ -304,7 +304,8 @@ async fn test_tokio_monitor_async_wait_while_for_zero_timeout_checks_predicate_o
         .wait_while_for_async(
             Duration::ZERO,
             move |ready| {
-                predicate_checks.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                predicate_checks
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 !*ready
             },
             |_| (),
@@ -397,8 +398,5 @@ async fn test_tokio_monitor_async_wait_while_for_rechecks_state_after_timeout()
     monitor.with_write_async(|ready| *ready = true).await;
     tokio::time::advance(Duration::from_millis(20)).await;
 
-    assert_eq!(
-        wait.await,
-        WaitTimeoutResult::Ready(9),
-    );
+    assert_eq!(wait.await, WaitTimeoutResult::Ready(9),);
 }

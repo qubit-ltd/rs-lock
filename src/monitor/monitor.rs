@@ -13,14 +13,6 @@ use crate::monitor::{
 };
 
 /// Aggregate trait for blocking monitor-style synchronization.
-pub trait Monitor:
-    Notifier
-    + TimeoutConditionWaiter
-{
-}
+pub trait Monitor: Notifier + TimeoutConditionWaiter {}
 
-impl<T> Monitor for T where
-    T: Notifier
-        + TimeoutConditionWaiter
-{
-}
+impl<T> Monitor for T where T: Notifier + TimeoutConditionWaiter {}

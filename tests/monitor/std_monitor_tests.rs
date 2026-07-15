@@ -362,7 +362,7 @@ fn test_std_monitor_wait_until_for_returns_timed_out_when_timeout() {
 /// Verifies that initial lock contention does not consume timeout budget.
 #[test]
 fn test_std_monitor_wait_while_for_excludes_initial_lock_contention_from_timeout()
-{
+ {
     const WAIT_TIMEOUT: Duration = Duration::from_millis(20);
 
     let monitor = Arc::new(StdMonitor::new(false));
@@ -379,15 +379,17 @@ fn test_std_monitor_wait_while_for_excludes_initial_lock_contention_from_timeout
             move |ready| {
                 if let Some(checked_tx) = checked_tx.take() {
                     thread::sleep(WAIT_TIMEOUT.saturating_mul(3));
-                    checked_tx
-                        .send(())
-                        .expect("test should observe the initial predicate check");
+                    checked_tx.send(()).expect(
+                        "test should observe the initial predicate check",
+                    );
                 }
                 !*ready
             },
             |_| (),
         );
-        done_tx.send(result).expect("test should receive wait result");
+        done_tx
+            .send(result)
+            .expect("test should receive wait result");
     });
     started_rx
         .recv_timeout(Duration::from_secs(1))
@@ -442,15 +444,17 @@ fn test_std_monitor_wait_while_for_timeout_final_predicate_wins() {
             Duration::from_millis(20),
             move |ready| {
                 if let Some(checked_tx) = checked_tx.take() {
-                    checked_tx
-                        .send(())
-                        .expect("test should observe the initial predicate check");
+                    checked_tx.send(()).expect(
+                        "test should observe the initial predicate check",
+                    );
                 }
                 !*ready
             },
             |_| 7,
         );
-        done_tx.send(result).expect("test should receive wait result");
+        done_tx
+            .send(result)
+            .expect("test should receive wait result");
     });
 
     checked_rx
