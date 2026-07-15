@@ -42,6 +42,7 @@ fn assert_send<F: Future + Send>(future: F) -> F {
     future
 }
 
+/// Verifies that all Mock condition-wait trait methods return `Send` futures.
 #[cfg(feature = "async")]
 #[tokio::test]
 async fn test_mock_monitor_condition_wait_futures_are_send() {
@@ -205,6 +206,7 @@ fn test_shared_clock_drives_multiple_mock_monitors() {
     second_waiter.join().expect("second waiter should finish");
 }
 
+/// Verifies that an async timeout observes manual time and unregisters on exit.
 #[cfg(feature = "async")]
 #[tokio::test]
 async fn test_mock_monitor_async_timeout_uses_shared_manual_time() {
@@ -234,6 +236,7 @@ async fn test_mock_monitor_async_timeout_uses_shared_manual_time() {
     assert_eq!(0, monitor.pending_timeout_waiters());
 }
 
+/// Verifies that dropping a pending async timeout unregisters its waiter.
 #[cfg(feature = "async")]
 #[tokio::test]
 async fn test_mock_monitor_cancelled_async_timeout_unregisters_waiter() {
