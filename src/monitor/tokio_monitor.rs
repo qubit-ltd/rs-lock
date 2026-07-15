@@ -721,11 +721,6 @@ mod tests {
         fn wake(self: Arc<Self>) {
             self.wakes.fetch_add(1, Ordering::SeqCst);
         }
-
-        /// Records a wakeup through a borrowed shared owner.
-        fn wake_by_ref(self: &Arc<Self>) {
-            self.wakes.fetch_add(1, Ordering::SeqCst);
-        }
     }
 
     impl WakeCounter {
@@ -745,7 +740,7 @@ mod tests {
     /// # Returns
     ///
     /// The result of this single poll.
-    fn poll_once<F: Future>(
+    fn poll_once<F: Future + ?Sized>(
         future: Pin<&mut F>,
         wake_counter: &Arc<WakeCounter>,
     ) -> Poll<F::Output> {
@@ -851,113 +846,134 @@ mod tests {
         );
     }
 
+    /// Verifies that `Notifier::notify_all` selects every waiter registered at
+    /// the call boundary without retaining a signal for a future waiter.
+    #[test]
+    fn test_tokio_monitor_notify_all_selects_registered_waiters_only() {
+        const REGISTERED_WAITERS: usize = 2;
+
+        let monitor = TokioMonitor::new(true);
+        let predicate_checks = Arc::new(AtomicUsize::new(0));
+        let mut waiters = Vec::with_capacity(REGISTERED_WAITERS);
+        let mut wake_counters = Vec::with_capacity(REGISTERED_WAITERS);
+        for _ in 0..REGISTERED_WAITERS {
+            let waiter_checks = Arc::clone(&predicate_checks);
+            let mut waiter = Box::pin(monitor.wait_while_async(
+                move |blocked| {
+                    waiter_checks.fetch_add(1, Ordering::SeqCst);
+                    *blocked
+                },
+                |_| (),
+            ));
+            let wake_counter = Arc::new(WakeCounter::default());
+            assert!(poll_once(waiter.as_mut(), &wake_counter).is_pending());
+            waiters.push(waiter);
+            wake_counters.push(wake_counter);
+        }
+
+        <TokioMonitor<bool> as super::Notifier>::notify_all(&monitor);
+        assert!(
+            wake_counters.iter().all(|counter| counter.count() == 1),
+            "notify_all should select every registered waiter exactly once"
+        );
+        drop(waiters);
+
+        let future_checks = Arc::clone(&predicate_checks);
+        let mut future_waiter = Box::pin(monitor.wait_while_async(
+            move |blocked| {
+                future_checks.fetch_add(1, Ordering::SeqCst);
+                *blocked
+            },
+            |_| (),
+        ));
+        let future_wakes = Arc::new(WakeCounter::default());
+        assert!(poll_once(future_waiter.as_mut(), &future_wakes).is_pending());
+        assert_eq!(0, future_wakes.count());
+        assert_eq!(
+            REGISTERED_WAITERS + 1,
+            predicate_checks.load(Ordering::SeqCst)
+        );
+    }
+
     /// Verifies that cancelling the waiter selected by `notify_one` discards
     /// that selection instead of transferring it to another waiter.
     #[test]
     fn test_tokio_monitor_cancelled_selected_waiter_discards_notification() {
         let monitor = TokioMonitor::new(());
-        let first_checks = Arc::new(AtomicUsize::new(0));
-        let second_checks = Arc::new(AtomicUsize::new(0));
-        let first_waiter_checks = Arc::clone(&first_checks);
-        let second_waiter_checks = Arc::clone(&second_checks);
-        let mut first_waiter = Some(Box::pin(monitor.wait_while_async(
-            move |_| {
-                first_waiter_checks.fetch_add(1, Ordering::SeqCst);
-                true
-            },
-            |_| (),
-        )));
-        let mut second_waiter = Some(Box::pin(monitor.wait_while_async(
-            move |_| {
-                second_waiter_checks.fetch_add(1, Ordering::SeqCst);
-                true
-            },
-            |_| (),
-        )));
-        let first_wakes = Arc::new(WakeCounter::default());
-        let second_wakes = Arc::new(WakeCounter::default());
+        let predicate_checks =
+            [Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0))];
+        let mut waiters: Vec<Option<Pin<Box<dyn Future<Output = ()> + Send>>>> =
+            predicate_checks
+                .iter()
+                .map(|checks| {
+                    let waiter_checks = Arc::clone(checks);
+                    Some(Box::pin(monitor.wait_while_async(
+                        move |_| {
+                            waiter_checks.fetch_add(1, Ordering::SeqCst);
+                            true
+                        },
+                        |_| (),
+                    ))
+                        as Pin<Box<dyn Future<Output = ()> + Send>>)
+                })
+                .collect();
+        let wake_counters = [
+            Arc::new(WakeCounter::default()),
+            Arc::new(WakeCounter::default()),
+        ];
 
-        assert!(
-            poll_once(
-                first_waiter
-                    .as_mut()
-                    .expect("first waiter should still exist")
-                    .as_mut(),
-                &first_wakes,
-            )
-            .is_pending()
-        );
-        assert!(
-            poll_once(
-                second_waiter
-                    .as_mut()
-                    .expect("second waiter should still exist")
-                    .as_mut(),
-                &second_wakes,
-            )
-            .is_pending()
-        );
+        for (waiter, wake_counter) in waiters.iter_mut().zip(&wake_counters) {
+            assert!(
+                poll_once(
+                    waiter
+                        .as_mut()
+                        .expect("registered waiter should still exist")
+                        .as_mut(),
+                    wake_counter,
+                )
+                .is_pending()
+            );
+        }
 
         monitor.notify_one();
         assert_eq!(
             1,
-            first_wakes.count() + second_wakes.count(),
+            wake_counters
+                .iter()
+                .map(|counter| counter.count())
+                .sum::<usize>(),
             "notify_one should select exactly one registered waiter"
         );
 
-        let transferred_wakes = if first_wakes.count() == 1 {
-            drop(first_waiter.take());
-            let transferred_wakes = second_wakes.count();
-            monitor.notify_one();
-            assert_eq!(
-                1,
-                second_wakes.count(),
-                "the unselected waiter should receive the next notification"
-            );
-            assert!(
-                poll_once(
-                    second_waiter
-                        .as_mut()
-                        .expect("unselected waiter should still exist")
-                        .as_mut(),
-                    &second_wakes,
-                )
-                .is_pending()
-            );
-            assert_eq!(
-                2,
-                second_checks.load(Ordering::SeqCst),
-                "the unselected waiter should recheck exactly once"
-            );
-            drop(second_waiter.take());
-            transferred_wakes
-        } else {
-            drop(second_waiter.take());
-            let transferred_wakes = first_wakes.count();
-            monitor.notify_one();
-            assert_eq!(
-                1,
-                first_wakes.count(),
-                "the unselected waiter should receive the next notification"
-            );
-            assert!(
-                poll_once(
-                    first_waiter
-                        .as_mut()
-                        .expect("unselected waiter should still exist")
-                        .as_mut(),
-                    &first_wakes,
-                )
-                .is_pending()
-            );
-            assert_eq!(
-                2,
-                first_checks.load(Ordering::SeqCst),
-                "the unselected waiter should recheck exactly once"
-            );
-            drop(first_waiter.take());
-            transferred_wakes
-        };
+        let selected = wake_counters
+            .iter()
+            .position(|counter| counter.count() == 1)
+            .expect("notify_one should select one waiter");
+        let unselected = 1 - selected;
+        drop(waiters[selected].take());
+        let transferred_wakes = wake_counters[unselected].count();
+        monitor.notify_one();
+        assert_eq!(
+            1,
+            wake_counters[unselected].count(),
+            "the unselected waiter should receive the next notification"
+        );
+        assert!(
+            poll_once(
+                waiters[unselected]
+                    .as_mut()
+                    .expect("unselected waiter should still exist")
+                    .as_mut(),
+                &wake_counters[unselected],
+            )
+            .is_pending()
+        );
+        assert_eq!(
+            2,
+            predicate_checks[unselected].load(Ordering::SeqCst),
+            "the unselected waiter should recheck exactly once"
+        );
+        drop(waiters[unselected].take());
 
         let future_checks = Arc::new(AtomicUsize::new(0));
         let future_waiter_checks = Arc::clone(&future_checks);
@@ -1116,7 +1132,7 @@ mod tests {
         const TIMEOUT: Duration = Duration::from_millis(5);
         const REACQUIRE_DELAY: Duration = Duration::from_millis(20);
 
-        let monitor = Arc::new(TokioMonitor::new(true));
+        let monitor = Arc::new(TokioMonitor::new(()));
         let registrations = Arc::new(AtomicUsize::new(0));
         let hook_registrations = Arc::clone(&registrations);
         let hook_monitor = Arc::downgrade(&monitor);
@@ -1128,7 +1144,10 @@ mod tests {
                     .notify_one();
             }
         });
-        monitor.set_timeout_before_state_reacquire_hook(|| {
+        let reacquisitions = Arc::new(AtomicUsize::new(0));
+        let hook_reacquisitions = Arc::clone(&reacquisitions);
+        monitor.set_timeout_before_state_reacquire_hook(move || {
+            hook_reacquisitions.fetch_add(1, Ordering::SeqCst);
             let delay_gate = Mutex::new(false);
             let delay_changed = Condvar::new();
             let delayed = delay_gate
@@ -1144,11 +1163,8 @@ mod tests {
                 "state reacquisition delay should consume the timeout budget"
             );
         });
-        let mut waiter = Box::pin(monitor.wait_while_for_async(
-            TIMEOUT,
-            |blocked| *blocked,
-            |_| (),
-        ));
+        let mut waiter =
+            Box::pin(monitor.wait_while_for_async(TIMEOUT, |_| true, |_| ()));
         let wake_counter = Arc::new(WakeCounter::default());
 
         assert_eq!(
@@ -1160,6 +1176,19 @@ mod tests {
             1,
             registrations.load(Ordering::SeqCst),
             "an elapsed waiter must not register after reacquiring state"
+        );
+        assert_eq!(
+            1,
+            reacquisitions.load(Ordering::SeqCst),
+            "the selected signal should cross the pre-reacquisition boundary once"
+        );
+        assert!(
+            monitor
+                .waiters
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .is_empty(),
+            "the completed timeout should leave no selectable waiter"
         );
     }
 
@@ -1276,12 +1305,11 @@ mod tests {
         release_changed.notify_all();
 
         for completion in 0..WAITER_COUNT {
-            done_rx.recv_timeout(REAL_TIMEOUT).unwrap_or_else(|_| {
-                panic!(
-                    "waiter completion {} of {WAITER_COUNT} should arrive",
-                    completion + 1,
-                )
-            });
+            assert!(
+                done_rx.recv_timeout(REAL_TIMEOUT).is_ok(),
+                "waiter completion {} of {WAITER_COUNT} should arrive",
+                completion + 1,
+            );
         }
         for waiter in waiters {
             waiter.await.expect("condition waiter task should finish");
