@@ -9,11 +9,12 @@ condition-wait timeout semantics while simplifying the async and Arc-backed
 APIs.
 
 **Architecture:** Blocking monitors continue to use their native condition
-variables. `TokioMonitor` keeps `tokio::sync::Notify`, but explicitly enables a
-condition waiter before releasing the state mutex. `MockMonitor` keeps its
-per-waiter registry while moving its clock-change epoch outside protected user
-state so clock callbacks never reacquire the monitor mutex. Async traits use
-RPITIT concrete futures instead of boxed trait-object futures.
+variables. `TokioMonitor` keeps an explicit registry of waiter-owned
+`tokio::sync::Notify` signals and registers each waiter before releasing the
+state mutex. `MockMonitor` keeps its per-waiter registry while moving its
+clock-change epoch outside protected user state so clock callbacks never
+reacquire the monitor mutex. Async traits use RPITIT concrete futures instead
+of boxed trait-object futures.
 
 **Tech Stack:** Rust 2024, `std::sync`, `parking_lot`, Tokio 1.52,
 `qubit-clock::ManualMonotonicClock`, Cargo integration tests and rustdoc tests.
@@ -73,14 +74,16 @@ relock the monitor state.
 - Modify: `src/monitor/notifier.rs`
 - Modify: `tests/monitor/tokio_monitor_tests.rs`
 
-**Step 1: Pin and enable each condition notification before unlock**
+**Step 1: Register a private condition notification before unlock**
 
 In untimed and timed predicate waits:
 
-- create `self.changed.notified()` while holding the state guard;
-- pin it locally;
-- call `enable()` before dropping the state guard;
-- then await it, or await it through the fixed-deadline timeout path.
+- create one waiter-owned `Notify` and add it to the monitor registry while
+  holding the state guard;
+- drop the state guard only after registration;
+- have `notify_one` remove and signal at most one registered waiter and
+  `notify_all` remove and signal all registered waiters;
+- await only the private signal, or poll it together with the fixed deadline.
 
 Do not add stored-permit behavior at the monitor API level.
 
@@ -403,11 +406,13 @@ Expected: normal examples and compile-fail examples pass.
 Run:
 
 ```bash
-cargo fmt --all -- --check
+cargo +nightly-2026-06-05 fmt -- --check --config-path .rs-ci/rustfmt.toml
 git diff --check
 ```
 
-If formatting is required, run `cargo fmt --all`, then rerun both checks.
+If formatting is required, run
+`cargo +nightly-2026-06-05 fmt -- --config-path .rs-ci/rustfmt.toml`, then rerun
+both checks.
 
 **Step 2: Run the complete feature matrix**
 
