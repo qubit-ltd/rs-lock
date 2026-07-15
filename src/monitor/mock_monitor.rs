@@ -68,7 +68,7 @@ pub struct MockMonitor<T> {
     clock: Arc<ManualMonotonicClock>,
     /// Protected mock state.
     state: Arc<Mutex<MockMonitorState<T>>>,
-    /// Epoch incremented by notifications and mock time changes.
+    /// Modulo-u64 change token advanced by notifications and time changes.
     change_epoch: Arc<AtomicU64>,
     /// Gate pairing epoch checks with blocking condition-variable waits.
     change_gate: Arc<Mutex<()>>,
@@ -150,18 +150,19 @@ impl<T: Send + 'static> MockMonitor<T> {
         #[cfg(feature = "async")]
         let callback_change_sender = async_change_sender.clone();
         let advance_subscription = clock.subscribe_advances(move || {
-            let _change_gate = callback_change_gate
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            let change_epoch =
-                Self::advance_change_epoch(&callback_change_epoch);
-            callback_changed.notify_all();
             #[cfg(feature = "async")]
-            {
-                callback_change_sender.send_replace(change_epoch);
-            }
+            Self::publish_change(
+                &callback_change_gate,
+                &callback_change_epoch,
+                &callback_changed,
+                &callback_change_sender,
+            );
             #[cfg(not(feature = "async"))]
-            let _ = change_epoch;
+            Self::publish_change(
+                &callback_change_gate,
+                &callback_change_epoch,
+                &callback_changed,
+            );
         });
         Self {
             _advance_subscription: advance_subscription,
@@ -528,29 +529,32 @@ impl<T: Send + 'static> MockMonitor<T> {
         std::mem::take(&mut waiter.notified)
     }
 
-    /// Returns the current shared change epoch.
+    /// Returns the current shared modulo-u64 change token.
     ///
     /// The value is only compared with a later load to detect intervening
-    /// changes; protected predicate state remains synchronized by the monitor
-    /// mutex.
+    /// changes. Correctness assumes fewer than `2^64` changes occur during one
+    /// waiter's check-to-sleep window; a complete wrap in that window could be
+    /// mistaken for no change. Protected predicate state remains synchronized
+    /// by the monitor mutex.
     fn current_change_epoch(&self) -> u64 {
         self.change_epoch.load(Ordering::Relaxed)
     }
 
-    /// Waits until the shared change epoch differs from `observed_epoch`.
+    /// Waits until the shared change token differs from `observed_epoch`.
     ///
     /// The caller must capture `observed_epoch` before its final locked state
     /// check. This method releases `state` before acquiring the independent
-    /// change gate, then compares the epoch under that gate before sleeping.
-    /// Consequently a callback either changes the epoch before the comparison
+    /// change gate, then compares the token under that gate before sleeping.
+    /// Consequently a callback either changes the token before the comparison
     /// or blocks on the gate until the condition-variable wait atomically
-    /// releases it. The gate is dropped before the state lock is reacquired,
+    /// releases it. This relies on no complete `u64` wrap occurring in that
+    /// short window. The gate is dropped before the state lock is reacquired,
     /// so no `change_gate -> state` lock edge exists.
     ///
     /// # Arguments
     ///
     /// * `state` - Protected-state guard held during the preceding check.
-    /// * `observed_epoch` - Epoch captured before that check.
+    /// * `observed_epoch` - Modulo-u64 token captured before that check.
     ///
     /// # Returns
     ///
@@ -577,42 +581,61 @@ impl<T: Send + 'static> MockMonitor<T> {
         self.lock_state()
     }
 
-    /// Advances the shared epoch and signals all waiters under the change gate.
+    /// Publishes a monitor change through the shared change protocol.
     ///
     /// Notification callers invoke this while holding protected state after
-    /// assigning per-waiter notification ownership. Blocking waiters never
-    /// acquire protected state while holding the gate, preventing a lock-order
-    /// cycle. Publishing the watch value under the same gate preserves atomic
-    /// epoch order across concurrent clock and notification changes.
+    /// assigning per-waiter notification ownership. It delegates to the same
+    /// gate/token/Condvar/watch helper used by clock callbacks. Blocking
+    /// waiters never acquire protected state while holding the gate, preventing
+    /// a lock-order cycle.
     fn signal_change(&self) {
-        let _change_gate = self
-            .change_gate
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        let change_epoch = Self::advance_change_epoch(&self.change_epoch);
-        self.changed.notify_all();
         #[cfg(feature = "async")]
-        self.async_change_sender.send_replace(change_epoch);
+        Self::publish_change(
+            &self.change_gate,
+            &self.change_epoch,
+            &self.changed,
+            &self.async_change_sender,
+        );
         #[cfg(not(feature = "async"))]
-        let _ = change_epoch;
+        Self::publish_change(
+            &self.change_gate,
+            &self.change_epoch,
+            &self.changed,
+        );
     }
 
-    /// Increments the change epoch.
+    /// Serializes and publishes one modulo-u64 change token.
+    ///
+    /// The gate orders token allocation, blocking notification, and async watch
+    /// publication identically for clock callbacks and explicit notifications.
+    /// `Relaxed` ordering is sufficient because the atomic token only detects
+    /// changes; predicate state remains synchronized by the monitor mutex.
+    /// Token values wrap modulo `u64`, so waiters assume fewer than `2^64`
+    /// publications occur within one check-to-sleep window.
     ///
     /// # Arguments
     ///
-    /// * `change_epoch` - Shared epoch advanced by notifications and clock
-    ///   callbacks.
-    ///
-    /// # Returns
-    ///
-    /// The new change epoch.
-    fn advance_change_epoch(change_epoch: &AtomicU64) -> u64 {
-        // Relaxed ordering is sufficient: fetch-add's atomic modification
-        // order assigns every change a unique epoch. Protected predicate state
-        // remains synchronized by the monitor mutex, and the condition/watch
-        // primitives provide their own wake-up synchronization.
-        change_epoch.fetch_add(1, Ordering::Relaxed).wrapping_add(1)
+    /// * `change_gate` - Gate paired with the blocking condition variable.
+    /// * `change_epoch` - Shared modulo-u64 change token.
+    /// * `changed` - Condition variable signaled for blocking waiters.
+    /// * `async_change_sender` - Watch sender notified for async waiters when
+    ///   async support is enabled.
+    fn publish_change(
+        change_gate: &Mutex<()>,
+        change_epoch: &AtomicU64,
+        changed: &Condvar,
+        #[cfg(feature = "async")] async_change_sender: &watch::Sender<u64>,
+    ) {
+        let _change_gate = change_gate
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let change_token =
+            change_epoch.fetch_add(1, Ordering::Relaxed).wrapping_add(1);
+        changed.notify_all();
+        #[cfg(feature = "async")]
+        async_change_sender.send_replace(change_token);
+        #[cfg(not(feature = "async"))]
+        let _ = change_token;
     }
 }
 
@@ -990,7 +1013,7 @@ mod tests {
     }
 
     /// Verifies that a clock advance after the final state check but before
-    /// condition-variable sleep is detected through the shared epoch.
+    /// condition-variable sleep is detected through the shared change token.
     #[test]
     fn test_mock_monitor_blocking_wait_observes_change_before_sleep() {
         let monitor = Arc::new(MockMonitor::new(false));
