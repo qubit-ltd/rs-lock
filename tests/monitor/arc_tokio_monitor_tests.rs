@@ -7,15 +7,35 @@
 // =============================================================================
 //! Tests for [`ArcTokioMonitor`](qubit_lock::ArcTokioMonitor).
 
-use std::time::Duration;
+use std::{
+    sync::Arc,
+    time::Duration,
+};
 
 use qubit_lock::{
     ArcTokioMonitor,
     AsyncConditionWaiter,
     AsyncTimeoutConditionWaiter,
     Notifier,
+    TokioMonitor,
     WaitTimeoutResult,
 };
+
+#[tokio::test(start_paused = true)]
+async fn test_arc_tokio_monitor_preserves_inner_arc_identity() {
+    let inner = Arc::new(TokioMonitor::new(1usize));
+    let monitor = ArcTokioMonitor::from_arc(Arc::clone(&inner));
+
+    assert!(Arc::ptr_eq(&inner, monitor.as_arc()));
+
+    let cloned = monitor.clone();
+    assert!(Arc::ptr_eq(monitor.as_arc(), cloned.as_arc()));
+    cloned.with_write_async(|value| *value += 1).await;
+    let recovered = cloned.into_arc();
+
+    assert!(Arc::ptr_eq(&inner, &recovered));
+    assert_eq!(monitor.with_read_async(|value| *value).await, 2);
+}
 
 #[tokio::test(start_paused = true)]
 async fn test_arc_tokio_monitor_clone_shares_state() {

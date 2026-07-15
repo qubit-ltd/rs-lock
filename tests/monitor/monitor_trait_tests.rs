@@ -15,6 +15,7 @@ use qubit_lock::{
     ArcParkingLotMonitor,
     Monitor,
     SharedMonitor,
+    TimeoutConditionWaiter,
     WaitTimeoutResult,
 };
 #[cfg(feature = "async")]
@@ -56,7 +57,12 @@ fn test_shared_monitor_trait_accepts_parking_lot_monitor_handle() {
     let cloned = require_shared_monitor(monitor);
 
     assert_eq!(
-        cloned.wait_until_for(Duration::ZERO, |ready| *ready, |_| ()),
+        <ArcParkingLotMonitor<bool> as TimeoutConditionWaiter>::wait_until_for(
+            &cloned,
+            Duration::ZERO,
+            |ready| *ready,
+            |_| (),
+        ),
         WaitTimeoutResult::TimedOut,
     );
 }
@@ -68,7 +74,12 @@ fn test_shared_monitor_trait_accepts_mock_monitor_handle() {
     let cloned = require_shared_monitor(monitor);
 
     assert_eq!(
-        cloned.wait_until_for(Duration::ZERO, |ready| *ready, |_| ()),
+        <ArcMockMonitor<bool> as TimeoutConditionWaiter>::wait_until_for(
+            &cloned,
+            Duration::ZERO,
+            |ready| *ready,
+            |_| (),
+        ),
         WaitTimeoutResult::TimedOut,
     );
 }

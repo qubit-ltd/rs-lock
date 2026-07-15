@@ -8,7 +8,10 @@
 //! Tests for [`ArcParkingLotMonitor`](qubit_lock::ArcParkingLotMonitor).
 
 use std::{
-    sync::mpsc,
+    sync::{
+        Arc,
+        mpsc,
+    },
     thread,
     time::Duration,
 };
@@ -17,9 +20,26 @@ use qubit_lock::{
     ArcParkingLotMonitor,
     ConditionWaiter,
     Notifier,
+    ParkingLotMonitor,
     TimeoutConditionWaiter,
     WaitTimeoutResult,
 };
+
+#[test]
+fn test_arc_parking_lot_monitor_preserves_inner_arc_identity() {
+    let inner = Arc::new(ParkingLotMonitor::new(1usize));
+    let monitor = ArcParkingLotMonitor::from_arc(Arc::clone(&inner));
+
+    assert!(Arc::ptr_eq(&inner, monitor.as_arc()));
+
+    let cloned = monitor.clone();
+    assert!(Arc::ptr_eq(monitor.as_arc(), cloned.as_arc()));
+    cloned.with_write(|value| *value += 1);
+    let recovered = cloned.into_arc();
+
+    assert!(Arc::ptr_eq(&inner, &recovered));
+    assert_eq!(monitor.with_read(|value| *value), 2);
+}
 
 #[test]
 fn test_arc_parking_lot_monitor_new_read_write_updates_state() {

@@ -37,6 +37,39 @@ pub struct ArcMockMonitor<T> {
     inner: Arc<MockMonitor<T>>,
 }
 
+impl<T> ArcMockMonitor<T> {
+    /// Creates a shared handle from an existing Arc-wrapped monitor.
+    ///
+    /// # Arguments
+    ///
+    /// * `inner` - Existing shared monitor allocation to wrap.
+    ///
+    /// # Returns
+    ///
+    /// A handle that preserves the identity and ownership of `inner`.
+    pub fn from_arc(inner: Arc<MockMonitor<T>>) -> Self {
+        Self { inner }
+    }
+
+    /// Borrows the Arc that owns the wrapped monitor.
+    ///
+    /// # Returns
+    ///
+    /// The existing Arc without changing its strong reference count.
+    pub fn as_arc(&self) -> &Arc<MockMonitor<T>> {
+        &self.inner
+    }
+
+    /// Consumes this handle and returns the Arc that owns the monitor.
+    ///
+    /// # Returns
+    ///
+    /// The existing Arc, preserving the wrapped monitor allocation.
+    pub fn into_arc(self) -> Arc<MockMonitor<T>> {
+        self.inner
+    }
+}
+
 impl<T: Send + 'static> ArcMockMonitor<T> {
     /// Creates an Arc-wrapped mock monitor.
     ///
@@ -98,290 +131,17 @@ impl<T: Send + 'static> ArcMockMonitor<T> {
             .wait_for_timeout_waiters(expected_count, real_timeout)
     }
 
-    /// Reads protected state.
-    pub fn with_read<R, F>(&self, f: F) -> R
-    where
-        F: FnOnce(&T) -> R,
-    {
-        self.inner.with_read(f)
-    }
-
-    /// Mutates protected state without notifying.
-    pub fn with_write<R, F>(&self, f: F) -> R
-    where
-        F: FnOnce(&mut T) -> R,
-    {
-        self.inner.with_write(f)
-    }
-
-    /// Mutates protected state and wakes one waiter.
-    pub fn with_write_notify_one<R, F>(&self, f: F) -> R
-    where
-        F: FnOnce(&mut T) -> R,
-    {
-        self.inner.with_write_notify_one(f)
-    }
-
-    /// Mutates protected state and wakes all waiters.
-    pub fn with_write_notify_all<R, F>(&self, f: F) -> R
-    where
-        F: FnOnce(&mut T) -> R,
-    {
-        self.inner.with_write_notify_all(f)
-    }
-
-    /// Wakes one waiter.
-    pub fn notify_one(&self) {
-        self.inner.notify_one();
-    }
-
-    /// Wakes all waiters.
-    pub fn notify_all(&self) {
-        self.inner.notify_all();
-    }
-
-    /// Blocks until the predicate becomes true, then runs the action.
-    ///
-    /// # Arguments
-    ///
-    /// * `predicate` - Predicate that returns `true` when the state is ready.
-    /// * `action` - Action to run after the predicate becomes true.
-    ///
-    /// # Returns
-    ///
-    /// The value returned by `action`.
-    pub fn wait_until<R, P, F>(&self, predicate: P, action: F) -> R
-    where
-        P: FnMut(&T) -> bool,
-        F: FnOnce(&mut T) -> R,
-    {
-        <MockMonitor<T> as ConditionWaiter>::wait_until(
-            self.inner.as_ref(),
-            predicate,
-            action,
-        )
-    }
-
-    /// Blocks while the predicate remains true, then runs the action.
-    ///
-    /// # Arguments
-    ///
-    /// * `predicate` - Predicate that returns `true` while waiting should
-    ///   continue.
-    /// * `action` - Action to run after the predicate becomes false.
-    ///
-    /// # Returns
-    ///
-    /// The value returned by `action`.
-    pub fn wait_while<R, P, F>(&self, predicate: P, action: F) -> R
-    where
-        P: FnMut(&T) -> bool,
-        F: FnOnce(&mut T) -> R,
-    {
-        <MockMonitor<T> as ConditionWaiter>::wait_while(
-            self.inner.as_ref(),
-            predicate,
-            action,
-        )
-    }
-
-    /// Blocks until the predicate becomes true or mock timeout expires.
-    ///
-    /// # Arguments
-    ///
-    /// * `timeout` - Maximum mock duration to wait.
-    /// * `predicate` - Predicate that returns `true` when the state is ready.
-    /// * `action` - Action to run after the predicate becomes true.
-    ///
-    /// # Returns
-    ///
-    /// [`WaitTimeoutResult::Ready`] with the action result, or
-    /// [`WaitTimeoutResult::TimedOut`] when mock time reaches the timeout.
-    pub fn wait_until_for<R, P, F>(
-        &self,
-        timeout: Duration,
-        predicate: P,
-        action: F,
-    ) -> WaitTimeoutResult<R>
-    where
-        P: FnMut(&T) -> bool,
-        F: FnOnce(&mut T) -> R,
-    {
-        <MockMonitor<T> as TimeoutConditionWaiter>::wait_until_for(
-            self.inner.as_ref(),
-            timeout,
-            predicate,
-            action,
-        )
-    }
-
-    /// Blocks while the predicate remains true or until mock timeout expires.
-    ///
-    /// # Arguments
-    ///
-    /// * `timeout` - Maximum mock duration to wait.
-    /// * `predicate` - Predicate that returns `true` while waiting should
-    ///   continue.
-    /// * `action` - Action to run after the predicate becomes false.
-    ///
-    /// # Returns
-    ///
-    /// [`WaitTimeoutResult::Ready`] with the action result, or
-    /// [`WaitTimeoutResult::TimedOut`] when mock time reaches the timeout.
-    pub fn wait_while_for<R, P, F>(
-        &self,
-        timeout: Duration,
-        predicate: P,
-        action: F,
-    ) -> WaitTimeoutResult<R>
-    where
-        P: FnMut(&T) -> bool,
-        F: FnOnce(&mut T) -> R,
-    {
-        <MockMonitor<T> as TimeoutConditionWaiter>::wait_while_for(
-            self.inner.as_ref(),
-            timeout,
-            predicate,
-            action,
-        )
-    }
-
-    /// Returns a future that waits until the predicate becomes true.
-    ///
-    /// # Arguments
-    ///
-    /// * `predicate` - Predicate that returns `true` when the state is ready.
-    /// * `action` - Action to run after the predicate becomes true.
-    ///
-    /// # Returns
-    ///
-    /// A future resolving to the action result.
-    #[cfg(feature = "async")]
-    pub fn wait_until_async<'a, R, P, F>(
-        &'a self,
-        predicate: P,
-        action: F,
-    ) -> impl Future<Output = R> + Send + 'a
-    where
-        T: Send,
-        R: Send + 'a,
-        P: FnMut(&T) -> bool + Send + 'a,
-        F: FnOnce(&mut T) -> R + Send + 'a,
-    {
-        <MockMonitor<T> as AsyncConditionWaiter>::wait_until_async(
-            self.inner.as_ref(),
-            predicate,
-            action,
-        )
-    }
-
-    /// Returns a future that waits while the predicate remains true.
-    ///
-    /// # Arguments
-    ///
-    /// * `predicate` - Predicate that returns `true` while waiting should
-    ///   continue.
-    /// * `action` - Action to run after the predicate becomes false.
-    ///
-    /// # Returns
-    ///
-    /// A future resolving to the action result.
-    #[cfg(feature = "async")]
-    pub fn wait_while_async<'a, R, P, F>(
-        &'a self,
-        predicate: P,
-        action: F,
-    ) -> impl Future<Output = R> + Send + 'a
-    where
-        T: Send,
-        R: Send + 'a,
-        P: FnMut(&T) -> bool + Send + 'a,
-        F: FnOnce(&mut T) -> R + Send + 'a,
-    {
-        <MockMonitor<T> as AsyncConditionWaiter>::wait_while_async(
-            self.inner.as_ref(),
-            predicate,
-            action,
-        )
-    }
-
-    /// Returns a future that waits until the predicate becomes true or times
-    /// out.
-    ///
-    /// # Arguments
-    ///
-    /// * `timeout` - Maximum mock duration to wait.
-    /// * `predicate` - Predicate that returns `true` when the state is ready.
-    /// * `action` - Action to run after the predicate becomes true.
-    ///
-    /// # Returns
-    ///
-    /// A future resolving to the timed wait result.
-    #[cfg(feature = "async")]
-    pub fn wait_until_for_async<'a, R, P, F>(
-        &'a self,
-        timeout: Duration,
-        predicate: P,
-        action: F,
-    ) -> impl Future<Output = WaitTimeoutResult<R>> + Send + 'a
-    where
-        T: Send,
-        R: Send + 'a,
-        P: FnMut(&T) -> bool + Send + 'a,
-        F: FnOnce(&mut T) -> R + Send + 'a,
-    {
-        <MockMonitor<T> as AsyncTimeoutConditionWaiter>::wait_until_for_async(
-            self.inner.as_ref(),
-            timeout,
-            predicate,
-            action,
-        )
-    }
-
-    /// Returns a future that waits while the predicate remains true or times
-    /// out.
-    ///
-    /// # Arguments
-    ///
-    /// * `timeout` - Maximum mock duration to wait.
-    /// * `predicate` - Predicate that returns `true` while waiting should
-    ///   continue.
-    /// * `action` - Action to run after the predicate becomes false.
-    ///
-    /// # Returns
-    ///
-    /// A future resolving to the timed wait result.
-    #[cfg(feature = "async")]
-    pub fn wait_while_for_async<'a, R, P, F>(
-        &'a self,
-        timeout: Duration,
-        predicate: P,
-        action: F,
-    ) -> impl Future<Output = WaitTimeoutResult<R>> + Send + 'a
-    where
-        T: Send,
-        R: Send + 'a,
-        P: FnMut(&T) -> bool + Send + 'a,
-        F: FnOnce(&mut T) -> R + Send + 'a,
-    {
-        <MockMonitor<T> as AsyncTimeoutConditionWaiter>::wait_while_for_async(
-            self.inner.as_ref(),
-            timeout,
-            predicate,
-            action,
-        )
-    }
 }
 
 impl<T: Send + 'static> Notifier for ArcMockMonitor<T> {
     /// Wakes one waiter.
     fn notify_one(&self) {
-        Self::notify_one(self);
+        self.inner.notify_one();
     }
 
     /// Wakes all waiters.
     fn notify_all(&self) {
-        Self::notify_all(self);
+        self.inner.notify_all();
     }
 }
 

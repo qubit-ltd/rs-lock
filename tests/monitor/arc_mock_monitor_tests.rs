@@ -8,6 +8,7 @@
 //! Tests for [`ArcMockMonitor`](qubit_lock::ArcMockMonitor).
 
 use std::{
+    sync::Arc,
     thread,
     time::Duration,
 };
@@ -16,6 +17,7 @@ use qubit_clock::ManualMonotonicClock;
 use qubit_lock::{
     ArcMockMonitor,
     ConditionWaiter,
+    MockMonitor,
     Notifier,
     TimeoutConditionWaiter,
     WaitTimeoutResult,
@@ -25,6 +27,22 @@ use qubit_lock::{
     AsyncConditionWaiter,
     AsyncTimeoutConditionWaiter,
 };
+
+#[test]
+fn test_arc_mock_monitor_preserves_inner_arc_identity() {
+    let inner = Arc::new(MockMonitor::new(1usize));
+    let monitor = ArcMockMonitor::from_arc(Arc::clone(&inner));
+
+    assert!(Arc::ptr_eq(&inner, monitor.as_arc()));
+
+    let cloned = monitor.clone();
+    assert!(Arc::ptr_eq(monitor.as_arc(), cloned.as_arc()));
+    cloned.with_write(|value| *value += 1);
+    let recovered = cloned.into_arc();
+
+    assert!(Arc::ptr_eq(&inner, &recovered));
+    assert_eq!(monitor.with_read(|value| *value), 2);
+}
 
 #[test]
 fn test_arc_mock_monitor_clone_shares_state_and_mock_time() {
