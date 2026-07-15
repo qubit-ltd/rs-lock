@@ -7,10 +7,18 @@
 // =============================================================================
 //! Arc-wrapped Tokio monitor.
 
-use std::{ops::Deref, sync::Arc, time::Duration};
+use std::{
+    ops::Deref,
+    sync::Arc,
+    time::Duration,
+};
 
 use super::{
-    AsyncConditionWaiter, AsyncMonitorFuture, AsyncTimeoutConditionWaiter, Notifier, TokioMonitor,
+    AsyncConditionWaiter,
+    AsyncMonitorFuture,
+    AsyncTimeoutConditionWaiter,
+    Notifier,
+    TokioMonitor,
     WaitTimeoutResult,
 };
 
@@ -217,7 +225,11 @@ impl<T: Send> AsyncConditionWaiter for ArcTokioMonitor<T> {
     type State = T;
 
     /// Returns a future that waits while the predicate remains true.
-    fn wait_while_async<'a, R, P, F>(&'a self, predicate: P, action: F) -> AsyncMonitorFuture<'a, R>
+    fn wait_while_async<'a, R, P, F>(
+        &'a self,
+        predicate: P,
+        action: F,
+    ) -> AsyncMonitorFuture<'a, R>
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,

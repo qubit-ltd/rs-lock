@@ -7,13 +7,27 @@
 // =============================================================================
 //! Arc-wrapped mock monitor.
 
-use std::{ops::Deref, sync::Arc, time::Duration};
+use std::{
+    ops::Deref,
+    sync::Arc,
+    time::Duration,
+};
 
 use qubit_clock::ManualMonotonicClock;
 
 #[cfg(feature = "async")]
-use super::{AsyncConditionWaiter, AsyncMonitorFuture, AsyncTimeoutConditionWaiter};
-use super::{ConditionWaiter, MockMonitor, Notifier, TimeoutConditionWaiter, WaitTimeoutResult};
+use super::{
+    AsyncConditionWaiter,
+    AsyncMonitorFuture,
+    AsyncTimeoutConditionWaiter,
+};
+use super::{
+    ConditionWaiter,
+    MockMonitor,
+    Notifier,
+    TimeoutConditionWaiter,
+    WaitTimeoutResult,
+};
 
 /// Cloneable handle around a [`MockMonitor`].
 pub struct ArcMockMonitor<T> {
@@ -73,7 +87,11 @@ impl<T: Send + 'static> ArcMockMonitor<T> {
     /// Returns `false` if `real_timeout` expires before `expected_count`
     /// waiters are active. The real-time guard never contributes to mock time.
     #[must_use]
-    pub fn wait_for_timeout_waiters(&self, expected_count: usize, real_timeout: Duration) -> bool {
+    pub fn wait_for_timeout_waiters(
+        &self,
+        expected_count: usize,
+        real_timeout: Duration,
+    ) -> bool {
         self.inner
             .wait_for_timeout_waiters(expected_count, real_timeout)
     }
@@ -135,7 +153,11 @@ impl<T: Send + 'static> ArcMockMonitor<T> {
         P: FnMut(&T) -> bool,
         F: FnOnce(&mut T) -> R,
     {
-        <MockMonitor<T> as ConditionWaiter>::wait_until(self.inner.as_ref(), predicate, action)
+        <MockMonitor<T> as ConditionWaiter>::wait_until(
+            self.inner.as_ref(),
+            predicate,
+            action,
+        )
     }
 
     /// Blocks while the predicate remains true, then runs the action.
@@ -154,7 +176,11 @@ impl<T: Send + 'static> ArcMockMonitor<T> {
         P: FnMut(&T) -> bool,
         F: FnOnce(&mut T) -> R,
     {
-        <MockMonitor<T> as ConditionWaiter>::wait_while(self.inner.as_ref(), predicate, action)
+        <MockMonitor<T> as ConditionWaiter>::wait_while(
+            self.inner.as_ref(),
+            predicate,
+            action,
+        )
     }
 
     /// Blocks until the predicate becomes true or mock timeout expires.
@@ -391,7 +417,11 @@ impl<T: Send + 'static> AsyncConditionWaiter for ArcMockMonitor<T> {
     type State = T;
 
     /// Returns a future that waits while the predicate remains true.
-    fn wait_while_async<'a, R, P, F>(&'a self, predicate: P, action: F) -> AsyncMonitorFuture<'a, R>
+    fn wait_while_async<'a, R, P, F>(
+        &'a self,
+        predicate: P,
+        action: F,
+    ) -> AsyncMonitorFuture<'a, R>
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
