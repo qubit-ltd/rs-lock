@@ -15,6 +15,12 @@ use crate::monitor::{
 };
 
 /// Waits for predicates over protected state with relative timeouts.
+///
+/// A timeout is a condition-wait budget. Initial state-lock contention and the
+/// initial locked predicate check are excluded. If waiting is required, one
+/// fixed deadline is established immediately before the first condition-wait
+/// suspension and reused across wakeups. A zero timeout still checks the
+/// predicate, and a final locked predicate check wins over timeout.
 pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// Blocks until the predicate becomes true or the timeout expires.
     ///
@@ -27,13 +33,9 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// # Returns
     ///
     /// [`WaitTimeoutResult::Ready`] with the action result, or
-    /// [`WaitTimeoutResult::TimedOut`] when the timeout expires first.
-    /// The monitor acquires the state lock and checks `predicate` before
-    /// starting the timeout budget immediately before the first condition-wait
-    /// suspension, so initial lock contention is excluded. One fixed deadline
-    /// is reused across wakeups. At the deadline, the predicate is checked once
-    /// more under the state lock; readiness wins over timeout. A zero timeout
-    /// still performs the initial locked check.
+    /// [`WaitTimeoutResult::TimedOut`] when the condition-wait budget expires.
+    /// The trait-level timeout contract determines when that budget starts and
+    /// how the deadline boundary is resolved.
     fn wait_until_for<R, P, F>(
         &self,
         timeout: Duration,
@@ -59,13 +61,9 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// # Returns
     ///
     /// [`WaitTimeoutResult::Ready`] with the action result, or
-    /// [`WaitTimeoutResult::TimedOut`] when the timeout expires first.
-    /// The monitor acquires the state lock and checks `predicate` before
-    /// starting the timeout budget immediately before the first condition-wait
-    /// suspension, so initial lock contention is excluded. One fixed deadline
-    /// is reused across wakeups. At the deadline, the predicate is checked once
-    /// more under the state lock; readiness wins over timeout. A zero timeout
-    /// still performs the initial locked check.
+    /// [`WaitTimeoutResult::TimedOut`] when the condition-wait budget expires.
+    /// The trait-level timeout contract determines when that budget starts and
+    /// how the deadline boundary is resolved.
     fn wait_while_for<R, P, F>(
         &self,
         timeout: Duration,

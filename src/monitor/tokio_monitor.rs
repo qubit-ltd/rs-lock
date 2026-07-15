@@ -126,14 +126,15 @@ fn run_notification_registration_boundary_hook(target: usize) {
 /// Waiter selection has no fairness or FIFO guarantee.
 ///
 /// Dropping a pending condition-wait future cancels the wait, releases any held
-/// state guard, and unregisters its Tokio notification waiter. A `notify_one`
-/// signal selected concurrently with cancellation follows [`Notify`]'s
-/// cancellation behavior and is offered to another waiter. A timed wait creates
-/// a timer only for a nonzero remaining budget immediately before an actual
-/// condition-wait suspension; polling that timer requires a Tokio runtime with
-/// the time driver enabled. Initial mutex contention, an immediately ready
-/// predicate, and a zero or already exhausted budget do not create a timer and
-/// therefore do not require the time driver.
+/// state guard, and unregisters its Tokio notification waiter without running
+/// the action or rolling back protected-state changes. A `notify_one` signal
+/// selected concurrently with cancellation follows [`Notify`]'s cancellation
+/// behavior and is offered to another waiter. A timed wait creates a timer only
+/// for a nonzero remaining budget immediately before an actual condition-wait
+/// suspension; polling that timer requires a Tokio runtime with the time driver
+/// enabled. Initial mutex contention, an immediately ready predicate, and a
+/// zero or already exhausted budget do not create a timer and therefore do not
+/// require the time driver.
 pub struct TokioMonitor<T> {
     /// Protected monitor state.
     state: Mutex<T>,
@@ -279,7 +280,7 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
     /// The waiter registers before releasing the state lock. Notifications
     /// carry no state and provide no fairness guarantee. Dropping the returned
     /// future while it is pending cancels and unregisters the wait without
-    /// running `action`.
+    /// running `action` or rolling back protected-state changes.
     fn wait_until_async<'a, R, P, F>(
         &'a self,
         mut predicate: P,
@@ -299,7 +300,7 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
     /// The waiter registers before releasing the state lock. Notifications
     /// carry no state and provide no fairness guarantee. Dropping the returned
     /// future while it is pending cancels and unregisters the wait without
-    /// running `action`.
+    /// running `action` or rolling back protected-state changes.
     #[allow(
         clippy::manual_async_fn,
         reason = "the explicit Send bound is part of the trait contract"
@@ -340,15 +341,15 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// The waiter registers before releasing the state lock. Notifications
     /// carry no state and provide no fairness guarantee. Dropping the returned
     /// future while it is pending cancels and unregisters the wait without
-    /// running `action`. The method creates a timer only for a nonzero remaining
-    /// budget immediately before an actual condition-wait suspension; the
-    /// current Tokio runtime must then have its time driver enabled or Tokio
-    /// will panic. Initial mutex contention, an immediately ready predicate,
-    /// and a zero or already exhausted budget do not create a timer and do not
-    /// require the time driver. The timeout uses one fixed deadline across
-    /// wakeups and performs one final locked predicate check at the deadline.
-    /// Readiness wins over timeout, and zero timeout still checks the predicate
-    /// once.
+    /// running `action` or rolling back protected-state changes. The method
+    /// creates a timer only for a nonzero remaining budget immediately before
+    /// an actual condition-wait suspension. The current Tokio runtime must then
+    /// have its time driver enabled or Tokio will panic. Initial mutex
+    /// contention, an immediately ready predicate, and a zero or already
+    /// exhausted budget do not create a timer and do not require the time
+    /// driver. The timeout uses one fixed deadline across wakeups and performs
+    /// one final locked predicate check at the deadline. Readiness wins over
+    /// timeout, and zero timeout still checks the predicate once.
     fn wait_until_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
@@ -373,15 +374,15 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// The waiter registers before releasing the state lock. Notifications
     /// carry no state and provide no fairness guarantee. Dropping the returned
     /// future while it is pending cancels and unregisters the wait without
-    /// running `action`. The method creates a timer only for a nonzero remaining
-    /// budget immediately before an actual condition-wait suspension; the
-    /// current Tokio runtime must then have its time driver enabled or Tokio
-    /// will panic. Initial mutex contention, an immediately ready predicate,
-    /// and a zero or already exhausted budget do not create a timer and do not
-    /// require the time driver. The timeout uses one fixed deadline across
-    /// wakeups and performs one final locked predicate check at the deadline.
-    /// Readiness wins over timeout, and zero timeout still checks the predicate
-    /// once.
+    /// running `action` or rolling back protected-state changes. The method
+    /// creates a timer only for a nonzero remaining budget immediately before
+    /// an actual condition-wait suspension. The current Tokio runtime must then
+    /// have its time driver enabled or Tokio will panic. Initial mutex
+    /// contention, an immediately ready predicate, and a zero or already
+    /// exhausted budget do not create a timer and do not require the time
+    /// driver. The timeout uses one fixed deadline across wakeups and performs
+    /// one final locked predicate check at the deadline. Readiness wins over
+    /// timeout, and zero timeout still checks the predicate once.
     #[allow(
         clippy::manual_async_fn,
         reason = "the explicit Send bound is part of the trait contract"

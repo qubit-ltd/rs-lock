@@ -29,6 +29,23 @@
 /// let (_guard, status) = guard.wait_timeout(Duration::from_millis(1));
 /// assert_eq!(status, WaitTimeoutStatus::TimedOut);
 /// ```
+///
+/// Ignoring the status returned by a guard wait is rejected when unused
+/// must-use values are denied:
+///
+/// ```compile_fail
+/// #![deny(unused_must_use)]
+///
+/// use std::time::Duration;
+///
+/// use qubit_lock::ParkingLotMonitor;
+///
+/// let monitor = ParkingLotMonitor::new(false);
+/// let guard = monitor.lock();
+/// let (_guard, status) = guard.wait_timeout(Duration::ZERO);
+/// status;
+/// ```
+#[must_use = "check whether the condition wait woke or reached its timeout"]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WaitTimeoutStatus {
     /// The wait returned before the timeout elapsed.

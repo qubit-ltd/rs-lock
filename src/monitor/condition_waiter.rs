@@ -8,6 +8,12 @@
 //! Blocking condition-wait capability.
 
 /// Waits for predicates over protected monitor state.
+///
+/// Predicates and actions run while the state is locked. A wakeup only causes
+/// the predicate to be checked again: notifications have memoryless
+/// condition-variable semantics, may be spurious, and do not guarantee
+/// fairness or make the predicate true. The action runs only after the
+/// predicate reaches its completion condition.
 pub trait ConditionWaiter {
     /// State protected by the monitor.
     type State;

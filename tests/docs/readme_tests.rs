@@ -20,6 +20,12 @@ const ARC_RW_LOCK_SRC: &str = include_str!("../../src/lock/arc_rw_lock.rs");
 const ARC_ASYNC_RW_LOCK_SRC: &str =
     include_str!("../../src/lock/arc_async_rw_lock.rs");
 
+/// Collapses Markdown whitespace so prose assertions do not depend on line
+/// wrapping.
+fn normalize_readme_text(content: &str) -> String {
+    content.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 #[test]
 /// Ensures README files only reference the current lock method names.
 fn test_readme_uses_with_lock_api_names() {
@@ -59,6 +65,62 @@ fn test_readme_monitor_example_uses_with_write_notify_one() {
     assert!(README_EN.contains("with_write_notify_one"));
     assert!(README_ZH.contains("use qubit_lock::ArcParkingLotMonitor;"));
     assert!(README_ZH.contains("with_write_notify_one"));
+}
+
+#[test]
+/// Ensures both READMEs describe monitor notification and timeout semantics.
+fn test_readme_documents_monitor_wait_semantics() {
+    let readme_en = normalize_readme_text(README_EN);
+    let readme_zh = normalize_readme_text(README_ZH);
+    assert!(readme_en.contains("memoryless condition-variable semantics"));
+    assert!(readme_en.contains("already registered waiters"));
+    assert!(readme_en.contains("condition-wait budget"));
+    assert!(readme_en.contains("one fixed deadline"));
+    assert!(readme_en.contains("A zero timeout still checks the predicate"));
+    assert!(readme_en.contains("final locked predicate check wins"));
+    assert!(readme_zh.contains("无记忆的条件变量语义"));
+    assert!(readme_zh.contains("已经注册的 waiter"));
+    assert!(readme_zh.contains("条件等待预算"));
+    assert!(readme_zh.contains("同一个固定 deadline"));
+    assert!(readme_zh.contains("零 timeout 仍会检查 predicate"));
+    assert!(readme_zh.contains("最后一次持锁 predicate 检查优先"));
+}
+
+#[test]
+/// Ensures both READMEs describe async cancellation and Tokio timer needs.
+fn test_readme_documents_async_monitor_contract() {
+    let readme_en = normalize_readme_text(README_EN);
+    let readme_zh = normalize_readme_text(README_ZH);
+    assert!(readme_en.contains("returned future is lazy"));
+    assert!(readme_en.contains("time driver enabled"));
+    assert!(readme_en.contains("does not run the action"));
+    assert!(readme_en.contains("does not roll back protected-state changes"));
+    assert!(readme_zh.contains("返回的 future 是惰性的"));
+    assert!(readme_zh.contains("启用 time driver"));
+    assert!(readme_zh.contains("不会执行 action"));
+    assert!(readme_zh.contains("不会回滚受保护状态的变化"));
+}
+
+#[test]
+/// Ensures both READMEs describe RPITIT and Arc monitor ownership boundaries.
+fn test_readme_documents_monitor_api_boundaries() {
+    assert!(README_EN.contains("return `impl Future`"));
+    assert!(README_EN.contains("`from_arc`, `as_arc`, and `into_arc`"));
+    assert!(README_EN.contains("resolve through `Deref`"));
+    assert!(README_ZH.contains("返回 `impl Future`"));
+    assert!(README_ZH.contains("`from_arc`、`as_arc` 和 `into_arc`"));
+    assert!(README_ZH.contains("通过 `Deref` 解析"));
+}
+
+#[test]
+/// Ensures both READMEs allow mock-clock advancement under monitor state lock.
+fn test_readme_documents_reentrant_mock_clock_advance() {
+    let readme_en = normalize_readme_text(README_EN);
+    let readme_zh = normalize_readme_text(README_ZH);
+    assert!(readme_en.contains(
+        "may also advance the clock while holding that monitor's state lock"
+    ));
+    assert!(readme_zh.contains("也可以在持有该 monitor 状态锁时推进 clock"));
 }
 
 #[test]

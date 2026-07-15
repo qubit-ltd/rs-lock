@@ -46,6 +46,33 @@ runtime features in your own `Cargo.toml`, such as `rt` or `rt-multi-thread`.
 `AsyncLock` returns `Send` futures: `ArcAsyncMutex<T>` implements it for
 `T: Send`, while `ArcAsyncRwLock<T>` implements it for `T: Send + Sync`.
 
+## Monitor semantics
+
+Monitor notifications use memoryless condition-variable semantics.
+`notify_one` selects at most one of the already registered waiters, while a
+notification with no registered waiter has no future effect. A wakeup only
+prompts another protected predicate check; it neither makes the predicate true
+nor guarantees fairness.
+
+A relative timeout is a condition-wait budget. Initial state-lock contention
+and the initial predicate check are excluded. Once that check determines that
+waiting is required, the monitor establishes one fixed deadline immediately
+before the first condition-wait suspension and reuses it across wakeups. A zero
+timeout still checks the predicate, and the final locked predicate check wins
+over timeout.
+
+Async monitor traits return `impl Future`; the returned future is lazy, so
+construction and time before its first poll consume no timeout budget. A Tokio
+time driver is needed only when a timed wait actually enters a nonzero timed
+suspension, in which case the runtime must have the time driver enabled.
+Dropping a pending future unregisters its active waiter, does not run the
+action, and does not roll back protected-state changes made by other tasks.
+
+Arc-backed monitor wrappers keep explicit trait implementations for generic
+code, while ordinary monitor method calls resolve through `Deref`. Their
+`from_arc`, `as_arc`, and `into_arc` methods make the shared-ownership boundary
+explicit.
+
 ### Deterministic monitor time
 
 Enable the `mock` feature to use `MockMonitor` and `ArcMockMonitor`.
@@ -75,9 +102,9 @@ clock delay is involved. Blocking tests can call
 time instead of guessing waiter registration with a real sleep.
 `pending_timeout_waiters()` counts blocking and asynchronous timeout waits that
 are ready to observe changes. An async wait starts contributing after its future
-is first polled, and unregisters automatically when cancelled. Do not advance
-the clock from inside a closure that currently holds the same monitor's state
-lock.
+is first polled, and unregisters automatically when cancelled. Code may also
+advance the clock while holding that monitor's state lock; clock callbacks do
+not reacquire the protected state.
 
 ## Migration from 0.9
 
@@ -101,6 +128,12 @@ Version `0.10` intentionally changes features and closure-method names:
   `wait_async`, and `wait_for_async` methods have been removed. Coordinate on
   protected state with predicate-based condition waits instead. Code that
   needs queued permits should use a semaphore or event primitive.
+- The boxed `AsyncMonitorFuture` alias has been removed. Async monitor traits
+  now return `impl Future` directly.
+- Arc-backed monitor wrappers no longer duplicate inherent forwarding methods.
+  Ordinary calls resolve through `Deref`; use the retained trait
+  implementations for generic bounds and `from_arc`, `as_arc`, or `into_arc`
+  at ownership boundaries.
 
 ## Migration from 0.8
 
