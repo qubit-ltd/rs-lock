@@ -41,7 +41,7 @@ real timeout.
 Run:
 
 ```bash
-cargo test --all-features --test tests monitor::tokio_monitor_tests::test_tokio_monitor_notify_one_does_not_lose_registered_condition_waiter -- --exact --nocapture
+cargo test --all-features --test mod monitor::tokio_monitor_tests::test_tokio_monitor_notify_one_does_not_lose_registered_condition_waiter -- --exact --nocapture
 ```
 
 Expected: the pre-fix implementation eventually times out because a producer
@@ -59,7 +59,7 @@ bounded channel receive. The test must fail promptly rather than wait forever.
 Run:
 
 ```bash
-cargo test --all-features --test tests monitor::mock_monitor_tests::test_mock_monitor_clock_can_advance_inside_state_closure -- --exact --nocapture
+cargo test --all-features --test mod monitor::mock_monitor_tests::test_mock_monitor_clock_can_advance_inside_state_closure -- --exact --nocapture
 ```
 
 Expected: the bounded receive times out because the clock callback tries to
@@ -158,7 +158,7 @@ permit needs belong to semaphore/event primitives.
 Run:
 
 ```bash
-cargo test --all-features --test tests monitor:: -- --nocapture
+cargo test --all-features --test mod monitor:: -- --nocapture
 ```
 
 Expected: all remaining monitor tests pass.
@@ -189,8 +189,8 @@ pass futures returned by condition and timeout-condition trait methods.
 Run:
 
 ```bash
-cargo test --all-features --test tests monitor::tokio_monitor_tests::
-cargo test --all-features --test tests monitor::mock_monitor_tests::
+cargo test --all-features --test mod monitor::tokio_monitor_tests::
+cargo test --all-features --test mod monitor::mock_monitor_tests::
 ```
 
 Expected: existing boxed futures satisfy Send, establishing the public bound
@@ -210,7 +210,7 @@ the Send and lifetime bounds.
 Run:
 
 ```bash
-cargo test --all-features --test tests monitor:: -- --nocapture
+cargo test --all-features --test mod monitor:: -- --nocapture
 ```
 
 Expected: pass without heap-boxed monitor futures.
@@ -248,7 +248,7 @@ Add or retain tests covering:
 Run:
 
 ```bash
-cargo test --all-features --test tests uses_condition_wait_budget -- --nocapture
+cargo test --all-features --test mod uses_condition_wait_budget -- --nocapture
 ```
 
 Expected: old Tokio and Mock call-time deadline tests fail under the new
@@ -268,7 +268,7 @@ returning `TimedOut`.
 Run:
 
 ```bash
-cargo test --all-features --test tests timeout -- --nocapture
+cargo test --all-features --test mod timeout -- --nocapture
 ```
 
 Expected: all timeout tests pass with the unified contract.
@@ -304,7 +304,7 @@ counts exactly once.
 Run:
 
 ```bash
-cargo test --all-features --test tests mock_monitor -- --nocapture
+cargo test --all-features --test mod mock_monitor -- --nocapture
 ```
 
 Expected: clock advancement inside state closures completes and all sync/async
@@ -349,7 +349,7 @@ the generic contract itself is under test.
 Run:
 
 ```bash
-cargo test --all-features --test tests arc_ -- --nocapture
+cargo test --all-features --test mod arc_ -- --nocapture
 ```
 
 Expected: all Arc monitor tests pass with the smaller inherent API.
