@@ -41,6 +41,25 @@
 ///
 /// assert_eq!(result, WaitTimeoutResult::Ready("ready"));
 /// ```
+///
+/// Ignoring a predicate-wait result is rejected when unused must-use values
+/// are denied:
+///
+/// ```compile_fail
+/// #![deny(unused_must_use)]
+///
+/// use std::time::Duration;
+///
+/// use qubit_lock::ParkingLotMonitor;
+///
+/// let monitor = ParkingLotMonitor::new(true);
+/// monitor.wait_until_for(
+///     Duration::ZERO,
+///     |ready| *ready,
+///     |ready| *ready = false,
+/// );
+/// ```
+#[must_use = "check whether the predicate became ready or the wait timed out"]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WaitTimeoutResult<R> {
     /// The predicate became ready before the timeout and produced this value.

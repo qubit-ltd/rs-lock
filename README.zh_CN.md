@@ -43,6 +43,25 @@ qubit-lock = { version = "0.10", features = ["async", "mock"] }
 `AsyncLock` 返回 `Send` future：`ArcAsyncMutex<T>` 在 `T: Send` 时实现它，
 `ArcAsyncRwLock<T>` 在 `T: Send + Sync` 时实现它。
 
+## Monitor 语义
+
+monitor notification 使用无记忆的条件变量语义。`notify_one` 最多选择一个已经注册的
+waiter；没有已注册 waiter 时发出的 notification 对未来没有影响。唤醒只会触发下一次
+受保护的 predicate 检查，既不会让 predicate 自动变为 true，也不保证公平性。
+
+相对 timeout 是条件等待预算。初始状态锁竞争和初始 predicate 检查不计入预算。初始
+检查确认必须等待后，monitor 会在首次条件等待挂起前立即建立同一个固定 deadline，并
+在后续唤醒中复用。零 timeout 仍会检查 predicate，最后一次持锁 predicate 检查优先于
+timeout。
+
+异步 monitor trait 返回 `impl Future`；返回的 future 是惰性的，所以构造 future 和首次
+poll 之前的时间不消耗 timeout 预算。只有带 timeout 的 wait 实际进入非零计时挂起时，
+Tokio runtime 才必须启用 time driver。drop 一个 pending future 会注销其活跃 waiter，
+不会执行 action，也不会回滚受保护状态的变化。
+
+基于 Arc 的 monitor 包装器保留了供泛型代码使用的显式 trait 实现；普通 monitor 方法
+调用通过 `Deref` 解析。`from_arc`、`as_arc` 和 `into_arc` 明确表达共享所有权边界。
+
 ### 确定性的 monitor 时间
 
 使用 `MockMonitor` 和 `ArcMockMonitor` 前需要启用 `mock` 特性。
@@ -68,7 +87,8 @@ assert_eq!(monitor.elapsed(), Duration::from_secs(10));
 mock time 前调用 `wait_for_timeout_waiters(expected_count, real_timeout)`，不再用真实
 sleep 猜测 waiter 是否已经注册。`pending_timeout_waiters()` 汇总已经能够观察变化的
 同步和异步 timeout wait；异步 wait 的 future 首次被 poll 后才计数，被取消时会自动
-注销。不要在持有同一个 monitor 状态锁的闭包内推进该 clock。
+注销。代码也可以在持有该 monitor 状态锁时推进 clock；clock callback 不会再次获取
+受保护的状态。
 
 ## 从 0.9 迁移
 
@@ -92,6 +112,11 @@ sleep 猜测 waiter 是否已经注册。`pending_timeout_waiters()` 汇总已�
   `wait_async` 和 `wait_for_async` 方法。请改用基于 predicate 的 condition
   wait 协调受保护状态；需要排队 permit 的场景应使用 semaphore 或 event
   原语。
+- 已删除 boxed `AsyncMonitorFuture` 别名。异步 monitor trait 现在直接返回
+  `impl Future`。
+- 基于 Arc 的 monitor 包装器不再重复提供 inherent 转发方法。普通调用通过
+  `Deref` 解析；泛型约束使用保留的 trait 实现，在所有权边界使用 `from_arc`、
+  `as_arc` 或 `into_arc`。
 
 ## 从 0.8 迁移
 
