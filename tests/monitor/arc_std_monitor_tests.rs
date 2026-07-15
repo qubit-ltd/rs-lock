@@ -7,21 +7,10 @@
 // =============================================================================
 //! Tests for [`ArcStdMonitor`](qubit_lock::ArcStdMonitor).
 
-use std::{
-    sync::mpsc,
-    thread,
-    time::Duration,
-};
+use std::{sync::mpsc, thread, time::Duration};
 
 use qubit_lock::{
-    ArcStdMonitor,
-    ConditionWaiter,
-    NotificationWaiter,
-    Notifier,
-    TimeoutConditionWaiter,
-    TimeoutNotificationWaiter,
-    WaitTimeoutResult,
-    WaitTimeoutStatus,
+    ArcStdMonitor, ConditionWaiter, Notifier, TimeoutConditionWaiter, WaitTimeoutResult,
 };
 
 #[test]
@@ -124,13 +113,6 @@ fn test_arc_std_monitor_traits_delegate_to_monitor_methods() {
     <ArcStdMonitor<Vec<i32>> as Notifier>::notify_all(&monitor);
 
     assert_eq!(
-        <ArcStdMonitor<Vec<i32>> as TimeoutNotificationWaiter>::wait_for(
-            &monitor,
-            Duration::ZERO,
-        ),
-        WaitTimeoutStatus::TimedOut,
-    );
-    assert_eq!(
         <ArcStdMonitor<Vec<i32>> as ConditionWaiter>::wait_until(
             &monitor,
             |items| !items.is_empty(),
@@ -167,31 +149,6 @@ fn test_arc_std_monitor_traits_delegate_to_monitor_methods() {
         ),
         WaitTimeoutResult::Ready(Some(1)),
     );
-}
-
-#[test]
-fn test_arc_std_monitor_notification_waiter_trait_wait_returns_after_notify() {
-    let monitor = ArcStdMonitor::new(false);
-    let waiter_monitor = monitor.clone();
-    let (done_tx, done_rx) = mpsc::channel();
-
-    let waiter = thread::spawn(move || {
-        <ArcStdMonitor<bool> as NotificationWaiter>::wait(&waiter_monitor);
-        done_tx.send(()).expect("test should receive wait result");
-    });
-
-    let deadline = std::time::Instant::now() + Duration::from_secs(1);
-    loop {
-        <ArcStdMonitor<bool> as Notifier>::notify_all(&monitor);
-        if done_rx.recv_timeout(Duration::from_millis(5)).is_ok() {
-            break;
-        }
-        assert!(
-            std::time::Instant::now() < deadline,
-            "notification wait should complete before deadline",
-        );
-    }
-    waiter.join().expect("waiter should finish");
 }
 
 #[test]
@@ -240,16 +197,6 @@ fn test_arc_std_monitor_wait_until_blocks_until_notify_one() {
     );
     waiter.join().expect("waiter should not panic");
     assert!(!monitor.with_read(|ready| *ready));
-}
-
-#[test]
-fn test_arc_std_monitor_wait_for_returns_timed_out() {
-    let monitor = ArcStdMonitor::new(false);
-
-    assert_eq!(
-        monitor.wait_for(Duration::from_millis(30)),
-        WaitTimeoutStatus::TimedOut,
-    );
 }
 
 #[test]

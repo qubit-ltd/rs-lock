@@ -10,21 +10,12 @@
 
 use std::time::Duration;
 
-use tokio::sync::{
-    Mutex,
-    Notify,
-};
+use tokio::sync::{Mutex, Notify};
 use tokio::time::Instant;
 
 use super::{
-    AsyncConditionWaiter,
-    AsyncMonitorFuture,
-    AsyncNotificationWaiter,
-    AsyncTimeoutConditionWaiter,
-    AsyncTimeoutNotificationWaiter,
-    Notifier,
+    AsyncConditionWaiter, AsyncMonitorFuture, AsyncTimeoutConditionWaiter, Notifier,
     WaitTimeoutResult,
-    WaitTimeoutStatus,
 };
 
 /// Test-only synchronization point between dropping the state guard and
@@ -78,7 +69,10 @@ fn install_notification_registration_boundary_hook(
     let mut installed = NOTIFICATION_REGISTRATION_BOUNDARY_HOOK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    assert!(installed.is_none(), "registration boundary hook installed twice");
+    assert!(
+        installed.is_none(),
+        "registration boundary hook installed twice"
+    );
     *installed = Some(hook);
     NotificationRegistrationBoundaryHookGuard
 }
@@ -107,9 +101,7 @@ fn run_notification_registration_boundary_hook(target: usize) {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let (released, _) = release_changed
-            .wait_timeout_while(released, hook.real_timeout, |released| {
-                !*released
-            })
+            .wait_timeout_while(released, hook.real_timeout, |released| !*released)
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         assert!(
             *released,
@@ -267,34 +259,6 @@ impl<T> Notifier for TokioMonitor<T> {
     }
 }
 
-impl<T: Send> AsyncNotificationWaiter for TokioMonitor<T> {
-    /// Returns a future that resolves after a Tokio notification.
-    fn wait_async<'a>(&'a self) -> AsyncMonitorFuture<'a, ()> {
-        Box::pin(self.changed.notified())
-    }
-}
-
-impl<T: Send> AsyncTimeoutNotificationWaiter for TokioMonitor<T> {
-    /// Returns a future that resolves after notification or timeout.
-    fn wait_for_async<'a>(
-        &'a self,
-        timeout: Duration,
-    ) -> AsyncMonitorFuture<'a, WaitTimeoutStatus> {
-        let start = Instant::now();
-        let notified = self.changed.notified();
-        Box::pin(async move {
-            let remaining = Self::remaining_timeout(start, timeout);
-            if remaining.is_zero() {
-                return WaitTimeoutStatus::TimedOut;
-            }
-            match tokio::time::timeout(remaining, notified).await {
-                Ok(()) => WaitTimeoutStatus::Woken,
-                Err(_) => WaitTimeoutStatus::TimedOut,
-            }
-        })
-    }
-}
-
 impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
     type State = T;
 
@@ -343,9 +307,7 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
                 notified.as_mut().enable();
                 drop(guard);
                 #[cfg(test)]
-                run_notification_registration_boundary_hook(
-                    std::ptr::from_ref(self).addr(),
-                );
+                run_notification_registration_boundary_hook(std::ptr::from_ref(self).addr());
                 notified.await;
                 guard = self.state.lock().await;
             }
@@ -374,11 +336,7 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
-        self.wait_while_for_async(
-            timeout,
-            move |state| !predicate(state),
-            action,
-        )
+        self.wait_while_for_async(timeout, move |state| !predicate(state), action)
     }
 
     /// Returns a future that rechecks the predicate while it remains true or
@@ -448,22 +406,12 @@ impl<T: Default> Default for TokioMonitor<T> {
 mod tests {
     use std::future::Future;
     use std::pin::Pin;
-    use std::sync::{
-        Arc,
-        Condvar,
-        Mutex,
-        mpsc,
-    };
-    use std::task::{
-        Context,
-        Poll,
-    };
+    use std::sync::{Arc, Condvar, Mutex, mpsc};
+    use std::task::{Context, Poll};
     use std::time::Duration;
 
     use super::{
-        AsyncConditionWaiter,
-        NotificationRegistrationBoundaryHook,
-        TokioMonitor,
+        AsyncConditionWaiter, NotificationRegistrationBoundaryHook, TokioMonitor,
         install_notification_registration_boundary_hook,
     };
 
@@ -515,10 +463,7 @@ mod tests {
         /// The first poll must return pending. This method reports that result
         /// without dropping the lock future, waits for bounded controller
         /// permission, and then continues polling the same future.
-        fn poll(
-            mut self: Pin<&mut Self>,
-            context: &mut Context<'_>,
-        ) -> Poll<Self::Output> {
+        fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
             let this = &mut *self;
             let result = this.inner.as_mut().poll(context);
             let Some(pending) = this.pending.take() else {
@@ -541,8 +486,7 @@ mod tests {
     /// Verifies that two condition waiters register before releasing the state
     /// lock, so two notifications cannot collapse into one retained permit.
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-    async fn test_tokio_monitor_notify_one_does_not_lose_registered_condition_waiter()
-    {
+    async fn test_tokio_monitor_notify_one_does_not_lose_registered_condition_waiter() {
         const REAL_TIMEOUT: Duration = Duration::from_secs(1);
         const WAITER_COUNT: usize = 2;
 
@@ -555,8 +499,7 @@ mod tests {
             release: Arc::clone(&release),
             real_timeout: REAL_TIMEOUT,
         });
-        let _hook_guard =
-            install_notification_registration_boundary_hook(hook);
+        let _hook_guard = install_notification_registration_boundary_hook(hook);
         let (done_tx, done_rx) = mpsc::channel();
         let mut waiters = Vec::with_capacity(WAITER_COUNT);
 
@@ -564,10 +507,7 @@ mod tests {
         let first_done_tx = done_tx.clone();
         waiters.push(tokio::spawn(async move {
             first_monitor
-                .wait_until_async(
-                    |available| *available > 0,
-                    |available| *available -= 1,
-                )
+                .wait_until_async(|available| *available > 0, |available| *available -= 1)
                 .await;
             first_done_tx
                 .send(())

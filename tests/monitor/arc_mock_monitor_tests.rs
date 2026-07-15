@@ -7,30 +7,14 @@
 // =============================================================================
 //! Tests for [`ArcMockMonitor`](qubit_lock::ArcMockMonitor).
 
-use std::{
-    sync::mpsc,
-    thread,
-    time::Duration,
-};
+use std::{thread, time::Duration};
 
 use qubit_clock::ManualMonotonicClock;
 use qubit_lock::{
-    ArcMockMonitor,
-    ConditionWaiter,
-    NotificationWaiter,
-    Notifier,
-    TimeoutConditionWaiter,
-    TimeoutNotificationWaiter,
-    WaitTimeoutResult,
-    WaitTimeoutStatus,
+    ArcMockMonitor, ConditionWaiter, Notifier, TimeoutConditionWaiter, WaitTimeoutResult,
 };
 #[cfg(feature = "async")]
-use qubit_lock::{
-    AsyncConditionWaiter,
-    AsyncNotificationWaiter,
-    AsyncTimeoutConditionWaiter,
-    AsyncTimeoutNotificationWaiter,
-};
+use qubit_lock::{AsyncConditionWaiter, AsyncTimeoutConditionWaiter};
 
 #[test]
 fn test_arc_mock_monitor_clone_shares_state_and_mock_time() {
@@ -50,8 +34,7 @@ fn test_arc_mock_monitor_clone_shares_state_and_mock_time() {
 #[test]
 fn test_arc_mock_monitor_from_clock_shares_external_clock() {
     let clock = std::sync::Arc::new(ManualMonotonicClock::new());
-    let monitor =
-        ArcMockMonitor::from_clock(false, std::sync::Arc::clone(&clock));
+    let monitor = ArcMockMonitor::from_clock(false, std::sync::Arc::clone(&clock));
 
     clock
         .advance(Duration::from_secs(2))
@@ -61,25 +44,12 @@ fn test_arc_mock_monitor_from_clock_shares_external_clock() {
 }
 
 #[test]
-fn test_arc_mock_monitor_wait_for_times_out_after_advance() {
-    let monitor = ArcMockMonitor::new(false);
-    monitor
-        .monotonic_clock()
-        .advance(Duration::from_millis(10))
-        .expect("manual clock should advance");
-
-    assert_eq!(
-        monitor.wait_for(Duration::from_millis(0)),
-        WaitTimeoutStatus::TimedOut,
-    );
-}
-
-#[test]
 fn test_arc_mock_monitor_timeout_waiter_helpers_delegate_to_inner_monitor() {
     let monitor = ArcMockMonitor::new(false);
     let waiter_monitor = monitor.clone();
-    let waiter =
-        thread::spawn(move || waiter_monitor.wait_for(Duration::from_secs(1)));
+    let waiter = thread::spawn(move || {
+        waiter_monitor.wait_until_for(Duration::from_secs(1), |ready| *ready, |_| ())
+    });
 
     assert!(monitor.wait_for_timeout_waiters(1, Duration::from_secs(1)));
     assert_eq!(1, monitor.pending_timeout_waiters());
@@ -88,7 +58,7 @@ fn test_arc_mock_monitor_timeout_waiter_helpers_delegate_to_inner_monitor() {
         .advance(Duration::from_secs(1))
         .expect("manual clock should advance");
 
-    assert_eq!(WaitTimeoutStatus::TimedOut, waiter.join().unwrap());
+    assert_eq!(WaitTimeoutResult::TimedOut, waiter.join().unwrap());
     assert_eq!(0, monitor.pending_timeout_waiters());
 }
 
@@ -131,13 +101,6 @@ fn test_arc_mock_monitor_traits_delegate_to_inner_monitor() {
     <ArcMockMonitor<Vec<i32>> as Notifier>::notify_one(&monitor);
     <ArcMockMonitor<Vec<i32>> as Notifier>::notify_all(&monitor);
 
-    assert_eq!(
-        <ArcMockMonitor<Vec<i32>> as TimeoutNotificationWaiter>::wait_for(
-            &monitor,
-            Duration::ZERO,
-        ),
-        WaitTimeoutStatus::TimedOut,
-    );
     assert_eq!(
         <ArcMockMonitor<Vec<i32>> as ConditionWaiter>::wait_until(
             &monitor,
@@ -182,10 +145,6 @@ fn test_arc_mock_monitor_wait_methods_delegate_to_inner_monitor() {
     let monitor = ArcMockMonitor::new(vec![1, 2]);
 
     assert_eq!(
-        monitor.wait_for(Duration::ZERO),
-        WaitTimeoutStatus::TimedOut,
-    );
-    assert_eq!(
         monitor.wait_until(
             |items| !items.is_empty(),
             |items| items.pop().expect("item should be ready"),
@@ -220,87 +179,10 @@ fn test_arc_mock_monitor_wait_methods_delegate_to_inner_monitor() {
     );
 }
 
-#[test]
-fn test_arc_mock_monitor_notification_waiter_trait_wait_returns_after_notify() {
-    let monitor = ArcMockMonitor::new(false);
-    let waiter_monitor = monitor.clone();
-    let (done_tx, done_rx) = mpsc::channel();
-
-    let waiter = thread::spawn(move || {
-        <ArcMockMonitor<bool> as NotificationWaiter>::wait(&waiter_monitor);
-        done_tx.send(()).expect("test should receive wait result");
-    });
-
-    let deadline = std::time::Instant::now() + Duration::from_secs(1);
-    loop {
-        <ArcMockMonitor<bool> as Notifier>::notify_all(&monitor);
-        if done_rx.recv_timeout(Duration::from_millis(5)).is_ok() {
-            break;
-        }
-        assert!(
-            std::time::Instant::now() < deadline,
-            "notification wait should complete before deadline",
-        );
-    }
-    waiter.join().expect("waiter should finish");
-}
-
-#[test]
-fn test_arc_mock_monitor_wait_returns_after_notify() {
-    let monitor = ArcMockMonitor::new(false);
-    let waiter_monitor = monitor.clone();
-    let (done_tx, done_rx) = mpsc::channel();
-
-    let waiter = thread::spawn(move || {
-        waiter_monitor.wait();
-        done_tx.send(()).expect("test should receive wait result");
-    });
-
-    let deadline = std::time::Instant::now() + Duration::from_secs(1);
-    loop {
-        monitor.notify_all();
-        if done_rx.recv_timeout(Duration::from_millis(5)).is_ok() {
-            break;
-        }
-        assert!(
-            std::time::Instant::now() < deadline,
-            "notification wait should complete before deadline",
-        );
-    }
-    waiter.join().expect("waiter should finish");
-}
-
 #[cfg(feature = "async")]
 #[tokio::test]
 async fn test_arc_mock_monitor_async_traits_delegate_to_inner_monitor() {
     let monitor = ArcMockMonitor::new(vec![1, 2]);
-    let waiter_monitor = monitor.clone();
-
-    let waiter = tokio::spawn(async move {
-        <ArcMockMonitor<Vec<i32>> as AsyncNotificationWaiter>::wait_async(
-            &waiter_monitor,
-        )
-        .await;
-    });
-    tokio::task::yield_now().await;
-    <ArcMockMonitor<Vec<i32>> as Notifier>::notify_all(&monitor);
-    tokio::time::timeout(Duration::from_millis(100), waiter)
-        .await
-        .expect("async notification wait should complete")
-        .expect("waiter task should finish");
-
-    let wait = <ArcMockMonitor<Vec<i32>> as AsyncTimeoutNotificationWaiter>::wait_for_async(
-        &monitor,
-        Duration::from_secs(1),
-    );
-    tokio::pin!(wait);
-    <ArcMockMonitor<Vec<i32>> as Notifier>::notify_one(&monitor);
-    assert_eq!(
-        tokio::time::timeout(Duration::from_millis(100), &mut wait)
-            .await
-            .expect("async timeout notification wait should complete"),
-        WaitTimeoutStatus::Woken,
-    );
 
     assert_eq!(
         <ArcMockMonitor<Vec<i32>> as AsyncConditionWaiter>::wait_until_async(
@@ -349,27 +231,6 @@ async fn test_arc_mock_monitor_async_traits_delegate_to_inner_monitor() {
 #[tokio::test]
 async fn test_arc_mock_monitor_async_wait_methods_delegate_to_inner_monitor() {
     let monitor = ArcMockMonitor::new(vec![1, 2]);
-    let waiter_monitor = monitor.clone();
-
-    let waiter = tokio::spawn(async move {
-        waiter_monitor.wait_async().await;
-    });
-    tokio::task::yield_now().await;
-    monitor.notify_all();
-    tokio::time::timeout(Duration::from_millis(100), waiter)
-        .await
-        .expect("async notification wait should complete")
-        .expect("waiter task should finish");
-
-    let wait = monitor.wait_for_async(Duration::from_secs(1));
-    tokio::pin!(wait);
-    monitor.notify_one();
-    assert_eq!(
-        tokio::time::timeout(Duration::from_millis(100), &mut wait)
-            .await
-            .expect("async timeout notification wait should complete"),
-        WaitTimeoutStatus::Woken,
-    );
 
     assert_eq!(
         monitor

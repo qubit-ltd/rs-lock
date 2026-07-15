@@ -7,32 +7,13 @@
 // =============================================================================
 //! Arc-wrapped mock monitor.
 
-use std::{
-    ops::Deref,
-    sync::Arc,
-    time::Duration,
-};
+use std::{ops::Deref, sync::Arc, time::Duration};
 
 use qubit_clock::ManualMonotonicClock;
 
 #[cfg(feature = "async")]
-use super::{
-    AsyncConditionWaiter,
-    AsyncMonitorFuture,
-    AsyncNotificationWaiter,
-    AsyncTimeoutConditionWaiter,
-    AsyncTimeoutNotificationWaiter,
-};
-use super::{
-    ConditionWaiter,
-    MockMonitor,
-    NotificationWaiter,
-    Notifier,
-    TimeoutConditionWaiter,
-    TimeoutNotificationWaiter,
-    WaitTimeoutResult,
-    WaitTimeoutStatus,
-};
+use super::{AsyncConditionWaiter, AsyncMonitorFuture, AsyncTimeoutConditionWaiter};
+use super::{ConditionWaiter, MockMonitor, Notifier, TimeoutConditionWaiter, WaitTimeoutResult};
 
 /// Cloneable handle around a [`MockMonitor`].
 pub struct ArcMockMonitor<T> {
@@ -92,11 +73,7 @@ impl<T: Send + 'static> ArcMockMonitor<T> {
     /// Returns `false` if `real_timeout` expires before `expected_count`
     /// waiters are active. The real-time guard never contributes to mock time.
     #[must_use]
-    pub fn wait_for_timeout_waiters(
-        &self,
-        expected_count: usize,
-        real_timeout: Duration,
-    ) -> bool {
+    pub fn wait_for_timeout_waiters(&self, expected_count: usize, real_timeout: Duration) -> bool {
         self.inner
             .wait_for_timeout_waiters(expected_count, real_timeout)
     }
@@ -143,27 +120,6 @@ impl<T: Send + 'static> ArcMockMonitor<T> {
         self.inner.notify_all();
     }
 
-    /// Blocks until a notification happens after this call starts.
-    pub fn wait(&self) {
-        <MockMonitor<T> as NotificationWaiter>::wait(self.inner.as_ref());
-    }
-
-    /// Blocks until notification or mock timeout.
-    ///
-    /// # Arguments
-    ///
-    /// * `timeout` - Maximum mock duration to wait.
-    ///
-    /// # Returns
-    ///
-    /// A status describing whether notification or timeout completed the wait.
-    pub fn wait_for(&self, timeout: Duration) -> WaitTimeoutStatus {
-        <MockMonitor<T> as TimeoutNotificationWaiter>::wait_for(
-            self.inner.as_ref(),
-            timeout,
-        )
-    }
-
     /// Blocks until the predicate becomes true, then runs the action.
     ///
     /// # Arguments
@@ -179,11 +135,7 @@ impl<T: Send + 'static> ArcMockMonitor<T> {
         P: FnMut(&T) -> bool,
         F: FnOnce(&mut T) -> R,
     {
-        <MockMonitor<T> as ConditionWaiter>::wait_until(
-            self.inner.as_ref(),
-            predicate,
-            action,
-        )
+        <MockMonitor<T> as ConditionWaiter>::wait_until(self.inner.as_ref(), predicate, action)
     }
 
     /// Blocks while the predicate remains true, then runs the action.
@@ -202,11 +154,7 @@ impl<T: Send + 'static> ArcMockMonitor<T> {
         P: FnMut(&T) -> bool,
         F: FnOnce(&mut T) -> R,
     {
-        <MockMonitor<T> as ConditionWaiter>::wait_while(
-            self.inner.as_ref(),
-            predicate,
-            action,
-        )
+        <MockMonitor<T> as ConditionWaiter>::wait_while(self.inner.as_ref(), predicate, action)
     }
 
     /// Blocks until the predicate becomes true or mock timeout expires.
@@ -267,40 +215,6 @@ impl<T: Send + 'static> ArcMockMonitor<T> {
             timeout,
             predicate,
             action,
-        )
-    }
-
-    /// Returns a future that resolves after an async notification.
-    #[cfg(feature = "async")]
-    pub fn wait_async(&self) -> AsyncMonitorFuture<'_, ()>
-    where
-        T: Send,
-    {
-        <MockMonitor<T> as AsyncNotificationWaiter>::wait_async(
-            self.inner.as_ref(),
-        )
-    }
-
-    /// Returns a future that resolves after notification or mock timeout.
-    ///
-    /// # Arguments
-    ///
-    /// * `timeout` - Maximum mock duration to wait.
-    ///
-    /// # Returns
-    ///
-    /// A future resolving to the timeout status.
-    #[cfg(feature = "async")]
-    pub fn wait_for_async(
-        &self,
-        timeout: Duration,
-    ) -> AsyncMonitorFuture<'_, WaitTimeoutStatus>
-    where
-        T: Send,
-    {
-        <MockMonitor<T> as AsyncTimeoutNotificationWaiter>::wait_for_async(
-            self.inner.as_ref(),
-            timeout,
         )
     }
 
@@ -443,20 +357,6 @@ impl<T: Send + 'static> Notifier for ArcMockMonitor<T> {
     }
 }
 
-impl<T: Send + 'static> NotificationWaiter for ArcMockMonitor<T> {
-    /// Blocks until notification.
-    fn wait(&self) {
-        self.inner.wait();
-    }
-}
-
-impl<T: Send + 'static> TimeoutNotificationWaiter for ArcMockMonitor<T> {
-    /// Blocks until notification or mock timeout.
-    fn wait_for(&self, timeout: Duration) -> WaitTimeoutStatus {
-        self.inner.wait_for(timeout)
-    }
-}
-
 impl<T: Send + 'static> ConditionWaiter for ArcMockMonitor<T> {
     type State = T;
 
@@ -487,34 +387,11 @@ impl<T: Send + 'static> TimeoutConditionWaiter for ArcMockMonitor<T> {
 }
 
 #[cfg(feature = "async")]
-impl<T: Send + 'static> AsyncNotificationWaiter for ArcMockMonitor<T> {
-    /// Returns a future that resolves after an async notification.
-    fn wait_async<'a>(&'a self) -> AsyncMonitorFuture<'a, ()> {
-        self.inner.wait_async()
-    }
-}
-
-#[cfg(feature = "async")]
-impl<T: Send + 'static> AsyncTimeoutNotificationWaiter for ArcMockMonitor<T> {
-    /// Returns a future that resolves after notification or mock timeout.
-    fn wait_for_async<'a>(
-        &'a self,
-        timeout: Duration,
-    ) -> AsyncMonitorFuture<'a, WaitTimeoutStatus> {
-        self.inner.wait_for_async(timeout)
-    }
-}
-
-#[cfg(feature = "async")]
 impl<T: Send + 'static> AsyncConditionWaiter for ArcMockMonitor<T> {
     type State = T;
 
     /// Returns a future that waits while the predicate remains true.
-    fn wait_while_async<'a, R, P, F>(
-        &'a self,
-        predicate: P,
-        action: F,
-    ) -> AsyncMonitorFuture<'a, R>
+    fn wait_while_async<'a, R, P, F>(&'a self, predicate: P, action: F) -> AsyncMonitorFuture<'a, R>
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,

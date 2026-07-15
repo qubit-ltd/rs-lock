@@ -5,7 +5,7 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-//! RAII registration for an active mock-monitor waiter.
+//! RAII registration for a mock-monitor waiter.
 
 use super::MockMonitor;
 
@@ -15,12 +15,8 @@ pub(super) struct MockMonitorWaiterGuard<'a, T: Send + 'static> {
     monitor: &'a MockMonitor<T>,
     /// Identifier assigned to the registered waiter.
     waiter_id: u64,
-    /// Whether this registration currently contributes to the timeout waiter
-    /// count.
-    timeout_waiter_active: bool,
-    /// Whether the waiter is currently eligible to receive a notification.
-    #[cfg(feature = "async")]
-    active: bool,
+    /// Whether this registration contributes to the timeout waiter count.
+    timeout_waiter: bool,
 }
 
 impl<'a, T: Send + 'static> MockMonitorWaiterGuard<'a, T> {
@@ -30,44 +26,17 @@ impl<'a, T: Send + 'static> MockMonitorWaiterGuard<'a, T> {
     ///
     /// * `monitor` - Monitor that owns the registration.
     /// * `waiter_id` - Identifier assigned to the registered waiter.
-    /// * `timeout_waiter_active` - Whether this registration already
-    ///   contributes to the timeout waiter count.
-    /// * `active` - Whether the waiter is already eligible to receive a
-    ///   notification.
+    /// * `timeout_waiter` - Whether this registration contributes to the timeout
+    ///   waiter count.
     pub(super) fn new(
         monitor: &'a MockMonitor<T>,
         waiter_id: u64,
-        timeout_waiter_active: bool,
-        active: bool,
+        timeout_waiter: bool,
     ) -> Self {
-        #[cfg(not(feature = "async"))]
-        let _ = active;
         Self {
             monitor,
             waiter_id,
-            timeout_waiter_active,
-            #[cfg(feature = "async")]
-            active,
-        }
-    }
-
-    /// Returns the identifier of the guarded waiter registration.
-    pub(super) const fn waiter_id(&self) -> u64 {
-        self.waiter_id
-    }
-
-    /// Activates a reserved async waiter after its future is first polled.
-    ///
-    /// # Arguments
-    ///
-    /// * `timeout_waiter` - Whether activation should also start timeout waiter
-    ///   accounting.
-    #[cfg(feature = "async")]
-    pub(super) fn activate_waiter(&mut self, timeout_waiter: bool) {
-        if !self.active {
-            self.monitor.activate_waiter(self.waiter_id, timeout_waiter);
-            self.active = true;
-            self.timeout_waiter_active = timeout_waiter;
+            timeout_waiter,
         }
     }
 }
@@ -76,6 +45,6 @@ impl<T: Send + 'static> Drop for MockMonitorWaiterGuard<'_, T> {
     /// Unregisters the waiter on normal return, cancellation, or panic.
     fn drop(&mut self) {
         self.monitor
-            .unregister_waiter(self.waiter_id, self.timeout_waiter_active);
+            .unregister_waiter(self.waiter_id, self.timeout_waiter);
     }
 }

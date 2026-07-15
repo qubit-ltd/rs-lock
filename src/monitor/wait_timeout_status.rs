@@ -12,9 +12,9 @@
 /// Result of a timed wait operation.
 ///
 /// This status is returned by
-/// [`ParkingLotMonitorGuard::wait_timeout`](super::ParkingLotMonitorGuard::wait_timeout) and
-/// [`ParkingLotMonitor::wait_for`](super::ParkingLotMonitor::wait_for). It
-/// describes why a timed wait returned, but callers must still re-check the
+/// [`ParkingLotMonitorGuard::wait_timeout`](super::ParkingLotMonitorGuard::wait_timeout)
+/// and [`StdMonitorGuard::wait_timeout`](super::StdMonitorGuard::wait_timeout).
+/// It describes why a timed wait returned, but callers must still re-check the
 /// protected state because condition variables may wake spuriously.
 ///
 /// # Example

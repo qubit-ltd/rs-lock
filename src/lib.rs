@@ -29,6 +29,26 @@
 //! ```compile_fail
 //! use qubit_lock::monitor::Monitor;
 //! ```
+//!
+//! Notification-only waiting is intentionally not part of the public API.
+//!
+//! ```compile_fail
+//! use qubit_lock::{
+//!     AsyncNotificationWaiter,
+//!     AsyncTimeoutNotificationWaiter,
+//!     NotificationWaiter,
+//!     TimeoutNotificationWaiter,
+//! };
+//! ```
+//!
+//! Concrete monitors likewise expose only predicate-based waiting.
+//!
+//! ```compile_fail
+//! use qubit_lock::StdMonitor;
+//!
+//! let monitor = StdMonitor::new(false);
+//! monitor.wait();
+//! ```
 
 mod lock;
 mod monitor;
@@ -56,7 +76,6 @@ pub use monitor::{
     ArcStdMonitor,
     ConditionWaiter,
     Monitor,
-    NotificationWaiter,
     Notifier,
     ParkingLotMonitor,
     ParkingLotMonitorGuard,
@@ -64,7 +83,6 @@ pub use monitor::{
     StdMonitor,
     StdMonitorGuard,
     TimeoutConditionWaiter,
-    TimeoutNotificationWaiter,
     WaitTimeoutResult,
     WaitTimeoutStatus,
 };
@@ -74,9 +92,7 @@ pub use monitor::{
     AsyncConditionWaiter,
     AsyncMonitor,
     AsyncMonitorFuture,
-    AsyncNotificationWaiter,
     AsyncTimeoutConditionWaiter,
-    AsyncTimeoutNotificationWaiter,
     SharedAsyncMonitor,
     TokioMonitor,
 };

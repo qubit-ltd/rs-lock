@@ -23,25 +23,13 @@
 //! [`ParkingLotMonitorGuard::wait_timeout`] for more complex state machines
 //! such as thread pools.
 
-use std::time::{
-    Duration,
-    Instant,
-};
+use std::time::{Duration, Instant};
 
-use parking_lot::{
-    Condvar,
-    Mutex,
-};
+use parking_lot::{Condvar, Mutex};
 
 use super::parking_lot_monitor_guard::ParkingLotMonitorGuard;
 use super::{
-    ConditionWaiter,
-    NotificationWaiter,
-    Notifier,
-    TimeoutConditionWaiter,
-    TimeoutNotificationWaiter,
-    wait_timeout_result::WaitTimeoutResult,
-    wait_timeout_status::WaitTimeoutStatus,
+    ConditionWaiter, Notifier, TimeoutConditionWaiter, wait_timeout_result::WaitTimeoutResult,
 };
 
 /// Shared state protected by a mutex and a condition variable.
@@ -328,60 +316,6 @@ impl<T> ParkingLotMonitor<T> {
         let result = self.with_write(f);
         self.notify_all();
         result
-    }
-
-    /// Waits for a notification without checking state.
-    ///
-    /// This method locks the monitor, waits once on the condition variable,
-    /// and returns after the wait is woken. Most coordination code should
-    /// prefer [`Self::wait_while`], [`Self::wait_until`], or an explicit
-    /// [`ParkingLotMonitorGuard`] loop that rechecks protected state.
-    ///
-    /// This method may block indefinitely if no notification is sent.
-    #[inline]
-    pub fn wait(&self) {
-        let guard = self.lock();
-        let _guard = guard.wait();
-    }
-
-    /// Waits for a notification or timeout without checking state.
-    ///
-    /// This convenience method locks the monitor, waits once on the condition
-    /// variable, and returns why the timed wait completed. It is useful only
-    /// when the caller genuinely needs a notification wait without inspecting
-    /// state before or after the wait. Most coordination code should prefer
-    /// [`Self::wait_while`], [`Self::wait_until`], or the explicit
-    /// [`ParkingLotMonitorGuard::wait_timeout`] loop.
-    ///
-    /// [`WaitTimeoutStatus::Woken`] means the condition variable was notified,
-    /// but it does not prove that the protected state changed in a useful way.
-    ///
-    /// # Arguments
-    ///
-    /// * `timeout` - Maximum duration to wait for a notification.
-    ///
-    /// # Returns
-    ///
-    /// [`WaitTimeoutStatus::Woken`] if the wait returned before the timeout,
-    /// or [`WaitTimeoutStatus::TimedOut`] if the timeout elapsed.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use std::time::Duration;
-    ///
-    /// use qubit_lock::{ParkingLotMonitor, WaitTimeoutStatus};
-    ///
-    /// let monitor = ParkingLotMonitor::new(false);
-    /// let status = monitor.wait_for(Duration::from_millis(1));
-    ///
-    /// assert_eq!(status, WaitTimeoutStatus::TimedOut);
-    /// ```
-    #[inline]
-    pub fn wait_for(&self, timeout: Duration) -> WaitTimeoutStatus {
-        let guard = self.lock();
-        let (_guard, status) = guard.wait_timeout(timeout);
-        status
     }
 
     /// Waits while a predicate remains true, then mutates the protected state.
@@ -719,22 +653,6 @@ impl<T> Notifier for ParkingLotMonitor<T> {
     #[inline]
     fn notify_all(&self) {
         Self::notify_all(self);
-    }
-}
-
-impl<T> NotificationWaiter for ParkingLotMonitor<T> {
-    /// Blocks until a notification wakes this waiter.
-    #[inline]
-    fn wait(&self) {
-        Self::wait(self);
-    }
-}
-
-impl<T> TimeoutNotificationWaiter for ParkingLotMonitor<T> {
-    /// Blocks until a notification wakes this waiter or the timeout expires.
-    #[inline]
-    fn wait_for(&self, timeout: Duration) -> WaitTimeoutStatus {
-        Self::wait_for(self, timeout)
     }
 }
 

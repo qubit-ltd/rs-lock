@@ -7,26 +7,9 @@
 // =============================================================================
 //! Aggregate blocking monitor capability.
 
-use crate::monitor::{
-    NotificationWaiter,
-    Notifier,
-    TimeoutConditionWaiter,
-    TimeoutNotificationWaiter,
-};
+use crate::monitor::{Notifier, TimeoutConditionWaiter};
 
 /// Aggregate trait for blocking monitor-style synchronization.
-pub trait Monitor:
-    Notifier
-    + NotificationWaiter
-    + TimeoutNotificationWaiter
-    + TimeoutConditionWaiter
-{
-}
+pub trait Monitor: Notifier + TimeoutConditionWaiter {}
 
-impl<T> Monitor for T where
-    T: Notifier
-        + NotificationWaiter
-        + TimeoutNotificationWaiter
-        + TimeoutConditionWaiter
-{
-}
+impl<T> Monitor for T where T: Notifier + TimeoutConditionWaiter {}

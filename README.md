@@ -97,13 +97,15 @@ Version `0.10` intentionally changes features and closure-method names:
   `async_read` to `with_read_async`, `async_write` to `with_write_async`,
   `async_write_notify_one` to `with_write_notify_one_async`, and
   `async_write_notify_all` to `with_write_notify_all_async`.
+- Notification-only waiting traits and concrete `wait`, `wait_for`,
+  `wait_async`, and `wait_for_async` methods have been removed. Coordinate on
+  protected state with predicate-based condition waits instead. Code that
+  needs queued permits should use a semaphore or event primitive.
 
 ## Migration from 0.8
 
 Version `0.9` contains intentional async monitor API renames:
 
-- `AsyncNotificationWaiter::async_wait` is now `wait_async`.
-- `AsyncTimeoutNotificationWaiter::async_wait_for` is now `wait_for_async`.
 - `AsyncConditionWaiter::async_wait_until` and `async_wait_while` are now
   `wait_until_async` and `wait_while_async`.
 - `AsyncTimeoutConditionWaiter::async_wait_until_for` and

@@ -7,22 +7,11 @@
 // =============================================================================
 //! Arc-wrapped Tokio monitor.
 
-use std::{
-    ops::Deref,
-    sync::Arc,
-    time::Duration,
-};
+use std::{ops::Deref, sync::Arc, time::Duration};
 
 use super::{
-    AsyncConditionWaiter,
-    AsyncMonitorFuture,
-    AsyncNotificationWaiter,
-    AsyncTimeoutConditionWaiter,
-    AsyncTimeoutNotificationWaiter,
-    Notifier,
-    TokioMonitor,
+    AsyncConditionWaiter, AsyncMonitorFuture, AsyncTimeoutConditionWaiter, Notifier, TokioMonitor,
     WaitTimeoutResult,
-    WaitTimeoutStatus,
 };
 
 /// Cloneable handle around a [`TokioMonitor`].
@@ -87,38 +76,6 @@ impl<T> ArcTokioMonitor<T> {
     /// Wakes all async waiters.
     pub fn notify_all(&self) {
         self.inner.notify_all();
-    }
-
-    /// Returns a future that resolves after an async notification.
-    pub fn wait_async(&self) -> AsyncMonitorFuture<'_, ()>
-    where
-        T: Send,
-    {
-        <TokioMonitor<T> as AsyncNotificationWaiter>::wait_async(
-            self.inner.as_ref(),
-        )
-    }
-
-    /// Returns a future that resolves after notification or timeout.
-    ///
-    /// # Arguments
-    ///
-    /// * `timeout` - Maximum relative duration to wait.
-    ///
-    /// # Returns
-    ///
-    /// A future resolving to the timeout status.
-    pub fn wait_for_async(
-        &self,
-        timeout: Duration,
-    ) -> AsyncMonitorFuture<'_, WaitTimeoutStatus>
-    where
-        T: Send,
-    {
-        <TokioMonitor<T> as AsyncTimeoutNotificationWaiter>::wait_for_async(
-            self.inner.as_ref(),
-            timeout,
-        )
     }
 
     /// Returns a future that waits until the predicate becomes true.
@@ -256,32 +213,11 @@ impl<T> Notifier for ArcTokioMonitor<T> {
     }
 }
 
-impl<T: Send> AsyncNotificationWaiter for ArcTokioMonitor<T> {
-    /// Returns a future that resolves after an async notification.
-    fn wait_async<'a>(&'a self) -> AsyncMonitorFuture<'a, ()> {
-        self.inner.wait_async()
-    }
-}
-
-impl<T: Send> AsyncTimeoutNotificationWaiter for ArcTokioMonitor<T> {
-    /// Returns a future that resolves after notification or timeout.
-    fn wait_for_async<'a>(
-        &'a self,
-        timeout: Duration,
-    ) -> AsyncMonitorFuture<'a, WaitTimeoutStatus> {
-        self.inner.wait_for_async(timeout)
-    }
-}
-
 impl<T: Send> AsyncConditionWaiter for ArcTokioMonitor<T> {
     type State = T;
 
     /// Returns a future that waits while the predicate remains true.
-    fn wait_while_async<'a, R, P, F>(
-        &'a self,
-        predicate: P,
-        action: F,
-    ) -> AsyncMonitorFuture<'a, R>
+    fn wait_while_async<'a, R, P, F>(&'a self, predicate: P, action: F) -> AsyncMonitorFuture<'a, R>
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
