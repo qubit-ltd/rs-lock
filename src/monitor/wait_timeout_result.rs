@@ -74,7 +74,7 @@ impl<R> WaitTimeoutResult<R> {
     /// # Returns
     ///
     /// `true` for [`Self::Ready`], otherwise `false`.
-    #[inline]
+    #[inline(always)]
     pub const fn is_ready(&self) -> bool {
         match self {
             Self::Ready(_) => true,
@@ -87,7 +87,7 @@ impl<R> WaitTimeoutResult<R> {
     /// # Returns
     ///
     /// `true` for [`Self::TimedOut`], otherwise `false`.
-    #[inline]
+    #[inline(always)]
     pub const fn is_timed_out(&self) -> bool {
         match self {
             Self::Ready(_) => false,

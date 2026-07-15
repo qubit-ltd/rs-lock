@@ -27,10 +27,10 @@ mod async_monitor;
 #[cfg(feature = "async")]
 mod async_timeout_condition_waiter;
 mod condition_waiter;
+#[cfg(any(feature = "async", feature = "mock"))]
+mod internal;
 #[cfg(feature = "mock")]
 mod mock_monitor;
-#[cfg(feature = "mock")]
-mod mock_monitor_waiter_guard;
 mod monitor;
 mod notifier;
 mod parking_lot_monitor;

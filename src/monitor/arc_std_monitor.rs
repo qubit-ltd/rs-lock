@@ -105,7 +105,7 @@ impl<T> ArcStdMonitor<T> {
     /// # Returns
     ///
     /// The existing Arc without changing its strong reference count.
-    #[inline]
+    #[inline(always)]
     pub fn as_arc(&self) -> &Arc<StdMonitor<T>> {
         &self.inner
     }
@@ -115,7 +115,7 @@ impl<T> ArcStdMonitor<T> {
     /// # Returns
     ///
     /// The existing Arc, preserving the wrapped monitor allocation.
-    #[inline]
+    #[inline(always)]
     pub fn into_arc(self) -> Arc<StdMonitor<T>> {
         self.inner
     }
@@ -126,7 +126,7 @@ impl<T> AsRef<StdMonitor<T>> for ArcStdMonitor<T> {
     ///
     /// This is useful when callers need an explicit [`StdMonitor`] reference
     /// while keeping the cloneable [`ArcStdMonitor`] handle.
-    #[inline]
+    #[inline(always)]
     fn as_ref(&self) -> &StdMonitor<T> {
         self.inner.as_ref()
     }
@@ -134,13 +134,13 @@ impl<T> AsRef<StdMonitor<T>> for ArcStdMonitor<T> {
 
 impl<T> Notifier for ArcStdMonitor<T> {
     /// Wakes one thread waiting on this monitor.
-    #[inline]
+    #[inline(always)]
     fn notify_one(&self) {
         self.inner.notify_one();
     }
 
     /// Wakes all threads waiting on this monitor.
-    #[inline]
+    #[inline(always)]
     fn notify_all(&self) {
         self.inner.notify_all();
     }
@@ -150,7 +150,7 @@ impl<T> ConditionWaiter for ArcStdMonitor<T> {
     type State = T;
 
     /// Blocks while the predicate remains true, then runs the action.
-    #[inline]
+    #[inline(always)]
     fn wait_while<R, P, F>(&self, predicate: P, action: F) -> R
     where
         P: FnMut(&Self::State) -> bool,
@@ -166,7 +166,7 @@ impl<T> ConditionWaiter for ArcStdMonitor<T> {
 
 impl<T> TimeoutConditionWaiter for ArcStdMonitor<T> {
     /// Blocks while the predicate remains true or until the timeout expires.
-    #[inline]
+    #[inline(always)]
     fn wait_while_for<R, P, F>(
         &self,
         timeout: Duration,
@@ -193,7 +193,7 @@ impl<T> Deref for ArcStdMonitor<T> {
     ///
     /// Method-call dereferencing lets callers use native [`StdMonitor`] APIs
     /// directly, while this wrapper still provides cloneable ownership.
-    #[inline]
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         self.inner.as_ref()
     }
@@ -209,7 +209,7 @@ impl<T> From<T> for ArcStdMonitor<T> {
     /// # Returns
     ///
     /// A cloneable standard monitor handle protecting `value`.
-    #[inline]
+    #[inline(always)]
     fn from(value: T) -> Self {
         Self::new(value)
     }
@@ -221,7 +221,7 @@ impl<T: Default> Default for ArcStdMonitor<T> {
     /// # Returns
     ///
     /// A cloneable monitor handle protecting the default value for `T`.
-    #[inline]
+    #[inline(always)]
     fn default() -> Self {
         Self::new(T::default())
     }
@@ -236,7 +236,7 @@ impl<T> Clone for ArcStdMonitor<T> {
     /// # Returns
     ///
     /// A new handle sharing the same monitor state.
-    #[inline]
+    #[inline(always)]
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),

@@ -71,7 +71,7 @@ impl WaitTimeoutStatus {
     /// # Returns
     ///
     /// `true` for [`Self::Woken`], otherwise `false`.
-    #[inline]
+    #[inline(always)]
     pub const fn is_woken(&self) -> bool {
         match self {
             Self::Woken => true,
@@ -84,7 +84,7 @@ impl WaitTimeoutStatus {
     /// # Returns
     ///
     /// `true` for [`Self::TimedOut`], otherwise `false`.
-    #[inline]
+    #[inline(always)]
     pub const fn is_timed_out(&self) -> bool {
         match self {
             Self::Woken => false,

@@ -89,6 +89,40 @@ impl<T> ArcMutex<T> {
             inner: Arc::new(Mutex::new(data)),
         }
     }
+
+    /// Creates a lock wrapper from an existing Arc-wrapped mutex.
+    ///
+    /// # Arguments
+    ///
+    /// * `inner` - Existing shared mutex allocation to wrap.
+    ///
+    /// # Returns
+    ///
+    /// A wrapper that preserves the identity and ownership of `inner`.
+    #[inline]
+    pub fn from_arc(inner: Arc<Mutex<T>>) -> Self {
+        Self { inner }
+    }
+
+    /// Borrows the Arc that owns the wrapped mutex.
+    ///
+    /// # Returns
+    ///
+    /// The existing Arc without changing its strong reference count.
+    #[inline(always)]
+    pub fn as_arc(&self) -> &Arc<Mutex<T>> {
+        &self.inner
+    }
+
+    /// Consumes this wrapper and returns the Arc that owns the mutex.
+    ///
+    /// # Returns
+    ///
+    /// The existing Arc, preserving the wrapped mutex allocation.
+    #[inline(always)]
+    pub fn into_arc(self) -> Arc<Mutex<T>> {
+        self.inner
+    }
 }
 
 impl<T> AsRef<Mutex<T>> for ArcMutex<T> {
@@ -97,7 +131,7 @@ impl<T> AsRef<Mutex<T>> for ArcMutex<T> {
     /// This is useful when callers need guard-based APIs such as
     /// [`Mutex::lock`] or [`Mutex::try_lock`] instead of the closure-based
     /// [`Lock`] methods.
-    #[inline]
+    #[inline(always)]
     fn as_ref(&self) -> &Mutex<T> {
         self.inner.as_ref()
     }
@@ -110,7 +144,7 @@ impl<T> Deref for ArcMutex<T> {
     ///
     /// Method-call dereferencing lets callers use native mutex APIs directly,
     /// while the wrapper continues to provide the [`Lock`] trait methods.
-    #[inline]
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         self.inner.as_ref()
     }
@@ -281,7 +315,7 @@ impl<T> From<T> for ArcMutex<T> {
     /// # Returns
     ///
     /// A new [`ArcMutex`] protecting `value`.
-    #[inline]
+    #[inline(always)]
     fn from(value: T) -> Self {
         Self::new(value)
     }
@@ -293,7 +327,7 @@ impl<T: Default> Default for ArcMutex<T> {
     /// # Returns
     ///
     /// A new [`ArcMutex`] protecting the default value for `T`.
-    #[inline]
+    #[inline(always)]
     fn default() -> Self {
         Self::new(T::default())
     }
@@ -310,7 +344,7 @@ impl<T> Clone for ArcMutex<T> {
     /// # Returns
     ///
     /// A new handle sharing the same underlying mutex and protected value.
-    #[inline]
+    #[inline(always)]
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),

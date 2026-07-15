@@ -10,7 +10,6 @@
 // private timeout-initialization and change-boundary hooks.
 //! Mock monitor with timeout time driven by a manual monotonic clock.
 
-use std::collections::BTreeMap;
 use std::sync::{
     Arc,
     Condvar,
@@ -36,7 +35,6 @@ use qubit_clock::{
 #[cfg(feature = "async")]
 use tokio::sync::watch;
 
-use super::mock_monitor_waiter_guard::MockMonitorWaiterGuard;
 #[cfg(feature = "async")]
 use super::{
     AsyncConditionWaiter,
@@ -47,6 +45,11 @@ use super::{
     Notifier,
     TimeoutConditionWaiter,
     WaitTimeoutResult,
+    internal::{
+        MockMonitorState,
+        MockMonitorWaiterGuard,
+        MockWaiterState,
+    },
 };
 
 /// Test-only timeout condition-wait phases.
@@ -102,24 +105,6 @@ pub struct MockMonitor<T> {
     change_wait_boundary_hook: Mutex<Option<ChangeWaitBoundaryHook>>,
 }
 
-/// State protected by [`MockMonitor`].
-struct MockMonitorState<T> {
-    /// User-visible protected value.
-    value: T,
-    /// Identifier assigned to the next registered waiter.
-    next_waiter_id: u64,
-    /// Registered waiters and their individually assigned notification state.
-    waiters: BTreeMap<u64, MockWaiterState>,
-    /// Number of active blocking and asynchronous timeout waits.
-    timeout_waiters: usize,
-}
-
-/// Notification state assigned to one active mock-monitor waiter.
-struct MockWaiterState {
-    /// Whether this waiter owns an unconsumed notification.
-    notified: bool,
-}
-
 impl<T: Send + 'static> MockMonitor<T> {
     /// Creates a mock monitor protecting the supplied state value.
     ///
@@ -130,6 +115,7 @@ impl<T: Send + 'static> MockMonitor<T> {
     /// # Returns
     ///
     /// A mock monitor with a new independent manual clock.
+    #[inline]
     pub fn new(state: T) -> Self {
         Self::from_clock(state, Arc::new(ManualMonotonicClock::new()))
     }
@@ -147,13 +133,9 @@ impl<T: Send + 'static> MockMonitor<T> {
     /// Advancing `clock` is safe while executing a closure that holds this
     /// monitor's state lock. The clock callback signals waiters without
     /// acquiring the protected-state lock.
+    #[inline]
     pub fn from_clock(state: T, clock: Arc<ManualMonotonicClock>) -> Self {
-        let state = Arc::new(Mutex::new(MockMonitorState {
-            value: state,
-            next_waiter_id: 0,
-            waiters: BTreeMap::new(),
-            timeout_waiters: 0,
-        }));
+        let state = Arc::new(Mutex::new(MockMonitorState::new(state)));
         let change_epoch = Arc::new(AtomicU64::new(0));
         let change_gate = Arc::new(Mutex::new(()));
         let changed = Arc::new(Condvar::new());
@@ -201,12 +183,14 @@ impl<T: Send + 'static> MockMonitor<T> {
     /// # Returns
     ///
     /// The elapsed time used by timeout waits.
+    #[inline(always)]
     pub fn elapsed(&self) -> Duration {
         self.clock.now().elapsed_since_origin()
     }
 
     /// Returns the manual clock used by timeout methods.
     #[must_use]
+    #[inline(always)]
     pub fn monotonic_clock(&self) -> &ManualMonotonicClock {
         self.clock.as_ref()
     }
@@ -216,6 +200,7 @@ impl<T: Send + 'static> MockMonitor<T> {
     /// An asynchronous timeout wait is counted after its future is first
     /// polled, not when the future is created.
     #[must_use]
+    #[inline(always)]
     pub fn pending_timeout_waiters(&self) -> usize {
         self.lock_state().timeout_waiters
     }
@@ -262,6 +247,7 @@ impl<T: Send + 'static> MockMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
+    #[inline]
     pub fn with_read<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R,
@@ -281,6 +267,7 @@ impl<T: Send + 'static> MockMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
+    #[inline]
     pub fn with_write<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
@@ -298,6 +285,7 @@ impl<T: Send + 'static> MockMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
+    #[inline]
     pub fn with_write_notify_one<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
@@ -316,6 +304,7 @@ impl<T: Send + 'static> MockMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
+    #[inline]
     pub fn with_write_notify_all<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
@@ -538,7 +527,7 @@ impl<T: Send + 'static> MockMonitor<T> {
             .expect("mock monitor waiter identifier overflowed");
         let previous = state
             .waiters
-            .insert(waiter_id, MockWaiterState { notified: false });
+            .insert(waiter_id, MockWaiterState::new());
         assert!(previous.is_none(), "mock monitor waiter identifier reused");
         if timeout_waiter {
             state.timeout_waiters = state
@@ -599,6 +588,7 @@ impl<T: Send + 'static> MockMonitor<T> {
     /// waiter's check-to-sleep window; a complete wrap in that window could be
     /// mistaken for no change. Protected predicate state remains synchronized
     /// by the monitor mutex.
+    #[inline(always)]
     fn current_change_epoch(&self) -> u64 {
         self.change_epoch.load(Ordering::Relaxed)
     }
@@ -651,6 +641,7 @@ impl<T: Send + 'static> MockMonitor<T> {
     /// gate/token/Condvar/watch helper used by clock callbacks. Blocking
     /// waiters never acquire protected state while holding the gate, preventing
     /// a lock-order cycle.
+    #[inline(always)]
     fn signal_change(&self) {
         #[cfg(feature = "async")]
         Self::publish_change(
@@ -704,11 +695,13 @@ impl<T: Send + 'static> MockMonitor<T> {
 
 impl<T: Send + 'static> Notifier for MockMonitor<T> {
     /// Wakes one waiter if one is blocked.
+    #[inline(always)]
     fn notify_one(&self) {
         Self::notify_one(self);
     }
 
     /// Wakes all waiters.
+    #[inline(always)]
     fn notify_all(&self) {
         Self::notify_all(self);
     }
@@ -909,6 +902,7 @@ impl<T: Send + 'static> AsyncTimeoutConditionWaiter for MockMonitor<T> {
 
 impl<T: Send + 'static> From<T> for MockMonitor<T> {
     /// Creates a mock monitor from an initial state value.
+    #[inline(always)]
     fn from(value: T) -> Self {
         Self::new(value)
     }
@@ -916,6 +910,7 @@ impl<T: Send + 'static> From<T> for MockMonitor<T> {
 
 impl<T: Default + Send + 'static> Default for MockMonitor<T> {
     /// Creates a mock monitor containing `T::default()`.
+    #[inline(always)]
     fn default() -> Self {
         Self::new(T::default())
     }

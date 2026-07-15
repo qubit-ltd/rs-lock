@@ -375,7 +375,6 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// assert_eq!(worker.join().expect("worker should finish"), 7);
     /// ```
-    #[inline]
     pub fn wait_while<R, P, F>(&self, mut waiting: P, f: F) -> R
     where
         P: FnMut(&T) -> bool,
@@ -437,7 +436,6 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// assert_eq!(waiter.join().expect("waiter should finish"), "done");
     /// ```
-    #[inline]
     pub fn wait_until<R, P, F>(&self, mut ready: P, f: F) -> R
     where
         P: FnMut(&T) -> bool,
@@ -494,7 +492,6 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// assert_eq!(result, WaitTimeoutResult::TimedOut);
     /// ```
-    #[inline]
     pub fn wait_while_for<R, P, F>(
         &self,
         timeout: Duration,
@@ -587,7 +584,6 @@ impl<T> ParkingLotMonitor<T> {
     ///     WaitTimeoutResult::Ready(5),
     /// );
     /// ```
-    #[inline]
     pub fn wait_until_for<R, P, F>(
         &self,
         timeout: Duration,
@@ -628,7 +624,7 @@ impl<T> ParkingLotMonitor<T> {
     /// monitor.notify_one();
     /// waiter.join().expect("waiter should finish");
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn notify_one(&self) {
         self.changed.notify_one();
     }
@@ -661,7 +657,7 @@ impl<T> ParkingLotMonitor<T> {
     ///     h.join().expect("waiter should finish");
     /// }
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn notify_all(&self) {
         self.changed.notify_all();
     }
@@ -669,13 +665,13 @@ impl<T> ParkingLotMonitor<T> {
 
 impl<T> Notifier for ParkingLotMonitor<T> {
     /// Wakes one thread waiting on this monitor.
-    #[inline]
+    #[inline(always)]
     fn notify_one(&self) {
         Self::notify_one(self);
     }
 
     /// Wakes all threads waiting on this monitor.
-    #[inline]
+    #[inline(always)]
     fn notify_all(&self) {
         Self::notify_all(self);
     }
@@ -685,7 +681,7 @@ impl<T> ConditionWaiter for ParkingLotMonitor<T> {
     type State = T;
 
     /// Blocks while the predicate remains true, then runs the action.
-    #[inline]
+    #[inline(always)]
     fn wait_while<R, P, F>(&self, predicate: P, action: F) -> R
     where
         P: FnMut(&Self::State) -> bool,
@@ -697,7 +693,7 @@ impl<T> ConditionWaiter for ParkingLotMonitor<T> {
 
 impl<T> TimeoutConditionWaiter for ParkingLotMonitor<T> {
     /// Blocks while the predicate remains true or until the timeout expires.
-    #[inline]
+    #[inline(always)]
     fn wait_while_for<R, P, F>(
         &self,
         timeout: Duration,
@@ -722,7 +718,7 @@ impl<T> From<T> for ParkingLotMonitor<T> {
     /// # Returns
     ///
     /// A monitor initialized with `value`.
-    #[inline]
+    #[inline(always)]
     fn from(value: T) -> Self {
         Self::new(value)
     }
@@ -743,7 +739,7 @@ impl<T: Default> Default for ParkingLotMonitor<T> {
     /// let monitor: ParkingLotMonitor<String> = ParkingLotMonitor::default();
     /// assert!(monitor.with_read(|s| s.is_empty()));
     /// ```
-    #[inline]
+    #[inline(always)]
     fn default() -> Self {
         Self::new(T::default())
     }

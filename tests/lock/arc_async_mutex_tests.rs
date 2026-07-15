@@ -40,6 +40,20 @@ mod arc_async_mutex_tests {
     }
 
     #[tokio::test]
+    async fn test_arc_async_mutex_arc_ownership_round_trip() {
+        let inner = Arc::new(tokio::sync::Mutex::new(41));
+        let async_mutex = ArcAsyncMutex::from_arc(Arc::clone(&inner));
+
+        assert!(Arc::ptr_eq(async_mutex.as_arc(), &inner));
+        assert_eq!(Arc::strong_count(&inner), 2);
+
+        let recovered = async_mutex.into_arc();
+        assert!(Arc::ptr_eq(&recovered, &inner));
+        assert_eq!(Arc::strong_count(&inner), 2);
+        assert_eq!(*recovered.lock().await, 41);
+    }
+
+    #[tokio::test]
     async fn test_arc_async_mutex_from_and_default() {
         let from_value = ArcAsyncMutex::from(42);
         assert_eq!(from_value.with_read(|value| *value).await, 42);
