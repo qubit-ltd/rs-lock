@@ -25,8 +25,6 @@ mod async_condition_waiter;
 #[cfg(feature = "async")]
 mod async_monitor;
 #[cfg(feature = "async")]
-mod async_monitor_future;
-#[cfg(feature = "async")]
 mod async_timeout_condition_waiter;
 mod condition_waiter;
 #[cfg(feature = "mock")]
@@ -58,8 +56,6 @@ pub use arc_tokio_monitor::ArcTokioMonitor;
 pub use async_condition_waiter::AsyncConditionWaiter;
 #[cfg(feature = "async")]
 pub use async_monitor::AsyncMonitor;
-#[cfg(feature = "async")]
-pub use async_monitor_future::AsyncMonitorFuture;
 #[cfg(feature = "async")]
 pub use async_timeout_condition_waiter::AsyncTimeoutConditionWaiter;
 pub use condition_waiter::ConditionWaiter;

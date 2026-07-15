@@ -8,6 +8,7 @@
 //! Arc-wrapped Tokio monitor.
 
 use std::{
+    future::Future,
     ops::Deref,
     sync::Arc,
     time::Duration,
@@ -15,7 +16,6 @@ use std::{
 
 use super::{
     AsyncConditionWaiter,
-    AsyncMonitorFuture,
     AsyncTimeoutConditionWaiter,
     Notifier,
     TokioMonitor,
@@ -100,7 +100,7 @@ impl<T> ArcTokioMonitor<T> {
         &'a self,
         predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, R>
+    ) -> impl Future<Output = R> + Send + 'a
     where
         T: Send,
         R: Send + 'a,
@@ -129,7 +129,7 @@ impl<T> ArcTokioMonitor<T> {
         &'a self,
         predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, R>
+    ) -> impl Future<Output = R> + Send + 'a
     where
         T: Send,
         R: Send + 'a,
@@ -160,7 +160,7 @@ impl<T> ArcTokioMonitor<T> {
         timeout: Duration,
         predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, WaitTimeoutResult<R>>
+    ) -> impl Future<Output = WaitTimeoutResult<R>> + Send + 'a
     where
         T: Send,
         R: Send + 'a,
@@ -193,7 +193,7 @@ impl<T> ArcTokioMonitor<T> {
         timeout: Duration,
         predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, WaitTimeoutResult<R>>
+    ) -> impl Future<Output = WaitTimeoutResult<R>> + Send + 'a
     where
         T: Send,
         R: Send + 'a,
@@ -229,7 +229,7 @@ impl<T: Send> AsyncConditionWaiter for ArcTokioMonitor<T> {
         &'a self,
         predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, R>
+    ) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
@@ -247,7 +247,7 @@ impl<T: Send> AsyncTimeoutConditionWaiter for ArcTokioMonitor<T> {
         timeout: Duration,
         predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, WaitTimeoutResult<R>>
+    ) -> impl Future<Output = WaitTimeoutResult<R>> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,

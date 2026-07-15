@@ -7,7 +7,10 @@
 // =============================================================================
 //! Tests for [`TokioMonitor`](qubit_lock::TokioMonitor).
 
-use std::time::Duration;
+use std::{
+    future::Future,
+    time::Duration,
+};
 
 use qubit_lock::{
     AsyncConditionWaiter,
@@ -16,6 +19,61 @@ use qubit_lock::{
     TokioMonitor,
     WaitTimeoutResult,
 };
+
+/// Returns a future after proving at compile time that it is sendable.
+fn assert_send<F: Future + Send>(future: F) -> F {
+    future
+}
+
+#[tokio::test(start_paused = true)]
+async fn test_tokio_monitor_condition_wait_futures_are_send() {
+    let monitor = TokioMonitor::new(true);
+
+    assert!(
+        assert_send(
+            <TokioMonitor<bool> as AsyncConditionWaiter>::wait_until_async(
+                &monitor,
+                |ready| *ready,
+                |ready| *ready,
+            ),
+        )
+        .await,
+    );
+    assert!(
+        assert_send(
+            <TokioMonitor<bool> as AsyncConditionWaiter>::wait_while_async(
+                &monitor,
+                |ready| !*ready,
+                |ready| *ready,
+            ),
+        )
+        .await,
+    );
+    assert_eq!(
+        assert_send(
+            <TokioMonitor<bool> as AsyncTimeoutConditionWaiter>::wait_until_for_async(
+                &monitor,
+                Duration::ZERO,
+                |ready| *ready,
+                |ready| *ready,
+            ),
+        )
+        .await,
+        WaitTimeoutResult::Ready(true),
+    );
+    assert_eq!(
+        assert_send(
+            <TokioMonitor<bool> as AsyncTimeoutConditionWaiter>::wait_while_for_async(
+                &monitor,
+                Duration::ZERO,
+                |ready| !*ready,
+                |ready| *ready,
+            ),
+        )
+        .await,
+        WaitTimeoutResult::Ready(true),
+    );
+}
 
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_helpers_and_conversions_delegate_to_state() {

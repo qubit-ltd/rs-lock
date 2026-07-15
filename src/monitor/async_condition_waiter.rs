@@ -7,7 +7,7 @@
 // =============================================================================
 //! Asynchronous condition-wait capability.
 
-use crate::monitor::AsyncMonitorFuture;
+use std::future::Future;
 
 /// Waits asynchronously for predicates over protected monitor state.
 pub trait AsyncConditionWaiter {
@@ -21,7 +21,7 @@ pub trait AsyncConditionWaiter {
         &'a self,
         mut predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, R>
+    ) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
@@ -37,7 +37,7 @@ pub trait AsyncConditionWaiter {
         &'a self,
         predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, R>
+    ) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,

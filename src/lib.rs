@@ -49,6 +49,13 @@
 //! use qubit_lock::AsyncTimeoutNotificationWaiter;
 //! ```
 //!
+//! The implementation-specific boxed async monitor future alias is not part
+//! of the public API.
+//!
+//! ```compile_fail
+//! use qubit_lock::AsyncMonitorFuture;
+//! ```
+//!
 //! Concrete monitors and Arc wrappers likewise expose only predicate-based
 //! waiting.
 //!
@@ -127,7 +134,6 @@ pub use monitor::{
     ArcTokioMonitor,
     AsyncConditionWaiter,
     AsyncMonitor,
-    AsyncMonitorFuture,
     AsyncTimeoutConditionWaiter,
     SharedAsyncMonitor,
     TokioMonitor,

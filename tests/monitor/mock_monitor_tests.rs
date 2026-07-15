@@ -17,7 +17,10 @@ use std::{
 };
 
 #[cfg(feature = "async")]
-use std::task::Poll;
+use std::{
+    future::Future,
+    task::Poll,
+};
 
 use qubit_clock::ManualMonotonicClock;
 #[cfg(feature = "async")]
@@ -32,6 +35,63 @@ use qubit_lock::{
     TimeoutConditionWaiter,
     WaitTimeoutResult,
 };
+
+/// Returns a future after proving at compile time that it is sendable.
+#[cfg(feature = "async")]
+fn assert_send<F: Future + Send>(future: F) -> F {
+    future
+}
+
+#[cfg(feature = "async")]
+#[tokio::test]
+async fn test_mock_monitor_condition_wait_futures_are_send() {
+    let monitor = MockMonitor::new(true);
+
+    assert!(
+        assert_send(
+            <MockMonitor<bool> as AsyncConditionWaiter>::wait_until_async(
+                &monitor,
+                |ready| *ready,
+                |ready| *ready,
+            ),
+        )
+        .await,
+    );
+    assert!(
+        assert_send(
+            <MockMonitor<bool> as AsyncConditionWaiter>::wait_while_async(
+                &monitor,
+                |ready| !*ready,
+                |ready| *ready,
+            ),
+        )
+        .await,
+    );
+    assert_eq!(
+        assert_send(
+            <MockMonitor<bool> as AsyncTimeoutConditionWaiter>::wait_until_for_async(
+                &monitor,
+                Duration::ZERO,
+                |ready| *ready,
+                |ready| *ready,
+            ),
+        )
+        .await,
+        WaitTimeoutResult::Ready(true),
+    );
+    assert_eq!(
+        assert_send(
+            <MockMonitor<bool> as AsyncTimeoutConditionWaiter>::wait_while_for_async(
+                &monitor,
+                Duration::ZERO,
+                |ready| !*ready,
+                |ready| *ready,
+            ),
+        )
+        .await,
+        WaitTimeoutResult::Ready(true),
+    );
+}
 
 /// Verifies that advancing a shared clock from a state closure does not
 /// re-enter the monitor state lock indefinitely.
@@ -150,11 +210,12 @@ fn test_shared_clock_drives_multiple_mock_monitors() {
 async fn test_mock_monitor_async_timeout_uses_shared_manual_time() {
     let clock = Arc::new(ManualMonotonicClock::new());
     let monitor = MockMonitor::from_clock(false, Arc::clone(&clock));
-    let mut wait = monitor.wait_until_for_async(
+    let wait = monitor.wait_until_for_async(
         Duration::from_secs(10),
         |ready| *ready,
         |_| (),
     );
+    tokio::pin!(wait);
     assert_eq!(0, monitor.pending_timeout_waiters());
     assert!(
         std::future::poll_fn(|context| {
@@ -177,22 +238,23 @@ async fn test_mock_monitor_async_timeout_uses_shared_manual_time() {
 #[tokio::test]
 async fn test_mock_monitor_cancelled_async_timeout_unregisters_waiter() {
     let monitor = MockMonitor::new(false);
-    let mut wait = monitor.wait_until_for_async(
-        Duration::from_secs(10),
-        |ready| *ready,
-        |_| (),
-    );
-    assert_eq!(0, monitor.pending_timeout_waiters());
-    assert!(
-        std::future::poll_fn(|context| {
-            Poll::Ready(wait.as_mut().poll(context))
-        })
-        .await
-        .is_pending(),
-    );
-    assert_eq!(1, monitor.pending_timeout_waiters());
-
-    drop(wait);
+    {
+        let wait = monitor.wait_until_for_async(
+            Duration::from_secs(10),
+            |ready| *ready,
+            |_| (),
+        );
+        tokio::pin!(wait);
+        assert_eq!(0, monitor.pending_timeout_waiters());
+        assert!(
+            std::future::poll_fn(|context| {
+                Poll::Ready(wait.as_mut().poll(context))
+            })
+            .await
+            .is_pending(),
+        );
+        assert_eq!(1, monitor.pending_timeout_waiters());
+    }
 
     assert_eq!(0, monitor.pending_timeout_waiters());
 }
@@ -423,20 +485,27 @@ async fn test_mock_monitor_notify_one_releases_only_one_async_condition_waiter()
     const WAIT_TIMEOUT: Duration = Duration::from_secs(10);
 
     let monitor = MockMonitor::new(false);
-    let mut first_wait =
+    let first_wait =
         monitor.wait_until_for_async(WAIT_TIMEOUT, |ready| *ready, |_| 1);
-    let mut second_wait =
+    let second_wait =
         monitor.wait_until_for_async(WAIT_TIMEOUT, |ready| *ready, |_| 2);
+    tokio::pin!(first_wait);
+    tokio::pin!(second_wait);
 
-    for wait in [&mut first_wait, &mut second_wait] {
-        assert!(
-            std::future::poll_fn(|context| {
-                Poll::Ready(wait.as_mut().poll(context))
-            })
-            .await
-            .is_pending(),
-        );
-    }
+    assert!(
+        std::future::poll_fn(|context| {
+            Poll::Ready(first_wait.as_mut().poll(context))
+        })
+        .await
+        .is_pending(),
+    );
+    assert!(
+        std::future::poll_fn(|context| {
+            Poll::Ready(second_wait.as_mut().poll(context))
+        })
+        .await
+        .is_pending(),
+    );
     assert_eq!(2, monitor.pending_timeout_waiters());
 
     monitor.with_write_notify_one(|ready| *ready = true);
