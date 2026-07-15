@@ -9,11 +9,15 @@
 //! Tokio-based asynchronous monitor.
 
 use std::{
-    future::Future,
+    future::{
+        Future,
+        poll_fn,
+    },
     sync::{
         Arc,
         Mutex as StdMutex,
     },
+    task::Poll,
     time::Duration,
 };
 
@@ -21,7 +25,6 @@ use tokio::sync::{
     Mutex,
     Notify,
 };
-use tokio::time::Instant;
 
 use super::{
     AsyncConditionWaiter,
@@ -144,6 +147,11 @@ struct TokioConditionWaiterRegistration<'a> {
     waiter: Arc<TokioConditionWaiter>,
 }
 
+/// Test-only callback run after timeout budget calculation and before waiter
+/// registration.
+#[cfg(test)]
+type TimeoutBeforeRegistrationHook = Arc<dyn Fn() + Send + Sync>;
+
 impl Drop for TokioConditionWaiterRegistration<'_> {
     /// Removes this waiter if no notification has selected it yet.
     fn drop(&mut self) {
@@ -167,17 +175,22 @@ impl Drop for TokioConditionWaiterRegistration<'_> {
 /// state guard, and unregisters its Tokio notification waiter without running
 /// the action or rolling back protected-state changes. If `notify_one` has
 /// already selected that waiter, cancellation discards that selection instead
-/// of transferring it to another or future waiter. A timed wait creates a timer
-/// only for a nonzero remaining budget immediately before an actual
-/// condition-wait suspension; polling that timer requires a Tokio runtime with
-/// the time driver enabled. Initial mutex contention, an immediately ready
-/// predicate, and a zero or already exhausted budget do not create a timer and
-/// therefore do not require the time driver.
+/// of transferring it to another or future waiter. After an initial predicate
+/// check requires waiting with a nonzero budget, a timed wait creates one timer
+/// before registering its first waiter and reuses that fixed deadline across
+/// wakeups. Registration time consumes the condition-wait budget. Polling the
+/// timer requires a Tokio runtime with the time driver enabled. Initial mutex
+/// contention, an immediately ready predicate, and a zero budget do not create
+/// a timer and therefore do not require the time driver.
 pub struct TokioMonitor<T> {
     /// Protected monitor state.
     state: Mutex<T>,
     /// Active condition waiters eligible for memoryless notification.
     waiters: StdMutex<Vec<Arc<TokioConditionWaiter>>>,
+    /// Per-monitor timeout initialization hook for deadline regressions.
+    #[cfg(test)]
+    timeout_before_registration_hook:
+        StdMutex<Option<TimeoutBeforeRegistrationHook>>,
 }
 
 impl<T> TokioMonitor<T> {
@@ -194,6 +207,8 @@ impl<T> TokioMonitor<T> {
         Self {
             state: Mutex::new(state),
             waiters: StdMutex::new(Vec::new()),
+            #[cfg(test)]
+            timeout_before_registration_hook: StdMutex::new(None),
         }
     }
 
@@ -314,19 +329,36 @@ impl<T> TokioMonitor<T> {
         }
     }
 
-    /// Calculates remaining timeout budget from the condition-wait start.
+    /// Installs the test-only timeout initialization callback.
     ///
     /// # Arguments
     ///
-    /// * `start` - Instant captured immediately before the first condition-wait
-    ///   suspension.
-    /// * `timeout` - Total timeout budget.
-    ///
-    /// # Returns
-    ///
-    /// The remaining budget, or zero when the budget is exhausted.
-    fn remaining_timeout(start: Instant, timeout: Duration) -> Duration {
-        timeout.checked_sub(start.elapsed()).unwrap_or_default()
+    /// * `hook` - Callback invoked after the timeout budget is calculated and
+    ///   before the waiter acquires the registry mutex.
+    #[cfg(test)]
+    fn set_timeout_before_registration_hook<F>(&self, hook: F)
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        *self
+            .timeout_before_registration_hook
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Some(Arc::new(hook));
+    }
+
+    /// Runs the test-only timeout initialization callback without holding its
+    /// configuration mutex.
+    #[cfg(test)]
+    fn run_timeout_before_registration_hook(&self) {
+        let hook = self
+            .timeout_before_registration_hook
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if let Some(hook) = hook {
+            hook();
+        }
     }
 }
 
@@ -416,14 +448,14 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// future while it is pending cancels and unregisters the wait without
     /// running `action` or rolling back protected-state changes. A notification
     /// that already selected this waiter is discarded rather than transferred.
-    /// The method creates a timer only for a nonzero remaining budget
-    /// immediately before an actual condition-wait suspension. The current
-    /// Tokio runtime must then have its time driver enabled or Tokio will panic.
-    /// Initial mutex contention, an immediately ready predicate, and a zero or
-    /// already exhausted budget do not create a timer and do not require the
-    /// time driver. The timeout uses one fixed deadline across wakeups and
-    /// performs one final locked predicate check at the deadline. Readiness
-    /// wins over timeout, and zero timeout still checks the predicate once.
+    /// After an initial blocking predicate with a nonzero budget, the method
+    /// creates one timer before waiter registration. The current Tokio runtime
+    /// must then have its time driver enabled or Tokio will panic. Registration
+    /// time consumes the budget. Initial mutex contention, an immediately ready
+    /// predicate, and a zero budget do not create a timer or require the time
+    /// driver. The fixed deadline is reused across wakeups and followed by one
+    /// final locked predicate check. Readiness wins over timeout, and zero
+    /// timeout still checks the predicate once.
     fn wait_until_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
@@ -450,14 +482,14 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// future while it is pending cancels and unregisters the wait without
     /// running `action` or rolling back protected-state changes. A notification
     /// that already selected this waiter is discarded rather than transferred.
-    /// The method creates a timer only for a nonzero remaining budget
-    /// immediately before an actual condition-wait suspension. The current
-    /// Tokio runtime must then have its time driver enabled or Tokio will panic.
-    /// Initial mutex contention, an immediately ready predicate, and a zero or
-    /// already exhausted budget do not create a timer and do not require the
-    /// time driver. The timeout uses one fixed deadline across wakeups and
-    /// performs one final locked predicate check at the deadline. Readiness
-    /// wins over timeout, and zero timeout still checks the predicate once.
+    /// After an initial blocking predicate with a nonzero budget, the method
+    /// creates one timer before waiter registration. The current Tokio runtime
+    /// must then have its time driver enabled or Tokio will panic. Registration
+    /// time consumes the budget. Initial mutex contention, an immediately ready
+    /// predicate, and a zero budget do not create a timer or require the time
+    /// driver. The fixed deadline is reused across wakeups and followed by one
+    /// final locked predicate check. Readiness wins over timeout, and zero
+    /// timeout still checks the predicate once.
     #[allow(
         clippy::manual_async_fn,
         reason = "the explicit Send bound is part of the trait contract"
@@ -478,21 +510,33 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
             if !predicate(&*guard) {
                 return WaitTimeoutResult::Ready(action(&mut *guard));
             }
-            let start = Instant::now();
-            loop {
-                let remaining = Self::remaining_timeout(start, timeout);
-                if remaining.is_zero() {
-                    return WaitTimeoutResult::TimedOut;
-                }
+            if timeout.is_zero() {
+                return WaitTimeoutResult::TimedOut;
+            }
 
+            // Tokio turns an unrepresentable relative deadline into a
+            // far-future timer, avoiding `Instant` addition overflow.
+            let deadline = tokio::time::sleep(timeout);
+            tokio::pin!(deadline);
+            #[cfg(test)]
+            self.run_timeout_before_registration_hook();
+            loop {
                 let registration = self.register_waiter();
                 drop(guard);
-                let timed_out = tokio::time::timeout(
-                    remaining,
-                    registration.waiter.signal.notified(),
-                )
-                .await
-                .is_err();
+                let timed_out = {
+                    let notified = registration.waiter.signal.notified();
+                    tokio::pin!(notified);
+                    poll_fn(|context| {
+                        if notified.as_mut().poll(context).is_ready() {
+                            Poll::Ready(false)
+                        } else if deadline.as_mut().poll(context).is_ready() {
+                            Poll::Ready(true)
+                        } else {
+                            Poll::Pending
+                        }
+                    })
+                    .await
+                };
                 drop(registration);
                 if timed_out {
                     guard = self.state.lock().await;
@@ -548,8 +592,10 @@ mod tests {
 
     use super::{
         AsyncConditionWaiter,
+        AsyncTimeoutConditionWaiter,
         NotificationRegistrationBoundaryHook,
         TokioMonitor,
+        WaitTimeoutResult,
         install_notification_registration_boundary_hook,
     };
 
@@ -700,12 +746,22 @@ mod tests {
     #[test]
     fn test_tokio_monitor_cancelled_selected_waiter_discards_notification() {
         let monitor = TokioMonitor::new(());
+        let first_checks = Arc::new(AtomicUsize::new(0));
+        let second_checks = Arc::new(AtomicUsize::new(0));
+        let first_waiter_checks = Arc::clone(&first_checks);
+        let second_waiter_checks = Arc::clone(&second_checks);
         let mut first_waiter = Some(Box::pin(monitor.wait_while_async(
-            |_| true,
+            move |_| {
+                first_waiter_checks.fetch_add(1, Ordering::SeqCst);
+                true
+            },
             |_| (),
         )));
         let mut second_waiter = Some(Box::pin(monitor.wait_while_async(
-            |_| true,
+            move |_| {
+                second_waiter_checks.fetch_add(1, Ordering::SeqCst);
+                true
+            },
             |_| (),
         )));
         let first_wakes = Arc::new(WakeCounter::default());
@@ -742,11 +798,53 @@ mod tests {
         let transferred_wakes = if first_wakes.count() == 1 {
             drop(first_waiter.take());
             let transferred_wakes = second_wakes.count();
+            monitor.notify_one();
+            assert_eq!(
+                1,
+                second_wakes.count(),
+                "the unselected waiter should receive the next notification"
+            );
+            assert!(
+                poll_once(
+                    second_waiter
+                        .as_mut()
+                        .expect("unselected waiter should still exist")
+                        .as_mut(),
+                    &second_wakes,
+                )
+                .is_pending()
+            );
+            assert_eq!(
+                2,
+                second_checks.load(Ordering::SeqCst),
+                "the unselected waiter should recheck exactly once"
+            );
             drop(second_waiter.take());
             transferred_wakes
         } else {
             drop(second_waiter.take());
             let transferred_wakes = first_wakes.count();
+            monitor.notify_one();
+            assert_eq!(
+                1,
+                first_wakes.count(),
+                "the unselected waiter should receive the next notification"
+            );
+            assert!(
+                poll_once(
+                    first_waiter
+                        .as_mut()
+                        .expect("unselected waiter should still exist")
+                        .as_mut(),
+                    &first_wakes,
+                )
+                .is_pending()
+            );
+            assert_eq!(
+                2,
+                first_checks.load(Ordering::SeqCst),
+                "the unselected waiter should recheck exactly once"
+            );
             drop(first_waiter.take());
             transferred_wakes
         };
@@ -772,6 +870,61 @@ mod tests {
             future_checks.load(Ordering::SeqCst),
             "cancelled selection must not be retained for a future waiter"
         );
+    }
+
+    /// Verifies that timeout budget consumed before waiter registration is not
+    /// restarted when the timer begins.
+    #[tokio::test(flavor = "current_thread")]
+    async fn test_tokio_monitor_timeout_includes_registration_delay() {
+        const TIMEOUT: Duration = Duration::from_millis(5);
+        const REGISTRATION_DELAY: Duration = Duration::from_millis(20);
+
+        let monitor = TokioMonitor::new(());
+        let delay_gate = Arc::new((Mutex::new(false), Condvar::new()));
+        let hook_delay_gate = Arc::clone(&delay_gate);
+        monitor.set_timeout_before_registration_hook(move || {
+            let (released, release_changed) = &*hook_delay_gate;
+            let released = released
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let (_released, wait_result) = release_changed
+                .wait_timeout_while(
+                    released,
+                    REGISTRATION_DELAY,
+                    |released| !*released,
+                )
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            assert!(
+                wait_result.timed_out(),
+                "registration delay gate should consume the timeout budget"
+            );
+        });
+        let mut waiter = Box::pin(monitor.wait_while_for_async(
+            TIMEOUT,
+            |_| true,
+            |_| (),
+        ));
+
+        assert_eq!(
+            Ok(WaitTimeoutResult::TimedOut),
+            tokio::time::timeout(TIMEOUT, waiter.as_mut()).await,
+            "the monitor deadline should expire before registration finishes"
+        );
+    }
+
+    /// Verifies that an unrepresentable relative deadline becomes a far-future
+    /// timer instead of overflowing `Instant` arithmetic.
+    #[tokio::test(flavor = "current_thread")]
+    async fn test_tokio_monitor_timeout_duration_max_does_not_overflow() {
+        let monitor = TokioMonitor::new(());
+        let mut waiter = Box::pin(monitor.wait_while_for_async(
+            Duration::MAX,
+            |_| true,
+            |_| (),
+        ));
+        let wake_counter = Arc::new(WakeCounter::default());
+
+        assert!(poll_once(waiter.as_mut(), &wake_counter).is_pending());
     }
 
     /// Verifies that two condition waiters register before releasing the state
