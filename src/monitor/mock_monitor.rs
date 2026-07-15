@@ -14,6 +14,10 @@ use std::sync::{
     Condvar,
     Mutex,
     MutexGuard,
+    atomic::{
+        AtomicU64,
+        Ordering,
+    },
 };
 use std::time::Duration;
 use std::time::Instant;
@@ -47,6 +51,10 @@ use super::{
 #[cfg(test)]
 type TimeoutPreLockBoundaryHook = Arc<dyn Fn() + Send + Sync + 'static>;
 
+/// Test-only callback run after a blocking wait checks state and before sleep.
+#[cfg(test)]
+type ChangeWaitBoundaryHook = Arc<dyn Fn() + Send + Sync + 'static>;
+
 /// Monitor implementation for deterministic tests.
 ///
 /// `MockMonitor` protects a state value like the real monitor implementations,
@@ -60,6 +68,10 @@ pub struct MockMonitor<T> {
     clock: Arc<ManualMonotonicClock>,
     /// Protected mock state.
     state: Arc<Mutex<MockMonitorState<T>>>,
+    /// Epoch incremented by notifications and mock time changes.
+    change_epoch: Arc<AtomicU64>,
+    /// Gate pairing epoch checks with blocking condition-variable waits.
+    change_gate: Arc<Mutex<()>>,
     /// Condition variable used by blocking waiters.
     changed: Arc<Condvar>,
     /// Condition variable used to observe timeout-waiter registrations.
@@ -70,14 +82,15 @@ pub struct MockMonitor<T> {
     /// Per-monitor synchronization hook for timeout-budget regressions.
     #[cfg(test)]
     timeout_pre_lock_boundary_hook: Mutex<Option<TimeoutPreLockBoundaryHook>>,
+    /// Per-monitor hook for the blocking change-check-to-sleep boundary.
+    #[cfg(test)]
+    change_wait_boundary_hook: Mutex<Option<ChangeWaitBoundaryHook>>,
 }
 
 /// State protected by [`MockMonitor`].
 struct MockMonitorState<T> {
     /// User-visible protected value.
     value: T,
-    /// Epoch incremented by notifications and mock time changes.
-    change_epoch: u64,
     /// Identifier assigned to the next registered waiter.
     next_waiter_id: u64,
     /// Registered waiters and their individually assigned notification state.
@@ -116,36 +129,36 @@ impl<T: Send + 'static> MockMonitor<T> {
     /// A monitor that wakes timeout waiters whenever `clock` advances.
     ///
     /// # Concurrency
-    /// The clock callback briefly locks the monitor state before signaling the
-    /// condition variable. Callers must not advance `clock` while executing a
-    /// closure that already holds this monitor's state lock.
+    /// Advancing `clock` is safe while executing a closure that holds this
+    /// monitor's state lock. The clock callback signals waiters without
+    /// acquiring the protected-state lock.
     pub fn from_clock(state: T, clock: Arc<ManualMonotonicClock>) -> Self {
         let state = Arc::new(Mutex::new(MockMonitorState {
             value: state,
-            change_epoch: 0,
             next_waiter_id: 0,
             waiters: BTreeMap::new(),
             timeout_waiters: 0,
         }));
+        let change_epoch = Arc::new(AtomicU64::new(0));
+        let change_gate = Arc::new(Mutex::new(()));
         let changed = Arc::new(Condvar::new());
         #[cfg(feature = "async")]
         let (async_change_sender, _) = watch::channel(0);
-        let callback_state = Arc::clone(&state);
+        let callback_change_epoch = Arc::clone(&change_epoch);
+        let callback_change_gate = Arc::clone(&change_gate);
         let callback_changed = Arc::clone(&changed);
         #[cfg(feature = "async")]
         let callback_change_sender = async_change_sender.clone();
         let advance_subscription = clock.subscribe_advances(move || {
-            let change_epoch = {
-                let mut state = callback_state
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-                state.change_epoch = state.change_epoch.wrapping_add(1);
-                state.change_epoch
-            };
+            let _change_gate = callback_change_gate
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let change_epoch =
+                Self::advance_change_epoch(&callback_change_epoch);
             callback_changed.notify_all();
             #[cfg(feature = "async")]
             {
-                let _ = callback_change_sender.send(change_epoch);
+                callback_change_sender.send_replace(change_epoch);
             }
             #[cfg(not(feature = "async"))]
             let _ = change_epoch;
@@ -154,12 +167,16 @@ impl<T: Send + 'static> MockMonitor<T> {
             _advance_subscription: advance_subscription,
             clock,
             state,
+            change_epoch,
+            change_gate,
             changed,
             timeout_waiters_changed: Condvar::new(),
             #[cfg(feature = "async")]
             async_change_sender,
             #[cfg(test)]
             timeout_pre_lock_boundary_hook: Mutex::new(None),
+            #[cfg(test)]
+            change_wait_boundary_hook: Mutex::new(None),
         }
     }
 
@@ -294,36 +311,25 @@ impl<T: Send + 'static> MockMonitor<T> {
 
     /// Wakes one waiter if one is blocked.
     pub fn notify_one(&self) {
-        let change_epoch = {
-            let mut state = self.lock_state();
-            let waiter_id = state
-                .waiters
-                .iter()
-                .find_map(|(waiter_id, waiter)| {
-                    (!waiter.notified).then_some(*waiter_id)
-                });
-            if let Some(waiter) = waiter_id
-                .and_then(|waiter_id| state.waiters.get_mut(&waiter_id))
-            {
-                waiter.notified = true;
-            }
-            Self::advance_change_epoch(&mut state)
-        };
-        self.changed.notify_all();
-        self.notify_async_change(change_epoch);
+        let mut state = self.lock_state();
+        let waiter_id = state.waiters.iter().find_map(|(waiter_id, waiter)| {
+            (!waiter.notified).then_some(*waiter_id)
+        });
+        if let Some(waiter) =
+            waiter_id.and_then(|waiter_id| state.waiters.get_mut(&waiter_id))
+        {
+            waiter.notified = true;
+        }
+        self.signal_change();
     }
 
     /// Wakes all waiters.
     pub fn notify_all(&self) {
-        let change_epoch = {
-            let mut state = self.lock_state();
-            for waiter in state.waiters.values_mut() {
-                waiter.notified = true;
-            }
-            Self::advance_change_epoch(&mut state)
-        };
-        self.changed.notify_all();
-        self.notify_async_change(change_epoch);
+        let mut state = self.lock_state();
+        for waiter in state.waiters.values_mut() {
+            waiter.notified = true;
+        }
+        self.signal_change();
     }
 
     /// Locks the internal state and recovers from poisoning.
@@ -368,6 +374,43 @@ impl<T: Send + 'static> MockMonitor<T> {
     fn run_timeout_pre_lock_boundary_hook(&self) {
         let hook = self
             .timeout_pre_lock_boundary_hook
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if let Some(hook) = hook {
+            hook();
+        }
+    }
+
+    /// Installs a callback at the blocking change-check-to-sleep boundary.
+    ///
+    /// The callback is test-only and runs after protected state is released,
+    /// but before the independent change gate is acquired. It may advance this
+    /// monitor's manual clock to exercise the epoch race deterministically.
+    ///
+    /// # Arguments
+    ///
+    /// * `hook` - Callback to run at the blocking wait boundary.
+    #[cfg(test)]
+    fn set_change_wait_boundary_hook<F>(&self, hook: F)
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        *self
+            .change_wait_boundary_hook
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Some(Arc::new(hook));
+    }
+
+    /// Runs the test-only blocking change-check-to-sleep callback.
+    ///
+    /// No protected-state or change-gate lock is held while the callback runs,
+    /// so it may safely advance this monitor's manual clock.
+    #[cfg(test)]
+    fn run_change_wait_boundary_hook(&self) {
+        let hook = self
+            .change_wait_boundary_hook
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
@@ -485,33 +528,92 @@ impl<T: Send + 'static> MockMonitor<T> {
         std::mem::take(&mut waiter.notified)
     }
 
+    /// Returns the current shared change epoch.
+    ///
+    /// The value is only compared with a later load to detect intervening
+    /// changes; protected predicate state remains synchronized by the monitor
+    /// mutex.
+    fn current_change_epoch(&self) -> u64 {
+        self.change_epoch.load(Ordering::Relaxed)
+    }
+
+    /// Waits until the shared change epoch differs from `observed_epoch`.
+    ///
+    /// The caller must capture `observed_epoch` before its final locked state
+    /// check. This method releases `state` before acquiring the independent
+    /// change gate, then compares the epoch under that gate before sleeping.
+    /// Consequently a callback either changes the epoch before the comparison
+    /// or blocks on the gate until the condition-variable wait atomically
+    /// releases it. The gate is dropped before the state lock is reacquired,
+    /// so no `change_gate -> state` lock edge exists.
+    ///
+    /// # Arguments
+    ///
+    /// * `state` - Protected-state guard held during the preceding check.
+    /// * `observed_epoch` - Epoch captured before that check.
+    ///
+    /// # Returns
+    ///
+    /// A newly acquired protected-state guard after a real or spurious wake.
+    fn wait_for_blocking_change<'a>(
+        &'a self,
+        state: MutexGuard<'a, MockMonitorState<T>>,
+        observed_epoch: u64,
+    ) -> MutexGuard<'a, MockMonitorState<T>> {
+        drop(state);
+        #[cfg(test)]
+        self.run_change_wait_boundary_hook();
+        let change_gate = self
+            .change_gate
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let change_gate = self
+            .changed
+            .wait_while(change_gate, |_| {
+                self.current_change_epoch() == observed_epoch
+            })
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        drop(change_gate);
+        self.lock_state()
+    }
+
+    /// Advances the shared epoch and signals all waiters under the change gate.
+    ///
+    /// Notification callers invoke this while holding protected state after
+    /// assigning per-waiter notification ownership. Blocking waiters never
+    /// acquire protected state while holding the gate, preventing a lock-order
+    /// cycle. Publishing the watch value under the same gate preserves atomic
+    /// epoch order across concurrent clock and notification changes.
+    fn signal_change(&self) {
+        let _change_gate = self
+            .change_gate
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let change_epoch = Self::advance_change_epoch(&self.change_epoch);
+        self.changed.notify_all();
+        #[cfg(feature = "async")]
+        self.async_change_sender.send_replace(change_epoch);
+        #[cfg(not(feature = "async"))]
+        let _ = change_epoch;
+    }
+
     /// Increments the change epoch.
     ///
     /// # Arguments
     ///
-    /// * `state` - Internal state whose change epoch should advance.
+    /// * `change_epoch` - Shared epoch advanced by notifications and clock
+    ///   callbacks.
     ///
     /// # Returns
     ///
     /// The new change epoch.
-    fn advance_change_epoch(state: &mut MockMonitorState<T>) -> u64 {
-        state.change_epoch = state.change_epoch.wrapping_add(1);
-        state.change_epoch
+    fn advance_change_epoch(change_epoch: &AtomicU64) -> u64 {
+        // Relaxed ordering is sufficient: fetch-add's atomic modification
+        // order assigns every change a unique epoch. Protected predicate state
+        // remains synchronized by the monitor mutex, and the condition/watch
+        // primitives provide their own wake-up synchronization.
+        change_epoch.fetch_add(1, Ordering::Relaxed).wrapping_add(1)
     }
-
-    /// Notifies asynchronous waiters about a notification or time change.
-    ///
-    /// # Arguments
-    ///
-    /// * `change_epoch` - New change epoch.
-    #[cfg(feature = "async")]
-    fn notify_async_change(&self, change_epoch: u64) {
-        let _ = self.async_change_sender.send(change_epoch);
-    }
-
-    /// No-op when async support is disabled.
-    #[cfg(not(feature = "async"))]
-    fn notify_async_change(&self, _change_epoch: u64) {}
 }
 
 impl<T: Send + 'static> Notifier for MockMonitor<T> {
@@ -546,15 +648,13 @@ impl<T: Send + 'static> ConditionWaiter for MockMonitor<T> {
             self.waiter_guard_from_registered(waiter_id, false);
         let mut state = self.lock_state();
         loop {
-            while !Self::take_notification(&mut state, waiter_id) {
-                state = self
-                    .changed
-                    .wait(state)
-                    .unwrap_or_else(std::sync::PoisonError::into_inner);
-            }
-            if !predicate(&state.value) {
+            let observed_epoch = self.current_change_epoch();
+            if Self::take_notification(&mut state, waiter_id)
+                && !predicate(&state.value)
+            {
                 return action(&mut state.value);
             }
+            state = self.wait_for_blocking_change(state, observed_epoch);
         }
     }
 }
@@ -595,6 +695,7 @@ impl<T: Send + 'static> TimeoutConditionWaiter for MockMonitor<T> {
             self.waiter_guard_from_registered(waiter_id, true);
         let mut state = self.lock_state();
         loop {
+            let observed_epoch = self.current_change_epoch();
             let notified = Self::take_notification(&mut state, waiter_id);
             let timed_out = self.elapsed() >= target_elapsed;
             if notified || timed_out {
@@ -605,10 +706,7 @@ impl<T: Send + 'static> TimeoutConditionWaiter for MockMonitor<T> {
                     return WaitTimeoutResult::TimedOut;
                 }
             }
-            state = self
-                .changed
-                .wait(state)
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            state = self.wait_for_blocking_change(state, observed_epoch);
         }
     }
 }
@@ -889,6 +987,42 @@ mod tests {
             WaitTimeoutResult::TimedOut,
         );
         waiter.join().expect("blocking timeout waiter should finish");
+    }
+
+    /// Verifies that a clock advance after the final state check but before
+    /// condition-variable sleep is detected through the shared epoch.
+    #[test]
+    fn test_mock_monitor_blocking_wait_observes_change_before_sleep() {
+        let monitor = Arc::new(MockMonitor::new(false));
+        let hook_clock = Arc::clone(&monitor.clock);
+        monitor.set_change_wait_boundary_hook(move || {
+            hook_clock
+                .advance(WAIT_TIMEOUT)
+                .expect("manual clock should advance at the wait boundary");
+        });
+
+        let waiter_monitor = Arc::clone(&monitor);
+        let (done_tx, done_rx) = mpsc::channel();
+        let waiter = thread::spawn(move || {
+            let result = waiter_monitor.wait_while_for(
+                WAIT_TIMEOUT,
+                |ready| !*ready,
+                |_| (),
+            );
+            done_tx
+                .send(result)
+                .expect("controller should receive boundary wait result");
+        });
+
+        assert_eq!(
+            done_rx
+                .recv_timeout(REAL_TIMEOUT)
+                .expect("boundary clock change should not be lost"),
+            WaitTimeoutResult::TimedOut,
+        );
+        waiter
+            .join()
+            .expect("boundary timeout waiter should finish");
     }
 
     /// Verifies that an asynchronous timeout budget starts after initial
