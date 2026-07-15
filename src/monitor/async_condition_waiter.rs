@@ -19,7 +19,9 @@ use std::future::Future;
 ///
 /// Dropping a pending future cancels and unregisters its active wait. It does
 /// not run the action or roll back protected-state changes made while the wait
-/// existed.
+/// existed. If a notification already selected that waiter, cancellation
+/// discards the selection rather than transferring it to another or future
+/// waiter.
 pub trait AsyncConditionWaiter {
     /// State protected by the monitor.
     type State;

@@ -13,7 +13,9 @@
 /// carry protected state, and callers cannot rely on a signal being retained
 /// for a future waiter. A notification selects only waiters that have already
 /// registered. Condition waiters therefore recheck the protected state after
-/// every wake. No notification method guarantees fairness or FIFO selection.
+/// every wake. A selection belongs only to the selected waiter; if that waiter
+/// is subsequently cancelled, the selection is discarded rather than
+/// transferred. No notification method guarantees fairness or FIFO selection.
 pub trait Notifier {
     /// Selects at most one already registered waiter without a fairness
     /// guarantee.

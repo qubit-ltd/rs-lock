@@ -66,7 +66,9 @@ construction and time before its first poll consume no timeout budget. A Tokio
 time driver is needed only when a timed wait actually enters a nonzero timed
 suspension, in which case the runtime must have the time driver enabled.
 Dropping a pending future unregisters its active waiter, does not run the
-action, and does not roll back protected-state changes made by other tasks.
+action, and does not roll back protected-state changes made by other tasks. If
+`notify_one` already selected that waiter, cancellation discards that selection
+instead of transferring it to another or future waiter.
 
 Arc-backed monitor wrappers keep explicit trait implementations for generic
 code, while ordinary monitor method calls resolve through `Deref`. Their
