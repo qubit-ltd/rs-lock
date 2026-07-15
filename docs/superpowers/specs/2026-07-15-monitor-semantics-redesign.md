@@ -57,10 +57,14 @@ are lazy. Registration occurs when a polled future reaches its condition wait.
 Once an asynchronous condition wait has checked its predicate while holding the
 state lock, it must register before releasing that lock.
 
-`TokioMonitor` will create and pin `Notify::notified()`, call `enable()`, and
-only then release the state guard. This provides the same atomic
-register-and-release boundary as a condition variable and prevents a producer
-from changing state and notifying inside the gap.
+`TokioMonitor` will add one waiter-owned `Notify` to an explicit registry while
+still holding the state guard, and only then release that guard. `notify_one`
+removes and signals at most one registered waiter; `notify_all` removes and
+signals every registered waiter. Because each waiter owns a private signal,
+selection cannot collapse into a shared retained permit or transfer to another
+waiter. This provides the same atomic register-and-release boundary as a
+condition variable and prevents a producer from changing state and notifying
+inside the gap.
 
 ## API boundary
 
