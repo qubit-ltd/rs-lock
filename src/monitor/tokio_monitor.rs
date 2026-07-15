@@ -238,11 +238,11 @@ impl<T> TokioMonitor<T> {
         self.changed.notify_waiters();
     }
 
-    /// Calculates remaining timeout budget from a call-time start instant.
+    /// Calculates remaining timeout budget from the condition-wait start.
     ///
     /// # Arguments
     ///
-    /// * `start` - Instant captured when the public wait method was called.
+    /// * `start` - Instant captured immediately before the first suspension.
     /// * `timeout` - Total timeout budget.
     ///
     /// # Returns
@@ -337,7 +337,11 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// carry no state and provide no fairness guarantee. Dropping the returned
     /// future while it is pending cancels and unregisters the wait without
     /// running `action`. If the wait reaches suspension, the current Tokio
-    /// runtime must have its time driver enabled or Tokio will panic.
+    /// runtime must have its time driver enabled or Tokio will panic. The
+    /// timeout starts after the initial locked predicate check, uses one fixed
+    /// deadline across wakeups, and performs one final locked predicate check
+    /// at the deadline. Initial lock contention is excluded, readiness wins
+    /// over timeout, and zero timeout still checks the predicate once.
     fn wait_until_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
@@ -363,7 +367,11 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// carry no state and provide no fairness guarantee. Dropping the returned
     /// future while it is pending cancels and unregisters the wait without
     /// running `action`. If the wait reaches suspension, the current Tokio
-    /// runtime must have its time driver enabled or Tokio will panic.
+    /// runtime must have its time driver enabled or Tokio will panic. The
+    /// timeout starts after the initial locked predicate check, uses one fixed
+    /// deadline across wakeups, and performs one final locked predicate check
+    /// at the deadline. Initial lock contention is excluded, readiness wins
+    /// over timeout, and zero timeout still checks the predicate once.
     #[allow(
         clippy::manual_async_fn,
         reason = "the explicit Send bound is part of the trait contract"
@@ -379,14 +387,13 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
-        let start = Instant::now();
         async move {
             let mut guard = self.state.lock().await;
+            if !predicate(&*guard) {
+                return WaitTimeoutResult::Ready(action(&mut *guard));
+            }
+            let start = Instant::now();
             loop {
-                if !predicate(&*guard) {
-                    return WaitTimeoutResult::Ready(action(&mut *guard));
-                }
-
                 let remaining = Self::remaining_timeout(start, timeout);
                 if remaining.is_zero() {
                     return WaitTimeoutResult::TimedOut;
@@ -404,6 +411,9 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
                     return WaitTimeoutResult::TimedOut;
                 }
                 guard = self.state.lock().await;
+                if !predicate(&*guard) {
+                    return WaitTimeoutResult::Ready(action(&mut *guard));
+                }
             }
         }
     }

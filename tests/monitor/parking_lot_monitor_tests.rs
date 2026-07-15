@@ -360,6 +360,113 @@ fn test_parking_lot_monitor_wait_until_for_returns_timed_out_when_timeout() {
 }
 
 #[test]
+fn test_parking_lot_monitor_wait_while_for_excludes_initial_lock_contention_from_timeout()
+{
+    const WAIT_TIMEOUT: Duration = Duration::from_millis(20);
+
+    let monitor = Arc::new(ParkingLotMonitor::new(false));
+    let guard = monitor.lock();
+    let (started_tx, started_rx) = mpsc::channel();
+    let (checked_tx, checked_rx) = mpsc::channel();
+    let (done_tx, done_rx) = mpsc::channel();
+    let waiter_monitor = Arc::clone(&monitor);
+    let waiter = thread::spawn(move || {
+        started_tx.send(()).expect("test should observe wait start");
+        let mut checked_tx = Some(checked_tx);
+        let result = waiter_monitor.wait_while_for(
+            WAIT_TIMEOUT,
+            move |ready| {
+                if let Some(checked_tx) = checked_tx.take() {
+                    thread::sleep(WAIT_TIMEOUT.saturating_mul(3));
+                    checked_tx
+                        .send(())
+                        .expect("test should observe the initial predicate check");
+                }
+                !*ready
+            },
+            |_| (),
+        );
+        done_tx.send(result).expect("test should receive wait result");
+    });
+    started_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("waiter should begin while the state lock is held");
+    thread::sleep(WAIT_TIMEOUT.saturating_mul(3));
+    drop(guard);
+
+    checked_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("waiter should check the predicate after acquiring the lock");
+    drop(monitor.lock());
+    monitor.with_write_notify_one(|ready| *ready = true);
+
+    assert_eq!(
+        done_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("waiter should retain a fresh condition-wait budget"),
+        WaitTimeoutResult::Ready(()),
+    );
+    waiter.join().expect("waiter should finish");
+}
+
+#[test]
+fn test_parking_lot_monitor_wait_while_for_zero_timeout_checks_predicate_once()
+{
+    let monitor = ParkingLotMonitor::new(false);
+    let mut checks = 0;
+
+    let result = monitor.wait_while_for(
+        Duration::ZERO,
+        |ready| {
+            checks += 1;
+            !*ready
+        },
+        |_| (),
+    );
+
+    assert_eq!(result, WaitTimeoutResult::TimedOut);
+    assert_eq!(checks, 1);
+}
+
+#[test]
+fn test_parking_lot_monitor_wait_while_for_timeout_final_predicate_wins() {
+    let monitor = Arc::new(ParkingLotMonitor::new(false));
+    let (checked_tx, checked_rx) = mpsc::channel();
+    let (done_tx, done_rx) = mpsc::channel();
+    let waiter_monitor = Arc::clone(&monitor);
+    let waiter = thread::spawn(move || {
+        let mut checked_tx = Some(checked_tx);
+        let result = waiter_monitor.wait_while_for(
+            Duration::from_millis(20),
+            move |ready| {
+                if let Some(checked_tx) = checked_tx.take() {
+                    checked_tx
+                        .send(())
+                        .expect("test should observe the initial predicate check");
+                }
+                !*ready
+            },
+            |_| 7,
+        );
+        done_tx.send(result).expect("test should receive wait result");
+    });
+
+    checked_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("waiter should perform the initial predicate check");
+    drop(monitor.lock());
+    monitor.with_write(|ready| *ready = true);
+
+    assert_eq!(
+        done_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("ready predicate should win the final timeout check"),
+        WaitTimeoutResult::Ready(7),
+    );
+    waiter.join().expect("waiter should finish");
+}
+
+#[test]
 fn test_parking_lot_monitor_wait_until_for_returns_result_when_predicate_true()
 {
     let monitor = Arc::new(ParkingLotMonitor::new(false));

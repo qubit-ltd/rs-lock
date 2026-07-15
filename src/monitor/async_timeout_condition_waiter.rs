@@ -22,7 +22,13 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     /// Returns a future that waits until the predicate becomes true or times
     /// out.
     ///
-    /// The timeout budget is measured from this method call.
+    /// The returned future is lazy. After it is first polled, the monitor
+    /// acquires the state lock and checks the predicate once before starting
+    /// the timeout budget immediately before the first suspension. Initial
+    /// lock contention and time before the first poll do not consume the
+    /// budget. One fixed deadline is reused across wakeups. At the deadline,
+    /// the predicate is checked once more under the state lock; readiness wins
+    /// over timeout. A zero timeout still performs the initial locked check.
     fn wait_until_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
@@ -44,7 +50,13 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     /// Returns a future that waits while the predicate remains true or times
     /// out.
     ///
-    /// The timeout budget is measured from this method call.
+    /// The returned future is lazy. After it is first polled, the monitor
+    /// acquires the state lock and checks the predicate once before starting
+    /// the timeout budget immediately before the first suspension. Initial
+    /// lock contention and time before the first poll do not consume the
+    /// budget. One fixed deadline is reused across wakeups. At the deadline,
+    /// the predicate is checked once more under the state lock; readiness wins
+    /// over timeout. A zero timeout still performs the initial locked check.
     fn wait_while_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,

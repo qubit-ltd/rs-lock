@@ -236,6 +236,144 @@ async fn test_mock_monitor_async_timeout_uses_shared_manual_time() {
     assert_eq!(0, monitor.pending_timeout_waiters());
 }
 
+/// Verifies that constructing an async wait does not consume manual-clock
+/// budget before the future is first polled.
+#[cfg(feature = "async")]
+#[tokio::test]
+async fn test_mock_monitor_async_wait_while_for_uses_condition_wait_budget() {
+    let monitor = MockMonitor::new(false);
+    let wait = monitor.wait_while_for_async(
+        Duration::from_millis(5),
+        |ready| !*ready,
+        |_| (),
+    );
+
+    monitor
+        .monotonic_clock()
+        .advance(Duration::from_millis(10))
+        .expect("manual clock should advance before the first poll");
+
+    tokio::pin!(wait);
+    assert!(
+        std::future::poll_fn(|context| {
+            Poll::Ready(wait.as_mut().poll(context))
+        })
+        .await
+        .is_pending(),
+        "an unpolled condition wait should retain its full budget",
+    );
+    monitor
+        .monotonic_clock()
+        .advance(Duration::from_millis(4))
+        .expect("manual clock should advance within the wait budget");
+    assert!(
+        std::future::poll_fn(|context| {
+            Poll::Ready(wait.as_mut().poll(context))
+        })
+        .await
+        .is_pending(),
+    );
+    monitor
+        .monotonic_clock()
+        .advance(Duration::from_millis(1))
+        .expect("manual clock should reach the fixed target");
+    assert_eq!(wait.await, WaitTimeoutResult::TimedOut);
+}
+
+/// Verifies that notifications do not restart an async manual-clock budget.
+#[cfg(feature = "async")]
+#[tokio::test]
+async fn test_mock_monitor_async_wait_while_for_reuses_fixed_timeout_deadline()
+{
+    let monitor = MockMonitor::new(false);
+    let wait = monitor.wait_while_for_async(
+        Duration::from_millis(10),
+        |ready| !*ready,
+        |_| (),
+    );
+    tokio::pin!(wait);
+    assert!(
+        std::future::poll_fn(|context| {
+            Poll::Ready(wait.as_mut().poll(context))
+        })
+        .await
+        .is_pending(),
+    );
+
+    for _ in 0..2 {
+        monitor
+            .monotonic_clock()
+            .advance(Duration::from_millis(4))
+            .expect("manual clock should advance within the wait budget");
+        monitor.notify_one();
+        assert!(
+            std::future::poll_fn(|context| {
+                Poll::Ready(wait.as_mut().poll(context))
+            })
+            .await
+            .is_pending(),
+        );
+    }
+
+    monitor
+        .monotonic_clock()
+        .advance(Duration::from_millis(2))
+        .expect("manual clock should reach the fixed target");
+    assert_eq!(wait.await, WaitTimeoutResult::TimedOut);
+}
+
+/// Verifies that a ready predicate wins the final locked timeout check.
+#[cfg(feature = "async")]
+#[tokio::test]
+async fn test_mock_monitor_async_wait_while_for_timeout_final_predicate_wins() {
+    let monitor = MockMonitor::new(false);
+    let wait = monitor.wait_while_for_async(
+        Duration::from_millis(5),
+        |ready| !*ready,
+        |_| 7,
+    );
+    tokio::pin!(wait);
+    assert!(
+        std::future::poll_fn(|context| {
+            Poll::Ready(wait.as_mut().poll(context))
+        })
+        .await
+        .is_pending(),
+    );
+
+    monitor.with_write(|ready| *ready = true);
+    monitor
+        .monotonic_clock()
+        .advance(Duration::from_millis(5))
+        .expect("manual clock should reach the fixed target");
+
+    assert_eq!(wait.await, WaitTimeoutResult::Ready(7));
+}
+
+/// Verifies that zero timeout still evaluates the predicate exactly once.
+#[cfg(feature = "async")]
+#[tokio::test]
+async fn test_mock_monitor_async_wait_while_for_zero_timeout_checks_predicate_once()
+{
+    let checks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let predicate_checks = Arc::clone(&checks);
+    let monitor = MockMonitor::new(false);
+
+    let result = monitor
+        .wait_while_for_async(
+            Duration::ZERO,
+            move |ready| {
+                predicate_checks.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                !*ready
+            },
+            |_| (),
+        )
+        .await;
+
+    assert_eq!(result, WaitTimeoutResult::TimedOut);
+    assert_eq!(checks.load(std::sync::atomic::Ordering::SeqCst), 1);
+}
+
 /// Verifies that dropping a pending async timeout unregisters its waiter.
 #[cfg(feature = "async")]
 #[tokio::test]
@@ -444,6 +582,102 @@ fn test_mock_monitor_wait_until_for_times_out_on_mock_time() {
         WaitTimeoutResult::TimedOut,
     );
     waiter.join().expect("waiter should finish");
+}
+
+#[test]
+fn test_mock_monitor_wait_while_for_reuses_fixed_timeout_target() {
+    let monitor = Arc::new(MockMonitor::new(false));
+    let waiter_monitor = Arc::clone(&monitor);
+    let (checked_tx, checked_rx) = mpsc::channel();
+    let (done_tx, done_rx) = mpsc::channel();
+    let waiter = thread::spawn(move || {
+        let result = waiter_monitor.wait_while_for(
+            Duration::from_millis(10),
+            move |ready| {
+                checked_tx
+                    .send(())
+                    .expect("test should observe each predicate check");
+                !*ready
+            },
+            |_| (),
+        );
+        done_tx.send(result).expect("test should receive wait result");
+    });
+
+    assert!(monitor.wait_for_timeout_waiters(1, Duration::from_secs(1)));
+    checked_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("waiter should perform the initial predicate check");
+    for _ in 0..2 {
+        monitor
+            .monotonic_clock()
+            .advance(Duration::from_millis(4))
+            .expect("manual clock should advance within the wait budget");
+        monitor.notify_one();
+        checked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("waiter should recheck after notification");
+    }
+    monitor
+        .monotonic_clock()
+        .advance(Duration::from_millis(2))
+        .expect("manual clock should reach the fixed target");
+
+    assert_eq!(
+        done_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("fixed timeout target should not restart after wakeups"),
+        WaitTimeoutResult::TimedOut,
+    );
+    waiter.join().expect("waiter should finish");
+}
+
+#[test]
+fn test_mock_monitor_wait_while_for_timeout_final_predicate_wins() {
+    let monitor = Arc::new(MockMonitor::new(false));
+    let waiter_monitor = Arc::clone(&monitor);
+    let (done_tx, done_rx) = mpsc::channel();
+    let waiter = thread::spawn(move || {
+        let result = waiter_monitor.wait_while_for(
+            Duration::from_millis(5),
+            |ready| !*ready,
+            |_| 7,
+        );
+        done_tx.send(result).expect("test should receive wait result");
+    });
+
+    assert!(monitor.wait_for_timeout_waiters(1, Duration::from_secs(1)));
+    monitor.with_write(|ready| *ready = true);
+    monitor
+        .monotonic_clock()
+        .advance(Duration::from_millis(5))
+        .expect("manual clock should reach the fixed target");
+
+    assert_eq!(
+        done_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("ready predicate should win the final timeout check"),
+        WaitTimeoutResult::Ready(7),
+    );
+    waiter.join().expect("waiter should finish");
+}
+
+#[test]
+fn test_mock_monitor_wait_while_for_zero_timeout_checks_predicate_once() {
+    let monitor = MockMonitor::new(false);
+    let mut checks = 0;
+
+    let result = monitor.wait_while_for(
+        Duration::ZERO,
+        |ready| {
+            checks += 1;
+            !*ready
+        },
+        |_| (),
+    );
+
+    assert_eq!(result, WaitTimeoutResult::TimedOut);
+    assert_eq!(checks, 1);
 }
 
 #[test]
