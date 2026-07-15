@@ -9,13 +9,17 @@
 
 /// Sends notification signals to waiters.
 ///
-/// Notifications are coordination signals. They do not carry state by
-/// themselves, so condition waiters should always recheck the protected state
-/// after waking.
+/// Notifications have memoryless condition-variable semantics: they do not
+/// carry protected state, and callers cannot rely on a signal being retained
+/// for a future waiter. A notification selects only waiters that have already
+/// registered. Condition waiters therefore recheck the protected state after
+/// every wake. No notification method guarantees fairness or FIFO selection.
 pub trait Notifier {
-    /// Wakes one waiter if one is currently blocked.
+    /// Selects at most one already registered waiter without a fairness
+    /// guarantee.
     fn notify_one(&self);
 
-    /// Wakes all current waiters.
+    /// Selects all already registered waiters without retaining state for
+    /// future waiters.
     fn notify_all(&self);
 }

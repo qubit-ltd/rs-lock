@@ -28,14 +28,14 @@ use super::{
 };
 
 /// Test-only synchronization point between dropping the state guard and
-/// polling the notification future.
+/// awaiting the registered notification future.
 #[cfg(test)]
 struct NotificationRegistrationBoundaryHook {
     /// Address of the monitor instance controlled by this hook.
     target: usize,
     /// Channel used to report that a waiter dropped the protected-state guard.
     entered: std::sync::mpsc::SyncSender<()>,
-    /// Condition used to release waiters to poll their notification futures.
+    /// Condition used to release waiters to await their notification futures.
     release: std::sync::Arc<(std::sync::Mutex<bool>, std::sync::Condvar)>,
     /// Real-time upper bound for waiting on the test controller.
     real_timeout: Duration,
@@ -83,8 +83,8 @@ fn install_notification_registration_boundary_hook(
     NotificationRegistrationBoundaryHookGuard
 }
 
-/// Runs the test-only hook after the state guard is released and before the
-/// notification future is first polled.
+/// Runs the test-only hook after the notification is registered and the state
+/// guard is released, but before the notification future is awaited.
 ///
 /// The hook blocks the current test worker for at most the configured
 /// real-time bound.
@@ -121,8 +121,17 @@ fn run_notification_registration_boundary_hook(target: usize) {
 /// Asynchronous monitor built on Tokio synchronization primitives.
 ///
 /// `TokioMonitor` protects one state value with a Tokio mutex and coordinates
-/// waiters with a Tokio notification primitive. Notification semantics follow
-/// Tokio's [`Notify`] behavior.
+/// waiters with a Tokio notification primitive. Notifications have memoryless
+/// condition-variable semantics: they select already registered waiters but
+/// carry no protected state, so every wake is followed by a predicate recheck.
+/// Waiter selection has no fairness or FIFO guarantee.
+///
+/// Dropping a pending condition-wait future cancels the wait, releases any held
+/// state guard, and unregisters its Tokio notification waiter. A `notify_one`
+/// signal selected concurrently with cancellation follows [`Notify`]'s
+/// cancellation behavior and is offered to another waiter. Timed waits that
+/// reach a suspension point require a Tokio runtime with the time driver
+/// enabled.
 pub struct TokioMonitor<T> {
     /// Protected monitor state.
     state: Mutex<T>,
@@ -219,12 +228,13 @@ impl<T> TokioMonitor<T> {
         result
     }
 
-    /// Wakes one async waiter.
+    /// Selects at most one registered async waiter without a fairness
+    /// guarantee.
     pub fn notify_one(&self) {
         self.changed.notify_one();
     }
 
-    /// Wakes all async waiters.
+    /// Selects all registered async waiters without retaining protected state.
     pub fn notify_all(&self) {
         self.changed.notify_waiters();
     }
@@ -245,12 +255,13 @@ impl<T> TokioMonitor<T> {
 }
 
 impl<T> Notifier for TokioMonitor<T> {
-    /// Wakes one async waiter.
+    /// Selects at most one registered async waiter without a fairness
+    /// guarantee.
     fn notify_one(&self) {
         Self::notify_one(self);
     }
 
-    /// Wakes all async waiters.
+    /// Selects all registered async waiters without retaining protected state.
     fn notify_all(&self) {
         Self::notify_all(self);
     }
@@ -287,7 +298,13 @@ impl<T: Send> AsyncTimeoutNotificationWaiter for TokioMonitor<T> {
 impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
     type State = T;
 
-    /// Returns a future that waits until the predicate becomes true.
+    /// Returns a future that rechecks the protected predicate until it becomes
+    /// true.
+    ///
+    /// The waiter registers before releasing the state lock. Notifications
+    /// carry no state and provide no fairness guarantee. Dropping the returned
+    /// future while it is pending cancels and unregisters the wait without
+    /// running `action`.
     fn wait_until_async<'a, R, P, F>(
         &'a self,
         mut predicate: P,
@@ -301,7 +318,13 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
         self.wait_while_async(move |state| !predicate(state), action)
     }
 
-    /// Returns a future that waits while the predicate remains true.
+    /// Returns a future that rechecks the protected predicate while it remains
+    /// true.
+    ///
+    /// The waiter registers before releasing the state lock. Notifications
+    /// carry no state and provide no fairness guarantee. Dropping the returned
+    /// future while it is pending cancels and unregisters the wait without
+    /// running `action`.
     fn wait_while_async<'a, R, P, F>(
         &'a self,
         mut predicate: P,
@@ -316,6 +339,8 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
             let mut guard = self.state.lock().await;
             while predicate(&*guard) {
                 let notified = self.changed.notified();
+                tokio::pin!(notified);
+                notified.as_mut().enable();
                 drop(guard);
                 #[cfg(test)]
                 run_notification_registration_boundary_hook(
@@ -330,8 +355,14 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
 }
 
 impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
-    /// Returns a future that waits until the predicate becomes true or times
-    /// out.
+    /// Returns a future that rechecks the predicate until it becomes true or
+    /// the timeout expires.
+    ///
+    /// The waiter registers before releasing the state lock. Notifications
+    /// carry no state and provide no fairness guarantee. Dropping the returned
+    /// future while it is pending cancels and unregisters the wait without
+    /// running `action`. If the wait reaches suspension, the current Tokio
+    /// runtime must have its time driver enabled or Tokio will panic.
     fn wait_until_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
@@ -350,8 +381,14 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
         )
     }
 
-    /// Returns a future that waits while the predicate remains true or times
-    /// out.
+    /// Returns a future that rechecks the predicate while it remains true or
+    /// until the timeout expires.
+    ///
+    /// The waiter registers before releasing the state lock. Notifications
+    /// carry no state and provide no fairness guarantee. Dropping the returned
+    /// future while it is pending cancels and unregisters the wait without
+    /// running `action`. If the wait reaches suspension, the current Tokio
+    /// runtime must have its time driver enabled or Tokio will panic.
     fn wait_while_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
@@ -377,6 +414,8 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
                 }
 
                 let notified = self.changed.notified();
+                tokio::pin!(notified);
+                notified.as_mut().enable();
                 drop(guard);
                 if tokio::time::timeout(remaining, notified).await.is_err() {
                     guard = self.state.lock().await;
