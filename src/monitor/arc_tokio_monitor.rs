@@ -38,6 +38,7 @@ impl<T> ArcTokioMonitor<T> {
     /// # Returns
     ///
     /// A cloneable Tokio monitor handle.
+    #[inline]
     pub fn new(state: T) -> Self {
         Self {
             inner: Arc::new(TokioMonitor::new(state)),
@@ -53,6 +54,7 @@ impl<T> ArcTokioMonitor<T> {
     /// # Returns
     ///
     /// A handle that preserves the identity and ownership of `inner`.
+    #[inline]
     pub fn from_arc(inner: Arc<TokioMonitor<T>>) -> Self {
         Self { inner }
     }
@@ -62,6 +64,7 @@ impl<T> ArcTokioMonitor<T> {
     /// # Returns
     ///
     /// The existing Arc without changing its strong reference count.
+    #[inline(always)]
     pub fn as_arc(&self) -> &Arc<TokioMonitor<T>> {
         &self.inner
     }
@@ -71,6 +74,7 @@ impl<T> ArcTokioMonitor<T> {
     /// # Returns
     ///
     /// The existing Arc, preserving the wrapped monitor allocation.
+    #[inline(always)]
     pub fn into_arc(self) -> Arc<TokioMonitor<T>> {
         self.inner
     }
@@ -78,11 +82,13 @@ impl<T> ArcTokioMonitor<T> {
 
 impl<T> Notifier for ArcTokioMonitor<T> {
     /// Wakes one async waiter.
+    #[inline(always)]
     fn notify_one(&self) {
         self.inner.notify_one();
     }
 
     /// Wakes all async waiters.
+    #[inline(always)]
     fn notify_all(&self) {
         self.inner.notify_all();
     }
@@ -92,6 +98,7 @@ impl<T: Send> AsyncConditionWaiter for ArcTokioMonitor<T> {
     type State = T;
 
     /// Returns a future that waits while the predicate remains true.
+    #[inline(always)]
     fn wait_while_async<'a, R, P, F>(
         &'a self,
         predicate: P,
@@ -109,6 +116,7 @@ impl<T: Send> AsyncConditionWaiter for ArcTokioMonitor<T> {
 impl<T: Send> AsyncTimeoutConditionWaiter for ArcTokioMonitor<T> {
     /// Returns a future that waits while the predicate remains true or times
     /// out.
+    #[inline(always)]
     fn wait_while_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
@@ -126,6 +134,7 @@ impl<T: Send> AsyncTimeoutConditionWaiter for ArcTokioMonitor<T> {
 
 impl<T> AsRef<TokioMonitor<T>> for ArcTokioMonitor<T> {
     /// Returns a reference to the wrapped Tokio monitor.
+    #[inline(always)]
     fn as_ref(&self) -> &TokioMonitor<T> {
         self.inner.as_ref()
     }
@@ -135,6 +144,7 @@ impl<T> Deref for ArcTokioMonitor<T> {
     type Target = TokioMonitor<T>;
 
     /// Dereferences to the wrapped Tokio monitor.
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         self.inner.as_ref()
     }
@@ -142,6 +152,7 @@ impl<T> Deref for ArcTokioMonitor<T> {
 
 impl<T> Clone for ArcTokioMonitor<T> {
     /// Clones this shared Tokio monitor handle.
+    #[inline(always)]
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -151,6 +162,7 @@ impl<T> Clone for ArcTokioMonitor<T> {
 
 impl<T> From<T> for ArcTokioMonitor<T> {
     /// Creates an Arc-wrapped Tokio monitor from an initial state value.
+    #[inline(always)]
     fn from(value: T) -> Self {
         Self::new(value)
     }
@@ -158,6 +170,7 @@ impl<T> From<T> for ArcTokioMonitor<T> {
 
 impl<T: Default> Default for ArcTokioMonitor<T> {
     /// Creates an Arc-wrapped Tokio monitor containing `T::default()`.
+    #[inline(always)]
     fn default() -> Self {
         Self::new(T::default())
     }

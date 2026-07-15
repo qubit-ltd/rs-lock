@@ -47,6 +47,20 @@ mod arc_rw_lock_tests {
     }
 
     #[test]
+    fn test_arc_rw_lock_arc_ownership_round_trip() {
+        let inner = Arc::new(parking_lot::RwLock::new(41));
+        let rw_lock = ArcRwLock::from_arc(Arc::clone(&inner));
+
+        assert!(Arc::ptr_eq(rw_lock.as_arc(), &inner));
+        assert_eq!(Arc::strong_count(&inner), 2);
+
+        let recovered = rw_lock.into_arc();
+        assert!(Arc::ptr_eq(&recovered, &inner));
+        assert_eq!(Arc::strong_count(&inner), 2);
+        assert_eq!(*recovered.read(), 41);
+    }
+
+    #[test]
     fn test_arc_rw_lock_deref_and_as_ref_expose_rw_lock_api() {
         let rw_lock = ArcRwLock::new(1);
 

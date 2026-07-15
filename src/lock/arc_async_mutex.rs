@@ -91,6 +91,40 @@ impl<T> ArcAsyncMutex<T> {
             inner: Arc::new(AsyncMutex::new(data)),
         }
     }
+
+    /// Creates a lock wrapper from an existing Arc-wrapped Tokio mutex.
+    ///
+    /// # Arguments
+    ///
+    /// * `inner` - Existing shared Tokio mutex allocation to wrap.
+    ///
+    /// # Returns
+    ///
+    /// A wrapper that preserves the identity and ownership of `inner`.
+    #[inline]
+    pub fn from_arc(inner: Arc<AsyncMutex<T>>) -> Self {
+        Self { inner }
+    }
+
+    /// Borrows the Arc that owns the wrapped Tokio mutex.
+    ///
+    /// # Returns
+    ///
+    /// The existing Arc without changing its strong reference count.
+    #[inline(always)]
+    pub fn as_arc(&self) -> &Arc<AsyncMutex<T>> {
+        &self.inner
+    }
+
+    /// Consumes this wrapper and returns the Arc that owns the Tokio mutex.
+    ///
+    /// # Returns
+    ///
+    /// The existing Arc, preserving the wrapped Tokio mutex allocation.
+    #[inline(always)]
+    pub fn into_arc(self) -> Arc<AsyncMutex<T>> {
+        self.inner
+    }
 }
 
 impl<T> AsRef<AsyncMutex<T>> for ArcAsyncMutex<T> {
@@ -99,7 +133,7 @@ impl<T> AsRef<AsyncMutex<T>> for ArcAsyncMutex<T> {
     /// This is useful when callers need guard-based APIs such as
     /// [`AsyncMutex::lock`] or [`AsyncMutex::try_lock`] instead of the
     /// closure-based [`AsyncLock`] methods.
-    #[inline]
+    #[inline(always)]
     fn as_ref(&self) -> &AsyncMutex<T> {
         self.inner.as_ref()
     }
@@ -113,7 +147,7 @@ impl<T> Deref for ArcAsyncMutex<T> {
     /// Method-call dereferencing lets callers use native async mutex APIs
     /// directly, while the wrapper continues to provide the [`AsyncLock`] trait
     /// methods.
-    #[inline]
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         self.inner.as_ref()
     }
@@ -214,7 +248,7 @@ impl<T> From<T> for ArcAsyncMutex<T> {
     /// # Returns
     ///
     /// A new [`ArcAsyncMutex`] protecting `value`.
-    #[inline]
+    #[inline(always)]
     fn from(value: T) -> Self {
         Self::new(value)
     }
@@ -226,7 +260,7 @@ impl<T: Default> Default for ArcAsyncMutex<T> {
     /// # Returns
     ///
     /// A new [`ArcAsyncMutex`] protecting the default value for `T`.
-    #[inline]
+    #[inline(always)]
     fn default() -> Self {
         Self::new(T::default())
     }
@@ -244,7 +278,7 @@ impl<T> Clone for ArcAsyncMutex<T> {
     ///
     /// A new handle sharing the same underlying async mutex and protected
     /// value.
-    #[inline]
+    #[inline(always)]
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),

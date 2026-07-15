@@ -38,6 +38,20 @@ mod arc_mutex_tests {
     }
 
     #[test]
+    fn test_arc_mutex_arc_ownership_round_trip() {
+        let inner = Arc::new(parking_lot::Mutex::new(41));
+        let mutex = ArcMutex::from_arc(Arc::clone(&inner));
+
+        assert!(Arc::ptr_eq(mutex.as_arc(), &inner));
+        assert_eq!(Arc::strong_count(&inner), 2);
+
+        let recovered = mutex.into_arc();
+        assert!(Arc::ptr_eq(&recovered, &inner));
+        assert_eq!(Arc::strong_count(&inner), 2);
+        assert_eq!(*recovered.lock(), 41);
+    }
+
+    #[test]
     fn test_arc_mutex_from_and_default() {
         let from_value = ArcMutex::from(42);
         assert_eq!(from_value.with_read(|value| *value), 42);

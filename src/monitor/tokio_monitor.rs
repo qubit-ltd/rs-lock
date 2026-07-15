@@ -23,15 +23,16 @@ use std::{
     time::Duration,
 };
 
-use tokio::sync::{
-    Mutex,
-    Notify,
-};
+use tokio::sync::Mutex;
 
 use super::{
     AsyncConditionWaiter,
     AsyncTimeoutConditionWaiter,
     Notifier,
+    internal::{
+        TokioConditionWaiter,
+        TokioConditionWaiterRegistration,
+    },
     WaitTimeoutResult,
 };
 
@@ -129,29 +130,6 @@ fn run_notification_registration_boundary_hook(target: usize) {
     }
 }
 
-/// One independently signalled Tokio condition waiter.
-struct TokioConditionWaiter {
-    /// Private signal that cannot transfer a selection to another waiter.
-    signal: Notify,
-}
-
-impl TokioConditionWaiter {
-    /// Creates an unsignalled condition waiter.
-    fn new() -> Self {
-        Self {
-            signal: Notify::new(),
-        }
-    }
-}
-
-/// Removes an active waiter registration on cancellation or normal exit.
-struct TokioConditionWaiterRegistration<'a> {
-    /// Registry containing this waiter while it remains selectable.
-    registry: &'a StdMutex<Vec<Arc<TokioConditionWaiter>>>,
-    /// Independently signalled waiter owned by the pending condition wait.
-    waiter: Arc<TokioConditionWaiter>,
-}
-
 /// Test-only callback run after timeout budget calculation and before waiter
 /// registration.
 #[cfg(test)]
@@ -166,17 +144,6 @@ type TimeoutAfterRegistrationHook = Arc<dyn Fn() + Send + Sync>;
 /// it reacquires the protected state.
 #[cfg(test)]
 type TimeoutBeforeStateReacquireHook = Arc<dyn Fn() + Send + Sync>;
-
-impl Drop for TokioConditionWaiterRegistration<'_> {
-    /// Removes this waiter if no notification has selected it yet.
-    fn drop(&mut self) {
-        let mut registry = self
-            .registry
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        registry.retain(|waiter| !Arc::ptr_eq(waiter, &self.waiter));
-    }
-}
 
 /// Asynchronous monitor built on Tokio synchronization primitives.
 ///
@@ -229,6 +196,7 @@ impl<T> TokioMonitor<T> {
     /// # Returns
     ///
     /// A Tokio-based monitor.
+    #[inline]
     pub fn new(state: T) -> Self {
         Self {
             state: Mutex::new(state),
@@ -251,6 +219,7 @@ impl<T> TokioMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
+    #[inline]
     pub async fn with_read_async<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&T) -> R,
@@ -270,6 +239,7 @@ impl<T> TokioMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
+    #[inline]
     pub async fn with_write_async<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
@@ -287,6 +257,7 @@ impl<T> TokioMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
+    #[inline]
     pub async fn with_write_notify_one_async<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
@@ -305,6 +276,7 @@ impl<T> TokioMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
+    #[inline]
     pub async fn with_write_notify_all_async<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut T) -> R,
@@ -316,6 +288,7 @@ impl<T> TokioMonitor<T> {
 
     /// Selects at most one registered async waiter without a fairness
     /// guarantee.
+    #[inline]
     pub fn notify_one(&self) {
         let waiter = self
             .waiters
@@ -323,7 +296,7 @@ impl<T> TokioMonitor<T> {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .pop();
         if let Some(waiter) = waiter {
-            waiter.signal.notify_one();
+            waiter.signal().notify_one();
         }
     }
 
@@ -337,7 +310,7 @@ impl<T> TokioMonitor<T> {
             std::mem::take(&mut *registry)
         };
         for waiter in waiters {
-            waiter.signal.notify_one();
+            waiter.signal().notify_one();
         }
     }
 
@@ -347,16 +320,14 @@ impl<T> TokioMonitor<T> {
     ///
     /// A registration that removes the waiter if it is cancelled or leaves the
     /// wait before notification selects it.
+    #[inline]
     fn register_waiter(&self) -> TokioConditionWaiterRegistration<'_> {
         let waiter = Arc::new(TokioConditionWaiter::new());
         self.waiters
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .push(Arc::clone(&waiter));
-        TokioConditionWaiterRegistration {
-            registry: &self.waiters,
-            waiter,
-        }
+        TokioConditionWaiterRegistration::new(&self.waiters, waiter)
     }
 
     /// Installs the test-only timeout initialization callback.
@@ -459,11 +430,13 @@ impl<T> TokioMonitor<T> {
 impl<T> Notifier for TokioMonitor<T> {
     /// Selects at most one registered async waiter without a fairness
     /// guarantee.
+    #[inline(always)]
     fn notify_one(&self) {
         Self::notify_one(self);
     }
 
     /// Selects all registered async waiters without retaining protected state.
+    #[inline(always)]
     fn notify_all(&self) {
         Self::notify_all(self);
     }
@@ -480,6 +453,7 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
     /// future while it is pending cancels and unregisters the wait without
     /// running `action` or rolling back protected-state changes. A notification
     /// that already selected this waiter is discarded rather than transferred.
+    #[inline(always)]
     fn wait_until_async<'a, R, P, F>(
         &'a self,
         mut predicate: P,
@@ -524,7 +498,7 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
                 run_notification_registration_boundary_hook(
                     std::ptr::from_ref(self).addr(),
                 );
-                registration.waiter.signal.notified().await;
+                registration.waiter().signal().notified().await;
                 drop(registration);
                 guard = self.state.lock().await;
             }
@@ -554,6 +528,7 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// without another waiter registration. When the signal and deadline are
     /// both ready, the deadline is selected first. A zero timeout still checks
     /// the predicate once.
+    #[inline(always)]
     fn wait_until_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
@@ -628,7 +603,7 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
                 #[cfg(test)]
                 self.run_timeout_after_registration_hook();
                 let timed_out = {
-                    let notified = registration.waiter.signal.notified();
+                    let notified = registration.waiter().signal().notified();
                     tokio::pin!(notified);
                     poll_fn(|context| {
                         if deadline.as_mut().poll(context).is_ready() {
@@ -668,6 +643,7 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
 
 impl<T> From<T> for TokioMonitor<T> {
     /// Creates a Tokio monitor from an initial state value.
+    #[inline(always)]
     fn from(value: T) -> Self {
         Self::new(value)
     }
@@ -675,6 +651,7 @@ impl<T> From<T> for TokioMonitor<T> {
 
 impl<T: Default> Default for TokioMonitor<T> {
     /// Creates a Tokio monitor containing `T::default()`.
+    #[inline(always)]
     fn default() -> Self {
         Self::new(T::default())
     }

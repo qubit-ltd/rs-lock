@@ -91,6 +91,40 @@ impl<T> ArcRwLock<T> {
             inner: Arc::new(RwLock::new(data)),
         }
     }
+
+    /// Creates a lock wrapper from an existing Arc-wrapped read-write lock.
+    ///
+    /// # Arguments
+    ///
+    /// * `inner` - Existing shared read-write lock allocation to wrap.
+    ///
+    /// # Returns
+    ///
+    /// A wrapper that preserves the identity and ownership of `inner`.
+    #[inline]
+    pub fn from_arc(inner: Arc<RwLock<T>>) -> Self {
+        Self { inner }
+    }
+
+    /// Borrows the Arc that owns the wrapped read-write lock.
+    ///
+    /// # Returns
+    ///
+    /// The existing Arc without changing its strong reference count.
+    #[inline(always)]
+    pub fn as_arc(&self) -> &Arc<RwLock<T>> {
+        &self.inner
+    }
+
+    /// Consumes this wrapper and returns the Arc that owns the read-write lock.
+    ///
+    /// # Returns
+    ///
+    /// The existing Arc, preserving the wrapped read-write lock allocation.
+    #[inline(always)]
+    pub fn into_arc(self) -> Arc<RwLock<T>> {
+        self.inner
+    }
 }
 
 impl<T> AsRef<RwLock<T>> for ArcRwLock<T> {
@@ -99,7 +133,7 @@ impl<T> AsRef<RwLock<T>> for ArcRwLock<T> {
     /// This is useful when callers need guard-based APIs such as
     /// [`RwLock::read`] or [`RwLock::write`] instead of the closure-based
     /// [`Lock`] methods.
-    #[inline]
+    #[inline(always)]
     fn as_ref(&self) -> &RwLock<T> {
         self.inner.as_ref()
     }
@@ -114,7 +148,7 @@ impl<T> Deref for ArcRwLock<T> {
     /// access. The native guard-based [`RwLock::read`] and [`RwLock::write`]
     /// methods remain directly available through this dereference; use
     /// [`AsRef::as_ref`] when the target type should be explicit.
-    #[inline]
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         self.inner.as_ref()
     }
@@ -286,7 +320,7 @@ impl<T> From<T> for ArcRwLock<T> {
     /// # Returns
     ///
     /// A new [`ArcRwLock`] protecting `value`.
-    #[inline]
+    #[inline(always)]
     fn from(value: T) -> Self {
         Self::new(value)
     }
@@ -299,7 +333,7 @@ impl<T: Default> Default for ArcRwLock<T> {
     /// # Returns
     ///
     /// A new [`ArcRwLock`] protecting the default value for `T`.
-    #[inline]
+    #[inline(always)]
     fn default() -> Self {
         Self::new(T::default())
     }
@@ -317,7 +351,7 @@ impl<T> Clone for ArcRwLock<T> {
     ///
     /// A new handle sharing the same underlying read-write lock and protected
     /// value.
-    #[inline]
+    #[inline(always)]
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),

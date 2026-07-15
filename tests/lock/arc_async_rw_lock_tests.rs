@@ -46,6 +46,20 @@ mod arc_async_rw_lock_tests {
     }
 
     #[tokio::test]
+    async fn test_arc_async_rw_lock_arc_ownership_round_trip() {
+        let inner = Arc::new(tokio::sync::RwLock::new(41));
+        let async_rw_lock = ArcAsyncRwLock::from_arc(Arc::clone(&inner));
+
+        assert!(Arc::ptr_eq(async_rw_lock.as_arc(), &inner));
+        assert_eq!(Arc::strong_count(&inner), 2);
+
+        let recovered = async_rw_lock.into_arc();
+        assert!(Arc::ptr_eq(&recovered, &inner));
+        assert_eq!(Arc::strong_count(&inner), 2);
+        assert_eq!(*recovered.read().await, 41);
+    }
+
+    #[tokio::test]
     async fn test_arc_async_rw_lock_from_and_default() {
         let from_value = ArcAsyncRwLock::from(42);
         assert_eq!(from_value.with_read(|value| *value).await, 42);

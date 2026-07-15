@@ -4,6 +4,31 @@
     {
       "name": "sync-only",
       "defaultFeatures": false,
+      "features": [],
+      "commands": [
+        "test",
+        "doc",
+        "clippy"
+      ]
+    },
+    {
+      "name": "async-only",
+      "defaultFeatures": false,
+      "features": [
+        "async"
+      ],
+      "commands": [
+        "test",
+        "doc",
+        "clippy"
+      ]
+    },
+    {
+      "name": "mock-only",
+      "defaultFeatures": false,
+      "features": [
+        "mock"
+      ],
       "commands": [
         "test",
         "doc",

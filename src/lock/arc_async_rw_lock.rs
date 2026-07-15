@@ -99,6 +99,40 @@ impl<T> ArcAsyncRwLock<T> {
             inner: Arc::new(AsyncRwLock::new(data)),
         }
     }
+
+    /// Creates a wrapper from an existing Arc-wrapped Tokio read-write lock.
+    ///
+    /// # Arguments
+    ///
+    /// * `inner` - Existing shared Tokio read-write lock allocation to wrap.
+    ///
+    /// # Returns
+    ///
+    /// A wrapper that preserves the identity and ownership of `inner`.
+    #[inline]
+    pub fn from_arc(inner: Arc<AsyncRwLock<T>>) -> Self {
+        Self { inner }
+    }
+
+    /// Borrows the Arc that owns the wrapped Tokio read-write lock.
+    ///
+    /// # Returns
+    ///
+    /// The existing Arc without changing its strong reference count.
+    #[inline(always)]
+    pub fn as_arc(&self) -> &Arc<AsyncRwLock<T>> {
+        &self.inner
+    }
+
+    /// Consumes this wrapper and returns the Arc that owns the read-write lock.
+    ///
+    /// # Returns
+    ///
+    /// The existing Arc, preserving the wrapped read-write lock allocation.
+    #[inline(always)]
+    pub fn into_arc(self) -> Arc<AsyncRwLock<T>> {
+        self.inner
+    }
 }
 
 impl<T> AsRef<AsyncRwLock<T>> for ArcAsyncRwLock<T> {
@@ -107,7 +141,7 @@ impl<T> AsRef<AsyncRwLock<T>> for ArcAsyncRwLock<T> {
     /// This is useful when callers need guard-based APIs such as
     /// [`AsyncRwLock::read`] or [`AsyncRwLock::write`] instead of the
     /// closure-based [`AsyncLock`] methods.
-    #[inline]
+    #[inline(always)]
     fn as_ref(&self) -> &AsyncRwLock<T> {
         self.inner.as_ref()
     }
@@ -123,7 +157,7 @@ impl<T> Deref for ArcAsyncRwLock<T> {
     /// [`AsyncRwLock::write`] methods remain directly available through this
     /// dereference; use [`AsRef::as_ref`] when the target type should be
     /// explicit.
-    #[inline]
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         self.inner.as_ref()
     }
@@ -274,7 +308,7 @@ impl<T> From<T> for ArcAsyncRwLock<T> {
     /// # Returns
     ///
     /// A new [`ArcAsyncRwLock`] protecting `value`.
-    #[inline]
+    #[inline(always)]
     fn from(value: T) -> Self {
         Self::new(value)
     }
@@ -286,7 +320,7 @@ impl<T: Default> Default for ArcAsyncRwLock<T> {
     /// # Returns
     ///
     /// A new [`ArcAsyncRwLock`] protecting the default value for `T`.
-    #[inline]
+    #[inline(always)]
     fn default() -> Self {
         Self::new(T::default())
     }
@@ -304,7 +338,7 @@ impl<T> Clone for ArcAsyncRwLock<T> {
     ///
     /// A new handle sharing the same underlying async read-write lock and
     /// protected value.
-    #[inline]
+    #[inline(always)]
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),

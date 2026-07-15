@@ -7,10 +7,10 @@
 // =============================================================================
 //! RAII registration for a mock-monitor waiter.
 
-use super::MockMonitor;
+use crate::monitor::mock_monitor::MockMonitor;
 
 /// Keeps one waiter registered for the lifetime of a wait operation.
-pub(super) struct MockMonitorWaiterGuard<'a, T: Send + 'static> {
+pub(in crate::monitor) struct MockMonitorWaiterGuard<'a, T: Send + 'static> {
     /// Monitor that owns the waiter registration.
     monitor: &'a MockMonitor<T>,
     /// Identifier assigned to the registered waiter.
@@ -28,7 +28,12 @@ impl<'a, T: Send + 'static> MockMonitorWaiterGuard<'a, T> {
     /// * `waiter_id` - Identifier assigned to the registered waiter.
     /// * `timeout_waiter` - Whether this registration contributes to the
     ///   timeout waiter count.
-    pub(super) fn new(
+    ///
+    /// # Returns
+    ///
+    /// A guard that unregisters the waiter when dropped.
+    #[inline]
+    pub(in crate::monitor) fn new(
         monitor: &'a MockMonitor<T>,
         waiter_id: u64,
         timeout_waiter: bool,

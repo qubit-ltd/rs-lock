@@ -192,7 +192,7 @@ impl<T> Deref for ParkingLotMonitorGuard<'_, T> {
     type Target = T;
 
     /// Returns an immutable reference to the protected state.
-    #[inline]
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.inner
     }
@@ -200,7 +200,7 @@ impl<T> Deref for ParkingLotMonitorGuard<'_, T> {
 
 impl<T> DerefMut for ParkingLotMonitorGuard<'_, T> {
     /// Returns a mutable reference to the protected state.
-    #[inline]
+    #[inline(always)]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }

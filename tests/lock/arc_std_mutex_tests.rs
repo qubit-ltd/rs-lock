@@ -48,6 +48,20 @@ mod arc_std_mutex_tests {
     }
 
     #[test]
+    fn test_arc_std_mutex_arc_ownership_round_trip() {
+        let inner = Arc::new(std::sync::Mutex::new(41));
+        let mutex = ArcStdMutex::from_arc(Arc::clone(&inner));
+
+        assert!(Arc::ptr_eq(mutex.as_arc(), &inner));
+        assert_eq!(Arc::strong_count(&inner), 2);
+
+        let recovered = mutex.into_arc();
+        assert!(Arc::ptr_eq(&recovered, &inner));
+        assert_eq!(Arc::strong_count(&inner), 2);
+        assert_eq!(*recovered.lock().expect("mutex should not be poisoned"), 41);
+    }
+
+    #[test]
     fn test_arc_std_mutex_from_and_default() {
         let from_value = ArcStdMutex::from(42);
         assert_eq!(from_value.with_read(|value| *value), 42);
