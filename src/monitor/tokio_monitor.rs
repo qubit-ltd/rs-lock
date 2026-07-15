@@ -29,11 +29,11 @@ use super::{
     AsyncConditionWaiter,
     AsyncTimeoutConditionWaiter,
     Notifier,
+    WaitTimeoutResult,
     internal::{
         TokioConditionWaiter,
         TokioConditionWaiterRegistration,
     },
-    WaitTimeoutResult,
 };
 
 /// Test-only synchronization point between dropping the state guard and

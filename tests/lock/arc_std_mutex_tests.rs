@@ -58,7 +58,10 @@ mod arc_std_mutex_tests {
         let recovered = mutex.into_arc();
         assert!(Arc::ptr_eq(&recovered, &inner));
         assert_eq!(Arc::strong_count(&inner), 2);
-        assert_eq!(*recovered.lock().expect("mutex should not be poisoned"), 41);
+        assert_eq!(
+            *recovered.lock().expect("mutex should not be poisoned"),
+            41
+        );
     }
 
     #[test]
