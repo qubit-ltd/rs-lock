@@ -10,22 +10,11 @@
 //! Provides an Arc-wrapped synchronous monitor for condition-based state
 //! coordination across threads.
 
-use std::{
-    ops::Deref,
-    sync::Arc,
-    time::Duration,
-};
+use std::{ops::Deref, sync::Arc, time::Duration};
 
 use super::{
-    ConditionWaiter,
-    NotificationWaiter,
-    Notifier,
-    StdMonitor,
-    StdMonitorGuard,
-    TimeoutConditionWaiter,
-    TimeoutNotificationWaiter,
+    ConditionWaiter, Notifier, StdMonitor, StdMonitorGuard, TimeoutConditionWaiter,
     WaitTimeoutResult,
-    WaitTimeoutStatus,
 };
 
 /// Arc-wrapped monitor for shared condition-based state coordination.
@@ -207,50 +196,6 @@ impl<T> ArcStdMonitor<T> {
         self.inner.with_write_notify_all(f)
     }
 
-    /// Waits for a notification without checking state.
-    ///
-    /// This delegates to [`StdMonitor::wait`].
-    #[inline]
-    pub fn wait(&self) {
-        self.inner.wait();
-    }
-
-    /// Waits for a notification or timeout without checking state.
-    ///
-    /// This delegates to [`StdMonitor::wait_for`]. Most
-    /// coordination code should prefer [`Self::wait_while`],
-    /// [`Self::wait_until`], or an explicit [`StdMonitorGuard`] loop.
-    ///
-    /// Condition variables may wake spuriously, so
-    /// [`WaitTimeoutStatus::Woken`] does not prove that a notifier changed the
-    /// state.
-    ///
-    /// # Arguments
-    ///
-    /// * `timeout` - Maximum duration to wait for a notification.
-    ///
-    /// # Returns
-    ///
-    /// [`WaitTimeoutStatus::Woken`] if the wait returned before the timeout,
-    /// or [`WaitTimeoutStatus::TimedOut`] if the timeout elapsed.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use std::time::Duration;
-    ///
-    /// use qubit_lock::{ArcStdMonitor, WaitTimeoutStatus};
-    ///
-    /// let monitor = ArcStdMonitor::new(false);
-    /// let status = monitor.wait_for(Duration::from_millis(1));
-    ///
-    /// assert_eq!(status, WaitTimeoutStatus::TimedOut);
-    /// ```
-    #[inline]
-    pub fn wait_for(&self, timeout: Duration) -> WaitTimeoutStatus {
-        self.inner.wait_for(timeout)
-    }
-
     /// Waits while a predicate remains true, then mutates the protected state.
     ///
     /// This delegates to [`StdMonitor::wait_while`]. The predicate is evaluated
@@ -426,12 +371,7 @@ impl<T> ArcStdMonitor<T> {
     /// );
     /// ```
     #[inline]
-    pub fn wait_until_for<R, P, F>(
-        &self,
-        timeout: Duration,
-        ready: P,
-        f: F,
-    ) -> WaitTimeoutResult<R>
+    pub fn wait_until_for<R, P, F>(&self, timeout: Duration, ready: P, f: F) -> WaitTimeoutResult<R>
     where
         P: FnMut(&T) -> bool,
         F: FnOnce(&mut T) -> R,
@@ -482,22 +422,6 @@ impl<T> Notifier for ArcStdMonitor<T> {
     #[inline]
     fn notify_all(&self) {
         Self::notify_all(self);
-    }
-}
-
-impl<T> NotificationWaiter for ArcStdMonitor<T> {
-    /// Blocks until a notification wakes this waiter.
-    #[inline]
-    fn wait(&self) {
-        Self::wait(self);
-    }
-}
-
-impl<T> TimeoutNotificationWaiter for ArcStdMonitor<T> {
-    /// Blocks until a notification wakes this waiter or the timeout expires.
-    #[inline]
-    fn wait_for(&self, timeout: Duration) -> WaitTimeoutStatus {
-        Self::wait_for(self, timeout)
     }
 }
 

@@ -8,22 +8,13 @@
 //! Tests for [`StdMonitor`](qubit_lock::StdMonitor).
 
 use std::{
-    sync::{
-        Arc,
-        mpsc,
-    },
+    sync::{Arc, mpsc},
     thread,
     time::Duration,
 };
 
 use qubit_lock::{
-    ConditionWaiter,
-    NotificationWaiter,
-    Notifier,
-    StdMonitor,
-    TimeoutConditionWaiter,
-    TimeoutNotificationWaiter,
-    WaitTimeoutResult,
+    ConditionWaiter, Notifier, StdMonitor, TimeoutConditionWaiter, WaitTimeoutResult,
     WaitTimeoutStatus,
 };
 
@@ -50,9 +41,9 @@ fn test_std_monitor_write_notify_one_updates_state_and_wakes_waiter() {
         let result = waiter_monitor.wait_until(
             move |ready| {
                 if !*ready && let Some(checked_tx) = checked_tx.take() {
-                    checked_tx.send(()).expect(
-                        "test should observe waiter before notification",
-                    );
+                    checked_tx
+                        .send(())
+                        .expect("test should observe waiter before notification");
                 }
                 *ready
             },
@@ -181,13 +172,6 @@ fn test_std_monitor_traits_delegate_to_monitor_methods() {
     <StdMonitor<Vec<i32>> as Notifier>::notify_all(&monitor);
 
     assert_eq!(
-        <StdMonitor<Vec<i32>> as TimeoutNotificationWaiter>::wait_for(
-            &monitor,
-            Duration::ZERO,
-        ),
-        WaitTimeoutStatus::TimedOut,
-    );
-    assert_eq!(
         <StdMonitor<Vec<i32>> as ConditionWaiter>::wait_until(
             &monitor,
             |items| !items.is_empty(),
@@ -224,31 +208,6 @@ fn test_std_monitor_traits_delegate_to_monitor_methods() {
         ),
         WaitTimeoutResult::Ready(Some(1)),
     );
-}
-
-#[test]
-fn test_std_monitor_notification_waiter_trait_wait_returns_after_notify() {
-    let monitor = Arc::new(StdMonitor::new(false));
-    let waiter_monitor = Arc::clone(&monitor);
-    let (done_tx, done_rx) = mpsc::channel();
-
-    let waiter = thread::spawn(move || {
-        <StdMonitor<bool> as NotificationWaiter>::wait(waiter_monitor.as_ref());
-        done_tx.send(()).expect("test should receive wait result");
-    });
-
-    let deadline = std::time::Instant::now() + Duration::from_secs(1);
-    loop {
-        <StdMonitor<bool> as Notifier>::notify_all(monitor.as_ref());
-        if done_rx.recv_timeout(Duration::from_millis(5)).is_ok() {
-            break;
-        }
-        assert!(
-            std::time::Instant::now() < deadline,
-            "notification wait should complete before deadline",
-        );
-    }
-    waiter.join().expect("waiter should finish");
 }
 
 #[test]
@@ -332,15 +291,6 @@ fn test_std_monitor_wait_until_blocks_until_notify_one() {
 }
 
 #[test]
-fn test_std_monitor_wait_for_returns_timed_out() {
-    let monitor = StdMonitor::new(false);
-
-    let status = monitor.wait_for(Duration::from_millis(30));
-
-    assert_eq!(status, WaitTimeoutStatus::TimedOut);
-}
-
-#[test]
 fn test_std_monitor_guard_wait_timeout_returns_woken_when_notified() {
     let monitor = Arc::new(StdMonitor::new(false));
     let (waiting_tx, waiting_rx) = mpsc::channel();
@@ -380,11 +330,7 @@ fn test_std_monitor_guard_wait_timeout_returns_woken_when_notified() {
 fn test_std_monitor_wait_while_for_returns_timed_out_when_timeout() {
     let monitor = StdMonitor::new(false);
 
-    let result = monitor.wait_while_for(
-        Duration::from_millis(20),
-        |ready| !*ready,
-        |_| (),
-    );
+    let result = monitor.wait_while_for(Duration::from_millis(20), |ready| !*ready, |_| ());
 
     assert_eq!(result, WaitTimeoutResult::TimedOut);
 }
@@ -393,11 +339,7 @@ fn test_std_monitor_wait_while_for_returns_timed_out_when_timeout() {
 fn test_std_monitor_wait_until_for_returns_timed_out_when_timeout() {
     let monitor = StdMonitor::new(false);
 
-    let result = monitor.wait_until_for(
-        Duration::from_millis(20),
-        |ready| *ready,
-        |_| (),
-    );
+    let result = monitor.wait_until_for(Duration::from_millis(20), |ready| *ready, |_| ());
 
     assert_eq!(result, WaitTimeoutResult::TimedOut);
 }

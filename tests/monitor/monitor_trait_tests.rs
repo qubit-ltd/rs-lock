@@ -11,19 +11,9 @@ use std::time::Duration;
 
 #[cfg(feature = "mock")]
 use qubit_lock::ArcMockMonitor;
-use qubit_lock::{
-    ArcParkingLotMonitor,
-    Monitor,
-    SharedMonitor,
-    WaitTimeoutResult,
-    WaitTimeoutStatus,
-};
+use qubit_lock::{ArcParkingLotMonitor, Monitor, SharedMonitor, WaitTimeoutResult};
 #[cfg(feature = "async")]
-use qubit_lock::{
-    ArcTokioMonitor,
-    AsyncMonitor,
-    SharedAsyncMonitor,
-};
+use qubit_lock::{ArcTokioMonitor, AsyncMonitor, SharedAsyncMonitor};
 
 /// Exercises a blocking monitor through the aggregate trait.
 fn wait_through_monitor_trait<M>(monitor: &M)
@@ -56,7 +46,10 @@ fn test_shared_monitor_trait_accepts_parking_lot_monitor_handle() {
     let monitor = ArcParkingLotMonitor::new(false);
     let cloned = require_shared_monitor(monitor);
 
-    assert_eq!(cloned.wait_for(Duration::ZERO), WaitTimeoutStatus::TimedOut);
+    assert_eq!(
+        cloned.wait_until_for(Duration::ZERO, |ready| *ready, |_| ()),
+        WaitTimeoutResult::TimedOut,
+    );
 }
 
 #[test]
@@ -65,7 +58,10 @@ fn test_shared_monitor_trait_accepts_mock_monitor_handle() {
     let monitor = ArcMockMonitor::new(false);
     let cloned = require_shared_monitor(monitor);
 
-    assert_eq!(cloned.wait_for(Duration::ZERO), WaitTimeoutStatus::TimedOut);
+    assert_eq!(
+        cloned.wait_until_for(Duration::ZERO, |ready| *ready, |_| ()),
+        WaitTimeoutResult::TimedOut,
+    );
 }
 
 /// Exercises an async monitor through the aggregate trait.
@@ -76,11 +72,7 @@ where
 {
     assert_eq!(
         monitor
-            .wait_until_for_async(
-                Duration::from_millis(1),
-                |ready| *ready,
-                |_| 7
-            )
+            .wait_until_for_async(Duration::from_millis(1), |ready| *ready, |_| 7)
             .await,
         WaitTimeoutResult::TimedOut,
     );

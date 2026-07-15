@@ -88,13 +88,15 @@ sleep 猜测 waiter 是否已经注册。`pending_timeout_waiters()` 汇总已�
   `with_read_async`，`async_write` 改为 `with_write_async`，
   `async_write_notify_one` 改为 `with_write_notify_one_async`，
   `async_write_notify_all` 改为 `with_write_notify_all_async`。
+- 已删除仅等待通知的 trait，以及具体 monitor 上的 `wait`、`wait_for`、
+  `wait_async` 和 `wait_for_async` 方法。请改用基于 predicate 的 condition
+  wait 协调受保护状态；需要排队 permit 的场景应使用 semaphore 或 event
+  原语。
 
 ## 从 0.8 迁移
 
 `0.9` 包含有意的异步 monitor API 重命名：
 
-- `AsyncNotificationWaiter::async_wait` 现在改为 `wait_async`。
-- `AsyncTimeoutNotificationWaiter::async_wait_for` 现在改为 `wait_for_async`。
 - `AsyncConditionWaiter::async_wait_until` 和 `async_wait_while` 现在改为
   `wait_until_async` 和 `wait_while_async`。
 - `AsyncTimeoutConditionWaiter::async_wait_until_for` 和
