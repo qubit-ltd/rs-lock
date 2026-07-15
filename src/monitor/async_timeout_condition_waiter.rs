@@ -7,11 +7,13 @@
 // =============================================================================
 //! Asynchronous timeout condition-wait capability.
 
-use std::time::Duration;
+use std::{
+    future::Future,
+    time::Duration,
+};
 
 use crate::monitor::{
     AsyncConditionWaiter,
-    AsyncMonitorFuture,
     WaitTimeoutResult,
 };
 
@@ -26,7 +28,7 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
         timeout: Duration,
         mut predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, WaitTimeoutResult<R>>
+    ) -> impl Future<Output = WaitTimeoutResult<R>> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
@@ -48,7 +50,7 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
         timeout: Duration,
         predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, WaitTimeoutResult<R>>
+    ) -> impl Future<Output = WaitTimeoutResult<R>> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,

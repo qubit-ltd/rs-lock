@@ -13,12 +13,14 @@ use std::{
     time::Duration,
 };
 
+#[cfg(feature = "async")]
+use std::future::Future;
+
 use qubit_clock::ManualMonotonicClock;
 
 #[cfg(feature = "async")]
 use super::{
     AsyncConditionWaiter,
-    AsyncMonitorFuture,
     AsyncTimeoutConditionWaiter,
 };
 use super::{
@@ -259,7 +261,7 @@ impl<T: Send + 'static> ArcMockMonitor<T> {
         &'a self,
         predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, R>
+    ) -> impl Future<Output = R> + Send + 'a
     where
         T: Send,
         R: Send + 'a,
@@ -289,7 +291,7 @@ impl<T: Send + 'static> ArcMockMonitor<T> {
         &'a self,
         predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, R>
+    ) -> impl Future<Output = R> + Send + 'a
     where
         T: Send,
         R: Send + 'a,
@@ -321,7 +323,7 @@ impl<T: Send + 'static> ArcMockMonitor<T> {
         timeout: Duration,
         predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, WaitTimeoutResult<R>>
+    ) -> impl Future<Output = WaitTimeoutResult<R>> + Send + 'a
     where
         T: Send,
         R: Send + 'a,
@@ -355,7 +357,7 @@ impl<T: Send + 'static> ArcMockMonitor<T> {
         timeout: Duration,
         predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, WaitTimeoutResult<R>>
+    ) -> impl Future<Output = WaitTimeoutResult<R>> + Send + 'a
     where
         T: Send,
         R: Send + 'a,
@@ -421,7 +423,7 @@ impl<T: Send + 'static> AsyncConditionWaiter for ArcMockMonitor<T> {
         &'a self,
         predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, R>
+    ) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
@@ -440,7 +442,7 @@ impl<T: Send + 'static> AsyncTimeoutConditionWaiter for ArcMockMonitor<T> {
         timeout: Duration,
         predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, WaitTimeoutResult<R>>
+    ) -> impl Future<Output = WaitTimeoutResult<R>> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,

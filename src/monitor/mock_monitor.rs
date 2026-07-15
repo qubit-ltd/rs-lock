@@ -17,6 +17,9 @@ use std::sync::{
 use std::time::Duration;
 use std::time::Instant;
 
+#[cfg(feature = "async")]
+use std::future::Future;
+
 use qubit_clock::{
     ManualAdvanceSubscription,
     ManualMonotonicClock,
@@ -30,7 +33,6 @@ use super::mock_monitor_waiter_guard::MockMonitorWaiterGuard;
 #[cfg(feature = "async")]
 use super::{
     AsyncConditionWaiter,
-    AsyncMonitorFuture,
     AsyncTimeoutConditionWaiter,
 };
 use super::{
@@ -559,18 +561,22 @@ impl<T: Send + 'static> AsyncConditionWaiter for MockMonitor<T> {
     type State = T;
 
     /// Returns a future that waits while the predicate remains true.
+    #[allow(
+        clippy::manual_async_fn,
+        reason = "the explicit Send bound is part of the trait contract"
+    )]
     fn wait_while_async<'a, R, P, F>(
         &'a self,
         mut predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, R>
+    ) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
         let mut change_receiver = self.async_change_sender.subscribe();
-        Box::pin(async move {
+        async move {
             let waiter_id = {
                 let mut state = self.lock_state();
                 if !predicate(&state.value) {
@@ -593,7 +599,7 @@ impl<T: Send + 'static> AsyncConditionWaiter for MockMonitor<T> {
                     "mock monitor sender should live while the monitor is borrowed",
                 );
             }
-        })
+        }
     }
 }
 
@@ -601,12 +607,16 @@ impl<T: Send + 'static> AsyncConditionWaiter for MockMonitor<T> {
 impl<T: Send + 'static> AsyncTimeoutConditionWaiter for MockMonitor<T> {
     /// Returns a future that waits while the predicate remains true or times
     /// out.
+    #[allow(
+        clippy::manual_async_fn,
+        reason = "the explicit Send bound is part of the trait contract"
+    )]
     fn wait_while_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
         mut predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, WaitTimeoutResult<R>>
+    ) -> impl Future<Output = WaitTimeoutResult<R>> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
@@ -614,7 +624,7 @@ impl<T: Send + 'static> AsyncTimeoutConditionWaiter for MockMonitor<T> {
     {
         let mut change_receiver = self.async_change_sender.subscribe();
         let target_elapsed = self.elapsed().saturating_add(timeout);
-        Box::pin(async move {
+        async move {
             let waiter_id = {
                 let mut state = self.lock_state();
                 if !predicate(&state.value) {
@@ -649,7 +659,7 @@ impl<T: Send + 'static> AsyncTimeoutConditionWaiter for MockMonitor<T> {
                     .await
                     .expect("mock monitor sender should live while the monitor is borrowed");
             }
-        })
+        }
     }
 }
 

@@ -8,7 +8,10 @@
 // qubit-style: allow inline-tests
 //! Tokio-based asynchronous monitor.
 
-use std::time::Duration;
+use std::{
+    future::Future,
+    time::Duration,
+};
 
 use tokio::sync::{
     Mutex,
@@ -18,7 +21,6 @@ use tokio::time::Instant;
 
 use super::{
     AsyncConditionWaiter,
-    AsyncMonitorFuture,
     AsyncTimeoutConditionWaiter,
     Notifier,
     WaitTimeoutResult,
@@ -278,7 +280,7 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
         &'a self,
         mut predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, R>
+    ) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
@@ -294,17 +296,21 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
     /// carry no state and provide no fairness guarantee. Dropping the returned
     /// future while it is pending cancels and unregisters the wait without
     /// running `action`.
+    #[allow(
+        clippy::manual_async_fn,
+        reason = "the explicit Send bound is part of the trait contract"
+    )]
     fn wait_while_async<'a, R, P, F>(
         &'a self,
         mut predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, R>
+    ) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
-        Box::pin(async move {
+        async move {
             let mut guard = self.state.lock().await;
             while predicate(&*guard) {
                 let notified = self.changed.notified();
@@ -319,7 +325,7 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
                 guard = self.state.lock().await;
             }
             action(&mut *guard)
-        })
+        }
     }
 }
 
@@ -337,7 +343,7 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
         timeout: Duration,
         mut predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, WaitTimeoutResult<R>>
+    ) -> impl Future<Output = WaitTimeoutResult<R>> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
@@ -358,19 +364,23 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// future while it is pending cancels and unregisters the wait without
     /// running `action`. If the wait reaches suspension, the current Tokio
     /// runtime must have its time driver enabled or Tokio will panic.
+    #[allow(
+        clippy::manual_async_fn,
+        reason = "the explicit Send bound is part of the trait contract"
+    )]
     fn wait_while_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
         mut predicate: P,
         action: F,
-    ) -> AsyncMonitorFuture<'a, WaitTimeoutResult<R>>
+    ) -> impl Future<Output = WaitTimeoutResult<R>> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
         let start = Instant::now();
-        Box::pin(async move {
+        async move {
             let mut guard = self.state.lock().await;
             loop {
                 if !predicate(&*guard) {
@@ -395,7 +405,7 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
                 }
                 guard = self.state.lock().await;
             }
-        })
+        }
     }
 }
 
