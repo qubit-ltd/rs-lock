@@ -42,7 +42,7 @@ use qubit_lock::{
 /// re-enter the monitor state lock indefinitely.
 #[test]
 fn test_mock_monitor_clock_can_advance_inside_state_closure() {
-    const REAL_TIMEOUT: Duration = Duration::from_millis(100);
+    const REAL_TIMEOUT: Duration = Duration::from_secs(1);
 
     let clock = Arc::new(ManualMonotonicClock::new());
     let monitor = Arc::new(MockMonitor::from_clock((), Arc::clone(&clock)));

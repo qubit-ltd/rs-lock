@@ -34,7 +34,7 @@ struct NotificationRegistrationBoundaryHook {
     /// Address of the monitor instance controlled by this hook.
     target: usize,
     /// Channel used to report that a waiter dropped the protected-state guard.
-    entered: std::sync::mpsc::Sender<()>,
+    entered: std::sync::mpsc::SyncSender<()>,
     /// Condition used to release waiters to poll their notification futures.
     release: std::sync::Arc<(std::sync::Mutex<bool>, std::sync::Condvar)>,
     /// Real-time upper bound for waiting on the test controller.
@@ -66,7 +66,7 @@ impl Drop for NotificationRegistrationBoundaryHookGuard {
 ///
 /// # Arguments
 ///
-/// * `hook` - Barrier pair that controls the notification registration window.
+/// * `hook` - Bounded coordination state for the registration window.
 ///
 /// # Returns
 ///
@@ -100,7 +100,7 @@ fn run_notification_registration_boundary_hook(target: usize) {
         .clone();
     if let Some(hook) = hook.filter(|hook| hook.target == target) {
         hook.entered
-            .send(())
+            .try_send(())
             .expect("registration-window controller should receive waiter");
         let (released, release_changed) = &*hook.release;
         let released = released
@@ -407,15 +407,17 @@ impl<T: Default> Default for TokioMonitor<T> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::{
-        AtomicUsize,
-        Ordering,
-    };
+    use std::future::Future;
+    use std::pin::Pin;
     use std::sync::{
         Arc,
         Condvar,
         Mutex,
         mpsc,
+    };
+    use std::task::{
+        Context,
+        Poll,
     };
     use std::time::Duration;
 
@@ -426,17 +428,87 @@ mod tests {
         install_notification_registration_boundary_hook,
     };
 
+    /// Preserves one lock future after proving that its first poll contended.
+    struct ContendedLockFuture<F> {
+        /// Pinned lock future retained across every poll.
+        inner: Pin<Box<F>>,
+        /// Bounded signal emitted when the first lock poll returns pending.
+        pending: Option<mpsc::SyncSender<()>>,
+        /// Permission to continue polling after the contention is observed.
+        proceed: mpsc::Receiver<()>,
+        /// Real-time upper bound for waiting for permission to proceed.
+        real_timeout: Duration,
+    }
+
+    impl<F> ContendedLockFuture<F> {
+        /// Wraps a lock future and gates it after its first pending poll.
+        ///
+        /// # Arguments
+        ///
+        /// * `inner` - Lock future whose queue position must be preserved.
+        /// * `pending` - Bounded signal proving that the first poll contended.
+        /// * `proceed` - Permission to resume polling the same lock future.
+        /// * `real_timeout` - Maximum real time to wait for permission.
+        ///
+        /// # Returns
+        ///
+        /// A future that resolves to the wrapped lock future's output.
+        fn new(
+            inner: F,
+            pending: mpsc::SyncSender<()>,
+            proceed: mpsc::Receiver<()>,
+            real_timeout: Duration,
+        ) -> Self {
+            Self {
+                inner: Box::pin(inner),
+                pending: Some(pending),
+                proceed,
+                real_timeout,
+            }
+        }
+    }
+
+    impl<F: Future> Future for ContendedLockFuture<F> {
+        type Output = F::Output;
+
+        /// Polls the retained lock future and gates its first pending result.
+        ///
+        /// The first poll must return pending. This method reports that result
+        /// without dropping the lock future, waits for bounded controller
+        /// permission, and then continues polling the same future.
+        fn poll(
+            mut self: Pin<&mut Self>,
+            context: &mut Context<'_>,
+        ) -> Poll<Self::Output> {
+            let this = &mut *self;
+            let result = this.inner.as_mut().poll(context);
+            let Some(pending) = this.pending.take() else {
+                return result;
+            };
+            assert!(
+                result.is_pending(),
+                "producer lock should contend on its first poll"
+            );
+            pending
+                .try_send(())
+                .expect("second waiter should observe producer contention");
+            this.proceed
+                .recv_timeout(this.real_timeout)
+                .expect("controller should release contended producer");
+            this.inner.as_mut().poll(context)
+        }
+    }
+
     /// Verifies that two condition waiters register before releasing the state
     /// lock, so two notifications cannot collapse into one retained permit.
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn test_tokio_monitor_notify_one_does_not_lose_registered_condition_waiter()
     {
-        const REAL_TIMEOUT: Duration = Duration::from_millis(500);
+        const REAL_TIMEOUT: Duration = Duration::from_secs(1);
         const WAITER_COUNT: usize = 2;
 
-        let resources = Arc::new(AtomicUsize::new(0));
-        let monitor = Arc::new(TokioMonitor::new(Arc::clone(&resources)));
-        let (entered_tx, entered_rx) = mpsc::channel();
+        let monitor = Arc::new(TokioMonitor::new(0_usize));
+        let (entered_tx, entered_rx) = mpsc::sync_channel(WAITER_COUNT);
         let release = Arc::new((Mutex::new(false), Condvar::new()));
         let hook = Arc::new(NotificationRegistrationBoundaryHook {
             target: Arc::as_ptr(&monitor).addr(),
@@ -449,36 +521,91 @@ mod tests {
         let (done_tx, done_rx) = mpsc::channel();
         let mut waiters = Vec::with_capacity(WAITER_COUNT);
 
-        for _ in 0..WAITER_COUNT {
-            let waiter_monitor = Arc::clone(&monitor);
-            let done_tx = done_tx.clone();
-            waiters.push(tokio::spawn(async move {
-                waiter_monitor
-                    .wait_until_async(
-                        |available| available.load(Ordering::Acquire) > 0,
-                        |available| {
-                            available.fetch_sub(1, Ordering::AcqRel);
-                        },
-                    )
-                    .await;
-                done_tx
-                    .send(())
-                    .expect("test should receive waiter completion");
-            }));
-        }
-        drop(done_tx);
-
-        for waiter in 0..WAITER_COUNT {
-            entered_rx.recv_timeout(REAL_TIMEOUT).unwrap_or_else(|_| {
-                panic!(
-                    "waiter {} of {WAITER_COUNT} should reach the registration window",
-                    waiter + 1,
+        let first_monitor = Arc::clone(&monitor);
+        let first_done_tx = done_tx.clone();
+        waiters.push(tokio::spawn(async move {
+            first_monitor
+                .wait_until_async(
+                    |available| *available > 0,
+                    |available| *available -= 1,
                 )
-            });
-        }
-        resources.store(WAITER_COUNT, Ordering::Release);
-        monitor.notify_one();
-        monitor.notify_one();
+                .await;
+            first_done_tx
+                .send(())
+                .expect("test should receive first waiter completion");
+        }));
+        entered_rx
+            .recv_timeout(REAL_TIMEOUT)
+            .expect("first waiter should reach the registration window");
+
+        let (holding_tx, holding_rx) = mpsc::sync_channel(1);
+        let (producer_pending_tx, producer_pending_rx) = mpsc::sync_channel(1);
+        let second_monitor = Arc::clone(&monitor);
+        let second_done_tx = done_tx.clone();
+        waiters.push(tokio::spawn(async move {
+            let mut holding_tx = Some(holding_tx);
+            let mut producer_pending_rx = Some(producer_pending_rx);
+            second_monitor
+                .wait_until_async(
+                    move |available| {
+                        if *available == 0 {
+                            holding_tx
+                                .take()
+                                .expect("second waiter should report contention once")
+                                .try_send(())
+                                .expect("controller should observe held state lock");
+                            producer_pending_rx
+                                .take()
+                                .expect("second waiter should await producer once")
+                                .recv_timeout(REAL_TIMEOUT)
+                                .expect("producer lock should become pending");
+                        }
+                        *available > 0
+                    },
+                    |available| *available -= 1,
+                )
+                .await;
+            second_done_tx
+                .send(())
+                .expect("test should receive second waiter completion");
+        }));
+        drop(done_tx);
+        holding_rx
+            .recv_timeout(REAL_TIMEOUT)
+            .expect("second waiter should hold the state lock");
+
+        let (producer_proceed_tx, producer_proceed_rx) = mpsc::sync_channel(1);
+        let (producer_done_tx, producer_done_rx) = mpsc::sync_channel(1);
+        let producer_monitor = Arc::clone(&monitor);
+        let producer = tokio::spawn(async move {
+            let lock = producer_monitor.state.lock();
+            let mut guard = ContendedLockFuture::new(
+                lock,
+                producer_pending_tx,
+                producer_proceed_rx,
+                REAL_TIMEOUT,
+            )
+            .await;
+            *guard = WAITER_COUNT;
+            drop(guard);
+            producer_monitor.notify_one();
+            producer_monitor.notify_one();
+            producer_done_tx
+                .try_send(())
+                .expect("controller should observe producer completion");
+        });
+
+        entered_rx
+            .recv_timeout(REAL_TIMEOUT)
+            .expect("second waiter should reach the registration window");
+        producer_proceed_tx
+            .try_send(())
+            .expect("producer should receive permission to acquire state lock");
+        producer_done_rx
+            .recv_timeout(REAL_TIMEOUT)
+            .expect("producer should update state and notify both waiters");
+        producer.await.expect("producer task should finish");
+
         let (released, release_changed) = &*release;
         *released
             .lock()
@@ -496,6 +623,6 @@ mod tests {
         for waiter in waiters {
             waiter.await.expect("condition waiter task should finish");
         }
-        assert_eq!(0, resources.load(Ordering::Acquire));
+        assert_eq!(0, monitor.with_read_async(|available| *available).await);
     }
 }
