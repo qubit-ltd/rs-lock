@@ -84,7 +84,10 @@ fn install_notification_registration_boundary_hook(
     let mut installed = NOTIFICATION_REGISTRATION_BOUNDARY_HOOK
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    assert!(installed.is_none(), "registration boundary hook installed twice");
+    assert!(
+        installed.is_none(),
+        "registration boundary hook installed twice"
+    );
     *installed = Some(hook);
     NotificationRegistrationBoundaryHookGuard
 }
@@ -152,6 +155,16 @@ struct TokioConditionWaiterRegistration<'a> {
 #[cfg(test)]
 type TimeoutBeforeRegistrationHook = Arc<dyn Fn() + Send + Sync>;
 
+/// Test-only callback run after timed waiter registration and state release,
+/// but before polling the signal or fixed timer.
+#[cfg(test)]
+type TimeoutAfterRegistrationHook = Arc<dyn Fn() + Send + Sync>;
+
+/// Test-only callback run after a timed waiter consumes a signal, but before
+/// it reacquires the protected state.
+#[cfg(test)]
+type TimeoutBeforeStateReacquireHook = Arc<dyn Fn() + Send + Sync>;
+
 impl Drop for TokioConditionWaiterRegistration<'_> {
     /// Removes this waiter if no notification has selected it yet.
     fn drop(&mut self) {
@@ -178,10 +191,13 @@ impl Drop for TokioConditionWaiterRegistration<'_> {
 /// of transferring it to another or future waiter. After an initial predicate
 /// check requires waiting with a nonzero budget, a timed wait creates one timer
 /// before registering its first waiter and reuses that fixed deadline across
-/// wakeups. Registration time consumes the condition-wait budget. Polling the
-/// timer requires a Tokio runtime with the time driver enabled. Initial mutex
-/// contention, an immediately ready predicate, and a zero budget do not create
-/// a timer and therefore do not require the time driver.
+/// wakeups. Registration and state-reacquisition time consume the
+/// condition-wait budget; a signal cannot restart or extend it. When a signal
+/// and the deadline are both ready, the deadline is selected first, followed
+/// by one final locked predicate check. Polling the timer requires a Tokio
+/// runtime with the time driver enabled. Initial mutex contention, an
+/// immediately ready predicate, and a zero budget do not create a timer and
+/// therefore do not require the time driver.
 pub struct TokioMonitor<T> {
     /// Protected monitor state.
     state: Mutex<T>,
@@ -191,6 +207,14 @@ pub struct TokioMonitor<T> {
     #[cfg(test)]
     timeout_before_registration_hook:
         StdMutex<Option<TimeoutBeforeRegistrationHook>>,
+    /// Per-monitor post-registration hook for deadline races.
+    #[cfg(test)]
+    timeout_after_registration_hook:
+        StdMutex<Option<TimeoutAfterRegistrationHook>>,
+    /// Per-monitor hook for deadline races while reacquiring protected state.
+    #[cfg(test)]
+    timeout_before_state_reacquire_hook:
+        StdMutex<Option<TimeoutBeforeStateReacquireHook>>,
 }
 
 impl<T> TokioMonitor<T> {
@@ -209,6 +233,10 @@ impl<T> TokioMonitor<T> {
             waiters: StdMutex::new(Vec::new()),
             #[cfg(test)]
             timeout_before_registration_hook: StdMutex::new(None),
+            #[cfg(test)]
+            timeout_after_registration_hook: StdMutex::new(None),
+            #[cfg(test)]
+            timeout_before_state_reacquire_hook: StdMutex::new(None),
         }
     }
 
@@ -360,6 +388,70 @@ impl<T> TokioMonitor<T> {
             hook();
         }
     }
+
+    /// Installs the test-only post-registration timeout callback.
+    ///
+    /// # Arguments
+    ///
+    /// * `hook` - Callback invoked after timed waiter registration and state
+    ///   release, before the signal or fixed timer is polled.
+    #[cfg(test)]
+    fn set_timeout_after_registration_hook<F>(&self, hook: F)
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        *self
+            .timeout_after_registration_hook
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Some(Arc::new(hook));
+    }
+
+    /// Runs the test-only post-registration timeout callback without holding
+    /// its configuration mutex.
+    #[cfg(test)]
+    fn run_timeout_after_registration_hook(&self) {
+        let hook = self
+            .timeout_after_registration_hook
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if let Some(hook) = hook {
+            hook();
+        }
+    }
+
+    /// Installs the test-only pre-reacquisition timeout callback.
+    ///
+    /// # Arguments
+    ///
+    /// * `hook` - Callback invoked after a signal is consumed and before the
+    ///   timed waiter reacquires the protected state.
+    #[cfg(test)]
+    fn set_timeout_before_state_reacquire_hook<F>(&self, hook: F)
+    where
+        F: Fn() + Send + Sync + 'static,
+    {
+        *self
+            .timeout_before_state_reacquire_hook
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Some(Arc::new(hook));
+    }
+
+    /// Runs the test-only pre-reacquisition timeout callback without holding
+    /// its configuration mutex.
+    #[cfg(test)]
+    fn run_timeout_before_state_reacquire_hook(&self) {
+        let hook = self
+            .timeout_before_state_reacquire_hook
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if let Some(hook) = hook {
+            hook();
+        }
+    }
 }
 
 impl<T> Notifier for TokioMonitor<T> {
@@ -454,8 +546,12 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// time consumes the budget. Initial mutex contention, an immediately ready
     /// predicate, and a zero budget do not create a timer or require the time
     /// driver. The fixed deadline is reused across wakeups and followed by one
-    /// final locked predicate check. Readiness wins over timeout, and zero
-    /// timeout still checks the predicate once.
+    /// final locked predicate check. Predicate readiness wins over timeout. If
+    /// a signal wins before the timer is ready but reacquiring the state
+    /// exhausts the fixed deadline, a still-blocking predicate times out
+    /// without another waiter registration. When the signal and deadline are
+    /// both ready, the deadline is selected first. A zero timeout still checks
+    /// the predicate once.
     fn wait_until_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
@@ -488,8 +584,12 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// time consumes the budget. Initial mutex contention, an immediately ready
     /// predicate, and a zero budget do not create a timer or require the time
     /// driver. The fixed deadline is reused across wakeups and followed by one
-    /// final locked predicate check. Readiness wins over timeout, and zero
-    /// timeout still checks the predicate once.
+    /// final locked predicate check. Predicate readiness wins over timeout. If
+    /// a signal wins before the timer is ready but reacquiring the state
+    /// exhausts the fixed deadline, a still-blocking predicate times out
+    /// without another waiter registration. When the signal and deadline are
+    /// both ready, the deadline is selected first. A zero timeout still checks
+    /// the predicate once.
     #[allow(
         clippy::manual_async_fn,
         reason = "the explicit Send bound is part of the trait contract"
@@ -523,14 +623,16 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
             loop {
                 let registration = self.register_waiter();
                 drop(guard);
+                #[cfg(test)]
+                self.run_timeout_after_registration_hook();
                 let timed_out = {
                     let notified = registration.waiter.signal.notified();
                     tokio::pin!(notified);
                     poll_fn(|context| {
-                        if notified.as_mut().poll(context).is_ready() {
-                            Poll::Ready(false)
-                        } else if deadline.as_mut().poll(context).is_ready() {
+                        if deadline.as_mut().poll(context).is_ready() {
                             Poll::Ready(true)
+                        } else if notified.as_mut().poll(context).is_ready() {
+                            Poll::Ready(false)
                         } else {
                             Poll::Pending
                         }
@@ -545,9 +647,17 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
                     }
                     return WaitTimeoutResult::TimedOut;
                 }
+                #[cfg(test)]
+                self.run_timeout_before_state_reacquire_hook();
                 guard = self.state.lock().await;
                 if !predicate(&*guard) {
                     return WaitTimeoutResult::Ready(action(&mut *guard));
+                }
+                if deadline.as_ref().is_elapsed()
+                    || tokio::time::Instant::now()
+                        >= deadline.as_ref().deadline()
+                {
+                    return WaitTimeoutResult::TimedOut;
                 }
             }
         }
@@ -888,22 +998,17 @@ mod tests {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             let (_released, wait_result) = release_changed
-                .wait_timeout_while(
-                    released,
-                    REGISTRATION_DELAY,
-                    |released| !*released,
-                )
+                .wait_timeout_while(released, REGISTRATION_DELAY, |released| {
+                    !*released
+                })
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             assert!(
                 wait_result.timed_out(),
                 "registration delay gate should consume the timeout budget"
             );
         });
-        let mut waiter = Box::pin(monitor.wait_while_for_async(
-            TIMEOUT,
-            |_| true,
-            |_| (),
-        ));
+        let mut waiter =
+            Box::pin(monitor.wait_while_for_async(TIMEOUT, |_| true, |_| ()));
 
         assert_eq!(
             Ok(WaitTimeoutResult::TimedOut),
@@ -927,11 +1032,142 @@ mod tests {
         assert!(poll_once(waiter.as_mut(), &wake_counter).is_pending());
     }
 
+    /// Verifies that simultaneous signal and deadline readiness performs the
+    /// final predicate check without registering another expired waiter.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_tokio_monitor_simultaneous_signal_and_deadline_do_not_reregister()
+     {
+        const TIMEOUT: Duration = Duration::from_millis(5);
+        const DEADLINE_DELAY: Duration = Duration::from_millis(20);
+        const REAL_TIMEOUT: Duration = Duration::from_secs(1);
+
+        let monitor = Arc::new(TokioMonitor::new(true));
+        let (entered_tx, entered_rx) = mpsc::sync_channel(2);
+        let release = Arc::new((Mutex::new(false), Condvar::new()));
+        let hook_release = Arc::clone(&release);
+        monitor.set_timeout_after_registration_hook(move || {
+            entered_tx
+                .try_send(())
+                .expect("controller should observe timed waiter registration");
+            let (released, release_changed) = &*hook_release;
+            let released = released
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let (released, _) = release_changed
+                .wait_timeout_while(released, REAL_TIMEOUT, |released| {
+                    !*released
+                })
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            assert!(*released, "controller should release timed waiter");
+        });
+
+        let waiter_monitor = Arc::clone(&monitor);
+        let waiter = tokio::spawn(async move {
+            waiter_monitor
+                .wait_while_for_async(TIMEOUT, |blocked| *blocked, |_| ())
+                .await
+        });
+        entered_rx
+            .recv_timeout(REAL_TIMEOUT)
+            .expect("timed waiter should reach the poll boundary");
+        monitor.notify_one();
+
+        let delay_gate = Mutex::new(false);
+        let delay_changed = Condvar::new();
+        let delayed = delay_gate
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let (delayed, delay_result) = delay_changed
+            .wait_timeout_while(delayed, DEADLINE_DELAY, |delayed| !*delayed)
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        assert!(delay_result.timed_out(), "deadline delay should elapse");
+        drop(delayed);
+
+        let (released, release_changed) = &*release;
+        *released
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = true;
+        release_changed.notify_all();
+
+        let reregistered =
+            entered_rx.recv_timeout(Duration::from_millis(50)).is_ok();
+        if reregistered {
+            monitor
+                .with_write_notify_all_async(|blocked| *blocked = false)
+                .await;
+        }
+        let result = tokio::time::timeout(REAL_TIMEOUT, waiter)
+            .await
+            .expect("timed waiter should finish within one second")
+            .expect("timed waiter task should not panic");
+
+        assert!(
+            !reregistered,
+            "an elapsed waiter must not register after its final predicate check"
+        );
+        assert_eq!(WaitTimeoutResult::TimedOut, result);
+    }
+
+    /// Verifies that a signal selected before the deadline cannot restart the
+    /// wait after state reacquisition consumes the remaining budget.
+    #[tokio::test(flavor = "current_thread")]
+    async fn test_tokio_monitor_signal_reacquire_crossing_deadline_does_not_reregister()
+     {
+        const TIMEOUT: Duration = Duration::from_millis(5);
+        const REACQUIRE_DELAY: Duration = Duration::from_millis(20);
+
+        let monitor = Arc::new(TokioMonitor::new(true));
+        let registrations = Arc::new(AtomicUsize::new(0));
+        let hook_registrations = Arc::clone(&registrations);
+        let hook_monitor = Arc::downgrade(&monitor);
+        monitor.set_timeout_after_registration_hook(move || {
+            if hook_registrations.fetch_add(1, Ordering::SeqCst) == 0 {
+                hook_monitor
+                    .upgrade()
+                    .expect("monitor should outlive its waiter")
+                    .notify_one();
+            }
+        });
+        monitor.set_timeout_before_state_reacquire_hook(|| {
+            let delay_gate = Mutex::new(false);
+            let delay_changed = Condvar::new();
+            let delayed = delay_gate
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let (_delayed, delay_result) = delay_changed
+                .wait_timeout_while(delayed, REACQUIRE_DELAY, |delayed| {
+                    !*delayed
+                })
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            assert!(
+                delay_result.timed_out(),
+                "state reacquisition delay should consume the timeout budget"
+            );
+        });
+        let mut waiter = Box::pin(monitor.wait_while_for_async(
+            TIMEOUT,
+            |blocked| *blocked,
+            |_| (),
+        ));
+        let wake_counter = Arc::new(WakeCounter::default());
+
+        assert_eq!(
+            Poll::Ready(WaitTimeoutResult::TimedOut),
+            poll_once(waiter.as_mut(), &wake_counter),
+            "a blocking predicate must time out after reacquisition consumes the budget"
+        );
+        assert_eq!(
+            1,
+            registrations.load(Ordering::SeqCst),
+            "an elapsed waiter must not register after reacquiring state"
+        );
+    }
+
     /// Verifies that two condition waiters register before releasing the state
     /// lock, so two notifications cannot collapse into one retained permit.
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn test_tokio_monitor_notify_one_does_not_lose_registered_condition_waiter()
-    {
+     {
         const REAL_TIMEOUT: Duration = Duration::from_secs(1);
         const WAITER_COUNT: usize = 2;
 
@@ -944,8 +1180,7 @@ mod tests {
             release: Arc::clone(&release),
             real_timeout: REAL_TIMEOUT,
         });
-        let _hook_guard =
-            install_notification_registration_boundary_hook(hook);
+        let _hook_guard = install_notification_registration_boundary_hook(hook);
         let (done_tx, done_rx) = mpsc::channel();
         let mut waiters = Vec::with_capacity(WAITER_COUNT);
 
