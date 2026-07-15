@@ -9,11 +9,21 @@
 
 use std::{
     future::Future,
+    pin::Pin,
     sync::{
         Arc,
+        atomic::{
+            AtomicUsize,
+            Ordering,
+        },
         mpsc,
     },
-    task::Poll,
+    task::{
+        Context,
+        Poll,
+        Wake,
+        Waker,
+    },
     thread,
     time::Duration,
 };
@@ -29,6 +39,236 @@ use qubit_lock::{
 /// Returns a future after proving at compile time that it is sendable.
 fn assert_send<F: Future + Send>(future: F) -> F {
     future
+}
+
+/// Counts wakeups delivered to one manually polled future.
+#[derive(Default)]
+struct WakeCounter {
+    /// Number of wakeups observed by this waker.
+    wakes: AtomicUsize,
+}
+
+impl Wake for WakeCounter {
+    /// Records a wakeup that consumes the waker's shared owner.
+    fn wake(self: Arc<Self>) {
+        self.wakes.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+impl WakeCounter {
+    /// Returns the number of wakeups observed so far.
+    fn count(&self) -> usize {
+        self.wakes.load(Ordering::SeqCst)
+    }
+}
+
+/// Polls one future once with a wake-counting context.
+///
+/// # Arguments
+///
+/// * `future` - Pinned future to poll.
+/// * `wake_counter` - Counter backing the poll context's waker.
+///
+/// # Returns
+///
+/// The result of this single poll.
+fn poll_once<F: Future + ?Sized>(
+    future: Pin<&mut F>,
+    wake_counter: &Arc<WakeCounter>,
+) -> Poll<F::Output> {
+    let waker = Waker::from(Arc::clone(wake_counter));
+    let mut context = Context::from_waker(&waker);
+    future.poll(&mut context)
+}
+
+/// Verifies that `notify_one` without a registered waiter has no effect on a
+/// condition waiter registered later.
+#[test]
+fn test_tokio_monitor_notify_one_without_waiter_is_not_retained() {
+    let monitor = TokioMonitor::new(());
+    monitor.notify_one();
+
+    let predicate_checks = Arc::new(AtomicUsize::new(0));
+    let waiter_checks = Arc::clone(&predicate_checks);
+    let mut waiter = Box::pin(monitor.wait_while_async(
+        move |_| {
+            waiter_checks.fetch_add(1, Ordering::SeqCst);
+            true
+        },
+        |_| (),
+    ));
+    let wake_counter = Arc::new(WakeCounter::default());
+
+    assert!(poll_once(waiter.as_mut(), &wake_counter).is_pending());
+    assert_eq!(
+        1,
+        predicate_checks.load(Ordering::SeqCst),
+        "a notification sent without waiters must not reach a future waiter"
+    );
+}
+
+/// Verifies that `Notifier::notify_all` selects every waiter registered at the
+/// call boundary without retaining a signal for a future waiter.
+#[test]
+fn test_tokio_monitor_notify_all_selects_registered_waiters_only() {
+    const REGISTERED_WAITERS: usize = 2;
+
+    let monitor = TokioMonitor::new(true);
+    let predicate_checks = Arc::new(AtomicUsize::new(0));
+    let mut waiters = Vec::with_capacity(REGISTERED_WAITERS);
+    let mut wake_counters = Vec::with_capacity(REGISTERED_WAITERS);
+    for _ in 0..REGISTERED_WAITERS {
+        let waiter_checks = Arc::clone(&predicate_checks);
+        let mut waiter = Box::pin(monitor.wait_while_async(
+            move |blocked| {
+                waiter_checks.fetch_add(1, Ordering::SeqCst);
+                *blocked
+            },
+            |_| (),
+        ));
+        let wake_counter = Arc::new(WakeCounter::default());
+        assert!(poll_once(waiter.as_mut(), &wake_counter).is_pending());
+        waiters.push(waiter);
+        wake_counters.push(wake_counter);
+    }
+
+    <TokioMonitor<bool> as Notifier>::notify_all(&monitor);
+    assert!(
+        wake_counters.iter().all(|counter| counter.count() == 1),
+        "notify_all should select every registered waiter exactly once"
+    );
+    drop(waiters);
+
+    let future_checks = Arc::clone(&predicate_checks);
+    let mut future_waiter = Box::pin(monitor.wait_while_async(
+        move |blocked| {
+            future_checks.fetch_add(1, Ordering::SeqCst);
+            *blocked
+        },
+        |_| (),
+    ));
+    let future_wakes = Arc::new(WakeCounter::default());
+    assert!(poll_once(future_waiter.as_mut(), &future_wakes).is_pending());
+    assert_eq!(0, future_wakes.count());
+    assert_eq!(
+        REGISTERED_WAITERS + 1,
+        predicate_checks.load(Ordering::SeqCst)
+    );
+}
+
+/// Verifies that cancelling the waiter selected by `notify_one` discards that
+/// selection instead of transferring it to another waiter.
+#[test]
+fn test_tokio_monitor_cancelled_selected_waiter_discards_notification() {
+    let monitor = TokioMonitor::new(());
+    let predicate_checks =
+        [Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0))];
+    let mut waiters: Vec<Option<Pin<Box<dyn Future<Output = ()> + Send>>>> =
+        predicate_checks
+            .iter()
+            .map(|checks| {
+                let waiter_checks = Arc::clone(checks);
+                Some(Box::pin(monitor.wait_while_async(
+                    move |_| {
+                        waiter_checks.fetch_add(1, Ordering::SeqCst);
+                        true
+                    },
+                    |_| (),
+                ))
+                    as Pin<Box<dyn Future<Output = ()> + Send>>)
+            })
+            .collect();
+    let wake_counters = [
+        Arc::new(WakeCounter::default()),
+        Arc::new(WakeCounter::default()),
+    ];
+
+    for (waiter, wake_counter) in waiters.iter_mut().zip(&wake_counters) {
+        assert!(
+            poll_once(
+                waiter
+                    .as_mut()
+                    .expect("registered waiter should still exist")
+                    .as_mut(),
+                wake_counter,
+            )
+            .is_pending()
+        );
+    }
+
+    monitor.notify_one();
+    assert_eq!(
+        1,
+        wake_counters
+            .iter()
+            .map(|counter| counter.count())
+            .sum::<usize>(),
+        "notify_one should select exactly one registered waiter"
+    );
+
+    let selected = wake_counters
+        .iter()
+        .position(|counter| counter.count() == 1)
+        .expect("notify_one should select one waiter");
+    let unselected = 1 - selected;
+    drop(waiters[selected].take());
+    let transferred_wakes = wake_counters[unselected].count();
+    monitor.notify_one();
+    assert_eq!(
+        1,
+        wake_counters[unselected].count(),
+        "the unselected waiter should receive the next notification"
+    );
+    assert!(
+        poll_once(
+            waiters[unselected]
+                .as_mut()
+                .expect("unselected waiter should still exist")
+                .as_mut(),
+            &wake_counters[unselected],
+        )
+        .is_pending()
+    );
+    assert_eq!(
+        2,
+        predicate_checks[unselected].load(Ordering::SeqCst),
+        "the unselected waiter should recheck exactly once"
+    );
+    drop(waiters[unselected].take());
+
+    let future_checks = Arc::new(AtomicUsize::new(0));
+    let future_waiter_checks = Arc::clone(&future_checks);
+    let mut future_waiter = Box::pin(monitor.wait_while_async(
+        move |_| {
+            future_waiter_checks.fetch_add(1, Ordering::SeqCst);
+            true
+        },
+        |_| (),
+    ));
+    let future_wakes = Arc::new(WakeCounter::default());
+    assert!(poll_once(future_waiter.as_mut(), &future_wakes).is_pending());
+
+    assert_eq!(
+        0, transferred_wakes,
+        "cancelled selection must not wake the unselected waiter"
+    );
+    assert_eq!(
+        1,
+        future_checks.load(Ordering::SeqCst),
+        "cancelled selection must not be retained for a future waiter"
+    );
+}
+
+/// Verifies that an unrepresentable relative deadline becomes a far-future
+/// timer instead of overflowing `Instant` arithmetic.
+#[tokio::test(flavor = "current_thread")]
+async fn test_tokio_monitor_timeout_duration_max_does_not_overflow() {
+    let monitor = TokioMonitor::new(());
+    let mut waiter =
+        Box::pin(monitor.wait_while_for_async(Duration::MAX, |_| true, |_| ()));
+    let wake_counter = Arc::new(WakeCounter::default());
+
+    assert!(poll_once(waiter.as_mut(), &wake_counter).is_pending());
 }
 
 /// Verifies that all Tokio condition-wait trait methods return `Send` futures.
