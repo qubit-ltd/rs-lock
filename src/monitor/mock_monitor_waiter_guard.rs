@@ -26,8 +26,8 @@ impl<'a, T: Send + 'static> MockMonitorWaiterGuard<'a, T> {
     ///
     /// * `monitor` - Monitor that owns the registration.
     /// * `waiter_id` - Identifier assigned to the registered waiter.
-    /// * `timeout_waiter` - Whether this registration contributes to the timeout
-    ///   waiter count.
+    /// * `timeout_waiter` - Whether this registration contributes to the
+    ///   timeout waiter count.
     pub(super) fn new(
         monitor: &'a MockMonitor<T>,
         waiter_id: u64,

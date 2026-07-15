@@ -10,10 +10,18 @@
 //! Provides an Arc-wrapped synchronous monitor for condition-based state
 //! coordination across threads.
 
-use std::{ops::Deref, sync::Arc, time::Duration};
+use std::{
+    ops::Deref,
+    sync::Arc,
+    time::Duration,
+};
 
 use super::{
-    ConditionWaiter, Notifier, StdMonitor, StdMonitorGuard, TimeoutConditionWaiter,
+    ConditionWaiter,
+    Notifier,
+    StdMonitor,
+    StdMonitorGuard,
+    TimeoutConditionWaiter,
     WaitTimeoutResult,
 };
 
@@ -371,7 +379,12 @@ impl<T> ArcStdMonitor<T> {
     /// );
     /// ```
     #[inline]
-    pub fn wait_until_for<R, P, F>(&self, timeout: Duration, ready: P, f: F) -> WaitTimeoutResult<R>
+    pub fn wait_until_for<R, P, F>(
+        &self,
+        timeout: Duration,
+        ready: P,
+        f: F,
+    ) -> WaitTimeoutResult<R>
     where
         P: FnMut(&T) -> bool,
         F: FnOnce(&mut T) -> R,

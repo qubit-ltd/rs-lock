@@ -7,14 +7,24 @@
 // =============================================================================
 //! Tests for [`ArcMockMonitor`](qubit_lock::ArcMockMonitor).
 
-use std::{thread, time::Duration};
+use std::{
+    thread,
+    time::Duration,
+};
 
 use qubit_clock::ManualMonotonicClock;
 use qubit_lock::{
-    ArcMockMonitor, ConditionWaiter, Notifier, TimeoutConditionWaiter, WaitTimeoutResult,
+    ArcMockMonitor,
+    ConditionWaiter,
+    Notifier,
+    TimeoutConditionWaiter,
+    WaitTimeoutResult,
 };
 #[cfg(feature = "async")]
-use qubit_lock::{AsyncConditionWaiter, AsyncTimeoutConditionWaiter};
+use qubit_lock::{
+    AsyncConditionWaiter,
+    AsyncTimeoutConditionWaiter,
+};
 
 #[test]
 fn test_arc_mock_monitor_clone_shares_state_and_mock_time() {
@@ -34,7 +44,8 @@ fn test_arc_mock_monitor_clone_shares_state_and_mock_time() {
 #[test]
 fn test_arc_mock_monitor_from_clock_shares_external_clock() {
     let clock = std::sync::Arc::new(ManualMonotonicClock::new());
-    let monitor = ArcMockMonitor::from_clock(false, std::sync::Arc::clone(&clock));
+    let monitor =
+        ArcMockMonitor::from_clock(false, std::sync::Arc::clone(&clock));
 
     clock
         .advance(Duration::from_secs(2))
@@ -48,7 +59,11 @@ fn test_arc_mock_monitor_timeout_waiter_helpers_delegate_to_inner_monitor() {
     let monitor = ArcMockMonitor::new(false);
     let waiter_monitor = monitor.clone();
     let waiter = thread::spawn(move || {
-        waiter_monitor.wait_until_for(Duration::from_secs(1), |ready| *ready, |_| ())
+        waiter_monitor.wait_until_for(
+            Duration::from_secs(1),
+            |ready| *ready,
+            |_| (),
+        )
     });
 
     assert!(monitor.wait_for_timeout_waiters(1, Duration::from_secs(1)));
@@ -183,7 +198,6 @@ fn test_arc_mock_monitor_wait_methods_delegate_to_inner_monitor() {
 #[tokio::test]
 async fn test_arc_mock_monitor_async_traits_delegate_to_inner_monitor() {
     let monitor = ArcMockMonitor::new(vec![1, 2]);
-
     assert_eq!(
         <ArcMockMonitor<Vec<i32>> as AsyncConditionWaiter>::wait_until_async(
             &monitor,
@@ -231,7 +245,6 @@ async fn test_arc_mock_monitor_async_traits_delegate_to_inner_monitor() {
 #[tokio::test]
 async fn test_arc_mock_monitor_async_wait_methods_delegate_to_inner_monitor() {
     let monitor = ArcMockMonitor::new(vec![1, 2]);
-
     assert_eq!(
         monitor
             .wait_until_async(

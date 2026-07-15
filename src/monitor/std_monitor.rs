@@ -22,13 +22,22 @@
 //! complex state machines such as thread pools.
 
 use std::{
-    sync::{Condvar, Mutex},
-    time::{Duration, Instant},
+    sync::{
+        Condvar,
+        Mutex,
+    },
+    time::{
+        Duration,
+        Instant,
+    },
 };
 
 use super::std_monitor_guard::StdMonitorGuard;
 use super::{
-    ConditionWaiter, Notifier, TimeoutConditionWaiter, wait_timeout_result::WaitTimeoutResult,
+    ConditionWaiter,
+    Notifier,
+    TimeoutConditionWaiter,
+    wait_timeout_result::WaitTimeoutResult,
 };
 
 /// Shared state protected by a mutex and a condition variable.

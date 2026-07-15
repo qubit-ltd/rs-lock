@@ -30,24 +30,60 @@
 //! use qubit_lock::monitor::Monitor;
 //! ```
 //!
-//! Notification-only waiting is intentionally not part of the public API.
+//! Notification-only waiting traits are intentionally not part of the public
+//! API.
 //!
 //! ```compile_fail
-//! use qubit_lock::{
-//!     AsyncNotificationWaiter,
-//!     AsyncTimeoutNotificationWaiter,
-//!     NotificationWaiter,
-//!     TimeoutNotificationWaiter,
-//! };
+//! use qubit_lock::NotificationWaiter;
 //! ```
 //!
-//! Concrete monitors likewise expose only predicate-based waiting.
+//! ```compile_fail
+//! use qubit_lock::TimeoutNotificationWaiter;
+//! ```
+//!
+//! ```compile_fail
+//! use qubit_lock::AsyncNotificationWaiter;
+//! ```
+//!
+//! ```compile_fail
+//! use qubit_lock::AsyncTimeoutNotificationWaiter;
+//! ```
+//!
+//! Concrete monitors and Arc wrappers likewise expose only predicate-based
+//! waiting.
 //!
 //! ```compile_fail
 //! use qubit_lock::StdMonitor;
 //!
 //! let monitor = StdMonitor::new(false);
 //! monitor.wait();
+//! ```
+//!
+//! ```compile_fail
+//! use std::time::Duration;
+//!
+//! use qubit_lock::ArcStdMonitor;
+//!
+//! let monitor = ArcStdMonitor::new(false);
+//! let _ = monitor.wait_for(Duration::ZERO);
+//! ```
+//!
+//! ```compile_fail
+//! use qubit_lock::ArcTokioMonitor;
+//!
+//! async fn wait_for_notification(monitor: &ArcTokioMonitor<bool>) {
+//!     monitor.wait_async().await;
+//! }
+//! ```
+//!
+//! ```compile_fail
+//! use std::time::Duration;
+//!
+//! use qubit_lock::{AsyncTimeoutNotificationWaiter, TokioMonitor};
+//!
+//! async fn wait_for_notification(monitor: &TokioMonitor<bool>) {
+//!     let _ = monitor.wait_for_async(Duration::ZERO).await;
+//! }
 //! ```
 
 mod lock;

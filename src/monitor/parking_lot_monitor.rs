@@ -23,13 +23,22 @@
 //! [`ParkingLotMonitorGuard::wait_timeout`] for more complex state machines
 //! such as thread pools.
 
-use std::time::{Duration, Instant};
+use std::time::{
+    Duration,
+    Instant,
+};
 
-use parking_lot::{Condvar, Mutex};
+use parking_lot::{
+    Condvar,
+    Mutex,
+};
 
 use super::parking_lot_monitor_guard::ParkingLotMonitorGuard;
 use super::{
-    ConditionWaiter, Notifier, TimeoutConditionWaiter, wait_timeout_result::WaitTimeoutResult,
+    ConditionWaiter,
+    Notifier,
+    TimeoutConditionWaiter,
+    wait_timeout_result::WaitTimeoutResult,
 };
 
 /// Shared state protected by a mutex and a condition variable.
