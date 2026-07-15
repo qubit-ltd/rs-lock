@@ -166,6 +166,7 @@ async fn test_tokio_monitor_traits_delegate_to_monitor_methods() {
     assert_eq!(timeout_condition_wait.await, WaitTimeoutResult::Ready(1),);
 }
 
+/// Verifies that time before the first poll does not consume timeout budget.
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_while_for_uses_condition_wait_budget() {
     let monitor = TokioMonitor::new(false);
@@ -199,6 +200,7 @@ async fn test_tokio_monitor_async_wait_while_for_uses_condition_wait_budget() {
     assert_eq!(wait.await, WaitTimeoutResult::TimedOut);
 }
 
+/// Verifies that initial mutex contention does not consume timeout budget.
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_while_for_excludes_initial_lock_contention_from_timeout()
 {
@@ -255,6 +257,7 @@ async fn test_tokio_monitor_async_wait_while_for_excludes_initial_lock_contentio
     assert_eq!(wait.await, WaitTimeoutResult::TimedOut);
 }
 
+/// Verifies that notifications reuse one fixed timeout deadline.
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_while_for_reuses_fixed_timeout_deadline()
 {
@@ -289,6 +292,7 @@ async fn test_tokio_monitor_async_wait_while_for_reuses_fixed_timeout_deadline()
     assert_eq!(wait.await, WaitTimeoutResult::TimedOut);
 }
 
+/// Verifies that zero timeout evaluates the initial predicate exactly once.
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_while_for_zero_timeout_checks_predicate_once()
 {
@@ -311,6 +315,7 @@ async fn test_tokio_monitor_async_wait_while_for_zero_timeout_checks_predicate_o
     assert_eq!(checks.load(std::sync::atomic::Ordering::SeqCst), 1);
 }
 
+/// Verifies that a condition wait runs its action after notification.
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_until_runs_action_after_notify() {
     let monitor = Arc::new(TokioMonitor::new(false));
@@ -337,6 +342,7 @@ async fn test_tokio_monitor_async_wait_until_runs_action_after_notify() {
     assert!(!monitor.with_read_async(|ready| *ready).await);
 }
 
+/// Verifies that notification returns a ready timed condition-wait result.
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_while_for_returns_ready_after_notify() {
     let monitor = Arc::new(TokioMonitor::new(false));
@@ -365,30 +371,34 @@ async fn test_tokio_monitor_async_wait_while_for_returns_ready_after_notify() {
     );
 }
 
+/// Verifies that an unnotified ready predicate wins the final deadline check.
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_while_for_rechecks_state_after_timeout()
 {
-    let monitor = Arc::new(TokioMonitor::new(false));
-    let waiter_monitor = Arc::clone(&monitor);
+    let monitor = TokioMonitor::new(false);
+    let wait = monitor.wait_while_for_async(
+        Duration::from_millis(20),
+        |ready| !*ready,
+        |ready| {
+            *ready = false;
+            9
+        },
+    );
+    tokio::pin!(wait);
+    assert!(
+        std::future::poll_fn(|context| {
+            Poll::Ready(wait.as_mut().poll(context))
+        })
+        .await
+        .is_pending(),
+        "initial blocking check should register the deadline timer",
+    );
 
-    let waiter = tokio::spawn(async move {
-        waiter_monitor
-            .wait_while_for_async(
-                Duration::from_millis(20),
-                |ready| !*ready,
-                |ready| {
-                    *ready = false;
-                    9
-                },
-            )
-            .await
-    });
-
-    tokio::time::advance(Duration::from_millis(5)).await;
     monitor.with_write_async(|ready| *ready = true).await;
+    tokio::time::advance(Duration::from_millis(20)).await;
 
     assert_eq!(
-        waiter.await.expect("waiter task should finish"),
+        wait.await,
         WaitTimeoutResult::Ready(9),
     );
 }

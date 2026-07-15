@@ -480,10 +480,10 @@ impl<T> StdMonitor<T> {
     ///
     /// The timeout budget starts after the monitor lock is acquired and the
     /// initial predicate check still requires waiting, immediately before the
-    /// first condition suspension. Initial lock contention and that predicate
-    /// check do not consume the budget. One fixed deadline is reused across
-    /// wakeups. At the deadline, readiness wins one final locked predicate
-    /// check. A zero timeout still checks the predicate once.
+    /// first condition-wait suspension. Initial lock contention and that
+    /// predicate check do not consume the budget. One fixed deadline is reused
+    /// across wakeups. At the deadline, readiness wins one final locked
+    /// predicate check. A zero timeout still checks the predicate once.
     ///
     /// Condition variables may wake spuriously, and timeout status alone is not
     /// used as proof that the predicate is still true; the predicate is always
@@ -562,10 +562,10 @@ impl<T> StdMonitor<T> {
     ///
     /// The timeout budget starts after the monitor lock is acquired and the
     /// initial predicate check still requires waiting, immediately before the
-    /// first condition suspension. Initial lock contention and that predicate
-    /// check do not consume the budget. One fixed deadline is reused across
-    /// wakeups. At the deadline, readiness wins one final locked predicate
-    /// check. A zero timeout still checks the predicate once.
+    /// first condition-wait suspension. Initial lock contention and that
+    /// predicate check do not consume the budget. One fixed deadline is reused
+    /// across wakeups. At the deadline, readiness wins one final locked
+    /// predicate check. A zero timeout still checks the predicate once.
     ///
     /// Condition variables may wake spuriously, and timeout status alone is not
     /// used as proof that the predicate is still false; the predicate is always

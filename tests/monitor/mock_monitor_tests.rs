@@ -584,6 +584,7 @@ fn test_mock_monitor_wait_until_for_times_out_on_mock_time() {
     waiter.join().expect("waiter should finish");
 }
 
+/// Verifies that blocking notifications reuse one fixed manual-clock target.
 #[test]
 fn test_mock_monitor_wait_while_for_reuses_fixed_timeout_target() {
     let monitor = Arc::new(MockMonitor::new(false));
@@ -632,6 +633,7 @@ fn test_mock_monitor_wait_while_for_reuses_fixed_timeout_target() {
     waiter.join().expect("waiter should finish");
 }
 
+/// Verifies that readiness wins the final blocking manual-clock target check.
 #[test]
 fn test_mock_monitor_wait_while_for_timeout_final_predicate_wins() {
     let monitor = Arc::new(MockMonitor::new(false));
@@ -662,6 +664,7 @@ fn test_mock_monitor_wait_while_for_timeout_final_predicate_wins() {
     waiter.join().expect("waiter should finish");
 }
 
+/// Verifies that zero timeout evaluates the blocking predicate exactly once.
 #[test]
 fn test_mock_monitor_wait_while_for_zero_timeout_checks_predicate_once() {
     let monitor = MockMonitor::new(false);

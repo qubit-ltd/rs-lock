@@ -29,11 +29,11 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// [`WaitTimeoutResult::Ready`] with the action result, or
     /// [`WaitTimeoutResult::TimedOut`] when the timeout expires first.
     /// The monitor acquires the state lock and checks `predicate` before
-    /// starting the timeout budget immediately before the first suspension,
-    /// so initial lock contention is excluded. One fixed deadline is reused
-    /// across wakeups. At the deadline, the predicate is checked once more
-    /// under the state lock; readiness wins over timeout. A zero timeout still
-    /// performs the initial locked check.
+    /// starting the timeout budget immediately before the first condition-wait
+    /// suspension, so initial lock contention is excluded. One fixed deadline
+    /// is reused across wakeups. At the deadline, the predicate is checked once
+    /// more under the state lock; readiness wins over timeout. A zero timeout
+    /// still performs the initial locked check.
     fn wait_until_for<R, P, F>(
         &self,
         timeout: Duration,
@@ -61,11 +61,11 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// [`WaitTimeoutResult::Ready`] with the action result, or
     /// [`WaitTimeoutResult::TimedOut`] when the timeout expires first.
     /// The monitor acquires the state lock and checks `predicate` before
-    /// starting the timeout budget immediately before the first suspension,
-    /// so initial lock contention is excluded. One fixed deadline is reused
-    /// across wakeups. At the deadline, the predicate is checked once more
-    /// under the state lock; readiness wins over timeout. A zero timeout still
-    /// performs the initial locked check.
+    /// starting the timeout budget immediately before the first condition-wait
+    /// suspension, so initial lock contention is excluded. One fixed deadline
+    /// is reused across wakeups. At the deadline, the predicate is checked once
+    /// more under the state lock; readiness wins over timeout. A zero timeout
+    /// still performs the initial locked check.
     fn wait_while_for<R, P, F>(
         &self,
         timeout: Duration,

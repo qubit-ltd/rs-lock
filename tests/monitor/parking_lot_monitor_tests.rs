@@ -359,6 +359,7 @@ fn test_parking_lot_monitor_wait_until_for_returns_timed_out_when_timeout() {
     assert_eq!(result, WaitTimeoutResult::TimedOut);
 }
 
+/// Verifies that initial lock contention does not consume timeout budget.
 #[test]
 fn test_parking_lot_monitor_wait_while_for_excludes_initial_lock_contention_from_timeout()
 {
@@ -409,6 +410,7 @@ fn test_parking_lot_monitor_wait_while_for_excludes_initial_lock_contention_from
     waiter.join().expect("waiter should finish");
 }
 
+/// Verifies that zero timeout evaluates the initial predicate exactly once.
 #[test]
 fn test_parking_lot_monitor_wait_while_for_zero_timeout_checks_predicate_once()
 {
@@ -428,6 +430,7 @@ fn test_parking_lot_monitor_wait_while_for_zero_timeout_checks_predicate_once()
     assert_eq!(checks, 1);
 }
 
+/// Verifies that readiness wins the final locked timeout check.
 #[test]
 fn test_parking_lot_monitor_wait_while_for_timeout_final_predicate_wins() {
     let monitor = Arc::new(ParkingLotMonitor::new(false));

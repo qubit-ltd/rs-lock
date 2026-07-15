@@ -128,9 +128,11 @@ fn run_notification_registration_boundary_hook(target: usize) {
 /// Dropping a pending condition-wait future cancels the wait, releases any held
 /// state guard, and unregisters its Tokio notification waiter. A `notify_one`
 /// signal selected concurrently with cancellation follows [`Notify`]'s
-/// cancellation behavior and is offered to another waiter. Timed waits that
-/// reach a suspension point require a Tokio runtime with the time driver
-/// enabled.
+/// cancellation behavior and is offered to another waiter. A timed wait whose
+/// initial locked predicate check still requires waiting creates its timer
+/// immediately before the first condition-wait suspension and therefore
+/// requires a Tokio runtime with the time driver enabled. Initial mutex
+/// contention does not create a timer.
 pub struct TokioMonitor<T> {
     /// Protected monitor state.
     state: Mutex<T>,
@@ -242,7 +244,8 @@ impl<T> TokioMonitor<T> {
     ///
     /// # Arguments
     ///
-    /// * `start` - Instant captured immediately before the first suspension.
+    /// * `start` - Instant captured immediately before the first condition-wait
+    ///   suspension.
     /// * `timeout` - Total timeout budget.
     ///
     /// # Returns
@@ -336,12 +339,13 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// The waiter registers before releasing the state lock. Notifications
     /// carry no state and provide no fairness guarantee. Dropping the returned
     /// future while it is pending cancels and unregisters the wait without
-    /// running `action`. If the wait reaches suspension, the current Tokio
-    /// runtime must have its time driver enabled or Tokio will panic. The
-    /// timeout starts after the initial locked predicate check, uses one fixed
-    /// deadline across wakeups, and performs one final locked predicate check
-    /// at the deadline. Initial lock contention is excluded, readiness wins
-    /// over timeout, and zero timeout still checks the predicate once.
+    /// running `action`. If the initial locked predicate check still requires
+    /// waiting, the method creates a timer immediately before the first
+    /// condition-wait suspension; the current Tokio runtime must then have its
+    /// time driver enabled or Tokio will panic. Initial mutex contention does
+    /// not create a timer. The timeout uses one fixed deadline across wakeups
+    /// and performs one final locked predicate check at the deadline. Readiness
+    /// wins over timeout, and zero timeout still checks the predicate once.
     fn wait_until_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
@@ -366,12 +370,13 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// The waiter registers before releasing the state lock. Notifications
     /// carry no state and provide no fairness guarantee. Dropping the returned
     /// future while it is pending cancels and unregisters the wait without
-    /// running `action`. If the wait reaches suspension, the current Tokio
-    /// runtime must have its time driver enabled or Tokio will panic. The
-    /// timeout starts after the initial locked predicate check, uses one fixed
-    /// deadline across wakeups, and performs one final locked predicate check
-    /// at the deadline. Initial lock contention is excluded, readiness wins
-    /// over timeout, and zero timeout still checks the predicate once.
+    /// running `action`. If the initial locked predicate check still requires
+    /// waiting, the method creates a timer immediately before the first
+    /// condition-wait suspension; the current Tokio runtime must then have its
+    /// time driver enabled or Tokio will panic. Initial mutex contention does
+    /// not create a timer. The timeout uses one fixed deadline across wakeups
+    /// and performs one final locked predicate check at the deadline. Readiness
+    /// wins over timeout, and zero timeout still checks the predicate once.
     #[allow(
         clippy::manual_async_fn,
         reason = "the explicit Send bound is part of the trait contract"
