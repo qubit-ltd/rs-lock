@@ -47,9 +47,20 @@ use super::{
     WaitTimeoutResult,
 };
 
-/// Test-only callback run immediately before a timeout wait first locks state.
+/// Test-only timeout state-lock acquisition phases.
 #[cfg(test)]
-type TimeoutPreLockBoundaryHook = Arc<dyn Fn() + Send + Sync + 'static>;
+#[derive(Clone, Copy)]
+enum TimeoutLockBoundaryPhase {
+    /// Immediately before the timeout waiter calls `lock_state()`.
+    BeforeLock,
+    /// Immediately after the timeout waiter acquires the state lock.
+    AfterLock,
+}
+
+/// Test-only callback run around a timeout wait's first state-lock acquisition.
+#[cfg(test)]
+type TimeoutLockBoundaryHook =
+    Arc<dyn Fn(TimeoutLockBoundaryPhase) + Send + Sync + 'static>;
 
 /// Test-only callback run after a blocking wait checks state and before sleep.
 #[cfg(test)]
@@ -79,9 +90,9 @@ pub struct MockMonitor<T> {
     /// Broadcasts mock notifications and time changes to async waiters.
     #[cfg(feature = "async")]
     async_change_sender: watch::Sender<u64>,
-    /// Per-monitor synchronization hook for timeout-budget regressions.
+    /// Per-monitor state-lock boundary hook for timeout-budget regressions.
     #[cfg(test)]
-    timeout_pre_lock_boundary_hook: Mutex<Option<TimeoutPreLockBoundaryHook>>,
+    timeout_lock_boundary_hook: Mutex<Option<TimeoutLockBoundaryHook>>,
     /// Per-monitor hook for the blocking change-check-to-sleep boundary.
     #[cfg(test)]
     change_wait_boundary_hook: Mutex<Option<ChangeWaitBoundaryHook>>,
@@ -175,7 +186,7 @@ impl<T: Send + 'static> MockMonitor<T> {
             #[cfg(feature = "async")]
             async_change_sender,
             #[cfg(test)]
-            timeout_pre_lock_boundary_hook: Mutex::new(None),
+            timeout_lock_boundary_hook: Mutex::new(None),
             #[cfg(test)]
             change_wait_boundary_hook: Mutex::new(None),
         }
@@ -344,42 +355,50 @@ impl<T: Send + 'static> MockMonitor<T> {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
-    /// Installs a callback for this monitor's initial timeout pre-lock boundary.
+    /// Installs a callback around the initial timeout state-lock acquisition.
     ///
-    /// The callback is test-only and may pause a timeout waiter before it first
-    /// acquires the protected-state lock. It is isolated to this monitor
-    /// instance and is invoked once by each blocking or asynchronous timeout
-    /// condition wait.
+    /// The test-only callback is isolated to this monitor instance. Each
+    /// blocking or asynchronous timeout condition wait invokes it immediately
+    /// before and after its first `lock_state()` call. The before-lock phase may
+    /// pause; the after-lock phase runs while protected state is held and must
+    /// return promptly.
     ///
     /// # Arguments
     ///
-    /// * `hook` - Callback to run at the pre-lock boundary.
+    /// * `hook` - Callback to run at both lock-acquisition boundaries.
     #[cfg(test)]
-    fn set_timeout_pre_lock_boundary_hook<F>(&self, hook: F)
+    fn set_timeout_lock_boundary_hook<F>(&self, hook: F)
     where
-        F: Fn() + Send + Sync + 'static,
+        F: Fn(TimeoutLockBoundaryPhase) + Send + Sync + 'static,
     {
         *self
-            .timeout_pre_lock_boundary_hook
+            .timeout_lock_boundary_hook
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner) =
             Some(Arc::new(hook));
     }
 
-    /// Runs this monitor's test-only initial timeout pre-lock callback.
+    /// Runs this monitor's test-only timeout state-lock boundary callback.
     ///
     /// The callback is cloned while its configuration lock is held, then runs
-    /// without any monitor lock held so test coordination cannot re-enter the
-    /// protected state.
+    /// without that configuration lock. During [`TimeoutLockBoundaryPhase::AfterLock`]
+    /// the timeout waiter still holds protected state.
+    ///
+    /// # Arguments
+    ///
+    /// * `phase` - State-lock acquisition phase reached by the timeout waiter.
     #[cfg(test)]
-    fn run_timeout_pre_lock_boundary_hook(&self) {
+    fn run_timeout_lock_boundary_hook(
+        &self,
+        phase: TimeoutLockBoundaryPhase,
+    ) {
         let hook = self
-            .timeout_pre_lock_boundary_hook
+            .timeout_lock_boundary_hook
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
         if let Some(hook) = hook {
-            hook();
+            hook(phase);
         }
     }
 
@@ -699,9 +718,15 @@ impl<T: Send + 'static> TimeoutConditionWaiter for MockMonitor<T> {
         F: FnOnce(&mut Self::State) -> R,
     {
         #[cfg(test)]
-        self.run_timeout_pre_lock_boundary_hook();
+        self.run_timeout_lock_boundary_hook(
+            TimeoutLockBoundaryPhase::BeforeLock,
+        );
         let (waiter_id, target_elapsed) = {
             let mut state = self.lock_state();
+            #[cfg(test)]
+            self.run_timeout_lock_boundary_hook(
+                TimeoutLockBoundaryPhase::AfterLock,
+            );
             if !predicate(&state.value) {
                 return WaitTimeoutResult::Ready(action(&mut state.value));
             }
@@ -806,9 +831,15 @@ impl<T: Send + 'static> AsyncTimeoutConditionWaiter for MockMonitor<T> {
         let mut change_receiver = self.async_change_sender.subscribe();
         async move {
             #[cfg(test)]
-            self.run_timeout_pre_lock_boundary_hook();
+            self.run_timeout_lock_boundary_hook(
+                TimeoutLockBoundaryPhase::BeforeLock,
+            );
             let (waiter_id, target_elapsed) = {
                 let mut state = self.lock_state();
+                #[cfg(test)]
+                self.run_timeout_lock_boundary_hook(
+                    TimeoutLockBoundaryPhase::AfterLock,
+                );
                 if !predicate(&state.value) {
                     return WaitTimeoutResult::Ready(action(&mut state.value));
                 }
@@ -881,96 +912,138 @@ mod tests {
     use super::{
         MockMonitor,
         TimeoutConditionWaiter,
+        TimeoutLockBoundaryPhase,
         WaitTimeoutResult,
     };
 
     /// Maximum real time permitted for every test coordination wait.
     const REAL_TIMEOUT: Duration = Duration::from_secs(1);
-    /// Manual-clock budget used by the pre-lock timeout regressions.
+    /// Manual-clock budget used by the lock-contention timeout regressions.
     const WAIT_TIMEOUT: Duration = Duration::from_millis(5);
 
-    /// State of a bounded test rendezvous at the timeout pre-lock boundary.
-    #[derive(Default)]
-    struct PreLockBoundaryState {
-        /// Whether the waiter reached the boundary.
-        reached: bool,
-        /// Whether the controller released the waiter.
-        released: bool,
+    /// Ordered progress through the timeout waiter's first state-lock attempt.
+    #[derive(Clone, Copy, Default, Eq, Ord, PartialEq, PartialOrd)]
+    enum TimeoutLockProgress {
+        /// Neither waiter nor controller has entered the rendezvous.
+        #[default]
+        Initial,
+        /// Waiter reached the boundary immediately before `lock_state()`.
+        BeforeLock,
+        /// Controller holds state and allowed the waiter to attempt locking.
+        ReleasedForAttempt,
+        /// Waiter is returning from the boundary to call `lock_state()`.
+        AttemptingLock,
+        /// Waiter acquired the state lock after controller contention.
+        AfterLock,
     }
 
-    /// Bounded rendezvous that pauses one waiter immediately before state lock.
+    /// Bounded rendezvous around one timeout waiter's first state-lock attempt.
     #[derive(Default)]
-    struct PreLockBoundary {
+    struct TimeoutLockBoundary {
         /// Rendezvous state protected across waiter and controller threads.
-        state: Mutex<PreLockBoundaryState>,
-        /// Signals boundary arrival and controller release.
+        progress: Mutex<TimeoutLockProgress>,
+        /// Signals progress changes between waiter and controller.
         changed: Condvar,
     }
 
-    impl PreLockBoundary {
-        /// Reports boundary arrival and blocks until the controller releases it.
+    impl TimeoutLockBoundary {
+        /// Records one hook phase reached by the timeout waiter.
         ///
-        /// The real-time wait is bounded by [`REAL_TIMEOUT`] and panics if the
-        /// controller does not release the waiter in time.
-        fn pause_waiter(&self) {
-            let mut state = self
-                .state
+        /// The before-lock phase blocks for at most [`REAL_TIMEOUT`] until the
+        /// controller holds state and permits the lock attempt. The after-lock
+        /// phase only publishes acquisition and returns immediately.
+        ///
+        /// # Arguments
+        ///
+        /// * `phase` - Lock-acquisition phase reported by the monitor seam.
+        fn observe_waiter_phase(&self, phase: TimeoutLockBoundaryPhase) {
+            match phase {
+                TimeoutLockBoundaryPhase::BeforeLock => {
+                    self.set_progress(TimeoutLockProgress::BeforeLock);
+                    self.wait_until(TimeoutLockProgress::ReleasedForAttempt);
+                    self.set_progress(TimeoutLockProgress::AttemptingLock);
+                },
+                TimeoutLockBoundaryPhase::AfterLock => {
+                    self.set_progress(TimeoutLockProgress::AfterLock);
+                },
+            }
+        }
+
+        /// Waits for the waiter to reach the boundary before `lock_state()`.
+        ///
+        /// The real-time wait is bounded by [`REAL_TIMEOUT`].
+        fn wait_until_before_lock(&self) {
+            self.wait_until(TimeoutLockProgress::BeforeLock);
+        }
+
+        /// Permits the paused waiter to return and attempt `lock_state()`.
+        fn release_for_lock_attempt(&self) {
+            self.set_progress(TimeoutLockProgress::ReleasedForAttempt);
+        }
+
+        /// Waits until the waiter is returning to attempt `lock_state()`.
+        ///
+        /// The controller calls this while holding protected state, so reaching
+        /// this phase proves the next lock acquisition must contend.
+        fn wait_until_lock_attempt(&self) {
+            self.wait_until(TimeoutLockProgress::AttemptingLock);
+        }
+
+        /// Waits until the waiter acquires state after controller contention.
+        fn wait_until_after_lock(&self) {
+            self.wait_until(TimeoutLockProgress::AfterLock);
+        }
+
+        /// Advances the rendezvous to `progress` and wakes observers.
+        ///
+        /// # Arguments
+        ///
+        /// * `progress` - New monotonic progress value.
+        fn set_progress(&self, progress: TimeoutLockProgress) {
+            let mut current = self
+                .progress
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            state.reached = true;
+            assert!(
+                progress >= *current,
+                "timeout lock progress must not move backwards"
+            );
+            *current = progress;
             self.changed.notify_all();
-            let (state, _) = self
+        }
+
+        /// Waits at most [`REAL_TIMEOUT`] for `expected` progress.
+        ///
+        /// # Arguments
+        ///
+        /// * `expected` - Minimum progress required before returning.
+        fn wait_until(&self, expected: TimeoutLockProgress) {
+            let current = self
+                .progress
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let (current, _) = self
                 .changed
-                .wait_timeout_while(state, REAL_TIMEOUT, |state| {
-                    !state.released
+                .wait_timeout_while(current, REAL_TIMEOUT, |current| {
+                    *current < expected
                 })
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             assert!(
-                state.released,
-                "controller should release the pre-lock waiter within one second"
+                *current >= expected,
+                "timeout waiter should reach the expected lock phase within one second"
             );
-        }
-
-        /// Waits for the timeout waiter to reach the pre-lock boundary.
-        ///
-        /// The real-time wait is bounded by [`REAL_TIMEOUT`] and panics if the
-        /// waiter does not arrive in time.
-        fn wait_until_reached(&self) {
-            let state = self
-                .state
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            let (state, _) = self
-                .changed
-                .wait_timeout_while(state, REAL_TIMEOUT, |state| !state.reached)
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            assert!(
-                state.reached,
-                "timeout waiter should reach the pre-lock boundary within one second"
-            );
-        }
-
-        /// Releases the timeout waiter paused at the pre-lock boundary.
-        fn release_waiter(&self) {
-            let mut state = self
-                .state
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            state.released = true;
-            self.changed.notify_all();
         }
     }
 
-    /// Verifies that a blocking timeout budget starts after initial state-lock
-    /// acquisition rather than at the pre-lock boundary.
+    /// Verifies that blocking state-lock contention does not consume timeout.
     #[test]
     fn test_mock_monitor_blocking_timeout_budget_starts_after_initial_state_lock()
     {
         let monitor = Arc::new(MockMonitor::new(false));
-        let boundary = Arc::new(PreLockBoundary::default());
+        let boundary = Arc::new(TimeoutLockBoundary::default());
         let waiter_boundary = Arc::clone(&boundary);
-        monitor.set_timeout_pre_lock_boundary_hook(move || {
-            waiter_boundary.pause_waiter();
+        monitor.set_timeout_lock_boundary_hook(move |phase| {
+            waiter_boundary.observe_waiter_phase(phase);
         });
 
         let waiter_monitor = Arc::clone(&monitor);
@@ -986,12 +1059,16 @@ mod tests {
                 .expect("controller should receive blocking wait result");
         });
 
-        boundary.wait_until_reached();
-        monitor
-            .monotonic_clock()
-            .advance(WAIT_TIMEOUT.saturating_mul(2))
-            .expect("manual clock should advance while waiter is before lock");
-        boundary.release_waiter();
+        boundary.wait_until_before_lock();
+        monitor.with_write(|_| {
+            boundary.release_for_lock_attempt();
+            boundary.wait_until_lock_attempt();
+            monitor
+                .monotonic_clock()
+                .advance(WAIT_TIMEOUT.saturating_mul(2))
+                .expect("manual clock should advance during state-lock contention");
+        });
+        boundary.wait_until_after_lock();
         assert!(monitor.wait_for_timeout_waiters(1, REAL_TIMEOUT));
 
         monitor
@@ -1048,16 +1125,16 @@ mod tests {
             .expect("boundary timeout waiter should finish");
     }
 
-    /// Verifies that an asynchronous timeout budget starts after initial
-    /// state-lock acquisition rather than at the pre-lock boundary.
+    /// Verifies that asynchronous state-lock contention does not consume
+    /// timeout.
     #[cfg(feature = "async")]
     #[test]
     fn test_mock_monitor_async_timeout_budget_starts_after_initial_state_lock() {
         let monitor = Arc::new(MockMonitor::new(false));
-        let boundary = Arc::new(PreLockBoundary::default());
+        let boundary = Arc::new(TimeoutLockBoundary::default());
         let waiter_boundary = Arc::clone(&boundary);
-        monitor.set_timeout_pre_lock_boundary_hook(move || {
-            waiter_boundary.pause_waiter();
+        monitor.set_timeout_lock_boundary_hook(move |phase| {
+            waiter_boundary.observe_waiter_phase(phase);
         });
 
         let waiter_monitor = Arc::clone(&monitor);
@@ -1076,12 +1153,16 @@ mod tests {
                 .expect("controller should receive async wait result");
         });
 
-        boundary.wait_until_reached();
-        monitor
-            .monotonic_clock()
-            .advance(WAIT_TIMEOUT.saturating_mul(2))
-            .expect("manual clock should advance while waiter is before lock");
-        boundary.release_waiter();
+        boundary.wait_until_before_lock();
+        monitor.with_write(|_| {
+            boundary.release_for_lock_attempt();
+            boundary.wait_until_lock_attempt();
+            monitor
+                .monotonic_clock()
+                .advance(WAIT_TIMEOUT.saturating_mul(2))
+                .expect("manual clock should advance during state-lock contention");
+        });
+        boundary.wait_until_after_lock();
         assert!(monitor.wait_for_timeout_waiters(1, REAL_TIMEOUT));
 
         monitor
