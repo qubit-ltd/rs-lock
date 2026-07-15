@@ -95,10 +95,12 @@ fn test_readme_documents_async_monitor_contract() {
     assert!(readme_en.contains("time driver enabled"));
     assert!(readme_en.contains("does not run the action"));
     assert!(readme_en.contains("does not roll back protected-state changes"));
+    assert!(readme_en.contains("discards that selection"));
     assert!(readme_zh.contains("返回的 future 是惰性的"));
     assert!(readme_zh.contains("启用 time driver"));
     assert!(readme_zh.contains("不会执行 action"));
     assert!(readme_zh.contains("不会回滚受保护状态的变化"));
+    assert!(readme_zh.contains("丢弃该次选择"));
 }
 
 #[test]

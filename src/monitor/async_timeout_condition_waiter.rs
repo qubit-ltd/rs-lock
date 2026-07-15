@@ -29,7 +29,9 @@ use crate::monitor::{
 ///
 /// Dropping a pending future cancels and unregisters its active wait. It does
 /// not run the action or roll back protected-state changes made while the wait
-/// existed.
+/// existed. If a notification already selected that waiter, cancellation
+/// discards the selection rather than transferring it to another or future
+/// waiter.
 pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     /// Returns a future that waits until the predicate becomes true or times
     /// out.

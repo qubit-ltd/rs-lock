@@ -57,7 +57,8 @@ timeout。
 异步 monitor trait 返回 `impl Future`；返回的 future 是惰性的，所以构造 future 和首次
 poll 之前的时间不消耗 timeout 预算。只有带 timeout 的 wait 实际进入非零计时挂起时，
 Tokio runtime 才必须启用 time driver。drop 一个 pending future 会注销其活跃 waiter，
-不会执行 action，也不会回滚受保护状态的变化。
+不会执行 action，也不会回滚受保护状态的变化。如果 `notify_one` 已选择该 waiter，
+取消会丢弃该次选择，不会转交给其他或未来 waiter。
 
 基于 Arc 的 monitor 包装器保留了供泛型代码使用的显式 trait 实现；普通 monitor 方法
 调用通过 `Deref` 解析。`from_arc`、`as_arc` 和 `into_arc` 明确表达共享所有权边界。
