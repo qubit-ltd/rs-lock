@@ -534,12 +534,9 @@ impl<T: Send + 'static> MockMonitor<T> {
             .next_waiter_id
             .checked_add(1)
             .expect("mock monitor waiter identifier overflowed");
-        let previous = state.waiters.insert(
-            waiter_id,
-            MockWaiterState {
-                notified: false,
-            },
-        );
+        let previous = state
+            .waiters
+            .insert(waiter_id, MockWaiterState { notified: false });
         assert!(previous.is_none(), "mock monitor waiter identifier reused");
         if timeout_waiter {
             state.timeout_waiters = state
@@ -731,8 +728,7 @@ impl<T: Send + 'static> ConditionWaiter for MockMonitor<T> {
             }
             Self::register_waiter_locked(&mut state, false)
         };
-        let _waiter_guard =
-            self.waiter_guard_from_registered(waiter_id, false);
+        let _waiter_guard = self.waiter_guard_from_registered(waiter_id, false);
         let mut state = self.lock_state();
         loop {
             let observed_epoch = self.current_change_epoch();
@@ -767,8 +763,7 @@ impl<T: Send + 'static> TimeoutConditionWaiter for MockMonitor<T> {
             if !predicate(&state.value) {
                 return WaitTimeoutResult::Ready(action(&mut state.value));
             }
-            let target_elapsed =
-                self.condition_wait_target_elapsed(timeout);
+            let target_elapsed = self.condition_wait_target_elapsed(timeout);
             if self.elapsed() >= target_elapsed {
                 return WaitTimeoutResult::TimedOut;
             }
@@ -777,8 +772,7 @@ impl<T: Send + 'static> TimeoutConditionWaiter for MockMonitor<T> {
                 target_elapsed,
             )
         };
-        let _waiter_guard =
-            self.waiter_guard_from_registered(waiter_id, true);
+        let _waiter_guard = self.waiter_guard_from_registered(waiter_id, true);
         let mut state = self.lock_state();
         loop {
             let observed_epoch = self.current_change_epoch();
@@ -942,8 +936,8 @@ mod tests {
     use super::AsyncTimeoutConditionWaiter;
     use super::{
         MockMonitor,
-        TimeoutConditionWaiter,
         TimeoutConditionWaitPhase,
+        TimeoutConditionWaiter,
         WaitTimeoutResult,
     };
 
@@ -1023,7 +1017,7 @@ mod tests {
     /// Verifies that blocking state-lock contention does not consume timeout.
     #[test]
     fn test_mock_monitor_blocking_timeout_budget_starts_after_initial_state_lock()
-    {
+     {
         let monitor = Arc::new(MockMonitor::new(false));
         let sequence = Arc::new(TimeoutConditionWaitSequence::default());
         let waiter_sequence = Arc::clone(&sequence);
@@ -1040,17 +1034,17 @@ mod tests {
                     |ready| !*ready,
                     |_| (),
                 );
-                done_tx.send(result).expect(
-                    "controller should receive blocking wait result",
-                );
+                done_tx
+                    .send(result)
+                    .expect("controller should receive blocking wait result");
             });
-            sequence.wait_until_observed(
-                TimeoutConditionWaitPhase::BeforeLock,
-            );
+            sequence.wait_until_observed(TimeoutConditionWaitPhase::BeforeLock);
             monitor
                 .monotonic_clock()
                 .advance(WAIT_TIMEOUT.saturating_mul(2))
-                .expect("manual clock should advance during state-lock contention");
+                .expect(
+                    "manual clock should advance during state-lock contention",
+                );
             waiter
         });
         sequence.assert_sequence(&[
@@ -1075,7 +1069,9 @@ mod tests {
                 .expect("blocking timeout should finish within one second"),
             WaitTimeoutResult::TimedOut,
         );
-        waiter.join().expect("blocking timeout waiter should finish");
+        waiter
+            .join()
+            .expect("blocking timeout waiter should finish");
     }
 
     /// Verifies that a clock advance after the final state check but before
@@ -1118,7 +1114,8 @@ mod tests {
     /// timeout.
     #[cfg(feature = "async")]
     #[test]
-    fn test_mock_monitor_async_timeout_budget_starts_after_initial_state_lock() {
+    fn test_mock_monitor_async_timeout_budget_starts_after_initial_state_lock()
+    {
         let monitor = Arc::new(MockMonitor::new(false));
         let sequence = Arc::new(TimeoutConditionWaitSequence::default());
         let waiter_sequence = Arc::clone(&sequence);
@@ -1139,17 +1136,17 @@ mod tests {
                         |ready| !*ready,
                         |_| (),
                     ));
-                done_tx.send(result).expect(
-                    "controller should receive async wait result",
-                );
+                done_tx
+                    .send(result)
+                    .expect("controller should receive async wait result");
             });
-            sequence.wait_until_observed(
-                TimeoutConditionWaitPhase::BeforeLock,
-            );
+            sequence.wait_until_observed(TimeoutConditionWaitPhase::BeforeLock);
             monitor
                 .monotonic_clock()
                 .advance(WAIT_TIMEOUT.saturating_mul(2))
-                .expect("manual clock should advance during state-lock contention");
+                .expect(
+                    "manual clock should advance during state-lock contention",
+                );
             waiter
         });
         sequence.assert_sequence(&[

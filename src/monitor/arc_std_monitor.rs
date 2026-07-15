@@ -119,7 +119,6 @@ impl<T> ArcStdMonitor<T> {
     pub fn into_arc(self) -> Arc<StdMonitor<T>> {
         self.inner
     }
-
 }
 
 impl<T> AsRef<StdMonitor<T>> for ArcStdMonitor<T> {

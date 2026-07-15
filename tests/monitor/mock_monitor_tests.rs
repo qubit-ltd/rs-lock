@@ -354,7 +354,7 @@ async fn test_mock_monitor_async_wait_while_for_timeout_final_predicate_wins() {
 #[cfg(feature = "async")]
 #[tokio::test]
 async fn test_mock_monitor_async_wait_while_for_zero_timeout_checks_predicate_once()
-{
+ {
     let checks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let predicate_checks = Arc::clone(&checks);
     let monitor = MockMonitor::new(false);
@@ -363,7 +363,8 @@ async fn test_mock_monitor_async_wait_while_for_zero_timeout_checks_predicate_on
         .wait_while_for_async(
             Duration::ZERO,
             move |ready| {
-                predicate_checks.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                predicate_checks
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 !*ready
             },
             |_| (),
@@ -602,7 +603,9 @@ fn test_mock_monitor_wait_while_for_reuses_fixed_timeout_target() {
             },
             |_| (),
         );
-        done_tx.send(result).expect("test should receive wait result");
+        done_tx
+            .send(result)
+            .expect("test should receive wait result");
     });
 
     assert!(monitor.wait_for_timeout_waiters(1, Duration::from_secs(1)));
@@ -645,7 +648,9 @@ fn test_mock_monitor_wait_while_for_timeout_final_predicate_wins() {
             |ready| !*ready,
             |_| 7,
         );
-        done_tx.send(result).expect("test should receive wait result");
+        done_tx
+            .send(result)
+            .expect("test should receive wait result");
     });
 
     assert!(monitor.wait_for_timeout_waiters(1, Duration::from_secs(1)));

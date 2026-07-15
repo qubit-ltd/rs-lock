@@ -119,7 +119,6 @@ impl<T> ArcParkingLotMonitor<T> {
     pub fn into_arc(self) -> Arc<ParkingLotMonitor<T>> {
         self.inner
     }
-
 }
 
 impl<T> AsRef<ParkingLotMonitor<T>> for ArcParkingLotMonitor<T> {

@@ -74,7 +74,6 @@ impl<T> ArcTokioMonitor<T> {
     pub fn into_arc(self) -> Arc<TokioMonitor<T>> {
         self.inner
     }
-
 }
 
 impl<T> Notifier for ArcTokioMonitor<T> {
