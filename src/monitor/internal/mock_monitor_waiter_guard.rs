@@ -10,7 +10,7 @@
 use crate::monitor::mock_monitor::MockMonitor;
 
 /// Keeps one waiter registered for the lifetime of a wait operation.
-pub(in crate::monitor) struct MockMonitorWaiterGuard<'a, T: Send + 'static> {
+pub(in crate::monitor) struct MockMonitorWaiterGuard<'a, T> {
     /// Monitor that owns the waiter registration.
     monitor: &'a MockMonitor<T>,
     /// Identifier assigned to the registered waiter.
@@ -19,7 +19,7 @@ pub(in crate::monitor) struct MockMonitorWaiterGuard<'a, T: Send + 'static> {
     timeout_waiter: bool,
 }
 
-impl<'a, T: Send + 'static> MockMonitorWaiterGuard<'a, T> {
+impl<'a, T> MockMonitorWaiterGuard<'a, T> {
     /// Creates a guard for an existing waiter registration.
     ///
     /// # Arguments
@@ -46,7 +46,7 @@ impl<'a, T: Send + 'static> MockMonitorWaiterGuard<'a, T> {
     }
 }
 
-impl<T: Send + 'static> Drop for MockMonitorWaiterGuard<'_, T> {
+impl<T> Drop for MockMonitorWaiterGuard<'_, T> {
     /// Unregisters the waiter on normal return, cancellation, or panic.
     fn drop(&mut self) {
         self.monitor

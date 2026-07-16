@@ -105,7 +105,7 @@ pub struct MockMonitor<T> {
     change_wait_boundary_hook: Mutex<Option<ChangeWaitBoundaryHook>>,
 }
 
-impl<T: Send + 'static> MockMonitor<T> {
+impl<T> MockMonitor<T> {
     /// Creates a mock monitor protecting the supplied state value.
     ///
     /// # Arguments
@@ -122,7 +122,7 @@ impl<T: Send + 'static> MockMonitor<T> {
 
     /// Creates a mock monitor driven by an explicitly shared manual clock.
     ///
-    /// # Parameters
+    /// # Arguments
     /// - `state`: Initial protected state.
     /// - `clock`: Manual clock used for all timeout deadlines.
     ///
@@ -217,11 +217,14 @@ impl<T: Send + 'static> MockMonitor<T> {
         expected_count: usize,
         real_timeout: Duration,
     ) -> bool {
-        let Some(real_deadline) = Instant::now().checked_add(real_timeout)
-        else {
+        let real_start = Instant::now();
+        let mut state = self.lock_state();
+        if state.timeout_waiters >= expected_count {
+            return true;
+        }
+        let Some(real_deadline) = real_start.checked_add(real_timeout) else {
             return false;
         };
-        let mut state = self.lock_state();
         while state.timeout_waiters < expected_count {
             let remaining =
                 real_deadline.saturating_duration_since(Instant::now());
@@ -691,7 +694,7 @@ impl<T: Send + 'static> MockMonitor<T> {
     }
 }
 
-impl<T: Send + 'static> Notifier for MockMonitor<T> {
+impl<T> Notifier for MockMonitor<T> {
     /// Wakes one waiter if one is blocked.
     #[inline(always)]
     fn notify_one(&self) {
@@ -705,7 +708,7 @@ impl<T: Send + 'static> Notifier for MockMonitor<T> {
     }
 }
 
-impl<T: Send + 'static> ConditionWaiter for MockMonitor<T> {
+impl<T> ConditionWaiter for MockMonitor<T> {
     type State = T;
 
     /// Blocks while the predicate remains true, then runs the action.
@@ -735,7 +738,7 @@ impl<T: Send + 'static> ConditionWaiter for MockMonitor<T> {
     }
 }
 
-impl<T: Send + 'static> TimeoutConditionWaiter for MockMonitor<T> {
+impl<T> TimeoutConditionWaiter for MockMonitor<T> {
     /// Blocks while the predicate remains true or until mock elapsed time
     /// reaches timeout. The fixed target is established after the initial
     /// locked predicate check, excluding initial lock contention. At the
@@ -785,7 +788,7 @@ impl<T: Send + 'static> TimeoutConditionWaiter for MockMonitor<T> {
 }
 
 #[cfg(feature = "async")]
-impl<T: Send + 'static> AsyncConditionWaiter for MockMonitor<T> {
+impl<T: Send> AsyncConditionWaiter for MockMonitor<T> {
     type State = T;
 
     /// Returns a future that waits while the predicate remains true.
@@ -823,16 +826,17 @@ impl<T: Send + 'static> AsyncConditionWaiter for MockMonitor<T> {
                         return action(&mut state.value);
                     }
                 }
-                change_receiver.changed().await.expect(
-                    "mock monitor sender should live while the monitor is borrowed",
-                );
+                change_receiver
+                    .changed()
+                    .await
+                    .expect("mock monitor sender should live while the monitor is borrowed");
             }
         }
     }
 }
 
 #[cfg(feature = "async")]
-impl<T: Send + 'static> AsyncTimeoutConditionWaiter for MockMonitor<T> {
+impl<T: Send> AsyncTimeoutConditionWaiter for MockMonitor<T> {
     /// Returns a future that waits while the predicate remains true or times
     /// out. The future is lazy, and its fixed manual-clock target is
     /// established after the initial locked predicate check. Initial lock
@@ -898,7 +902,7 @@ impl<T: Send + 'static> AsyncTimeoutConditionWaiter for MockMonitor<T> {
     }
 }
 
-impl<T: Send + 'static> From<T> for MockMonitor<T> {
+impl<T> From<T> for MockMonitor<T> {
     /// Creates a mock monitor from an initial state value.
     #[inline(always)]
     fn from(value: T) -> Self {
@@ -906,7 +910,7 @@ impl<T: Send + 'static> From<T> for MockMonitor<T> {
     }
 }
 
-impl<T: Default + Send + 'static> Default for MockMonitor<T> {
+impl<T: Default> Default for MockMonitor<T> {
     /// Creates a mock monitor containing `T::default()`.
     #[inline(always)]
     fn default() -> Self {
