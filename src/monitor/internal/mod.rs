@@ -12,6 +12,8 @@ mod mock_monitor_state;
 #[cfg(feature = "mock")]
 mod mock_monitor_waiter_guard;
 #[cfg(feature = "mock")]
+mod mock_waiter_registry;
+#[cfg(feature = "mock")]
 mod mock_waiter_state;
 #[cfg(feature = "async")]
 mod tokio_condition_waiter;
@@ -22,6 +24,8 @@ mod tokio_condition_waiter_registration;
 pub(in crate::monitor) use mock_monitor_state::MockMonitorState;
 #[cfg(feature = "mock")]
 pub(in crate::monitor) use mock_monitor_waiter_guard::MockMonitorWaiterGuard;
+#[cfg(feature = "mock")]
+pub(in crate::monitor) use mock_waiter_registry::MockWaiterRegistry;
 #[cfg(feature = "mock")]
 pub(in crate::monitor) use mock_waiter_state::MockWaiterState;
 #[cfg(feature = "async")]

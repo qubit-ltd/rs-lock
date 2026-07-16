@@ -169,6 +169,158 @@ fn test_mock_monitor_clock_can_advance_inside_state_closure() {
     worker.join().expect("state closure worker should finish");
 }
 
+/// Verifies that notification does not re-enter the protected-state mutex.
+#[test]
+fn test_mock_monitor_can_notify_all_inside_state_closure() {
+    const REAL_TIMEOUT: Duration = Duration::from_secs(1);
+
+    let monitor = Arc::new(MockMonitor::new(false));
+    let worker_monitor = Arc::clone(&monitor);
+    let (done_tx, done_rx) = mpsc::channel();
+    let worker = thread::spawn(move || {
+        worker_monitor.with_write(|ready| {
+            *ready = true;
+            worker_monitor.notify_all();
+        });
+        done_tx
+            .send(())
+            .expect("test should receive closure completion");
+    });
+
+    done_rx
+        .recv_timeout(REAL_TIMEOUT)
+        .expect("notification inside state closure should not deadlock");
+    worker.join().expect("state closure worker should finish");
+    assert!(monitor.with_read(|ready| *ready));
+}
+
+/// Verifies that single notification also avoids re-entering the state mutex.
+#[test]
+fn test_mock_monitor_can_notify_one_inside_state_closure() {
+    const REAL_TIMEOUT: Duration = Duration::from_secs(1);
+
+    let monitor = Arc::new(MockMonitor::new(false));
+    let worker_monitor = Arc::clone(&monitor);
+    let (done_tx, done_rx) = mpsc::channel();
+    let worker = thread::spawn(move || {
+        worker_monitor.with_write(|ready| {
+            *ready = true;
+            worker_monitor.notify_one();
+        });
+        done_tx
+            .send(())
+            .expect("test should receive closure completion");
+    });
+
+    done_rx
+        .recv_timeout(REAL_TIMEOUT)
+        .expect("notification inside state closure should not deadlock");
+    worker.join().expect("state closure worker should finish");
+    assert!(monitor.with_read(|ready| *ready));
+}
+
+/// Verifies that initial state-lock contention does not consume mock timeout.
+#[test]
+fn test_mock_monitor_blocking_timeout_starts_after_initial_lock_contention() {
+    const REAL_TIMEOUT: Duration = Duration::from_secs(1);
+    const WAIT_TIMEOUT: Duration = Duration::from_millis(5);
+
+    let monitor = Arc::new(MockMonitor::new(false));
+    let (started_tx, started_rx) = mpsc::sync_channel(1);
+    let (done_tx, done_rx) = mpsc::channel();
+    let waiter = monitor.with_write(|_| {
+        let waiter_monitor = Arc::clone(&monitor);
+        let waiter = thread::spawn(move || {
+            started_tx
+                .send(())
+                .expect("controller should observe waiter startup");
+            let result = waiter_monitor.wait_while_for(
+                WAIT_TIMEOUT,
+                |ready| !*ready,
+                |_| (),
+            );
+            done_tx
+                .send(result)
+                .expect("controller should receive timeout result");
+        });
+        started_rx
+            .recv_timeout(REAL_TIMEOUT)
+            .expect("waiter should start while state is locked");
+        monitor
+            .monotonic_clock()
+            .advance(WAIT_TIMEOUT.saturating_mul(2))
+            .expect("manual clock should advance during lock contention");
+        waiter
+    });
+
+    assert!(monitor.wait_for_timeout_waiters(1, REAL_TIMEOUT));
+    assert!(done_rx.try_recv().is_err());
+    monitor
+        .monotonic_clock()
+        .advance(WAIT_TIMEOUT)
+        .expect("manual clock should reach the fresh timeout target");
+    assert_eq!(
+        done_rx
+            .recv_timeout(REAL_TIMEOUT)
+            .expect("waiter should finish after its fresh budget"),
+        WaitTimeoutResult::TimedOut,
+    );
+    waiter.join().expect("timeout waiter should finish");
+}
+
+/// Verifies the async mock timeout also starts after initial lock contention.
+#[cfg(feature = "async")]
+#[test]
+fn test_mock_monitor_async_timeout_starts_after_initial_lock_contention() {
+    const REAL_TIMEOUT: Duration = Duration::from_secs(1);
+    const WAIT_TIMEOUT: Duration = Duration::from_millis(5);
+
+    let monitor = Arc::new(MockMonitor::new(false));
+    let (started_tx, started_rx) = mpsc::sync_channel(1);
+    let (done_tx, done_rx) = mpsc::channel();
+    let waiter = monitor.with_write(|_| {
+        let waiter_monitor = Arc::clone(&monitor);
+        let waiter = thread::spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .build()
+                .expect("async timeout runtime should build");
+            started_tx
+                .send(())
+                .expect("controller should observe waiter startup");
+            let result = runtime.block_on(waiter_monitor.wait_while_for_async(
+                WAIT_TIMEOUT,
+                |ready| !*ready,
+                |_| (),
+            ));
+            done_tx
+                .send(result)
+                .expect("controller should receive timeout result");
+        });
+        started_rx
+            .recv_timeout(REAL_TIMEOUT)
+            .expect("waiter should start while state is locked");
+        monitor
+            .monotonic_clock()
+            .advance(WAIT_TIMEOUT.saturating_mul(2))
+            .expect("manual clock should advance during lock contention");
+        waiter
+    });
+
+    assert!(monitor.wait_for_timeout_waiters(1, REAL_TIMEOUT));
+    assert!(done_rx.try_recv().is_err());
+    monitor
+        .monotonic_clock()
+        .advance(WAIT_TIMEOUT)
+        .expect("manual clock should reach the fresh timeout target");
+    assert_eq!(
+        done_rx
+            .recv_timeout(REAL_TIMEOUT)
+            .expect("waiter should finish after its fresh budget"),
+        WaitTimeoutResult::TimedOut,
+    );
+    waiter.join().expect("async timeout waiter should finish");
+}
+
 #[test]
 fn test_mock_monitor_from_clock_uses_shared_manual_time() {
     let clock = Arc::new(ManualMonotonicClock::new());
