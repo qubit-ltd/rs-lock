@@ -13,7 +13,8 @@
 - Preserve all existing public wrapper types and public API paths.
 - Add no `Box`, reference, `AsyncLock`, or async monitor blanket implementations.
 - Async mock futures remain `Send`; async mock state requires `T: Send` but not `T: 'static`.
-- Keep the seven deterministic inline white-box tests in their source files.
+- Keep monitor regression tests in `tests/monitor` and avoid test-only hooks in
+  production source files.
 - Do not change the Tokio registry without fresh benchmark evidence.
 - Do not execute `git add`, `git commit`, or `git push` without explicit user authorization.
 
