@@ -7,6 +7,8 @@
 // =============================================================================
 //! Blocking condition-wait capability.
 
+use std::sync::Arc;
+
 /// Waits for predicates over protected monitor state.
 ///
 /// Predicates and actions run while the state is locked. A wakeup only causes
@@ -30,6 +32,7 @@ pub trait ConditionWaiter {
     /// # Returns
     ///
     /// The value returned by `action`.
+    #[inline(always)]
     fn wait_until<R, P, F>(&self, mut predicate: P, action: F) -> R
     where
         P: FnMut(&Self::State) -> bool,
@@ -55,4 +58,21 @@ pub trait ConditionWaiter {
     where
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R;
+}
+
+impl<M: ?Sized> ConditionWaiter for Arc<M>
+where
+    M: ConditionWaiter,
+{
+    type State = M::State;
+
+    /// Delegates a blocking condition wait to the shared monitor.
+    #[inline(always)]
+    fn wait_while<R, P, F>(&self, predicate: P, action: F) -> R
+    where
+        P: FnMut(&Self::State) -> bool,
+        F: FnOnce(&mut Self::State) -> R,
+    {
+        <M as ConditionWaiter>::wait_while(self.as_ref(), predicate, action)
+    }
 }
