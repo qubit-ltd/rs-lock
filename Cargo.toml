@@ -27,6 +27,9 @@ include = [
     "/tests/**",
 ]
 
+[package.metadata.docs.rs]
+all-features = true
+
 [lib]
 name = "qubit_lock"
 doctest = true
