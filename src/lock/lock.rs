@@ -12,6 +12,7 @@
 //! locks to be used in a generic way through closures, avoiding the complexity
 //! of explicitly managing lock guards and their lifetimes.
 use std::sync::{
+    Arc,
     Mutex,
     RwLock,
 };
@@ -271,6 +272,47 @@ pub trait Lock<T: ?Sized> {
     fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
         F: FnOnce(&mut T) -> R;
+}
+
+impl<T: ?Sized, L: ?Sized> Lock<T> for Arc<L>
+where
+    L: Lock<T>,
+{
+    /// Delegates a read operation to the shared inner lock.
+    #[inline(always)]
+    fn with_read<R, F>(&self, f: F) -> R
+    where
+        F: FnOnce(&T) -> R,
+    {
+        <L as Lock<T>>::with_read(self.as_ref(), f)
+    }
+
+    /// Delegates a write operation to the shared inner lock.
+    #[inline(always)]
+    fn with_write<R, F>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut T) -> R,
+    {
+        <L as Lock<T>>::with_write(self.as_ref(), f)
+    }
+
+    /// Delegates a non-blocking read operation to the shared inner lock.
+    #[inline(always)]
+    fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
+    where
+        F: FnOnce(&T) -> R,
+    {
+        <L as Lock<T>>::try_with_read(self.as_ref(), f)
+    }
+
+    /// Delegates a non-blocking write operation to the shared inner lock.
+    #[inline(always)]
+    fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
+    where
+        F: FnOnce(&mut T) -> R,
+    {
+        <L as Lock<T>>::try_with_write(self.as_ref(), f)
+    }
 }
 
 /// Synchronous mutex implementation of the Lock trait

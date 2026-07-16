@@ -7,7 +7,10 @@
 // =============================================================================
 //! Blocking timeout condition-wait capability.
 
-use std::time::Duration;
+use std::{
+    sync::Arc,
+    time::Duration,
+};
 
 use crate::monitor::{
     ConditionWaiter,
@@ -36,6 +39,7 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// [`WaitTimeoutResult::TimedOut`] when the condition-wait budget expires.
     /// The trait-level timeout contract determines when that budget starts and
     /// how the deadline boundary is resolved.
+    #[inline(always)]
     fn wait_until_for<R, P, F>(
         &self,
         timeout: Duration,
@@ -73,4 +77,29 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     where
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R;
+}
+
+impl<M: ?Sized> TimeoutConditionWaiter for Arc<M>
+where
+    M: TimeoutConditionWaiter,
+{
+    /// Delegates a timed blocking condition wait to the shared monitor.
+    #[inline(always)]
+    fn wait_while_for<R, P, F>(
+        &self,
+        timeout: Duration,
+        predicate: P,
+        action: F,
+    ) -> WaitTimeoutResult<R>
+    where
+        P: FnMut(&Self::State) -> bool,
+        F: FnOnce(&mut Self::State) -> R,
+    {
+        <M as TimeoutConditionWaiter>::wait_while_for(
+            self.as_ref(),
+            timeout,
+            predicate,
+            action,
+        )
+    }
 }

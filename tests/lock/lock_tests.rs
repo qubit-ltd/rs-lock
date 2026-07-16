@@ -42,9 +42,27 @@ fn increment_i32(value: &mut i32) -> i32 {
     *value
 }
 
+/// Increments a value through a generic synchronous lock implementation.
+fn increment_through_lock<L>(lock: &L) -> i32
+where
+    L: Lock<i32>,
+{
+    lock.with_write(increment_i32)
+}
+
 #[cfg(test)]
 mod lock_trait_tests {
     use super::*;
+
+    #[test]
+    fn test_lock_trait_accepts_arc_wrapped_implementation() {
+        let mutex = Arc::new(Mutex::new(0));
+
+        assert_eq!(increment_through_lock(&mutex), 1);
+        assert_eq!(mutex.with_read(read_i32), 1);
+        assert_eq!(mutex.try_with_write(increment_i32), Ok(2));
+        assert_eq!(mutex.try_with_read(read_i32), Ok(2));
+    }
 
     #[test]
     fn test_mutex_read_write_basic_operations() {

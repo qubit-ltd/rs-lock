@@ -7,6 +7,8 @@
 // =============================================================================
 //! Notification capability for monitor-style synchronization.
 
+use std::sync::Arc;
+
 /// Sends notification signals to waiters.
 ///
 /// Notifications have memoryless condition-variable semantics: they do not
@@ -24,4 +26,21 @@ pub trait Notifier {
     /// Selects all already registered waiters without retaining state for
     /// future waiters.
     fn notify_all(&self);
+}
+
+impl<M: ?Sized> Notifier for Arc<M>
+where
+    M: Notifier,
+{
+    /// Delegates single-waiter notification to the shared monitor.
+    #[inline(always)]
+    fn notify_one(&self) {
+        <M as Notifier>::notify_one(self.as_ref());
+    }
+
+    /// Delegates all-waiter notification to the shared monitor.
+    #[inline(always)]
+    fn notify_all(&self) {
+        <M as Notifier>::notify_all(self.as_ref());
+    }
 }

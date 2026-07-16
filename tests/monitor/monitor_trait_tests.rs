@@ -7,13 +7,17 @@
 // =============================================================================
 //! Tests for monitor aggregate traits.
 
-use std::time::Duration;
+use std::{
+    sync::Arc,
+    time::Duration,
+};
 
 #[cfg(feature = "mock")]
 use qubit_lock::ArcMockMonitor;
 use qubit_lock::{
     ArcParkingLotMonitor,
     Monitor,
+    ParkingLotMonitor,
     SharedMonitor,
     TimeoutConditionWaiter,
     WaitTimeoutResult,
@@ -49,6 +53,18 @@ fn test_monitor_trait_accepts_parking_lot_monitor() {
     let monitor = ArcParkingLotMonitor::new(false);
 
     wait_through_monitor_trait(&monitor);
+}
+
+#[test]
+fn test_monitor_trait_accepts_arc_wrapped_implementation() {
+    let monitor = Arc::new(ParkingLotMonitor::new(false));
+
+    wait_through_monitor_trait(&monitor);
+    let cloned = require_shared_monitor(monitor);
+    assert_eq!(
+        cloned.wait_until_for(Duration::ZERO, |ready| *ready, |_| ()),
+        WaitTimeoutResult::TimedOut,
+    );
 }
 
 #[test]
