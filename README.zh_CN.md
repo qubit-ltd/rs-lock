@@ -63,6 +63,25 @@ Tokio runtime 才必须启用 time driver。drop 一个 pending future 会注销
 基于 Arc 的 monitor 包装器保留了供泛型代码使用的显式 trait 实现；普通 monitor 方法
 调用通过 `Deref` 解析。`from_arc`、`as_arc` 和 `into_arc` 明确表达共享所有权边界。
 
+### 选择 monitor 能力
+
+普通应用代码应优先选择具体实现：阻塞式协调使用 `ParkingLotMonitor` 或
+`StdMonitor`，异步协调使用 `TokioMonitor`；需要克隆或长期持有共享所有权时，
+选择对应的 `Arc*Monitor` 句柄。
+
+在泛型 API 边界，使用能够表达操作的最小能力：仅发送通知时使用 `Notifier`，
+阻塞式 predicate wait 使用 `ConditionWaiter` 或 `TimeoutConditionWaiter`，异步
+wait 使用对应的 `AsyncConditionWaiter` 或 `AsyncTimeoutConditionWaiter`。只有在
+确实需要完整的通知与等待契约时才使用 `Monitor` 或 `AsyncMonitor`；泛型 API
+还要持有可克隆句柄时，使用 `SharedMonitor` 或 `SharedAsyncMonitor`。这些 waiter
+和聚合 trait 用于静态泛型约束，不用于 `dyn` trait object 接口。
+
+所有公开类型都直接从 crate root 导入。
+
+`MockMonitor` 和 `ArcMockMonitor` 是用于能力 trait 与 predicate wait 行为的
+确定性测试实现。它们不提供 mock guard 类型，也不替代具有 guard 接口的具体
+monitor 实现。
+
 ### 确定性的 monitor 时间
 
 使用 `MockMonitor` 和 `ArcMockMonitor` 前需要启用 `mock` 特性。
@@ -90,61 +109,6 @@ sleep 猜测 waiter 是否已经注册。`pending_timeout_waiters()` 汇总已�
 同步和异步 timeout wait；异步 wait 的 future 首次被 poll 后才计数，被取消时会自动
 注销。代码也可以在持有该 monitor 状态锁时推进 clock；clock callback 不会再次获取
 受保护的状态。
-
-## 从 0.9 迁移
-
-`0.10` 有意调整了特性与闭包方法命名：
-
-- 默认特性集现在只包含同步能力。Tokio 锁与 monitor 类型需要显式启用
-  `async`。
-- `MockMonitor`、`ArcMockMonitor` 和 `qubit-clock` 依赖由新的 `mock`
-  特性控制；异步 mock wait 需要同时启用 `async` 和 `mock`。
-- 闭包式锁方法已重命名：`read` 改为 `with_read`，`write` 改为
-  `with_write`，`try_read` 改为 `try_with_read`，`try_write` 改为
-  `try_with_write`。
-- 同步 monitor 状态方法已重命名：`read` 改为 `with_read`，`write` 改为
-  `with_write`，`write_notify_one` 改为 `with_write_notify_one`，
-  `write_notify_all` 改为 `with_write_notify_all`。
-- Tokio monitor 状态方法统一使用 `_async` 后缀：`async_read` 改为
-  `with_read_async`，`async_write` 改为 `with_write_async`，
-  `async_write_notify_one` 改为 `with_write_notify_one_async`，
-  `async_write_notify_all` 改为 `with_write_notify_all_async`。
-- 已删除仅等待通知的 trait，以及具体 monitor 上的 `wait`、`wait_for`、
-  `wait_async` 和 `wait_for_async` 方法。请改用基于 predicate 的 condition
-  wait 协调受保护状态；需要排队 permit 的场景应使用 semaphore 或 event
-  原语。
-- 已删除 boxed `AsyncMonitorFuture` 别名。异步 monitor trait 现在直接返回
-  `impl Future`。
-- 基于 Arc 的 monitor 包装器不再重复提供 inherent 转发方法。普通调用通过
-  `Deref` 解析；泛型约束使用保留的 trait 实现，在所有权边界使用 `from_arc`、
-  `as_arc` 或 `into_arc`。
-
-## 从 0.8 迁移
-
-`0.9` 包含有意的异步 monitor API 重命名：
-
-- `AsyncConditionWaiter::async_wait_until` 和 `async_wait_while` 现在改为
-  `wait_until_async` 和 `wait_while_async`。
-- `AsyncTimeoutConditionWaiter::async_wait_until_for` 和
-  `async_wait_while_for` 现在改为 `wait_until_for_async` 和
-  `wait_while_for_async`。
-- condition wait traits 通过对应的 `wait_while*` 方法提供默认
-  `wait_until*` 实现。
-
-## 从 0.7 迁移
-
-`0.8` 包含有意的破坏性 API 清理：
-
-- `Monitor` 现在是阻塞 monitor 能力的聚合 trait。
-- 基于 parking_lot 的具体实现改为 `ParkingLotMonitor`，其可克隆共享句柄改为
-  `ArcParkingLotMonitor`。
-- 带超时的 condition wait 方法改名为 `wait_until_for` 和 `wait_while_for`。
-- `MockMonitor` 和 `ArcMockMonitor` 使用 `ManualMonotonicClock` 实现确定性的
-  timeout 测试。
-- 启用 `async` 特性后，`TokioMonitor` 和 `ArcTokioMonitor` 提供异步
-  monitor 操作。
-- `qubit_lock::lock` 和 `qubit_lock::monitor` 不再作为公开模块暴露。
-  请直接从 crate root 导入公开类型。
 
 ## 快速开始
 

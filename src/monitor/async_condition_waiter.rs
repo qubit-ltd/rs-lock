@@ -22,6 +22,10 @@ use std::future::Future;
 /// existed. If a notification already selected that waiter, cancellation
 /// discards the selection rather than transferring it to another or future
 /// waiter.
+///
+/// Use this trait as a static generic bound when asynchronous code needs
+/// predicate waits but no timeout. Its return-position `impl Future` methods
+/// make it unsuitable as a `dyn` trait-object interface.
 pub trait AsyncConditionWaiter {
     /// State protected by the monitor.
     type State;

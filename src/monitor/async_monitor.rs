@@ -13,6 +13,11 @@ use crate::monitor::{
 };
 
 /// Aggregate trait for asynchronous monitor-style synchronization.
+///
+/// Use this trait as a static generic bound when code needs both notification
+/// and timed asynchronous condition waits. The inherited return-position
+/// `impl Future` methods make it unsuitable as a `dyn` trait-object interface.
+/// Prefer narrower capability traits when the complete contract is unnecessary.
 pub trait AsyncMonitor: Notifier + AsyncTimeoutConditionWaiter {}
 
 impl<T> AsyncMonitor for T where T: Notifier + AsyncTimeoutConditionWaiter {}

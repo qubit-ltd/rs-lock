@@ -18,6 +18,8 @@ use std::sync::Arc;
 /// every wake. A selection belongs only to the selected waiter; if that waiter
 /// is subsequently cancelled, the selection is discarded rather than
 /// transferred. No notification method guarantees fairness or FIFO selection.
+/// Use this trait as the smallest generic bound when code only emits
+/// notifications and never inspects protected state.
 pub trait Notifier {
     /// Selects at most one already registered waiter without a fairness
     /// guarantee.
