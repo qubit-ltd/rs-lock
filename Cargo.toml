@@ -19,6 +19,7 @@ include = [
     "/README.zh_CN.md",
     "/RUST_CODING_STYLE.md",
     "/RUST_CODING_STYLE.zh_CN.md",
+    "/benches/**",
     "/doc/**/user_guide*.md",
     "/examples/**",
     "/resources/**",
@@ -41,5 +42,11 @@ tokio = { version = "1.52", default-features = false, features = ["sync", "time"
 qubit-clock = { version = "0.9", path = "../rs-clock", optional = true }
 
 [dev-dependencies]
+criterion = { version = "0.8.2", default-features = false }
 semver = { version = "1.0", default-features = false }
 tokio = { version = "1.52", default-features = false, features = ["macros", "rt-multi-thread", "test-util", "time"] }
+
+[[bench]]
+name = "tokio_monitor_cancellation"
+harness = false
+required-features = ["async"]

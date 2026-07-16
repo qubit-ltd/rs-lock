@@ -11,6 +11,7 @@
 //! Tokio-based asynchronous monitor.
 
 use std::{
+    collections::BTreeMap,
     future::{
         Future,
         poll_fn,
@@ -171,7 +172,7 @@ pub struct TokioMonitor<T> {
     /// Protected monitor state.
     state: Mutex<T>,
     /// Active condition waiters eligible for memoryless notification.
-    waiters: StdMutex<Vec<Arc<TokioConditionWaiter>>>,
+    waiters: StdMutex<BTreeMap<usize, Arc<TokioConditionWaiter>>>,
     /// Per-monitor timeout initialization hook for deadline regressions.
     #[cfg(test)]
     timeout_before_registration_hook:
@@ -200,7 +201,7 @@ impl<T> TokioMonitor<T> {
     pub fn new(state: T) -> Self {
         Self {
             state: Mutex::new(state),
-            waiters: StdMutex::new(Vec::new()),
+            waiters: StdMutex::new(BTreeMap::new()),
             #[cfg(test)]
             timeout_before_registration_hook: StdMutex::new(None),
             #[cfg(test)]
@@ -294,7 +295,8 @@ impl<T> TokioMonitor<T> {
             .waiters
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .pop();
+            .pop_last()
+            .map(|(_, waiter)| waiter);
         if let Some(waiter) = waiter {
             waiter.signal().notify_one();
         }
@@ -309,7 +311,7 @@ impl<T> TokioMonitor<T> {
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
             std::mem::take(&mut *registry)
         };
-        for waiter in waiters {
+        for waiter in waiters.into_values() {
             waiter.signal().notify_one();
         }
     }
@@ -323,10 +325,13 @@ impl<T> TokioMonitor<T> {
     #[inline]
     fn register_waiter(&self) -> TokioConditionWaiterRegistration<'_> {
         let waiter = Arc::new(TokioConditionWaiter::new());
-        self.waiters
+        let waiter_key = Arc::as_ptr(&waiter) as usize;
+        let previous = self
+            .waiters
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .push(Arc::clone(&waiter));
+            .insert(waiter_key, Arc::clone(&waiter));
+        assert!(previous.is_none(), "Tokio monitor waiter pointer reused");
         TokioConditionWaiterRegistration::new(&self.waiters, waiter)
     }
 
