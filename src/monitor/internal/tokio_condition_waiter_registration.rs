@@ -7,9 +7,12 @@
 // =============================================================================
 //! Cancellation-safe registration for a Tokio condition waiter.
 
-use std::sync::{
-    Arc,
-    Mutex,
+use std::{
+    collections::BTreeMap,
+    sync::{
+        Arc,
+        Mutex,
+    },
 };
 
 use super::TokioConditionWaiter;
@@ -17,7 +20,7 @@ use super::TokioConditionWaiter;
 /// Removes an active waiter registration on cancellation or normal exit.
 pub(in crate::monitor) struct TokioConditionWaiterRegistration<'a> {
     /// Registry containing this waiter while it remains selectable.
-    registry: &'a Mutex<Vec<Arc<TokioConditionWaiter>>>,
+    registry: &'a Mutex<BTreeMap<usize, Arc<TokioConditionWaiter>>>,
     /// Independently signalled waiter owned by the pending condition wait.
     waiter: Arc<TokioConditionWaiter>,
 }
@@ -35,7 +38,7 @@ impl<'a> TokioConditionWaiterRegistration<'a> {
     /// A guard that unregisters `waiter` when dropped.
     #[inline]
     pub(in crate::monitor) fn new(
-        registry: &'a Mutex<Vec<Arc<TokioConditionWaiter>>>,
+        registry: &'a Mutex<BTreeMap<usize, Arc<TokioConditionWaiter>>>,
         waiter: Arc<TokioConditionWaiter>,
     ) -> Self {
         Self { registry, waiter }
@@ -55,10 +58,11 @@ impl<'a> TokioConditionWaiterRegistration<'a> {
 impl Drop for TokioConditionWaiterRegistration<'_> {
     /// Removes this waiter if no notification has selected it yet.
     fn drop(&mut self) {
+        let waiter_key = Arc::as_ptr(&self.waiter) as usize;
         let mut registry = self
             .registry
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        registry.retain(|waiter| !Arc::ptr_eq(waiter, &self.waiter));
+        registry.remove(&waiter_key);
     }
 }
