@@ -460,6 +460,7 @@ impl<T> StdMonitor<T> {
     ///
     /// assert_eq!(waiter.join().expect("waiter should finish"), "done");
     /// ```
+    #[inline(always)]
     pub fn wait_until<R, P, F>(&self, mut ready: P, f: F) -> R
     where
         P: FnMut(&T) -> bool,
@@ -616,6 +617,7 @@ impl<T> StdMonitor<T> {
     ///     WaitTimeoutResult::Ready(5),
     /// );
     /// ```
+    #[inline(always)]
     pub fn wait_until_for<R, P, F>(
         &self,
         timeout: Duration,

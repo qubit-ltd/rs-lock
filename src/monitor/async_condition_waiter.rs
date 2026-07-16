@@ -40,6 +40,7 @@ pub trait AsyncConditionWaiter {
     /// # Returns
     ///
     /// A lazy future that resolves to the value returned by `action`.
+    #[inline(always)]
     fn wait_until_async<'a, R, P, F>(
         &'a self,
         mut predicate: P,
