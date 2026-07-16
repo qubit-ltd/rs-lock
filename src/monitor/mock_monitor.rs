@@ -96,7 +96,7 @@ impl<T> MockMonitor<T> {
     /// A mock monitor with a new independent manual clock.
     #[inline]
     pub fn new(state: T) -> Self {
-        Self::from_clock(state, Arc::new(ManualMonotonicClock::new()))
+        Self::from_clock(state, ManualMonotonicClock::new_shared())
     }
 
     /// Creates a mock monitor driven by an explicitly shared manual clock.
