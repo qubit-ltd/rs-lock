@@ -107,6 +107,80 @@ fn test_tokio_monitor_notify_one_without_waiter_is_not_retained() {
     );
 }
 
+/// Verifies that two registered condition waiters receive two notifications.
+#[tokio::test]
+async fn test_tokio_monitor_notify_one_does_not_lose_registered_waiter() {
+    let monitor = TokioMonitor::new(0_usize);
+    let first = monitor.wait_until_async(
+        |available| *available > 0,
+        |available| *available -= 1,
+    );
+    let second = monitor.wait_until_async(
+        |available| *available > 0,
+        |available| *available -= 1,
+    );
+    tokio::pin!(first);
+    tokio::pin!(second);
+    let first_wakes = Arc::new(WakeCounter::default());
+    let second_wakes = Arc::new(WakeCounter::default());
+
+    assert!(poll_once(first.as_mut(), &first_wakes).is_pending());
+    assert!(poll_once(second.as_mut(), &second_wakes).is_pending());
+    monitor.with_write_async(|available| *available = 2).await;
+    monitor.notify_one();
+    monitor.notify_one();
+
+    first.await;
+    second.await;
+    assert_eq!(monitor.with_read_async(|available| *available).await, 0);
+}
+
+/// Verifies that state reacquisition cannot extend a fixed timeout deadline.
+#[tokio::test(start_paused = true)]
+async fn test_tokio_monitor_signal_reacquire_crossing_deadline_times_out() {
+    const TIMEOUT: Duration = Duration::from_millis(5);
+    const REAL_TIMEOUT: Duration = Duration::from_secs(1);
+
+    let monitor = Arc::new(TokioMonitor::new(()));
+    let wait = monitor.wait_while_for_async(TIMEOUT, |_| true, |_| ());
+    tokio::pin!(wait);
+    let wake_counter = Arc::new(WakeCounter::default());
+    assert!(poll_once(wait.as_mut(), &wake_counter).is_pending());
+
+    let holder_monitor = Arc::clone(&monitor);
+    let (holding_tx, holding_rx) = mpsc::sync_channel(1);
+    let (release_tx, release_rx) = mpsc::sync_channel(1);
+    let holder = thread::spawn(move || {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("holder runtime should build");
+        runtime.block_on(holder_monitor.with_write_async(|_| {
+            holding_tx
+                .send(())
+                .expect("controller should observe held state lock");
+            release_rx
+                .recv_timeout(REAL_TIMEOUT)
+                .expect("holder should receive release permission");
+        }));
+    });
+    holding_rx
+        .recv_timeout(REAL_TIMEOUT)
+        .expect("holder should acquire the state lock");
+
+    monitor.notify_one();
+    assert!(
+        poll_once(wait.as_mut(), &wake_counter).is_pending(),
+        "selected waiter should block while reacquiring state",
+    );
+    tokio::time::advance(TIMEOUT).await;
+    release_tx
+        .send(())
+        .expect("holder should receive release permission");
+    holder.join().expect("holder thread should finish");
+
+    assert_eq!(wait.await, WaitTimeoutResult::TimedOut);
+}
+
 /// Verifies that `Notifier::notify_all` selects every waiter registered at the
 /// call boundary without retaining a signal for a future waiter.
 #[test]

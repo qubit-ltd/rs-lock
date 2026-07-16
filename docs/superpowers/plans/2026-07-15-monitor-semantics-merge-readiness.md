@@ -53,22 +53,21 @@ nightly rustfmt configuration, and the existing `ci-check.sh` validation flow.
    cargo +1.94.0 test --all-features --test mod monitor::tokio_monitor_tests
    ```
 
-## Task 3: Document the approved inline-test exception
+## Task 3: Move monitor regressions to external tests
 
 **Files:**
 
 - Modify: `src/monitor/tokio_monitor.rs`
 - Modify: `src/monitor/mock_monitor.rs`
 
-1. Keep exactly four Tokio white-box tests that require private waiter or
-   deadline hooks.
+1. Re-express Tokio waiter and deadline regressions through public monitor
+   behavior in `tests/monitor/tokio_monitor_tests.rs`.
 
-2. Keep exactly three Mock white-box tests that require private initialization
-   or change-boundary hooks.
+2. Re-express Mock timeout and lock-contention regressions through public
+   behavior in `tests/monitor/mock_monitor_tests.rs`.
 
-3. Explain beside each `qubit-style: allow inline-tests` directive why these
-   deterministic race tests cannot be expressed through the public API without
-   weakening them into probabilistic tests.
+3. Remove the inline-test exemptions and private test-only synchronization
+   hooks from production source files.
 
 ## Task 4: Synchronize design and verification documentation
 

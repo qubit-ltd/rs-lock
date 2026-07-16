@@ -25,8 +25,9 @@ implementation surface.
   benchmark demonstrates material superlinear cancellation cost.
 - Add the eight agreed forwarding/default-method inline annotations and rename
   four `# Parameters` rustdoc headings to `# Arguments`.
-- Keep the seven deterministic inline white-box regression tests in place as
-  an explicit exception; do not expose private hooks or move those tests.
+- Keep monitor regression tests in the external `tests/monitor` layout and
+  exercise synchronization behavior through public APIs without test-only
+  production hooks.
 
 ## API Design
 

@@ -1,0 +1,35 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+//! Tests for [`AsyncTimeoutConditionWaiter`](qubit_lock::AsyncTimeoutConditionWaiter).
+
+use std::time::Duration;
+
+use qubit_lock::{
+    AsyncTimeoutConditionWaiter,
+    TokioMonitor,
+    WaitTimeoutResult,
+};
+
+/// Runs a zero-budget async wait through a generic timeout bound.
+async fn wait_through_trait<W>(waiter: &W) -> WaitTimeoutResult<i32>
+where
+    W: AsyncTimeoutConditionWaiter<State = bool>,
+{
+    waiter
+        .wait_until_for_async(Duration::ZERO, |ready| *ready, |_| 7)
+        .await
+}
+
+#[tokio::test]
+/// Verifies a Tokio monitor satisfies [`AsyncTimeoutConditionWaiter`].
+async fn test_async_timeout_condition_waiter_trait_accepts_tokio_monitor() {
+    assert_eq!(
+        wait_through_trait(&TokioMonitor::new(false)).await,
+        WaitTimeoutResult::TimedOut,
+    );
+}

@@ -15,13 +15,25 @@ mod arc_parking_lot_monitor_tests;
 mod arc_std_monitor_tests;
 #[cfg(feature = "async")]
 mod arc_tokio_monitor_tests;
+#[cfg(feature = "async")]
+mod async_condition_waiter_tests;
+#[cfg(feature = "async")]
+mod async_monitor_tests;
+#[cfg(feature = "async")]
+mod async_timeout_condition_waiter_tests;
+mod condition_waiter_tests;
 #[cfg(feature = "mock")]
 mod mock_monitor_tests;
-mod monitor_trait_tests;
+mod monitor_tests;
+mod notifier_tests;
 mod parking_lot_monitor_guard_tests;
 mod parking_lot_monitor_tests;
+#[cfg(feature = "async")]
+mod shared_async_monitor_tests;
+mod shared_monitor_tests;
 mod std_monitor_guard_tests;
 mod std_monitor_tests;
+mod timeout_condition_waiter_tests;
 #[cfg(feature = "async")]
 mod tokio_monitor_tests;
 mod wait_timeout_result_tests;
