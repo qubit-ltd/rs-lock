@@ -71,7 +71,7 @@ fn test_arc_mock_monitor_clone_shares_state_and_mock_time() {
 
 #[test]
 fn test_arc_mock_monitor_from_clock_shares_external_clock() {
-    let clock = std::sync::Arc::new(ManualMonotonicClock::new());
+    let clock = ManualMonotonicClock::new_shared();
     let monitor =
         ArcMockMonitor::from_clock(false, std::sync::Arc::clone(&clock));
 

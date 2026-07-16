@@ -147,7 +147,7 @@ async fn test_mock_monitor_condition_wait_futures_are_send() {
 fn test_mock_monitor_clock_can_advance_inside_state_closure() {
     const REAL_TIMEOUT: Duration = Duration::from_secs(1);
 
-    let clock = Arc::new(ManualMonotonicClock::new());
+    let clock = ManualMonotonicClock::new_shared();
     let monitor = Arc::new(MockMonitor::from_clock((), Arc::clone(&clock)));
     let worker_monitor = Arc::clone(&monitor);
     let worker_clock = Arc::clone(&clock);
@@ -323,7 +323,7 @@ fn test_mock_monitor_async_timeout_starts_after_initial_lock_contention() {
 
 #[test]
 fn test_mock_monitor_from_clock_uses_shared_manual_time() {
-    let clock = Arc::new(ManualMonotonicClock::new());
+    let clock = ManualMonotonicClock::new_shared();
     let monitor = Arc::new(MockMonitor::from_clock(false, Arc::clone(&clock)));
     let waiter_monitor = Arc::clone(&monitor);
     let (done_tx, done_rx) = mpsc::channel();
@@ -354,7 +354,7 @@ fn test_mock_monitor_from_clock_uses_shared_manual_time() {
 
 #[test]
 fn test_shared_clock_drives_multiple_mock_monitors() {
-    let clock = Arc::new(ManualMonotonicClock::new());
+    let clock = ManualMonotonicClock::new_shared();
     let first = Arc::new(MockMonitor::from_clock((), Arc::clone(&clock)));
     let second = Arc::new(MockMonitor::from_clock((), Arc::clone(&clock)));
     let (done_tx, done_rx) = mpsc::channel();
@@ -409,7 +409,7 @@ fn test_shared_clock_drives_multiple_mock_monitors() {
 #[cfg(feature = "async")]
 #[tokio::test]
 async fn test_mock_monitor_async_timeout_uses_shared_manual_time() {
-    let clock = Arc::new(ManualMonotonicClock::new());
+    let clock = ManualMonotonicClock::new_shared();
     let monitor = MockMonitor::from_clock(false, Arc::clone(&clock));
     let wait = monitor.wait_until_for_async(
         Duration::from_secs(10),
