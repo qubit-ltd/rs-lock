@@ -115,6 +115,28 @@ fn test_readme_documents_monitor_api_boundaries() {
 }
 
 #[test]
+/// Ensures both READMEs explain concrete and generic monitor selection.
+fn test_readme_documents_monitor_capability_selection() {
+    let readme_en = normalize_readme_text(README_EN);
+    let readme_zh = normalize_readme_text(README_ZH);
+    assert!(readme_en.contains("Choosing monitor capabilities"));
+    assert!(readme_en.contains("use the narrowest capability"));
+    assert!(readme_en.contains("static generic bounds"));
+    assert!(readme_en.contains("do not provide a mock guard type"));
+    assert!(readme_zh.contains("选择 monitor 能力"));
+    assert!(readme_zh.contains("使用能够表达操作的最小能力"));
+    assert!(readme_zh.contains("静态泛型约束"));
+    assert!(readme_zh.contains("不提供 mock guard 类型"));
+}
+
+#[test]
+/// Ensures README files do not retain version migration guides.
+fn test_readme_omits_version_migration_guides() {
+    assert!(!README_EN.contains("## Migration from"));
+    assert!(!README_ZH.contains("迁移"));
+}
+
+#[test]
 /// Ensures both READMEs allow mock-clock advancement under monitor state lock.
 fn test_readme_documents_reentrant_mock_clock_advance() {
     let readme_en = normalize_readme_text(README_EN);

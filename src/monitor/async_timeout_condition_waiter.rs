@@ -32,6 +32,10 @@ use crate::monitor::{
 /// existed. If a notification already selected that waiter, cancellation
 /// discards the selection rather than transferring it to another or future
 /// waiter.
+///
+/// Use this trait as a static generic bound when asynchronous code needs timed
+/// predicate waits. Its return-position `impl Future` methods make it
+/// unsuitable as a `dyn` trait-object interface.
 pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     /// Returns a future that waits until the predicate becomes true or times
     /// out.

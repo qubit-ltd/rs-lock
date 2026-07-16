@@ -10,6 +10,10 @@
 use crate::monitor::Monitor;
 
 /// Aggregate trait for cloneable, shared blocking monitor handles.
+///
+/// This is a static generic bound for APIs that retain or clone a monitor
+/// handle. The inherited generic methods make it unsuitable as a `dyn`
+/// trait-object interface.
 pub trait SharedMonitor: Monitor + Clone + Send + Sync + 'static {}
 
 impl<T> SharedMonitor for T where T: Monitor + Clone + Send + Sync + 'static {}

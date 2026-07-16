@@ -75,6 +75,29 @@ code, while ordinary monitor method calls resolve through `Deref`. Their
 `from_arc`, `as_arc`, and `into_arc` methods make the shared-ownership boundary
 explicit.
 
+### Choosing monitor capabilities
+
+For ordinary application code, prefer a concrete implementation:
+`ParkingLotMonitor` or `StdMonitor` for blocking coordination and
+`TokioMonitor` for asynchronous coordination. Choose the corresponding
+`Arc*Monitor` handle when ownership must be cloned or retained.
+
+At generic API boundaries, use the narrowest capability that expresses the
+operation: `Notifier` for signaling, `ConditionWaiter` or
+`TimeoutConditionWaiter` for blocking predicate waits, and their
+`AsyncConditionWaiter` or `AsyncTimeoutConditionWaiter` counterparts for
+asynchronous waits. Use `Monitor` or `AsyncMonitor` only when the full
+notification-and-wait contract is required; use `SharedMonitor` or
+`SharedAsyncMonitor` when the generic API also retains a cloneable handle.
+These waiter and aggregate traits are intended for static generic bounds, not
+`dyn` trait-object interfaces.
+
+Import public types directly from the crate root.
+
+`MockMonitor` and `ArcMockMonitor` are deterministic test implementations for
+capability-trait and predicate-wait behavior. They do not provide a mock guard
+type and are not replacements for concrete guard-oriented monitor APIs.
+
 ### Deterministic monitor time
 
 Enable the `mock` feature to use `MockMonitor` and `ArcMockMonitor`.
@@ -107,62 +130,6 @@ are ready to observe changes. An async wait starts contributing after its future
 is first polled, and unregisters automatically when cancelled. Code may also
 advance the clock while holding that monitor's state lock; clock callbacks do
 not reacquire the protected state.
-
-## Migration from 0.9
-
-Version `0.10` intentionally changes features and closure-method names:
-
-- The default feature set is now synchronous only. Enable `async` explicitly
-  for Tokio lock and monitor types.
-- `MockMonitor`, `ArcMockMonitor`, and the `qubit-clock` dependency are behind
-  the new `mock` feature. Enable both `async` and `mock` for async mock waits.
-- Closure-scoped lock methods were renamed: `read` to `with_read`, `write` to
-  `with_write`, `try_read` to `try_with_read`, and `try_write` to
-  `try_with_write`.
-- Synchronous monitor state helpers were renamed: `read` to `with_read`,
-  `write` to `with_write`, `write_notify_one` to `with_write_notify_one`, and
-  `write_notify_all` to `with_write_notify_all`.
-- Tokio monitor state helpers now use the `_async` suffix consistently:
-  `async_read` to `with_read_async`, `async_write` to `with_write_async`,
-  `async_write_notify_one` to `with_write_notify_one_async`, and
-  `async_write_notify_all` to `with_write_notify_all_async`.
-- Notification-only waiting traits and concrete `wait`, `wait_for`,
-  `wait_async`, and `wait_for_async` methods have been removed. Coordinate on
-  protected state with predicate-based condition waits instead. Code that
-  needs queued permits should use a semaphore or event primitive.
-- The boxed `AsyncMonitorFuture` alias has been removed. Async monitor traits
-  now return `impl Future` directly.
-- Arc-backed monitor wrappers no longer duplicate inherent forwarding methods.
-  Ordinary calls resolve through `Deref`; use the retained trait
-  implementations for generic bounds and `from_arc`, `as_arc`, or `into_arc`
-  at ownership boundaries.
-
-## Migration from 0.8
-
-Version `0.9` contains intentional async monitor API renames:
-
-- `AsyncConditionWaiter::async_wait_until` and `async_wait_while` are now
-  `wait_until_async` and `wait_while_async`.
-- `AsyncTimeoutConditionWaiter::async_wait_until_for` and
-  `async_wait_while_for` are now `wait_until_for_async` and
-  `wait_while_for_async`.
-- Condition-wait traits provide default `wait_until*` implementations through
-  their corresponding `wait_while*` methods.
-
-## Migration from 0.7
-
-Version `0.8` contains intentional breaking API cleanup:
-
-- `Monitor` is now an aggregate trait for blocking monitor capabilities.
-- The concrete parking_lot monitor is now `ParkingLotMonitor`; its cloneable
-  handle is `ArcParkingLotMonitor`.
-- Timeout condition methods are named `wait_until_for` and `wait_while_for`.
-- `MockMonitor` and `ArcMockMonitor` use a `ManualMonotonicClock` for
-  deterministic timeout tests.
-- With the `async` feature, `TokioMonitor` and `ArcTokioMonitor` provide async
-  monitor operations.
-- `qubit_lock::lock` and `qubit_lock::monitor` are no longer public modules.
-  Import public types directly from the crate root.
 
 ## Quick Start
 

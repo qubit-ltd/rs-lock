@@ -16,6 +16,10 @@ use std::sync::Arc;
 /// condition-variable semantics, may be spurious, and do not guarantee
 /// fairness or make the predicate true. The action runs only after the
 /// predicate reaches its completion condition.
+///
+/// Use this trait as a static generic bound when blocking code needs predicate
+/// waits but no timeout. Its generic methods make it unsuitable as a `dyn`
+/// trait-object interface.
 pub trait ConditionWaiter {
     /// State protected by the monitor.
     type State;

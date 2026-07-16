@@ -32,12 +32,32 @@ use super::{
 };
 
 /// Cloneable handle around a [`MockMonitor`].
+///
+/// This handle is intended for deterministic tests that need shared ownership
+/// of capability-trait and predicate-wait behavior. It does not add a guard
+/// API to [`MockMonitor`].
 pub struct ArcMockMonitor<T> {
     /// Shared mock monitor.
     inner: Arc<MockMonitor<T>>,
 }
 
 impl<T> ArcMockMonitor<T> {
+    /// Creates an Arc-wrapped mock monitor.
+    ///
+    /// # Arguments
+    ///
+    /// * `state` - Initial protected state.
+    ///
+    /// # Returns
+    ///
+    /// A cloneable mock monitor handle.
+    #[inline]
+    pub fn new(state: T) -> Self {
+        Self {
+            inner: Arc::new(MockMonitor::new(state)),
+        }
+    }
+
     /// Creates a shared handle from an existing Arc-wrapped monitor.
     ///
     /// # Arguments
@@ -50,6 +70,21 @@ impl<T> ArcMockMonitor<T> {
     #[inline]
     pub fn from_arc(inner: Arc<MockMonitor<T>>) -> Self {
         Self { inner }
+    }
+
+    /// Creates an Arc-wrapped mock monitor driven by a shared manual clock.
+    ///
+    /// # Arguments
+    /// - `state`: Initial protected state.
+    /// - `clock`: Manual clock used for timeout deadlines.
+    ///
+    /// # Returns
+    /// A cloneable monitor handle sharing `clock` with other test components.
+    #[inline]
+    pub fn from_clock(state: T, clock: Arc<ManualMonotonicClock>) -> Self {
+        Self {
+            inner: Arc::new(MockMonitor::from_clock(state, clock)),
+        }
     }
 
     /// Borrows the Arc that owns the wrapped monitor.
@@ -70,39 +105,6 @@ impl<T> ArcMockMonitor<T> {
     #[inline(always)]
     pub fn into_arc(self) -> Arc<MockMonitor<T>> {
         self.inner
-    }
-}
-
-impl<T> ArcMockMonitor<T> {
-    /// Creates an Arc-wrapped mock monitor.
-    ///
-    /// # Arguments
-    ///
-    /// * `state` - Initial protected state.
-    ///
-    /// # Returns
-    ///
-    /// A cloneable mock monitor handle.
-    #[inline]
-    pub fn new(state: T) -> Self {
-        Self {
-            inner: Arc::new(MockMonitor::new(state)),
-        }
-    }
-
-    /// Creates an Arc-wrapped mock monitor driven by a shared manual clock.
-    ///
-    /// # Arguments
-    /// - `state`: Initial protected state.
-    /// - `clock`: Manual clock used for timeout deadlines.
-    ///
-    /// # Returns
-    /// A cloneable monitor handle sharing `clock` with other test components.
-    #[inline]
-    pub fn from_clock(state: T, clock: Arc<ManualMonotonicClock>) -> Self {
-        Self {
-            inner: Arc::new(MockMonitor::from_clock(state, clock)),
-        }
     }
 
     /// Returns the current mock elapsed time.

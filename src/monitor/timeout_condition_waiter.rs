@@ -24,6 +24,10 @@ use crate::monitor::{
 /// fixed deadline is established immediately before the first condition-wait
 /// suspension and reused across wakeups. A zero timeout still checks the
 /// predicate, and a final locked predicate check wins over timeout.
+///
+/// Use this trait as a static generic bound when blocking code needs timed
+/// predicate waits. Its generic methods make it unsuitable as a `dyn`
+/// trait-object interface.
 pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// Blocks until the predicate becomes true or the timeout expires.
     ///
