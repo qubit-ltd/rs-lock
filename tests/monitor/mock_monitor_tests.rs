@@ -8,6 +8,8 @@
 //! Tests for [`MockMonitor`](qubit_lock::MockMonitor).
 
 use std::{
+    cell::Cell,
+    rc::Rc,
     sync::{
         Arc,
         mpsc,
@@ -40,6 +42,51 @@ use qubit_lock::{
 #[cfg(feature = "async")]
 fn assert_send<F: Future + Send>(future: F) -> F {
     future
+}
+
+#[test]
+fn test_mock_monitor_blocking_api_accepts_non_send_state() {
+    let monitor = MockMonitor::new(Rc::new(Cell::new(1)));
+
+    assert_eq!(
+        monitor.wait_until(
+            |value| value.get() == 1,
+            |value| {
+                value.set(2);
+                value.get()
+            },
+        ),
+        2,
+    );
+}
+
+#[test]
+fn test_mock_monitor_blocking_api_accepts_borrowed_state() {
+    let owner = String::from("borrowed");
+    let monitor = MockMonitor::new(owner.as_str());
+
+    assert_eq!(monitor.with_read(|value| *value), "borrowed");
+}
+
+#[test]
+fn test_wait_for_timeout_waiters_checks_readiness_before_deadline_overflow() {
+    let monitor = MockMonitor::new(());
+
+    assert!(monitor.wait_for_timeout_waiters(0, Duration::MAX));
+}
+
+#[cfg(feature = "async")]
+#[tokio::test]
+async fn test_mock_monitor_async_api_accepts_non_static_send_state() {
+    let owner = String::from("borrowed");
+    let monitor = MockMonitor::new(owner.as_str());
+
+    assert_eq!(
+        monitor
+            .wait_until_async(|value| *value == "borrowed", |value| *value)
+            .await,
+        "borrowed",
+    );
 }
 
 /// Verifies that all Mock condition-wait trait methods return `Send` futures.

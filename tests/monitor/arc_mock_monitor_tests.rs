@@ -8,6 +8,8 @@
 //! Tests for [`ArcMockMonitor`](qubit_lock::ArcMockMonitor).
 
 use std::{
+    cell::Cell,
+    rc::Rc,
     sync::Arc,
     thread,
     time::Duration,
@@ -22,6 +24,14 @@ use qubit_lock::{
     TimeoutConditionWaiter,
     WaitTimeoutResult,
 };
+
+#[test]
+fn test_arc_mock_monitor_blocking_api_accepts_non_send_borrowed_state() {
+    let owner = Rc::new(Cell::new(1));
+    let monitor = ArcMockMonitor::new(&owner);
+
+    assert_eq!(monitor.with_read(|value| value.get()), 1);
+}
 #[cfg(feature = "async")]
 use qubit_lock::{
     AsyncConditionWaiter,

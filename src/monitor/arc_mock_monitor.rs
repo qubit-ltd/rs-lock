@@ -73,7 +73,7 @@ impl<T> ArcMockMonitor<T> {
     }
 }
 
-impl<T: Send + 'static> ArcMockMonitor<T> {
+impl<T> ArcMockMonitor<T> {
     /// Creates an Arc-wrapped mock monitor.
     ///
     /// # Arguments
@@ -92,7 +92,7 @@ impl<T: Send + 'static> ArcMockMonitor<T> {
 
     /// Creates an Arc-wrapped mock monitor driven by a shared manual clock.
     ///
-    /// # Parameters
+    /// # Arguments
     /// - `state`: Initial protected state.
     /// - `clock`: Manual clock used for timeout deadlines.
     ///
@@ -127,8 +127,10 @@ impl<T: Send + 'static> ArcMockMonitor<T> {
 
     /// Blocks in real time until enough timeout waiters are ready.
     ///
-    /// Returns `false` if `real_timeout` expires before `expected_count`
-    /// waiters are active. The real-time guard never contributes to mock time.
+    /// Returns `false` if `real_timeout` expires or its real-time deadline
+    /// overflows before `expected_count` waiters are active. An already
+    /// satisfied count returns `true` before overflow is considered. The
+    /// real-time guard never contributes to mock time.
     #[must_use]
     #[inline(always)]
     pub fn wait_for_timeout_waiters(
@@ -141,7 +143,7 @@ impl<T: Send + 'static> ArcMockMonitor<T> {
     }
 }
 
-impl<T: Send + 'static> Notifier for ArcMockMonitor<T> {
+impl<T> Notifier for ArcMockMonitor<T> {
     /// Wakes one waiter.
     #[inline(always)]
     fn notify_one(&self) {
@@ -155,7 +157,7 @@ impl<T: Send + 'static> Notifier for ArcMockMonitor<T> {
     }
 }
 
-impl<T: Send + 'static> ConditionWaiter for ArcMockMonitor<T> {
+impl<T> ConditionWaiter for ArcMockMonitor<T> {
     type State = T;
 
     /// Blocks while the predicate remains true, then runs the action.
@@ -169,7 +171,7 @@ impl<T: Send + 'static> ConditionWaiter for ArcMockMonitor<T> {
     }
 }
 
-impl<T: Send + 'static> TimeoutConditionWaiter for ArcMockMonitor<T> {
+impl<T> TimeoutConditionWaiter for ArcMockMonitor<T> {
     /// Blocks while the predicate remains true or until mock timeout expires.
     #[inline(always)]
     fn wait_while_for<R, P, F>(
@@ -187,7 +189,7 @@ impl<T: Send + 'static> TimeoutConditionWaiter for ArcMockMonitor<T> {
 }
 
 #[cfg(feature = "async")]
-impl<T: Send + 'static> AsyncConditionWaiter for ArcMockMonitor<T> {
+impl<T: Send> AsyncConditionWaiter for ArcMockMonitor<T> {
     type State = T;
 
     /// Returns a future that waits while the predicate remains true.
@@ -207,7 +209,7 @@ impl<T: Send + 'static> AsyncConditionWaiter for ArcMockMonitor<T> {
 }
 
 #[cfg(feature = "async")]
-impl<T: Send + 'static> AsyncTimeoutConditionWaiter for ArcMockMonitor<T> {
+impl<T: Send> AsyncTimeoutConditionWaiter for ArcMockMonitor<T> {
     /// Returns a future that waits while the predicate remains true or times
     /// out.
     #[inline(always)]
@@ -254,7 +256,7 @@ impl<T> Clone for ArcMockMonitor<T> {
     }
 }
 
-impl<T: Send + 'static> From<T> for ArcMockMonitor<T> {
+impl<T> From<T> for ArcMockMonitor<T> {
     /// Creates an Arc-wrapped mock monitor from an initial state value.
     #[inline(always)]
     fn from(value: T) -> Self {
@@ -262,7 +264,7 @@ impl<T: Send + 'static> From<T> for ArcMockMonitor<T> {
     }
 }
 
-impl<T: Default + Send + 'static> Default for ArcMockMonitor<T> {
+impl<T: Default> Default for ArcMockMonitor<T> {
     /// Creates an Arc-wrapped mock monitor containing `T::default()`.
     #[inline(always)]
     fn default() -> Self {
