@@ -67,7 +67,7 @@ pub struct ParkingLotMonitorGuard<'a, T> {
 impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     /// Creates a guard from its owning monitor and parking_lot mutex guard.
     ///
-    /// # Parameters
+    /// # Arguments
     ///
     /// * `monitor` - ParkingLotMonitor whose mutex produced `inner`.
     /// * `inner` - Parking-lot mutex guard protecting the monitor state.

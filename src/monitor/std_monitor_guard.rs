@@ -65,7 +65,7 @@ pub struct StdMonitorGuard<'a, T> {
 impl<'a, T> StdMonitorGuard<'a, T> {
     /// Creates a guard from its owning monitor and standard mutex guard.
     ///
-    /// # Parameters
+    /// # Arguments
     ///
     /// * `monitor` - StdMonitor whose mutex produced `inner`.
     /// * `inner` - Standard mutex guard protecting the monitor state.

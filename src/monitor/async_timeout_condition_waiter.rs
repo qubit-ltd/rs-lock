@@ -50,6 +50,7 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     /// A lazy future that resolves to [`WaitTimeoutResult::Ready`] with the
     /// action result, or [`WaitTimeoutResult::TimedOut`] when the budget
     /// expires while the predicate still requires waiting.
+    #[inline(always)]
     fn wait_until_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
