@@ -39,7 +39,7 @@
 ///     },
 /// );
 ///
-/// assert_eq!(result, WaitTimeoutResult::Ready("ready"));
+/// assert_eq!(result, Ok(WaitTimeoutResult::Ready("ready")));
 /// ```
 ///
 /// Ignoring a predicate-wait result is rejected when unused must-use values

@@ -1,0 +1,59 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+//! Owns one active blocking Monitor waiter registration.
+
+use std::sync::Arc;
+
+use super::{
+    BlockingConditionWaiter,
+    BlockingWaiterRegistry,
+};
+
+/// RAII ownership of one active blocking waiter registration.
+pub(in crate::monitor) struct BlockingWaiterRegistration<'a> {
+    /// Registry from which cancellation removes the waiter.
+    registry: &'a BlockingWaiterRegistry,
+    /// Stable allocation-address key.
+    key: usize,
+    /// Waiter shared with notifications and Timer Wakers.
+    waiter: Arc<BlockingConditionWaiter>,
+}
+
+impl<'a> BlockingWaiterRegistration<'a> {
+    /// Creates ownership of an already inserted registry entry.
+    pub(super) const fn new(
+        registry: &'a BlockingWaiterRegistry,
+        key: usize,
+        waiter: Arc<BlockingConditionWaiter>,
+    ) -> Self {
+        Self {
+            registry,
+            key,
+            waiter,
+        }
+    }
+
+    /// Returns the registered waiter used to block or poll a Timer.
+    ///
+    /// # Returns
+    ///
+    /// A shared reference to this registration's waiter allocation.
+    #[must_use]
+    pub(in crate::monitor) const fn waiter(
+        &self,
+    ) -> &Arc<BlockingConditionWaiter> {
+        &self.waiter
+    }
+}
+
+impl Drop for BlockingWaiterRegistration<'_> {
+    /// Cancels an active registration without transferring notification.
+    fn drop(&mut self) {
+        self.registry.unregister(self.key);
+    }
+}

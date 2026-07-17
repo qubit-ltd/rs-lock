@@ -34,7 +34,11 @@ fn main() {
         |items| items.is_empty(),
         |items| items.pop(),
     );
-    assert!(result.is_timed_out());
+    assert!(
+        result
+            .expect("standard Timer should register")
+            .is_timed_out()
+    );
 
     monitor.with_write(|items| items.push(7));
     monitor.notify_one();
@@ -43,6 +47,7 @@ fn main() {
         |items| !items.is_empty(),
         |items| items.pop(),
     );
+    let result = result.expect("standard Timer should register");
     assert_eq!(result, WaitTimeoutResult::Ready(Some(7)));
     assert_eq!(
         result.map(|item| item.unwrap_or_default()).into_option(),

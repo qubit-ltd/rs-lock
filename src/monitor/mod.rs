@@ -8,14 +8,12 @@
 //! # Monitor Module
 //!
 //! Provides monitor capability traits and concrete monitor implementations
-//! built on parking_lot, standard-library, Tokio, and mock primitives.
+//! built on parking_lot, standard-library, and Tokio primitives.
 
 // The nested `monitor` module owns the `Monitor` trait; the repeated name is
 // intentional so each public trait can live in its matching source file.
 #![allow(clippy::module_inception)]
 
-#[cfg(feature = "mock")]
-mod arc_mock_monitor;
 mod arc_parking_lot_monitor;
 mod arc_std_monitor;
 #[cfg(feature = "async")]
@@ -27,10 +25,7 @@ mod async_monitor;
 #[cfg(feature = "async")]
 mod async_timeout_condition_waiter;
 mod condition_waiter;
-#[cfg(any(feature = "async", feature = "mock"))]
 mod internal;
-#[cfg(feature = "mock")]
-mod mock_monitor;
 mod monitor;
 mod notifier;
 mod parking_lot_monitor;
@@ -46,8 +41,6 @@ mod tokio_monitor;
 mod wait_timeout_result;
 mod wait_timeout_status;
 
-#[cfg(feature = "mock")]
-pub use arc_mock_monitor::ArcMockMonitor;
 pub use arc_parking_lot_monitor::ArcParkingLotMonitor;
 pub use arc_std_monitor::ArcStdMonitor;
 #[cfg(feature = "async")]
@@ -59,8 +52,6 @@ pub use async_monitor::AsyncMonitor;
 #[cfg(feature = "async")]
 pub use async_timeout_condition_waiter::AsyncTimeoutConditionWaiter;
 pub use condition_waiter::ConditionWaiter;
-#[cfg(feature = "mock")]
-pub use mock_monitor::MockMonitor;
 pub use monitor::Monitor;
 pub use notifier::Notifier;
 pub use parking_lot_monitor::ParkingLotMonitor;

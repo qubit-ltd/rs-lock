@@ -10,6 +10,10 @@
 //! Provides an Arc-wrapped synchronous monitor for condition-based state
 //! coordination across threads.
 
+use qubit_clock::{
+    TimeError,
+    Timer,
+};
 use std::{
     ops::Deref,
     sync::Arc,
@@ -83,6 +87,22 @@ impl<T> ArcStdMonitor<T> {
     pub fn new(state: T) -> Self {
         Self {
             inner: Arc::new(StdMonitor::new(state)),
+        }
+    }
+
+    /// Creates an Arc-wrapped monitor using an injected Timer.
+    ///
+    /// # Parameters
+    ///
+    /// * `state` - Initial protected state.
+    /// * `timer` - Timer driving monitor deadlines.
+    ///
+    /// # Returns
+    ///
+    /// A cloneable monitor handle bound to `timer`.
+    pub fn with_timer(state: T, timer: Arc<dyn Timer>) -> Self {
+        Self {
+            inner: Arc::new(StdMonitor::with_timer(state, timer)),
         }
     }
 
@@ -172,7 +192,7 @@ impl<T> TimeoutConditionWaiter for ArcStdMonitor<T> {
         timeout: Duration,
         predicate: P,
         action: F,
-    ) -> WaitTimeoutResult<R>
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
     where
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,

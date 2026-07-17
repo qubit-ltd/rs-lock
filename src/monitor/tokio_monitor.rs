@@ -21,6 +21,12 @@ use std::{
     time::Duration,
 };
 
+use qubit_clock::{
+    MonotonicClock,
+    TimeError,
+    Timer,
+    TokioMonotonicClock,
+};
 use tokio::sync::Mutex;
 
 use super::{
@@ -52,15 +58,17 @@ use super::{
 /// wakeups. Registration and state-reacquisition time consume the
 /// condition-wait budget; a signal cannot restart or extend it. When a signal
 /// and the deadline are both ready, the deadline is selected first, followed
-/// by one final locked predicate check. Polling the timer requires a Tokio
-/// runtime with the time driver enabled. Initial mutex contention, an
-/// immediately ready predicate, and a zero budget do not create a timer and
-/// therefore do not require the time driver.
+/// by one final locked predicate check. The default Tokio Timer requires a
+/// runtime with the time driver enabled; injected Timers may have different
+/// runtime requirements. Initial mutex contention, an immediately ready
+/// predicate, and a zero budget do not create a Timer future.
 pub struct TokioMonitor<T> {
     /// Protected monitor state.
     state: Mutex<T>,
     /// Active condition waiters eligible for memoryless notification.
     waiters: StdMutex<BTreeMap<usize, Arc<TokioConditionWaiter>>>,
+    /// Timer driving every asynchronous deadline wait.
+    timer: Arc<dyn Timer>,
 }
 
 impl<T> TokioMonitor<T> {
@@ -75,10 +83,35 @@ impl<T> TokioMonitor<T> {
     /// A Tokio-based monitor.
     #[inline]
     pub fn new(state: T) -> Self {
+        Self::with_timer(state, TokioMonotonicClock::new().new_timer())
+    }
+
+    /// Creates a Tokio monitor using an injected Timer.
+    ///
+    /// # Parameters
+    ///
+    /// * `state` - Initial protected state.
+    /// * `timer` - Timer driving asynchronous deadlines.
+    ///
+    /// # Returns
+    ///
+    /// A Tokio monitor bound to `timer`.
+    pub fn with_timer(state: T, timer: Arc<dyn Timer>) -> Self {
         Self {
             state: Mutex::new(state),
             waiters: StdMutex::new(BTreeMap::new()),
+            timer,
         }
+    }
+
+    /// Returns the Timer driving this monitor's deadline waits.
+    ///
+    /// # Returns
+    ///
+    /// The injected Timer and its monotonic clock domain.
+    #[must_use]
+    pub fn timer(&self) -> &dyn Timer {
+        self.timer.as_ref()
     }
 
     /// Acquires the monitor and reads the protected state.
@@ -298,11 +331,12 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// running `action` or rolling back protected-state changes. A notification
     /// that already selected this waiter is discarded rather than transferred.
     /// After an initial blocking predicate with a nonzero budget, the method
-    /// creates one timer before waiter registration. The current Tokio runtime
-    /// must then have its time driver enabled or Tokio will panic. Registration
-    /// time consumes the budget. Initial mutex contention, an immediately ready
-    /// predicate, and a zero budget do not create a timer or require the time
-    /// driver. The fixed deadline is reused across wakeups and followed by one
+    /// creates one Timer future before waiter registration. The default Tokio
+    /// Timer requires a runtime with its time driver enabled; injected Timers
+    /// may have different runtime requirements. Registration time consumes the
+    /// budget. Initial mutex contention, an immediately ready predicate, and a
+    /// zero budget do not create a Timer future. The fixed deadline is reused
+    /// across wakeups and followed by one
     /// final locked predicate check. Predicate readiness wins over timeout. If
     /// a signal wins before the timer is ready but reacquiring the state
     /// exhausts the fixed deadline, a still-blocking predicate times out
@@ -315,7 +349,7 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
         timeout: Duration,
         mut predicate: P,
         action: F,
-    ) -> impl Future<Output = WaitTimeoutResult<R>> + Send + 'a
+    ) -> impl Future<Output = Result<WaitTimeoutResult<R>, TimeError>> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
@@ -337,11 +371,12 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// running `action` or rolling back protected-state changes. A notification
     /// that already selected this waiter is discarded rather than transferred.
     /// After an initial blocking predicate with a nonzero budget, the method
-    /// creates one timer before waiter registration. The current Tokio runtime
-    /// must then have its time driver enabled or Tokio will panic. Registration
-    /// time consumes the budget. Initial mutex contention, an immediately ready
-    /// predicate, and a zero budget do not create a timer or require the time
-    /// driver. The fixed deadline is reused across wakeups and followed by one
+    /// creates one Timer future before waiter registration. The default Tokio
+    /// Timer requires a runtime with its time driver enabled; injected Timers
+    /// may have different runtime requirements. Registration time consumes the
+    /// budget. Initial mutex contention, an immediately ready predicate, and a
+    /// zero budget do not create a Timer future. The fixed deadline is reused
+    /// across wakeups and followed by one
     /// final locked predicate check. Predicate readiness wins over timeout. If
     /// a signal wins before the timer is ready but reacquiring the state
     /// exhausts the fixed deadline, a still-blocking predicate times out
@@ -357,7 +392,7 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
         timeout: Duration,
         mut predicate: P,
         action: F,
-    ) -> impl Future<Output = WaitTimeoutResult<R>> + Send + 'a
+    ) -> impl Future<Output = Result<WaitTimeoutResult<R>, TimeError>> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
@@ -366,16 +401,13 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
         async move {
             let mut guard = self.state.lock().await;
             if !predicate(&*guard) {
-                return WaitTimeoutResult::Ready(action(&mut *guard));
+                return Ok(WaitTimeoutResult::Ready(action(&mut *guard)));
             }
             if timeout.is_zero() {
-                return WaitTimeoutResult::TimedOut;
+                return Ok(WaitTimeoutResult::TimedOut);
             }
 
-            // Tokio turns an unrepresentable relative deadline into a
-            // far-future timer, avoiding `Instant` addition overflow.
-            let deadline = tokio::time::sleep(timeout);
-            tokio::pin!(deadline);
+            let mut deadline = self.timer.after(timeout)?;
             loop {
                 let registration = self.register_waiter();
                 drop(guard);
@@ -397,19 +429,22 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
                 if timed_out {
                     guard = self.state.lock().await;
                     if !predicate(&*guard) {
-                        return WaitTimeoutResult::Ready(action(&mut *guard));
+                        return Ok(WaitTimeoutResult::Ready(action(
+                            &mut *guard,
+                        )));
                     }
-                    return WaitTimeoutResult::TimedOut;
+                    return Ok(WaitTimeoutResult::TimedOut);
                 }
                 guard = self.state.lock().await;
                 if !predicate(&*guard) {
-                    return WaitTimeoutResult::Ready(action(&mut *guard));
+                    return Ok(WaitTimeoutResult::Ready(action(&mut *guard)));
                 }
-                if deadline.as_ref().is_elapsed()
-                    || tokio::time::Instant::now()
-                        >= deadline.as_ref().deadline()
-                {
-                    return WaitTimeoutResult::TimedOut;
+                let deadline_reached = poll_fn(|context| {
+                    Poll::Ready(deadline.as_mut().poll(context).is_ready())
+                })
+                .await;
+                if deadline_reached {
+                    return Ok(WaitTimeoutResult::TimedOut);
                 }
             }
         }

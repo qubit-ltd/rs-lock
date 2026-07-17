@@ -7,15 +7,15 @@
 // =============================================================================
 //! # Wait Timeout Status
 //!
-//! Provides the status returned by one timed condition-variable wait.
+//! Provides the status returned by one timed monitor wait.
 
 /// Result of a timed wait operation.
 ///
 /// This status is returned by
-/// [`ParkingLotMonitorGuard::wait_timeout`](super::ParkingLotMonitorGuard::wait_timeout) and
-/// [`StdMonitorGuard::wait_timeout`](super::StdMonitorGuard::wait_timeout). It
+/// [`ParkingLotMonitorGuard::wait_for`](super::ParkingLotMonitorGuard::wait_for)
+/// and [`StdMonitorGuard::wait_for`](super::StdMonitorGuard::wait_for). It
 /// describes why a timed wait returned, but callers must still re-check the
-/// protected state because condition variables may wake spuriously.
+/// protected state because notification does not imply predicate truth.
 ///
 /// # Example
 ///
@@ -25,8 +25,10 @@
 /// use qubit_lock::{ParkingLotMonitor, WaitTimeoutStatus};
 ///
 /// let monitor = ParkingLotMonitor::new(false);
-/// let guard = monitor.lock();
-/// let (_guard, status) = guard.wait_timeout(Duration::from_millis(1));
+/// let mut guard = monitor.lock();
+/// let status = guard
+///     .wait_for(Duration::from_millis(1))
+///     .expect("standard Timer should register");
 /// assert_eq!(status, WaitTimeoutStatus::TimedOut);
 /// ```
 ///
@@ -41,9 +43,8 @@
 /// use qubit_lock::ParkingLotMonitor;
 ///
 /// let monitor = ParkingLotMonitor::new(false);
-/// let guard = monitor.lock();
-/// let (_guard, status) = guard.wait_timeout(Duration::ZERO);
-/// status;
+/// let mut guard = monitor.lock();
+/// guard.wait_for(Duration::ZERO);
 /// ```
 #[must_use = "check whether the condition wait woke or reached its timeout"]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
