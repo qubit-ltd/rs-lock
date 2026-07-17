@@ -17,11 +17,10 @@ Lock-focused utilities for the Qubit Rust libraries. The crate provides synchron
   behind the optional `async` feature.
 - `ParkingLotMonitor`, `ArcParkingLotMonitor`, `ParkingLotMonitorGuard`: parking_lot-based condition coordination.
 - `StdMonitor`, `ArcStdMonitor`, `StdMonitorGuard`: std-based condition coordination.
-- `MockMonitor`, `ArcMockMonitor`: deterministic monitor testing behind the
-  optional `mock` feature, driven by a shared
-  `qubit_clock::ManualMonotonicClock`.
 - `TokioMonitor`, `ArcTokioMonitor`: async monitor coordination behind the
   optional `async` feature.
+- Timer injection on every monitor for deterministic integration tests that
+  execute the production wait algorithm.
 - Closure-based APIs that keep lock acquisition and release scoped to one call.
 - `Arc*` wrappers implement `Deref` and `AsRef`, so the native guard-based
   APIs of the wrapped primitive remain available when needed.
@@ -34,11 +33,11 @@ qubit-lock = "0.10"
 ```
 
 The default feature set contains the synchronous locks and monitors only.
-Enable asynchronous or deterministic-test support explicitly when needed:
+Enable asynchronous support explicitly when needed:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.10", features = ["async", "mock"] }
+qubit-lock = { version = "0.10", features = ["async"] }
 ```
 
 If your application creates a Tokio runtime, enable the appropriate Tokio
@@ -62,9 +61,10 @@ timeout still checks the predicate, and the final locked predicate check wins
 over timeout.
 
 Async monitor traits return `impl Future`; the returned future is lazy, so
-construction and time before its first poll consume no timeout budget. A Tokio
-time driver is needed only when a timed wait actually enters a nonzero timed
-suspension, in which case the runtime must have the time driver enabled.
+construction and time before its first poll consume no timeout budget. The
+default Tokio Timer requires a runtime with its time driver enabled when a
+nonzero timed wait actually suspends. An injected Timer determines the driver
+requirements for customized monitors.
 Dropping a pending future unregisters its active waiter, does not run the
 action, and does not roll back protected-state changes made by other tasks. If
 `notify_one` already selected that waiter, cancellation discards that selection
@@ -94,42 +94,45 @@ These waiter and aggregate traits are intended for static generic bounds, not
 
 Import public types directly from the crate root.
 
-`MockMonitor` and `ArcMockMonitor` are deterministic test implementations for
-capability-trait and predicate-wait behavior. They do not provide a mock guard
-type and are not replacements for concrete guard-oriented monitor APIs.
-
 ### Deterministic monitor time
 
-Enable the `mock` feature to use `MockMonitor` and `ArcMockMonitor`.
-`MockMonitor::new` creates an independent `ManualMonotonicClock`. Use
-`monotonic_clock()` to advance it explicitly. When several test components
-must observe the same time domain, construct them from the same clock with
-`MockMonitor::from_clock` or `ArcMockMonitor::from_clock`. Code that constructs
-the shared clock directly must also declare `qubit-clock = "0.9"` as a direct
-dependency:
+Every concrete monitor exposes `with_timer`. Integration tests inject a
+`ManualTimer` into the same `ParkingLotMonitor`, `StdMonitor`, or
+`TokioMonitor` type used in production; there is no separate mock wait
+algorithm. Code that constructs the manual clock declares
+`qubit-clock = "0.9"` as a direct dependency:
 
 ```rust
-use std::{sync::Arc, time::Duration};
+use std::{sync::Arc, thread, time::Duration};
 
-use qubit_clock::ManualMonotonicClock;
-use qubit_lock::ArcMockMonitor;
+use qubit_clock::{ManualMonotonicClock, MonotonicClock};
+use qubit_lock::{ParkingLotMonitor, WaitTimeoutResult};
 
-let clock = Arc::new(ManualMonotonicClock::new());
-let monitor = ArcMockMonitor::from_clock(false, Arc::clone(&clock));
+let clock = ManualMonotonicClock::new_shared();
+let monitor = Arc::new(ParkingLotMonitor::with_timer(false, clock.new_timer()));
+let waiter_monitor = Arc::clone(&monitor);
+let waiter = thread::spawn(move || {
+    waiter_monitor.wait_until_for(
+        Duration::from_secs(16),
+        |ready| *ready,
+        |_| (),
+    )
+});
 
-clock.advance(Duration::from_secs(10)).unwrap();
-assert_eq!(monitor.elapsed(), Duration::from_secs(10));
+assert!(clock.wait_for_waiters(1, Duration::from_secs(1)));
+let _ = clock.advance_to_next_deadline();
+assert_eq!(waiter.join().unwrap(), Ok(WaitTimeoutResult::TimedOut));
 ```
 
-Advancing the clock wakes blocking and asynchronous timeout waiters; no wall
-clock delay is involved. Blocking tests can call
-`wait_for_timeout_waiters(expected_count, real_timeout)` before advancing mock
-time instead of guessing waiter registration with a real sleep.
-`pending_timeout_waiters()` counts blocking and asynchronous timeout waits that
-are ready to observe changes. An async wait starts contributing after its future
-is first polled, and unregisters automatically when cancelled. Code may also
-advance the clock while holding that monitor's state lock; clock callbacks do
-not reacquire the protected state.
+`ManualMonotonicClock` is the test control plane. Its waiter/deadline observer
+APIs coordinate advancement without guessing registration with a real sleep.
+The Monitor and Timer registrations are cancellation-safe, and multiple
+components can share one manual clock domain.
+
+Timed predicate methods return `Result<WaitTimeoutResult<_>, TimeError>` so
+Timer registration failures remain distinct from a real timeout. Guard waits
+use in-place `wait`, `wait_for`, and `wait_until` methods; a Timer error leaves
+the guard held and usable.
 
 ## Quick Start
 
@@ -196,8 +199,8 @@ fn main() {
 ## Project Layout
 
 - `src/lock`: lock traits and lock wrappers.
-- `src/monitor`: monitor traits plus parking_lot, std, Tokio, and mock
-  monitor implementations.
+- `src/monitor`: monitor traits plus parking_lot, std, and Tokio monitor
+  implementations.
 - `tests/lock`: lock behavior tests.
 - `tests/monitor`: monitor behavior tests.
 - `tests/docs`: README and doctest consistency tests.

@@ -17,10 +17,9 @@
   异步锁包装器。
 - `ParkingLotMonitor`、`ArcParkingLotMonitor`、`ParkingLotMonitorGuard`：基于 parking_lot 的条件变量协调工具。
 - `StdMonitor`、`ArcStdMonitor`、`StdMonitorGuard`：基于标准库的条件变量协调工具。
-- `MockMonitor`、`ArcMockMonitor`：由可选 `mock` 特性启用、共享的
-  `qubit_clock::ManualMonotonicClock` 驱动的确定性测试 monitor。
 - `TokioMonitor`、`ArcTokioMonitor`：由可选 `async` 特性启用的 Tokio
   异步 monitor 协调工具。
+- 所有 monitor 都支持注入 Timer，使集成测试直接运行生产等待算法。
 - 基于闭包的访问接口，让加锁和释放始终局限在一次调用内部。
 - `Arc*` 包装器实现了 `Deref` 和 `AsRef`，需要时仍可使用底层同步原语的
   guard 风格原生接口。
@@ -32,11 +31,11 @@
 qubit-lock = "0.10"
 ```
 
-默认特性集只包含同步锁与同步 monitor。需要异步能力或确定性测试能力时，显式启用对应特性：
+默认特性集只包含同步锁与同步 monitor。需要异步能力时显式启用：
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.10", features = ["async", "mock"] }
+qubit-lock = { version = "0.10", features = ["async"] }
 ```
 
 如果应用需要创建 Tokio runtime，请在应用自己的 `Cargo.toml` 中启用合适的 Tokio runtime 特性，例如 `rt` 或 `rt-multi-thread`。
@@ -55,8 +54,8 @@ waiter；没有已注册 waiter 时发出的 notification 对未来没有影响�
 timeout。
 
 异步 monitor trait 返回 `impl Future`；返回的 future 是惰性的，所以构造 future 和首次
-poll 之前的时间不消耗 timeout 预算。只有带 timeout 的 wait 实际进入非零计时挂起时，
-Tokio runtime 才必须启用 time driver。drop 一个 pending future 会注销其活跃 waiter，
+poll 之前的时间不消耗 timeout 预算。默认 Tokio Timer 在非零计时等待真正挂起时要求
+runtime 启用 time driver；注入其他 Timer 时由该 Timer 决定驱动要求。drop 一个 pending future 会注销其活跃 waiter，
 不会执行 action，也不会回滚受保护状态的变化。如果 `notify_one` 已选择该 waiter，
 取消会丢弃该次选择，不会转交给其他或未来 waiter。
 
@@ -78,37 +77,41 @@ wait 使用对应的 `AsyncConditionWaiter` 或 `AsyncTimeoutConditionWaiter`。
 
 所有公开类型都直接从 crate root 导入。
 
-`MockMonitor` 和 `ArcMockMonitor` 是用于能力 trait 与 predicate wait 行为的
-确定性测试实现。它们不提供 mock guard 类型，也不替代具有 guard 接口的具体
-monitor 实现。
-
 ### 确定性的 monitor 时间
 
-使用 `MockMonitor` 和 `ArcMockMonitor` 前需要启用 `mock` 特性。
-`MockMonitor::new` 会创建一个独立的 `ManualMonotonicClock`，测试通过
-`monotonic_clock()` 显式推进它。如果多个测试组件需要处于同一个时间域，使用同一个
-clock 调用 `MockMonitor::from_clock` 或 `ArcMockMonitor::from_clock` 构造。
-直接构造共享 clock 的代码还需要显式声明直接依赖 `qubit-clock = "0.9"`：
+每个具体 monitor 都提供 `with_timer`。集成测试把 `ManualTimer` 注入生产所用的
+`ParkingLotMonitor`、`StdMonitor` 或 `TokioMonitor`，不再维护另一套 mock 等待算法。
+构造手动 clock 的代码需要直接依赖 `qubit-clock = "0.9"`：
 
 ```rust
-use std::{sync::Arc, time::Duration};
+use std::{sync::Arc, thread, time::Duration};
 
-use qubit_clock::ManualMonotonicClock;
-use qubit_lock::ArcMockMonitor;
+use qubit_clock::{ManualMonotonicClock, MonotonicClock};
+use qubit_lock::{ParkingLotMonitor, WaitTimeoutResult};
 
-let clock = Arc::new(ManualMonotonicClock::new());
-let monitor = ArcMockMonitor::from_clock(false, Arc::clone(&clock));
+let clock = ManualMonotonicClock::new_shared();
+let monitor = Arc::new(ParkingLotMonitor::with_timer(false, clock.new_timer()));
+let waiter_monitor = Arc::clone(&monitor);
+let waiter = thread::spawn(move || {
+    waiter_monitor.wait_until_for(
+        Duration::from_secs(16),
+        |ready| *ready,
+        |_| (),
+    )
+});
 
-clock.advance(Duration::from_secs(10)).unwrap();
-assert_eq!(monitor.elapsed(), Duration::from_secs(10));
+assert!(clock.wait_for_waiters(1, Duration::from_secs(1)));
+let _ = clock.advance_to_next_deadline();
+assert_eq!(waiter.join().unwrap(), Ok(WaitTimeoutResult::TimedOut));
 ```
 
-推进 clock 会唤醒阻塞和异步 timeout waiter，不会产生真实时间等待。阻塞测试可在推进
-mock time 前调用 `wait_for_timeout_waiters(expected_count, real_timeout)`，不再用真实
-sleep 猜测 waiter 是否已经注册。`pending_timeout_waiters()` 汇总已经能够观察变化的
-同步和异步 timeout wait；异步 wait 的 future 首次被 poll 后才计数，被取消时会自动
-注销。代码也可以在持有该 monitor 状态锁时推进 clock；clock callback 不会再次获取
-受保护的状态。
+`ManualMonotonicClock` 是测试控制面。测试通过 waiter/deadline 观察接口协调推进，
+无需用真实 sleep 猜测注册时机。Monitor 和 Timer 注册都支持安全取消；多个组件也可
+共享同一个手动时间域。
+
+带超时的 predicate API 返回 `Result<WaitTimeoutResult<_>, TimeError>`，Timer 注册错误
+不会伪装成超时。Guard 使用原地更新的 `wait`、`wait_for` 和 `wait_until`；Timer 出错时
+guard 仍然持有且可继续使用。
 
 ## 快速开始
 
@@ -173,8 +176,7 @@ fn main() {
 ## 项目结构
 
 - `src/lock`：锁 trait 与锁包装器。
-- `src/monitor`：monitor traits，以及 parking_lot、标准库、Tokio 和 mock
-  monitor 实现。
+- `src/monitor`：monitor traits，以及 parking_lot、标准库和 Tokio monitor 实现。
 - `tests/lock`：锁相关行为测试。
 - `tests/monitor`：monitor 相关行为测试。
 - `tests/docs`：README 与文档文本一致性测试。

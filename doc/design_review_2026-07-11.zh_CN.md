@@ -1,5 +1,8 @@
 # rs-lock 设计与实现评审
 
+> 历史记录：本文评估的是 Timer IOC 重构前的实现，其中关于 `MockMonitor`
+> 的结论已被 2026-07-17 的 Monitor Timer IOC 设计取代，不代表当前公开 API。
+
 评审日期：2026-07-11
 
 评审版本：`qubit-lock 0.9.0`
