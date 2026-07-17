@@ -22,31 +22,6 @@
         "doc",
         "clippy"
       ]
-    },
-    {
-      "name": "mock-only",
-      "defaultFeatures": false,
-      "features": [
-        "mock"
-      ],
-      "commands": [
-        "test",
-        "doc",
-        "clippy"
-      ]
-    },
-    {
-      "name": "async-mock",
-      "defaultFeatures": false,
-      "features": [
-        "async",
-        "mock"
-      ],
-      "commands": [
-        "test",
-        "doc",
-        "clippy"
-      ]
     }
   ]
 }
