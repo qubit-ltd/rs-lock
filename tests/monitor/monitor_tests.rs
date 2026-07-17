@@ -26,7 +26,7 @@ where
 {
     assert_eq!(
         monitor.wait_until_for(Duration::ZERO, |ready| *ready, |_| 7),
-        WaitTimeoutResult::TimedOut,
+        Ok(WaitTimeoutResult::TimedOut),
     );
 }
 

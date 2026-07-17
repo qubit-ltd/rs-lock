@@ -16,6 +16,11 @@ use std::{
     time::Duration,
 };
 
+use qubit_clock::{
+    ManualMonotonicClock,
+    MonotonicClock,
+    TimeError,
+};
 use qubit_lock::{
     ConditionWaiter,
     Notifier,
@@ -24,6 +29,8 @@ use qubit_lock::{
     WaitTimeoutResult,
     WaitTimeoutStatus,
 };
+
+use super::failing_timer_tests::FailingTimer;
 
 #[test]
 fn test_std_monitor_new_read_write_updates_state() {
@@ -204,7 +211,7 @@ fn test_std_monitor_traits_delegate_to_monitor_methods() {
             |items| !items.is_empty(),
             |items| items.pop().expect("item should be ready"),
         ),
-        WaitTimeoutResult::Ready(3),
+        Ok(WaitTimeoutResult::Ready(3)),
     );
     assert_eq!(
         <StdMonitor<Vec<i32>> as TimeoutConditionWaiter>::wait_while_for(
@@ -213,7 +220,7 @@ fn test_std_monitor_traits_delegate_to_monitor_methods() {
             |items| items.is_empty(),
             |items| items.pop(),
         ),
-        WaitTimeoutResult::Ready(Some(1)),
+        Ok(WaitTimeoutResult::Ready(Some(1))),
     );
 }
 
@@ -298,18 +305,20 @@ fn test_std_monitor_wait_until_blocks_until_notify_one() {
 }
 
 #[test]
-fn test_std_monitor_guard_wait_timeout_returns_woken_when_notified() {
+fn test_std_monitor_guard_wait_for_returns_woken_when_notified() {
     let monitor = Arc::new(StdMonitor::new(false));
     let (waiting_tx, waiting_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
 
     let waiter_monitor = Arc::clone(&monitor);
     let waiter = thread::spawn(move || {
-        let guard = waiter_monitor.lock();
+        let mut guard = waiter_monitor.lock();
         waiting_tx
             .send(())
             .expect("test should observe waiter before wait");
-        let (_guard, notified) = guard.wait_timeout(Duration::from_secs(5));
+        let notified = guard
+            .wait_for(Duration::from_secs(5))
+            .expect("standard Timer should register");
         done_tx
             .send(notified)
             .expect("test should receive waiter result");
@@ -343,7 +352,42 @@ fn test_std_monitor_wait_while_for_returns_timed_out_when_timeout() {
         |_| (),
     );
 
-    assert_eq!(result, WaitTimeoutResult::TimedOut);
+    assert_eq!(result, Ok(WaitTimeoutResult::TimedOut));
+}
+
+#[test]
+fn test_std_monitor_timed_predicate_wait_propagates_timer_error() {
+    let monitor = StdMonitor::with_timer(false, Arc::new(FailingTimer::new()));
+
+    let result =
+        monitor.wait_until_for(Duration::from_secs(1), |ready| *ready, |_| ());
+
+    assert_eq!(result, Err(TimeError::TimerUnavailable));
+}
+
+#[test]
+fn test_std_monitor_uses_injected_manual_timer_without_real_delay() {
+    let clock = ManualMonotonicClock::new_shared();
+    let monitor = Arc::new(StdMonitor::with_timer(false, clock.new_timer()));
+    assert_eq!(clock.now().domain(), monitor.timer().clock().now().domain(),);
+    let waiter_monitor = Arc::clone(&monitor);
+    let waiter = thread::spawn(move || {
+        waiter_monitor.wait_until_for(
+            Duration::from_secs(8),
+            |ready| *ready,
+            |_| (),
+        )
+    });
+
+    assert!(clock.wait_for_waiters(1, Duration::from_secs(1)));
+    let _reached = clock
+        .advance_to_next_deadline()
+        .expect("monitor deadline should be registered");
+
+    assert_eq!(
+        Ok(WaitTimeoutResult::TimedOut),
+        waiter.join().expect("waiter should finish"),
+    );
 }
 
 #[test]
@@ -356,7 +400,7 @@ fn test_std_monitor_wait_until_for_returns_timed_out_when_timeout() {
         |_| (),
     );
 
-    assert_eq!(result, WaitTimeoutResult::TimedOut);
+    assert_eq!(result, Ok(WaitTimeoutResult::TimedOut));
 }
 
 /// Verifies that initial lock contention does not consume timeout budget.
@@ -407,7 +451,7 @@ fn test_std_monitor_wait_while_for_excludes_initial_lock_contention_from_timeout
         done_rx
             .recv_timeout(Duration::from_secs(1))
             .expect("waiter should retain a fresh condition-wait budget"),
-        WaitTimeoutResult::Ready(()),
+        Ok(WaitTimeoutResult::Ready(())),
     );
     waiter.join().expect("waiter should finish");
 }
@@ -427,7 +471,7 @@ fn test_std_monitor_wait_while_for_zero_timeout_checks_predicate_once() {
         |_| (),
     );
 
-    assert_eq!(result, WaitTimeoutResult::TimedOut);
+    assert_eq!(result, Ok(WaitTimeoutResult::TimedOut));
     assert_eq!(checks, 1);
 }
 
@@ -467,7 +511,7 @@ fn test_std_monitor_wait_while_for_timeout_final_predicate_wins() {
         done_rx
             .recv_timeout(Duration::from_secs(1))
             .expect("ready predicate should win the final timeout check"),
-        WaitTimeoutResult::Ready(7),
+        Ok(WaitTimeoutResult::Ready(7)),
     );
     waiter.join().expect("waiter should finish");
 }
@@ -508,7 +552,7 @@ fn test_std_monitor_wait_until_for_returns_result_when_predicate_true() {
         done_rx
             .recv_timeout(Duration::from_secs(1))
             .expect("waiter should finish after notification"),
-        WaitTimeoutResult::Ready(7),
+        Ok(WaitTimeoutResult::Ready(7)),
     );
     waiter.join().expect("waiter should not panic");
     assert!(!monitor.with_read(|ready| *ready));

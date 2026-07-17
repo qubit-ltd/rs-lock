@@ -16,6 +16,10 @@ use std::{
     time::Duration,
 };
 
+use qubit_clock::{
+    ManualMonotonicClock,
+    MonotonicClock,
+};
 use qubit_lock::{
     ArcParkingLotMonitor,
     ConditionWaiter,
@@ -24,6 +28,14 @@ use qubit_lock::{
     TimeoutConditionWaiter,
     WaitTimeoutResult,
 };
+
+#[test]
+fn test_arc_parking_lot_monitor_with_timer_preserves_timer_domain() {
+    let clock = ManualMonotonicClock::new_shared();
+    let monitor = ArcParkingLotMonitor::with_timer(1usize, clock.new_timer());
+
+    assert_eq!(clock.now().domain(), monitor.timer().clock().now().domain());
+}
 
 #[test]
 fn test_arc_parking_lot_monitor_preserves_inner_arc_identity() {
@@ -166,7 +178,7 @@ fn test_arc_parking_lot_monitor_traits_delegate_to_monitor_methods() {
             |items| !items.is_empty(),
             |items| items.pop().expect("item should be ready"),
         ),
-        WaitTimeoutResult::Ready(3),
+        Ok(WaitTimeoutResult::Ready(3)),
     );
     assert_eq!(
         <ArcParkingLotMonitor<Vec<i32>> as TimeoutConditionWaiter>::wait_while_for(
@@ -175,7 +187,7 @@ fn test_arc_parking_lot_monitor_traits_delegate_to_monitor_methods() {
             |items| items.is_empty(),
             |items| items.pop(),
         ),
-        WaitTimeoutResult::Ready(Some(1)),
+        Ok(WaitTimeoutResult::Ready(Some(1))),
     );
 }
 
@@ -262,7 +274,7 @@ fn test_arc_parking_lot_monitor_wait_until_for_delegates_to_monitor() {
         done_rx
             .recv_timeout(Duration::from_secs(1))
             .expect("waiter should finish after predicate becomes true"),
-        WaitTimeoutResult::Ready(10),
+        Ok(WaitTimeoutResult::Ready(10)),
     );
     waiter.join().expect("waiter should not panic");
 }
@@ -344,7 +356,7 @@ fn test_arc_parking_lot_monitor_wait_while_for_returns_ready_when_predicate_clea
         done_rx
             .recv_timeout(Duration::from_secs(1))
             .expect("waiter should finish after predicate becomes ready"),
-        WaitTimeoutResult::Ready(9),
+        Ok(WaitTimeoutResult::Ready(9)),
     );
     waiter.join().expect("waiter should not panic");
 }
@@ -359,7 +371,7 @@ fn test_arc_parking_lot_monitor_wait_while_for_returns_timed_out() {
             |items| items.is_empty(),
             |items| items.pop(),
         ),
-        WaitTimeoutResult::TimedOut,
+        Ok(WaitTimeoutResult::TimedOut),
     );
 }
 
