@@ -12,9 +12,6 @@ use qubit_lock::{
     SharedMonitor,
 };
 
-#[cfg(feature = "mock")]
-use qubit_lock::ArcMockMonitor;
-
 /// Clones a monitor through the aggregate shared capability.
 fn clone_through_trait<M>(monitor: M) -> M
 where
@@ -27,13 +24,5 @@ where
 /// Verifies the parking-lot handle satisfies [`SharedMonitor`].
 fn test_shared_monitor_trait_accepts_parking_lot_monitor_handle() {
     let monitor = clone_through_trait(ArcParkingLotMonitor::new(false));
-    assert!(!monitor.with_read(|ready| *ready));
-}
-
-#[cfg(feature = "mock")]
-#[test]
-/// Verifies the mock handle satisfies [`SharedMonitor`].
-fn test_shared_monitor_trait_accepts_mock_monitor_handle() {
-    let monitor = clone_through_trait(ArcMockMonitor::new(false));
     assert!(!monitor.with_read(|ready| *ready));
 }

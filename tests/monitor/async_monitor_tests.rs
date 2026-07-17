@@ -28,7 +28,7 @@ where
                 |_| 7,
             )
             .await,
-        WaitTimeoutResult::TimedOut,
+        Ok(WaitTimeoutResult::TimedOut),
     );
 }
 

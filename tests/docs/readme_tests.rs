@@ -122,11 +122,11 @@ fn test_readme_documents_monitor_capability_selection() {
     assert!(readme_en.contains("Choosing monitor capabilities"));
     assert!(readme_en.contains("use the narrowest capability"));
     assert!(readme_en.contains("static generic bounds"));
-    assert!(readme_en.contains("do not provide a mock guard type"));
+    assert!(readme_en.contains("Every concrete monitor exposes `with_timer`"));
     assert!(readme_zh.contains("选择 monitor 能力"));
     assert!(readme_zh.contains("使用能够表达操作的最小能力"));
     assert!(readme_zh.contains("静态泛型约束"));
-    assert!(readme_zh.contains("不提供 mock guard 类型"));
+    assert!(readme_zh.contains("每个具体 monitor 都提供 `with_timer`"));
 }
 
 #[test]
@@ -137,25 +137,27 @@ fn test_readme_omits_version_migration_guides() {
 }
 
 #[test]
-/// Ensures both READMEs allow mock-clock advancement under monitor state lock.
-fn test_readme_documents_reentrant_mock_clock_advance() {
+/// Ensures both READMEs describe deterministic testing through Timer IOC.
+fn test_readme_documents_timer_ioc_testing() {
     let readme_en = normalize_readme_text(README_EN);
     let readme_zh = normalize_readme_text(README_ZH);
-    assert!(readme_en.contains(
-        "may also advance the clock while holding that monitor's state lock"
-    ));
-    assert!(readme_zh.contains("也可以在持有该 monitor 状态锁时推进 clock"));
+    assert!(readme_en.contains("there is no separate mock wait algorithm"));
+    assert!(
+        readme_en.contains("`ManualMonotonicClock` is the test control plane")
+    );
+    assert!(readme_zh.contains("不再维护另一套 mock 等待算法"));
+    assert!(readme_zh.contains("`ManualMonotonicClock` 是测试控制面"));
 }
 
 #[test]
-/// Ensures README files document the default, async, and mock feature tiers.
+/// Ensures README files document the default and async feature tiers.
 fn test_readme_documents_feature_tiers() {
     assert!(README_EN.contains("default feature set"));
     assert!(README_EN.contains("`async`"));
-    assert!(README_EN.contains("`mock`"));
+    assert!(!README_EN.contains("`mock` feature"));
     assert!(README_ZH.contains("默认特性集"));
     assert!(README_ZH.contains("`async`"));
-    assert!(README_ZH.contains("`mock`"));
+    assert!(!README_ZH.contains("`mock` feature"));
 }
 
 #[test]

@@ -12,6 +12,10 @@ use std::{
     time::Duration,
 };
 
+use qubit_clock::{
+    ManualMonotonicClock,
+    MonotonicClock,
+};
 use qubit_lock::{
     ArcTokioMonitor,
     AsyncConditionWaiter,
@@ -20,6 +24,14 @@ use qubit_lock::{
     TokioMonitor,
     WaitTimeoutResult,
 };
+
+#[test]
+fn test_arc_tokio_monitor_with_timer_preserves_timer_domain() {
+    let clock = ManualMonotonicClock::new_shared();
+    let monitor = ArcTokioMonitor::with_timer(1usize, clock.new_timer());
+
+    assert_eq!(clock.now().domain(), monitor.timer().clock().now().domain());
+}
 
 #[tokio::test(start_paused = true)]
 async fn test_arc_tokio_monitor_preserves_inner_arc_identity() {
@@ -160,7 +172,7 @@ async fn test_arc_tokio_monitor_traits_delegate_to_inner_monitor() {
     monitor
         .with_write_notify_one_async(|items| items.push(3))
         .await;
-    assert_eq!(timeout_until_wait.await, WaitTimeoutResult::Ready(3));
+    assert_eq!(timeout_until_wait.await, Ok(WaitTimeoutResult::Ready(3)),);
 
     let timeout_while_wait =
         <ArcTokioMonitor<Vec<i32>> as AsyncTimeoutConditionWaiter>::wait_while_for_async(
@@ -181,7 +193,10 @@ async fn test_arc_tokio_monitor_traits_delegate_to_inner_monitor() {
     monitor
         .with_write_notify_all_async(|items| items.push(4))
         .await;
-    assert_eq!(timeout_while_wait.await, WaitTimeoutResult::Ready(Some(4)),);
+    assert_eq!(
+        timeout_while_wait.await,
+        Ok(WaitTimeoutResult::Ready(Some(4))),
+    );
 }
 
 #[tokio::test(start_paused = true)]
@@ -242,7 +257,7 @@ async fn test_arc_tokio_monitor_wait_methods_delegate_to_inner_monitor() {
     monitor
         .with_write_notify_one_async(|items| items.push(3))
         .await;
-    assert_eq!(timeout_until_wait.await, WaitTimeoutResult::Ready(3));
+    assert_eq!(timeout_until_wait.await, Ok(WaitTimeoutResult::Ready(3)),);
 
     let timeout_while_wait = monitor.wait_while_for_async(
         Duration::from_secs(1),
@@ -261,7 +276,10 @@ async fn test_arc_tokio_monitor_wait_methods_delegate_to_inner_monitor() {
     monitor
         .with_write_notify_all_async(|items| items.push(4))
         .await;
-    assert_eq!(timeout_while_wait.await, WaitTimeoutResult::Ready(Some(4)),);
+    assert_eq!(
+        timeout_while_wait.await,
+        Ok(WaitTimeoutResult::Ready(Some(4))),
+    );
 }
 
 #[tokio::test(start_paused = true)]
@@ -276,6 +294,6 @@ async fn test_arc_tokio_monitor_async_wait_until_for_times_out() {
                 |_| 7
             )
             .await,
-        WaitTimeoutResult::TimedOut,
+        Ok(WaitTimeoutResult::TimedOut),
     );
 }

@@ -9,8 +9,6 @@
 //!
 //! Covers behavior corresponding to `src/monitor`.
 
-#[cfg(feature = "mock")]
-mod arc_mock_monitor_tests;
 mod arc_parking_lot_monitor_tests;
 mod arc_std_monitor_tests;
 #[cfg(feature = "async")]
@@ -22,8 +20,7 @@ mod async_monitor_tests;
 #[cfg(feature = "async")]
 mod async_timeout_condition_waiter_tests;
 mod condition_waiter_tests;
-#[cfg(feature = "mock")]
-mod mock_monitor_tests;
+mod failing_timer_tests;
 mod monitor_tests;
 mod notifier_tests;
 mod parking_lot_monitor_guard_tests;

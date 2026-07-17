@@ -9,6 +9,7 @@
 
 use std::time::Duration;
 
+use qubit_clock::TimeError;
 use qubit_lock::{
     AsyncTimeoutConditionWaiter,
     TokioMonitor,
@@ -16,7 +17,9 @@ use qubit_lock::{
 };
 
 /// Runs a zero-budget async wait through a generic timeout bound.
-async fn wait_through_trait<W>(waiter: &W) -> WaitTimeoutResult<i32>
+async fn wait_through_trait<W>(
+    waiter: &W,
+) -> Result<WaitTimeoutResult<i32>, TimeError>
 where
     W: AsyncTimeoutConditionWaiter<State = bool>,
 {
@@ -30,6 +33,6 @@ where
 async fn test_async_timeout_condition_waiter_trait_accepts_tokio_monitor() {
     assert_eq!(
         wait_through_trait(&TokioMonitor::new(false)).await,
-        WaitTimeoutResult::TimedOut,
+        Ok(WaitTimeoutResult::TimedOut),
     );
 }
