@@ -284,6 +284,7 @@ name = "qubit-clock"
 version = "0.9.0"
 dependencies = [
  "thiserror",
+ "tokio",
 ]
 
 [[package]]

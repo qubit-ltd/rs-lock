@@ -7,6 +7,7 @@
 // =============================================================================
 //! Blocking timeout condition-wait capability.
 
+use qubit_clock::TimeError;
 use std::{
     sync::Arc,
     time::Duration,
@@ -43,13 +44,17 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// [`WaitTimeoutResult::TimedOut`] when the condition-wait budget expires.
     /// The trait-level timeout contract determines when that budget starts and
     /// how the deadline boundary is resolved.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the monitor's Timer cannot register the deadline.
     #[inline(always)]
     fn wait_until_for<R, P, F>(
         &self,
         timeout: Duration,
         mut predicate: P,
         action: F,
-    ) -> WaitTimeoutResult<R>
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
     where
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,
@@ -72,12 +77,16 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// [`WaitTimeoutResult::TimedOut`] when the condition-wait budget expires.
     /// The trait-level timeout contract determines when that budget starts and
     /// how the deadline boundary is resolved.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the monitor's Timer cannot register the deadline.
     fn wait_while_for<R, P, F>(
         &self,
         timeout: Duration,
         predicate: P,
         action: F,
-    ) -> WaitTimeoutResult<R>
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
     where
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R;
@@ -94,7 +103,7 @@ where
         timeout: Duration,
         predicate: P,
         action: F,
-    ) -> WaitTimeoutResult<R>
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
     where
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,

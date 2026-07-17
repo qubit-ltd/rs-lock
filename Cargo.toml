@@ -36,13 +36,12 @@ doctest = true
 
 [features]
 default = []
-async = ["dep:tokio"]
-mock = ["dep:qubit-clock"]
+async = ["dep:tokio", "qubit-clock/tokio"]
 
 [dependencies]
 parking_lot = "0.12"
 tokio = { version = "1.52", default-features = false, features = ["sync", "time"], optional = true }
-qubit-clock = { version = "0.9", path = "../rs-clock", optional = true }
+qubit-clock = { version = "0.9", path = "../rs-clock" }
 
 [dev-dependencies]
 criterion = { version = "0.8.2", default-features = false }

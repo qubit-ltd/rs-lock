@@ -7,6 +7,10 @@
 // =============================================================================
 //! Arc-wrapped Tokio monitor.
 
+use qubit_clock::{
+    TimeError,
+    Timer,
+};
 use std::{
     future::Future,
     ops::Deref,
@@ -42,6 +46,22 @@ impl<T> ArcTokioMonitor<T> {
     pub fn new(state: T) -> Self {
         Self {
             inner: Arc::new(TokioMonitor::new(state)),
+        }
+    }
+
+    /// Creates an Arc-wrapped Tokio monitor using an injected Timer.
+    ///
+    /// # Parameters
+    ///
+    /// * `state` - Initial protected state.
+    /// * `timer` - Timer driving asynchronous deadlines.
+    ///
+    /// # Returns
+    ///
+    /// A cloneable Tokio monitor handle bound to `timer`.
+    pub fn with_timer(state: T, timer: Arc<dyn Timer>) -> Self {
+        Self {
+            inner: Arc::new(TokioMonitor::with_timer(state, timer)),
         }
     }
 
@@ -122,7 +142,7 @@ impl<T: Send> AsyncTimeoutConditionWaiter for ArcTokioMonitor<T> {
         timeout: Duration,
         predicate: P,
         action: F,
-    ) -> impl Future<Output = WaitTimeoutResult<R>> + Send + 'a
+    ) -> impl Future<Output = Result<WaitTimeoutResult<R>, TimeError>> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,

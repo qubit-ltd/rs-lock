@@ -10,7 +10,7 @@
 //! Provides the guard returned by
 //! [`ParkingLotMonitor::lock`](super::ParkingLotMonitor::lock). The guard wraps
 //! a parking_lot mutex guard and keeps a reference to the monitor that created
-//! it, so waiting operations can use the matching condition variable.
+//! it, so waiting operations can use its waiter registry and Timer.
 
 use std::{
     ops::{
@@ -21,6 +21,11 @@ use std::{
 };
 
 use parking_lot::MutexGuard;
+use qubit_clock::{
+    MonotonicInstant,
+    TimeError,
+    TimerFuture,
+};
 
 use super::{
     parking_lot_monitor::ParkingLotMonitor,
@@ -37,8 +42,9 @@ use super::{
 /// held `&T` or `&mut T`.
 ///
 /// Unlike a raw `MutexGuard`, this guard also remembers the monitor that
-/// created it. That lets [`Self::wait`] and [`Self::wait_timeout`] release and
-/// reacquire the correct mutex with the correct condition variable.
+/// created it. That lets [`Self::wait`], [`Self::wait_for`], and
+/// [`Self::wait_until`] release and reacquire the correct mutex while using the
+/// monitor's notification registry and Timer.
 ///
 /// # Type Parameters
 ///
@@ -58,10 +64,10 @@ use super::{
 /// assert_eq!(monitor.with_read(|items| items.len()), 1);
 /// ```
 pub struct ParkingLotMonitorGuard<'a, T> {
-    /// ParkingLotMonitor that owns the mutex and condition variable.
+    /// ParkingLotMonitor that owns the state, waiter registry, and Timer.
     monitor: &'a ParkingLotMonitor<T>,
     /// Parking-lot mutex guard protecting the monitor state.
-    inner: MutexGuard<'a, T>,
+    inner: Option<MutexGuard<'a, T>>,
 }
 
 impl<'a, T> ParkingLotMonitorGuard<'a, T> {
@@ -74,23 +80,24 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     ///
     /// # Returns
     ///
-    /// A monitor guard that can access state and wait on the monitor's
-    /// condition variable.
+    /// A monitor guard that can access state and wait for monitor notification.
     #[inline]
     pub(super) fn new(
         monitor: &'a ParkingLotMonitor<T>,
         inner: MutexGuard<'a, T>,
     ) -> Self {
-        Self { monitor, inner }
+        Self {
+            monitor,
+            inner: Some(inner),
+        }
     }
 
     /// Waits for a notification while temporarily releasing the monitor lock.
     ///
-    /// This method consumes the current guard, calls the underlying
-    /// [`parking_lot::Condvar::wait`], and returns the guard after the lock has
-    /// been reacquired. It is intended for explicit guarded-suspension loops
-    /// where the caller needs to inspect or update state before and after
-    /// waiting.
+    /// The guard stays in place while this method registers a private waiter,
+    /// releases the state lock, waits for notification, and reacquires the
+    /// lock. It is intended for explicit guarded-suspension loops where the
+    /// caller inspects state before and after waiting.
     ///
     /// The method may block indefinitely if no notification is sent. Callers
     /// should still use it inside a loop that re-checks the protected state so
@@ -98,7 +105,7 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     ///
     /// # Returns
     ///
-    /// A new guard holding the monitor lock after the wait returns.
+    /// This method returns after this guard has reacquired the monitor lock.
     ///
     /// # Example
     ///
@@ -116,7 +123,7 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     /// let waiter = thread::spawn(move || {
     ///     let mut ready = waiter_monitor.lock();
     ///     while !*ready {
-    ///         ready = ready.wait();
+    ///         ready.wait();
     ///     }
     ///     *ready = false;
     /// });
@@ -131,18 +138,24 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     /// assert!(!monitor.with_read(|ready| *ready));
     /// ```
     #[inline]
-    pub fn wait(mut self) -> Self {
-        self.monitor.changed.wait(&mut self.inner);
-        self
+    pub fn wait(&mut self) {
+        let registration = self.monitor.waiters.register();
+        let inner = self
+            .inner
+            .take()
+            .expect("parking-lot monitor guard slot must be occupied");
+        drop(inner);
+        registration.waiter().wait();
+        drop(registration);
+        self.inner = Some(self.monitor.state.lock());
     }
 
     /// Waits for a notification or timeout while temporarily releasing the
     /// lock.
     ///
-    /// This method consumes the current guard, calls the underlying
-    /// [`parking_lot::Condvar::wait_for`], and returns the guard after the
-    /// lock has been reacquired. The status reports whether the wait reached
-    /// the timeout boundary or returned earlier.
+    /// The guard stays in place while this method registers a private waiter,
+    /// releases the state lock, and races notification against the injected
+    /// Timer. It reacquires the state lock before returning.
     ///
     /// A [`WaitTimeoutStatus::Woken`] result does not prove that another thread
     /// changed the state. A [`WaitTimeoutStatus::TimedOut`] result also does
@@ -156,7 +169,11 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     ///
     /// # Returns
     ///
-    /// A tuple containing the reacquired guard and the timed-wait status.
+    /// The timed-wait status after this guard has reacquired the lock.
+    ///
+    /// # Errors
+    ///
+    /// Returns Timer registration errors without releasing this guard.
     ///
     /// # Example
     ///
@@ -166,25 +183,71 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     /// use qubit_lock::{ParkingLotMonitor, WaitTimeoutStatus};
     ///
     /// let monitor = ParkingLotMonitor::new(0);
-    /// let guard = monitor.lock();
-    /// let (guard, status) = guard.wait_timeout(Duration::from_millis(1));
+    /// let mut guard = monitor.lock();
+    /// let status = guard
+    ///     .wait_for(Duration::from_millis(1))
+    ///     .expect("standard Timer should register");
     ///
     /// assert_eq!(*guard, 0);
     /// assert_eq!(status, WaitTimeoutStatus::TimedOut);
     /// ```
     #[inline]
-    pub fn wait_timeout(
-        mut self,
+    pub fn wait_for(
+        &mut self,
         timeout: Duration,
-    ) -> (Self, WaitTimeoutStatus) {
-        let timeout_result =
-            self.monitor.changed.wait_for(&mut self.inner, timeout);
-        let status = if timeout_result.timed_out() {
+    ) -> Result<WaitTimeoutStatus, TimeError> {
+        let mut future = self.monitor.timer().after(timeout)?;
+        Ok(self.wait_with_timer(&mut future))
+    }
+
+    /// Waits for a notification or an absolute Timer deadline.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Absolute deadline in this monitor's Timer domain.
+    ///
+    /// # Returns
+    ///
+    /// Whether notification or the deadline completed the wait.
+    ///
+    /// # Errors
+    ///
+    /// Returns Timer registration errors without releasing this guard.
+    pub fn wait_until(
+        &mut self,
+        deadline: MonotonicInstant,
+    ) -> Result<WaitTimeoutStatus, TimeError> {
+        let mut future = self.monitor.timer().at(deadline)?;
+        Ok(self.wait_with_timer(&mut future))
+    }
+
+    /// Releases and reacquires the state guard around one fixed TimerFuture.
+    pub(super) fn wait_with_timer(
+        &mut self,
+        future: &mut TimerFuture,
+    ) -> WaitTimeoutStatus {
+        let registration = self.monitor.waiters.register();
+        let waiter = std::sync::Arc::clone(registration.waiter());
+        if super::internal::BlockingConditionWaiter::poll_timer(&waiter, future)
+            .is_ready()
+        {
+            return WaitTimeoutStatus::TimedOut;
+        }
+        let inner = self
+            .inner
+            .take()
+            .expect("parking-lot monitor guard slot must be occupied");
+        drop(inner);
+        waiter.wait();
+        drop(registration);
+        self.inner = Some(self.monitor.state.lock());
+        if super::internal::BlockingConditionWaiter::poll_timer(&waiter, future)
+            .is_ready()
+        {
             WaitTimeoutStatus::TimedOut
         } else {
             WaitTimeoutStatus::Woken
-        };
-        (self, status)
+        }
     }
 }
 
@@ -194,7 +257,9 @@ impl<T> Deref for ParkingLotMonitorGuard<'_, T> {
     /// Returns an immutable reference to the protected state.
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        self.inner
+            .as_deref()
+            .expect("parking-lot monitor guard slot must be occupied")
     }
 }
 
@@ -202,6 +267,8 @@ impl<T> DerefMut for ParkingLotMonitorGuard<'_, T> {
     /// Returns a mutable reference to the protected state.
     #[inline(always)]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        self.inner
+            .as_deref_mut()
+            .expect("parking-lot monitor guard slot must be occupied")
     }
 }

@@ -7,27 +7,19 @@
 // =============================================================================
 //! Private implementation types shared by monitor implementations.
 
-#[cfg(feature = "mock")]
-mod mock_monitor_state;
-#[cfg(feature = "mock")]
-mod mock_monitor_waiter_guard;
-#[cfg(feature = "mock")]
-mod mock_waiter_registry;
-#[cfg(feature = "mock")]
-mod mock_waiter_state;
+mod blocking_condition_waiter;
+mod blocking_waiter_registration;
+mod blocking_waiter_registry;
+mod default_timer;
 #[cfg(feature = "async")]
 mod tokio_condition_waiter;
 #[cfg(feature = "async")]
 mod tokio_condition_waiter_registration;
 
-#[cfg(feature = "mock")]
-pub(in crate::monitor) use mock_monitor_state::MockMonitorState;
-#[cfg(feature = "mock")]
-pub(in crate::monitor) use mock_monitor_waiter_guard::MockMonitorWaiterGuard;
-#[cfg(feature = "mock")]
-pub(in crate::monitor) use mock_waiter_registry::MockWaiterRegistry;
-#[cfg(feature = "mock")]
-pub(in crate::monitor) use mock_waiter_state::MockWaiterState;
+pub(in crate::monitor) use blocking_condition_waiter::BlockingConditionWaiter;
+pub(in crate::monitor) use blocking_waiter_registration::BlockingWaiterRegistration;
+pub(in crate::monitor) use blocking_waiter_registry::BlockingWaiterRegistry;
+pub(in crate::monitor) use default_timer::default_timer;
 #[cfg(feature = "async")]
 pub(in crate::monitor) use tokio_condition_waiter::TokioConditionWaiter;
 #[cfg(feature = "async")]

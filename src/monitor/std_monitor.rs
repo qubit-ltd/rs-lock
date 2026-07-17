@@ -7,29 +7,29 @@
 // =============================================================================
 //! # StdMonitor
 //!
-//! Provides a synchronous monitor built from a mutex and a condition variable.
-//! A monitor protects one shared state value and binds that state to the
-//! condition variable used to wait for changes. This is the same low-level
-//! mechanism as using [`std::sync::Mutex`] and [`std::sync::Condvar`] directly,
-//! but packaged so callers do not have to keep a mutex and its matching
-//! condition variable as separate fields.
+//! Provides a synchronous monitor built from a mutex, an explicit waiter
+//! registry, and an injected [`Timer`]. A monitor protects one shared state
+//! value, offers memoryless notification, and lets tests drive timed waits
+//! deterministically through Timer IOC.
 //!
 //! The high-level APIs ([`StdMonitor::with_read`], [`StdMonitor::with_write`],
 //! [`StdMonitor::wait_while`], and [`StdMonitor::wait_until`]) are intended for
 //! short critical sections and simple guarded-suspension flows. The lower-level
 //! [`StdMonitor::lock`] API returns a [`StdMonitorGuard`], which supports
-//! [`StdMonitorGuard::wait`] and [`StdMonitorGuard::wait_timeout`] for more
-//! complex state machines such as thread pools.
+//! [`StdMonitorGuard::wait`], [`StdMonitorGuard::wait_for`], and
+//! [`StdMonitorGuard::wait_until`] for more complex state machines such as
+//! thread pools.
 
+use qubit_clock::{
+    TimeError,
+    Timer,
+};
 use std::{
     sync::{
-        Condvar,
+        Arc,
         Mutex,
     },
-    time::{
-        Duration,
-        Instant,
-    },
+    time::Duration,
 };
 
 use super::std_monitor_guard::StdMonitorGuard;
@@ -37,17 +37,20 @@ use super::{
     ConditionWaiter,
     Notifier,
     TimeoutConditionWaiter,
+    internal::{
+        BlockingWaiterRegistry,
+        default_timer,
+    },
     wait_timeout_result::WaitTimeoutResult,
 };
 
-/// Shared state protected by a mutex and a condition variable.
+/// Shared state protected by a mutex with notification and Timer-driven waits.
 ///
 /// `StdMonitor` is useful when callers need more than a short critical section.
 /// It models the classic monitor object pattern: one mutex protects the state,
-/// and one condition variable lets threads wait until that state changes. This
-/// is the same relationship used by `std::sync::Mutex` and
-/// `std::sync::Condvar`, but represented as one object so the condition
-/// variable is not accidentally used with unrelated state.
+/// while registered waiters receive memoryless notifications. Timed waits use
+/// one fixed future from the injected [`Timer`], so production and test code
+/// execute the same monitor algorithm.
 ///
 /// `StdMonitor` deliberately has two levels of API:
 ///
@@ -56,31 +59,30 @@ use super::{
 /// * `wait_while`, `wait_until`, and their timeout variants implement common
 ///   predicate-based waits.
 /// * `lock` returns a [`StdMonitorGuard`] for callers that need to write their
-///   own loop around [`StdMonitorGuard::wait`] or
-///   [`StdMonitorGuard::wait_timeout`].
+///   own loop around [`StdMonitorGuard::wait`] or [`StdMonitorGuard::wait_for`]
+///   or [`StdMonitorGuard::wait_until`].
 ///
 /// A poisoned mutex is recovered by taking the inner state. This makes
 /// `StdMonitor` suitable for coordination state that should remain observable
 /// after another thread panics while holding the lock.
 ///
-/// # Difference from `Mutex` and `Condvar`
+/// # Difference from raw synchronization primitives
 ///
-/// With the standard library primitives, callers usually store two fields and
-/// manually keep them paired:
+/// With raw standard-library primitives, callers usually store multiple fields
+/// and manually keep their notification and timeout semantics aligned:
 ///
 /// ```rust
-/// # use std::sync::{Condvar, Mutex};
+/// # use std::sync::Mutex;
 /// # struct State;
 /// struct Shared {
 ///     state: Mutex<State>,
-///     changed: Condvar,
 /// }
 /// ```
 ///
-/// `StdMonitor<State>` stores the same pair internally. A [`StdMonitorGuard`]
-/// is a wrapper around the standard library's `MutexGuard`; it keeps the
-/// protected state locked and knows which monitor it belongs to, so its wait
-/// methods use the matching condition variable.
+/// `StdMonitor<State>` supplies notification registration and Timer-driven
+/// deadlines as part of the same object. A [`StdMonitorGuard`] keeps the
+/// protected state locked and knows which monitor must release and reacquire it
+/// around a wait.
 ///
 /// # Type Parameters
 ///
@@ -115,9 +117,11 @@ use super::{
 /// ```
 pub struct StdMonitor<T> {
     /// Mutex protecting the monitor state.
-    state: Mutex<T>,
-    /// Condition variable used to wake predicate waiters after state changes.
-    pub(super) changed: Condvar,
+    pub(super) state: Mutex<T>,
+    /// Active blocking waiters eligible for memoryless notification.
+    pub(super) waiters: BlockingWaiterRegistry,
+    /// Timer driving every deadline wait.
+    timer: Arc<dyn Timer>,
 }
 
 impl<T> StdMonitor<T> {
@@ -141,10 +145,35 @@ impl<T> StdMonitor<T> {
     /// ```
     #[inline]
     pub fn new(state: T) -> Self {
+        Self::with_timer(state, default_timer())
+    }
+
+    /// Creates a monitor using an injected Timer.
+    ///
+    /// # Parameters
+    ///
+    /// * `state` - Initial state protected by the monitor.
+    /// * `timer` - Timer driving all relative and absolute deadlines.
+    ///
+    /// # Returns
+    ///
+    /// A monitor bound to the supplied Timer domain.
+    pub fn with_timer(state: T, timer: Arc<dyn Timer>) -> Self {
         Self {
             state: Mutex::new(state),
-            changed: Condvar::new(),
+            waiters: BlockingWaiterRegistry::new(),
+            timer,
         }
+    }
+
+    /// Returns the Timer driving this monitor's deadline waits.
+    ///
+    /// # Returns
+    ///
+    /// The injected Timer and its monotonic clock domain.
+    #[must_use]
+    pub fn timer(&self) -> &dyn Timer {
+        self.timer.as_ref()
     }
 
     /// Acquires the monitor and returns a guard for explicit state-machine
@@ -152,9 +181,9 @@ impl<T> StdMonitor<T> {
     ///
     /// The returned [`StdMonitorGuard`] keeps the monitor mutex locked until
     /// the guard is dropped. It can also be passed through
-    /// [`StdMonitorGuard::wait`] or [`StdMonitorGuard::wait_timeout`] to
-    /// temporarily release the lock while waiting on this monitor's
-    /// condition variable.
+    /// [`StdMonitorGuard::wait`], [`StdMonitorGuard::wait_for`], or
+    /// [`StdMonitorGuard::wait_until`] temporarily releases the lock while
+    /// waiting on this monitor.
     ///
     /// If the mutex is poisoned, this method recovers the inner state and still
     /// returns a guard.
@@ -403,7 +432,7 @@ impl<T> StdMonitor<T> {
     {
         let mut guard = self.lock();
         while waiting(&*guard) {
-            guard = guard.wait();
+            guard.wait();
         }
         f(&mut *guard)
     }
@@ -505,6 +534,10 @@ impl<T> StdMonitor<T> {
     /// predicate stops blocking before the timeout. Returns
     /// [`WaitTimeoutResult::TimedOut`] when the timeout expires first.
     ///
+    /// # Errors
+    ///
+    /// Returns an error when the injected Timer cannot register the deadline.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -519,34 +552,33 @@ impl<T> StdMonitor<T> {
     ///     |items| items.pop(),
     /// );
     ///
-    /// assert_eq!(result, WaitTimeoutResult::TimedOut);
+    /// assert_eq!(result, Ok(WaitTimeoutResult::TimedOut));
     /// ```
     pub fn wait_while_for<R, P, F>(
         &self,
         timeout: Duration,
         mut waiting: P,
         f: F,
-    ) -> WaitTimeoutResult<R>
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
     where
         P: FnMut(&T) -> bool,
         F: FnOnce(&mut T) -> R,
     {
         let mut guard = self.lock();
         if !waiting(&*guard) {
-            return WaitTimeoutResult::Ready(f(&mut *guard));
+            return Ok(WaitTimeoutResult::Ready(f(&mut *guard)));
         }
-        let start = Instant::now();
+        if timeout.is_zero() {
+            return Ok(WaitTimeoutResult::TimedOut);
+        }
+        let mut future = self.timer.after(timeout)?;
         loop {
-            let elapsed = start.elapsed();
-            let remaining = timeout.checked_sub(elapsed).unwrap_or_default();
-            if remaining.is_zero() {
-                return WaitTimeoutResult::TimedOut;
-            }
-
-            let (next_guard, _status) = guard.wait_timeout(remaining);
-            guard = next_guard;
+            let status = guard.wait_with_timer(&mut future);
             if !waiting(&*guard) {
-                return WaitTimeoutResult::Ready(f(&mut *guard));
+                return Ok(WaitTimeoutResult::Ready(f(&mut *guard)));
+            }
+            if status.is_timed_out() {
+                return Ok(WaitTimeoutResult::TimedOut);
             }
         }
     }
@@ -584,6 +616,10 @@ impl<T> StdMonitor<T> {
     /// predicate becomes true before the timeout. Returns
     /// [`WaitTimeoutResult::TimedOut`] when the timeout expires first.
     ///
+    /// # Errors
+    ///
+    /// Returns an error when the injected Timer cannot register the deadline.
+    ///
     /// # Example
     ///
     /// ```rust
@@ -614,7 +650,7 @@ impl<T> StdMonitor<T> {
     ///
     /// assert_eq!(
     ///     waiter.join().expect("waiter should finish"),
-    ///     WaitTimeoutResult::Ready(5),
+    ///     Ok(WaitTimeoutResult::Ready(5)),
     /// );
     /// ```
     #[inline(always)]
@@ -623,7 +659,7 @@ impl<T> StdMonitor<T> {
         timeout: Duration,
         mut ready: P,
         f: F,
-    ) -> WaitTimeoutResult<R>
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
     where
         P: FnMut(&T) -> bool,
         F: FnOnce(&mut T) -> R,
@@ -660,7 +696,7 @@ impl<T> StdMonitor<T> {
     /// ```
     #[inline(always)]
     pub fn notify_one(&self) {
-        self.changed.notify_one();
+        self.waiters.notify_one();
     }
 
     /// Wakes all threads waiting on this monitor's condition variable.
@@ -693,7 +729,7 @@ impl<T> StdMonitor<T> {
     /// ```
     #[inline(always)]
     pub fn notify_all(&self) {
-        self.changed.notify_all();
+        self.waiters.notify_all();
     }
 }
 
@@ -733,7 +769,7 @@ impl<T> TimeoutConditionWaiter for StdMonitor<T> {
         timeout: Duration,
         predicate: P,
         action: F,
-    ) -> WaitTimeoutResult<R>
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
     where
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,

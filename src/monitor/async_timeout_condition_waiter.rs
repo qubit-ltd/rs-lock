@@ -7,6 +7,7 @@
 // =============================================================================
 //! Asynchronous timeout condition-wait capability.
 
+use qubit_clock::TimeError;
 use std::{
     future::Future,
     time::Duration,
@@ -54,13 +55,18 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     /// A lazy future that resolves to [`WaitTimeoutResult::Ready`] with the
     /// action result, or [`WaitTimeoutResult::TimedOut`] when the budget
     /// expires while the predicate still requires waiting.
+    ///
+    /// # Errors
+    ///
+    /// The future resolves to an error when the monitor's Timer cannot
+    /// register the deadline.
     #[inline(always)]
     fn wait_until_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
         mut predicate: P,
         action: F,
-    ) -> impl Future<Output = WaitTimeoutResult<R>> + Send + 'a
+    ) -> impl Future<Output = Result<WaitTimeoutResult<R>, TimeError>> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
@@ -91,12 +97,17 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     /// A lazy future that resolves to [`WaitTimeoutResult::Ready`] with the
     /// action result, or [`WaitTimeoutResult::TimedOut`] when the budget
     /// expires while the predicate still requires waiting.
+    ///
+    /// # Errors
+    ///
+    /// The future resolves to an error when the monitor's Timer cannot
+    /// register the deadline.
     fn wait_while_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
         predicate: P,
         action: F,
-    ) -> impl Future<Output = WaitTimeoutResult<R>> + Send + 'a
+    ) -> impl Future<Output = Result<WaitTimeoutResult<R>, TimeError>> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
