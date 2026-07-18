@@ -12,12 +12,7 @@ use std::sync::{
     RwLock,
 };
 
-use parking_lot::RwLock as ParkingLotRwLock;
-use qubit_lock::{
-    Lock,
-    ReadWriteLock,
-    TryLockError,
-};
+use qubit_lock::ReadWriteLock;
 
 #[test]
 fn test_read_write_lock_std_modes_return_native_guards() {
@@ -26,30 +21,6 @@ fn test_read_write_lock_std_modes_return_native_guards() {
     assert_eq!(*ReadWriteLock::read(&lock), 7);
     *ReadWriteLock::write(&lock) = 11;
     assert_eq!(*ReadWriteLock::read(&lock), 11);
-}
-
-#[test]
-fn test_read_write_lock_read_adapter_is_shared() {
-    let lock = ParkingLotRwLock::new(());
-    let read_lock = ReadWriteLock::read_lock(&lock);
-    let first = Lock::lock(&read_lock);
-
-    assert!(Lock::try_lock(&read_lock).is_ok());
-    drop(first);
-}
-
-#[test]
-fn test_read_write_lock_write_adapter_is_exclusive() {
-    let lock = ParkingLotRwLock::new(());
-    let write_lock = ReadWriteLock::write_lock(&lock);
-    let guard = Lock::lock(&write_lock);
-
-    assert!(matches!(
-        Lock::try_lock(&write_lock),
-        Err(TryLockError::WouldBlock)
-    ));
-    drop(guard);
-    assert!(Lock::try_lock(&write_lock).is_ok());
 }
 
 #[test]

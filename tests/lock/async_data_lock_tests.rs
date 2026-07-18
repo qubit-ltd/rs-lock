@@ -729,7 +729,10 @@ mod async_rwlock_data_trait_tests {
         let rwlock = AsyncRwLock::new(0);
 
         assert_eq!(AsyncDataLock::try_with_read(&rwlock, read_i32), Ok(0));
-        assert_eq!(AsyncDataLock::try_with_write(&rwlock, increment_i32), Ok(1));
+        assert_eq!(
+            AsyncDataLock::try_with_write(&rwlock, increment_i32),
+            Ok(1)
+        );
 
         let write_guard = rwlock
             .try_write()
