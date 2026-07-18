@@ -12,18 +12,16 @@
 
 // Trait tests
 #[cfg(feature = "async")]
+mod async_data_lock_tests;
+#[cfg(feature = "async")]
 mod async_lock_tests;
+#[cfg(feature = "async")]
+mod async_read_write_lock_tests;
+mod data_lock_tests;
 mod lock_tests;
+mod read_write_lock_tests;
 
 // Implementation tests
-#[cfg(feature = "async")]
-mod arc_async_mutex_tests;
-#[cfg(feature = "async")]
-mod arc_async_rw_lock_tests;
-mod arc_mutex_tests;
-mod arc_rw_lock_tests;
-mod arc_std_mutex_tests;
-mod arc_std_rw_lock_tests;
 mod parking_lot_mutex_tests;
 mod parking_lot_rw_lock_tests;
 mod try_lock_error_tests;

@@ -11,9 +11,9 @@
 //!
 //! The crate provides:
 //!
-//! - Synchronous lock wrappers with `Arc` integrated internally.
-//! - Optional asynchronous Tokio-based lock wrappers behind the `async`
-//!   feature.
+//! - Data-independent synchronous RAII lock capabilities.
+//! - Closure-based protected-data access capabilities.
+//! - Optional asynchronous Tokio lock capabilities behind the `async` feature.
 //! - Blocking parking_lot and standard-library monitor implementations.
 //! - Tokio monitors behind the optional `async` feature.
 //!
@@ -27,6 +27,18 @@
 //!
 //! ```compile_fail
 //! use qubit_lock::monitor::Monitor;
+//! ```
+//!
+//! Read-write locks intentionally expose explicit read and write modes rather
+//! than guessing which mode [`Lock`] should acquire.
+//!
+//! ```compile_fail
+//! use std::sync::RwLock;
+//!
+//! use qubit_lock::Lock;
+//!
+//! let lock = RwLock::new(());
+//! let _guard = Lock::lock(&lock);
 //! ```
 //!
 //! Notification-only waiting traits are intentionally not part of the public
@@ -96,17 +108,19 @@ mod lock;
 mod monitor;
 #[cfg(feature = "async")]
 pub use lock::{
-    ArcAsyncMutex,
-    ArcAsyncRwLock,
+    AsyncDataLock,
     AsyncLock,
+    AsyncReadLock,
+    AsyncReadWriteLock,
+    AsyncWriteLock,
 };
 pub use lock::{
-    ArcMutex,
-    ArcRwLock,
-    ArcStdMutex,
-    ArcStdRwLock,
+    DataLock,
     Lock,
+    ReadLock,
+    ReadWriteLock,
     TryLockError,
+    WriteLock,
 };
 pub use monitor::{
     ArcParkingLotMonitor,

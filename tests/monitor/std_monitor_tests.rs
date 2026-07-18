@@ -20,6 +20,7 @@ use qubit_clock::{
     ManualMonotonicClock,
     MonotonicClock,
     TimeError,
+    TimerUnavailableReason,
 };
 use qubit_lock::{
     ConditionWaiter,
@@ -362,7 +363,12 @@ fn test_std_monitor_timed_predicate_wait_propagates_timer_error() {
     let result =
         monitor.wait_until_for(Duration::from_secs(1), |ready| *ready, |_| ());
 
-    assert_eq!(result, Err(TimeError::TimerUnavailable));
+    assert_eq!(
+        result,
+        Err(TimeError::TimerUnavailable {
+            reason: TimerUnavailableReason::BackendUnavailable,
+        })
+    );
 }
 
 #[test]

@@ -7,29 +7,32 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
-Lock-focused utilities for the Qubit Rust libraries. The crate provides synchronous and asynchronous lock wrappers plus monitor-style coordination.
+Lock-focused utilities for the Qubit Rust libraries. The crate provides
+generic lock capabilities plus monitor-style coordination.
 
 ## Features
 
-- `ArcMutex`, `ArcRwLock`: parking_lot-based synchronous lock wrappers with `Arc` built in.
-- `ArcStdMutex`, `ArcStdRwLock`: standard-library lock wrappers for callers that need poison semantics.
-- `ArcAsyncMutex`, `ArcAsyncRwLock`: Tokio-based asynchronous lock wrappers
-  behind the optional `async` feature.
+- `Lock`: data-independent exclusive locking with an RAII guard, implemented
+  by `std::sync::Mutex<T>` and `parking_lot::Mutex<T>`.
+- `ReadWriteLock`: data-independent shared/exclusive locking, implemented by
+  `std::sync::RwLock<T>` and `parking_lot::RwLock<T>`.
+- `DataLock<T>`: closure-based access to data protected by any supported mutex
+  or read-write lock.
+- `AsyncLock`, `AsyncReadWriteLock`, and `AsyncDataLock<T>`: equivalent Tokio
+  capabilities behind the optional `async` feature.
 - `ParkingLotMonitor`, `ArcParkingLotMonitor`, `ParkingLotMonitorGuard`: parking_lot-based condition coordination.
 - `StdMonitor`, `ArcStdMonitor`, `StdMonitorGuard`: std-based condition coordination.
 - `TokioMonitor`, `ArcTokioMonitor`: async monitor coordination behind the
   optional `async` feature.
 - Timer injection on every monitor for deterministic integration tests that
   execute the production wait algorithm.
-- Closure-based APIs that keep lock acquisition and release scoped to one call.
-- `Arc*` wrappers implement `Deref` and `AsRef`, so the native guard-based
-  APIs of the wrapped primitive remain available when needed.
+- Implementations for borrowed and `Arc`-owned locks, without wrapper types.
 
 ## Installation
 
 ```toml
 [dependencies]
-qubit-lock = "0.10"
+qubit-lock = "0.11"
 ```
 
 The default feature set contains the synchronous locks and monitors only.
@@ -37,13 +40,14 @@ Enable asynchronous support explicitly when needed:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.10", features = ["async"] }
+qubit-lock = { version = "0.11", features = ["async"] }
 ```
 
 If your application creates a Tokio runtime, enable the appropriate Tokio
 runtime features in your own `Cargo.toml`, such as `rt` or `rt-multi-thread`.
-`AsyncLock` returns `Send` futures: `ArcAsyncMutex<T>` implements it for
-`T: Send`, while `ArcAsyncRwLock<T>` implements it for `T: Send + Sync`.
+`AsyncLock` and `AsyncReadWriteLock` return `Send` futures. Tokio mutexes
+implement the former when `T: Send`; Tokio read-write locks implement the
+latter when `T: Send + Sync`.
 
 ## Monitor semantics
 
@@ -136,43 +140,45 @@ the guard held and usable.
 
 ## Quick Start
 
-### Synchronous lock
+### Data-bound lock
 
 ```rust
-use qubit_lock::{ArcMutex, Lock};
+use qubit_lock::DataLock;
 
 fn main() {
-    let counter = ArcMutex::new(0);
+    let counter = parking_lot::Mutex::new(0);
     counter.with_write(|value| *value += 1);
     assert_eq!(counter.with_read(|value| *value), 1);
 }
 ```
 
-### Native lock APIs
+### Data-independent lock
 
-`Arc*` wrappers can still use the native lock APIs of their wrapped
-primitives through `Deref` or `AsRef`.
+Use `Lock` when the protected state lives elsewhere, for example in atomics.
+The guard releases the lock automatically when it leaves scope.
 
 ```rust
-use qubit_lock::{ArcMutex, Lock};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use qubit_lock::Lock;
 
 fn main() {
-    let counter = ArcMutex::new(0);
+    let gate = std::sync::Mutex::new(());
+    let counter = AtomicUsize::new(0);
 
     {
-        let mut guard = counter.lock();
-        *guard += 1;
+        let _guard = Lock::lock(&gate);
+        counter.fetch_add(1, Ordering::Relaxed);
     }
 
-    counter.with_write(|value| *value += 1);
-    assert_eq!(counter.with_read(|value| *value), 2);
+    assert_eq!(counter.load(Ordering::Relaxed), 1);
 }
 ```
 
-The `with_read` and `with_write` names distinguish closure-scoped access from
-native guard acquisition. A read-write-lock wrapper can therefore acquire a
-native guard directly with `lock.read()` or `lock.write()`; `lock.as_ref()`
-remains available when the wrapped type should be explicit.
+`std::sync::Mutex<T>`, `std::sync::RwLock<T>`, `parking_lot::Mutex<T>`, and
+`parking_lot::RwLock<T>` implement `DataLock<T>`. Read-write locks implement
+`ReadWriteLock`; use `read_lock()` or `write_lock()` to adapt one side to the
+exclusive `Lock` capability.
 
 ### ParkingLotMonitor
 

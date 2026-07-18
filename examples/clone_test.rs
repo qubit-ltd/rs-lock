@@ -6,23 +6,22 @@
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
 use std::time::Duration;
+use std::sync::RwLock;
 
 use qubit_lock::{
     ArcParkingLotMonitor,
-    ArcRwLock,
-    ArcStdRwLock,
-    Lock,
+    DataLock,
     WaitTimeoutResult,
 };
 
 fn main() {
     println!("Demonstrating rs-lock wrapper boundaries...");
 
-    let cache = ArcRwLock::from(Vec::<String>::new());
+    let cache = parking_lot::RwLock::new(Vec::<String>::new());
     cache.with_write(|items| items.push(String::from("ready")));
     assert_eq!(cache.with_read(|items| items.len()), 1);
 
-    let std_state = ArcStdRwLock::new(String::from("std semantics"));
+    let std_state = RwLock::new(String::from("std semantics"));
     assert_eq!(
         std_state.with_read(|value| value.clone()),
         String::from("std semantics"),
