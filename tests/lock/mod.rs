@@ -16,10 +16,16 @@ mod async_data_lock_tests;
 #[cfg(feature = "async")]
 mod async_lock_tests;
 #[cfg(feature = "async")]
+mod async_read_lock_tests;
+#[cfg(feature = "async")]
 mod async_read_write_lock_tests;
+#[cfg(feature = "async")]
+mod async_write_lock_tests;
 mod data_lock_tests;
 mod lock_tests;
+mod read_lock_tests;
 mod read_write_lock_tests;
+mod write_lock_tests;
 
 // Implementation tests
 mod parking_lot_mutex_tests;

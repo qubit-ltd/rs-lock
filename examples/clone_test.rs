@@ -5,8 +5,8 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-use std::time::Duration;
 use std::sync::RwLock;
+use std::time::Duration;
 
 use qubit_lock::{
     ArcParkingLotMonitor,
