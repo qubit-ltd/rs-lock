@@ -14,6 +14,7 @@ use qubit_clock::{
     TimeError,
     Timer,
     TimerFuture,
+    TimerUnavailableReason,
 };
 
 /// Timer used to verify synchronous registration-error propagation.
@@ -23,7 +24,8 @@ pub(super) struct FailingTimer {
 }
 
 impl FailingTimer {
-    /// Creates a Timer that reports [`TimeError::TimerUnavailable`].
+    /// Creates a Timer that reports [`TimeError::TimerUnavailable`] with
+    /// [`TimerUnavailableReason::BackendUnavailable`].
     ///
     /// # Returns
     ///
@@ -46,6 +48,8 @@ impl Timer for FailingTimer {
         &self,
         _deadline: MonotonicInstant,
     ) -> Result<TimerFuture, TimeError> {
-        Err(TimeError::TimerUnavailable)
+        Err(TimeError::TimerUnavailable {
+            reason: TimerUnavailableReason::BackendUnavailable,
+        })
     }
 }
