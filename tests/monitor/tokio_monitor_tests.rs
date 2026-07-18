@@ -33,6 +33,7 @@ use qubit_clock::{
     ManualMonotonicClock,
     MonotonicClock,
     TimeError,
+    TimerUnavailableReason,
 };
 use qubit_lock::{
     AsyncConditionWaiter,
@@ -105,7 +106,12 @@ async fn test_tokio_monitor_propagates_timer_registration_error() {
         .wait_until_for_async(Duration::from_secs(1), |ready| *ready, |_| ())
         .await;
 
-    assert_eq!(result, Err(TimeError::TimerUnavailable));
+    assert_eq!(
+        result,
+        Err(TimeError::TimerUnavailable {
+            reason: TimerUnavailableReason::BackendUnavailable,
+        })
+    );
     assert!(!monitor.with_read_async(|ready| *ready).await);
 }
 
