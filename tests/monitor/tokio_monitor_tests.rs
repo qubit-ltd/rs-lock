@@ -63,10 +63,8 @@ async fn test_tokio_monitor_uses_injected_manual_timer_without_real_delay() {
             .await
     });
 
-    let _deadline = clock.wait_for_next_deadline_async().await;
-    let _reached = clock
-        .advance_to_next_deadline()
-        .expect("monitor deadline should be registered");
+    let reached = clock.advance_to_next_deadline_async().await;
+    assert_eq!(Duration::from_secs(8), reached.elapsed_since_origin());
 
     assert_eq!(
         Ok(WaitTimeoutResult::TimedOut),
