@@ -7,40 +7,41 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![English Doc](https://img.shields.io/badge/docs-English-blue.svg)](README.md)
 
-面向 Qubit Rust 库的锁工具 crate。它提供同步锁、异步锁与基于条件变量的 monitor 协调能力。
+面向 Qubit Rust 库的锁工具 crate。它提供通用锁能力与基于条件变量的 monitor 协调能力。
 
 ## 特性
 
-- `ArcMutex`、`ArcRwLock`：基于 parking_lot、内部已集成 `Arc` 的同步锁包装器。
-- `ArcStdMutex`、`ArcStdRwLock`：基于标准库、保留 poison 语义的同步锁包装器。
-- `ArcAsyncMutex`、`ArcAsyncRwLock`：由可选 `async` 特性启用的 Tokio
-  异步锁包装器。
+- `Lock`：与数据无关、返回 RAII guard 的独占锁能力，由
+  `std::sync::Mutex<T>` 和 `parking_lot::Mutex<T>` 实现。
+- `ReadWriteLock`：与数据无关的共享/独占锁能力，由
+  `std::sync::RwLock<T>` 和 `parking_lot::RwLock<T>` 实现。
+- `DataLock<T>`：以闭包访问受支持 mutex 或读写锁所保护的数据。
+- `AsyncLock`、`AsyncReadWriteLock` 和 `AsyncDataLock<T>`：由可选 `async`
+  特性启用的对应 Tokio 能力。
 - `ParkingLotMonitor`、`ArcParkingLotMonitor`、`ParkingLotMonitorGuard`：基于 parking_lot 的条件变量协调工具。
 - `StdMonitor`、`ArcStdMonitor`、`StdMonitorGuard`：基于标准库的条件变量协调工具。
 - `TokioMonitor`、`ArcTokioMonitor`：由可选 `async` 特性启用的 Tokio
   异步 monitor 协调工具。
 - 所有 monitor 都支持注入 Timer，使集成测试直接运行生产等待算法。
-- 基于闭包的访问接口，让加锁和释放始终局限在一次调用内部。
-- `Arc*` 包装器实现了 `Deref` 和 `AsRef`，需要时仍可使用底层同步原语的
-  guard 风格原生接口。
+- 直接支持借用和 `Arc` 持有的锁，无需额外包装类型。
 
 ## 安装
 
 ```toml
 [dependencies]
-qubit-lock = "0.10"
+qubit-lock = "0.11"
 ```
 
 默认特性集只包含同步锁与同步 monitor。需要异步能力时显式启用：
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.10", features = ["async"] }
+qubit-lock = { version = "0.11", features = ["async"] }
 ```
 
 如果应用需要创建 Tokio runtime，请在应用自己的 `Cargo.toml` 中启用合适的 Tokio runtime 特性，例如 `rt` 或 `rt-multi-thread`。
-`AsyncLock` 返回 `Send` future：`ArcAsyncMutex<T>` 在 `T: Send` 时实现它，
-`ArcAsyncRwLock<T>` 在 `T: Send + Sync` 时实现它。
+`AsyncLock` 和 `AsyncReadWriteLock` 返回 `Send` future。Tokio mutex 在
+`T: Send` 时实现前者；Tokio 读写锁在 `T: Send + Sync` 时实现后者。
 
 ## Monitor 语义
 
@@ -115,41 +116,43 @@ guard 仍然持有且可继续使用。
 
 ## 快速开始
 
-### 同步锁
+### 绑定数据的锁
 
 ```rust
-use qubit_lock::{ArcMutex, Lock};
+use qubit_lock::DataLock;
 
 fn main() {
-    let counter = ArcMutex::new(0);
+    let counter = parking_lot::Mutex::new(0);
     counter.with_write(|value| *value += 1);
     assert_eq!(counter.with_read(|value| *value), 1);
 }
 ```
 
-### 原生锁接口
+### 与数据无关的锁
 
-`Arc*` 包装器可以通过 `Deref` 或 `AsRef` 继续使用底层同步原语的原生锁接口。
+当受保护状态位于锁外部（例如 atomic）时使用 `Lock`。guard 离开作用域时自动解锁。
 
 ```rust
-use qubit_lock::{ArcMutex, Lock};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+use qubit_lock::Lock;
 
 fn main() {
-    let counter = ArcMutex::new(0);
+    let gate = std::sync::Mutex::new(());
+    let counter = AtomicUsize::new(0);
 
     {
-        let mut guard = counter.lock();
-        *guard += 1;
+        let _guard = Lock::lock(&gate);
+        counter.fetch_add(1, Ordering::Relaxed);
     }
 
-    counter.with_write(|value| *value += 1);
-    assert_eq!(counter.with_read(|value| *value), 2);
+    assert_eq!(counter.load(Ordering::Relaxed), 1);
 }
 ```
 
-`with_read` 和 `with_write` 将闭包式访问与原生 guard 获取明确区分开。
-因此，读写锁包装器可直接通过 `lock.read()` 或 `lock.write()` 获取原生 guard；
-需要显式指定底层类型时仍可使用 `lock.as_ref()`。
+`std::sync::Mutex<T>`、`std::sync::RwLock<T>`、`parking_lot::Mutex<T>` 和
+`parking_lot::RwLock<T>` 都实现 `DataLock<T>`。读写锁实现 `ReadWriteLock`；
+可用 `read_lock()` 或 `write_lock()` 将其中一侧适配为独占 `Lock` 能力。
 
 ### ParkingLotMonitor
 
@@ -175,7 +178,7 @@ fn main() {
 
 ## 项目结构
 
-- `src/lock`：锁 trait 与锁包装器。
+- `src/lock`：锁 trait 与原生锁适配器。
 - `src/monitor`：monitor traits，以及 parking_lot、标准库和 Tokio monitor 实现。
 - `tests/lock`：锁相关行为测试。
 - `tests/monitor`：monitor 相关行为测试。

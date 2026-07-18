@@ -16,32 +16,36 @@
 // intentional module boundary.
 #![allow(clippy::module_inception)]
 
-// Trait definitions
+#[cfg(feature = "async")]
+mod async_data_lock;
 #[cfg(feature = "async")]
 mod async_lock;
+#[cfg(feature = "async")]
+mod async_read_lock;
+#[cfg(feature = "async")]
+mod async_read_write_lock;
+#[cfg(feature = "async")]
+mod async_write_lock;
+mod data_lock;
 mod lock;
+mod read_lock;
+mod read_write_lock;
 mod try_lock_error;
+mod write_lock;
 
-// Implementations
 #[cfg(feature = "async")]
-mod arc_async_mutex;
-#[cfg(feature = "async")]
-mod arc_async_rw_lock;
-mod arc_mutex;
-mod arc_rw_lock;
-mod arc_std_mutex;
-mod arc_std_rw_lock;
-
-// Re-export implementations
-#[cfg(feature = "async")]
-pub use arc_async_mutex::ArcAsyncMutex;
-#[cfg(feature = "async")]
-pub use arc_async_rw_lock::ArcAsyncRwLock;
-pub use arc_mutex::ArcMutex;
-pub use arc_rw_lock::ArcRwLock;
-pub use arc_std_mutex::ArcStdMutex;
-pub use arc_std_rw_lock::ArcStdRwLock;
+pub use async_data_lock::AsyncDataLock;
 #[cfg(feature = "async")]
 pub use async_lock::AsyncLock;
+#[cfg(feature = "async")]
+pub use async_read_lock::AsyncReadLock;
+#[cfg(feature = "async")]
+pub use async_read_write_lock::AsyncReadWriteLock;
+#[cfg(feature = "async")]
+pub use async_write_lock::AsyncWriteLock;
+pub use data_lock::DataLock;
 pub use lock::Lock;
+pub use read_lock::ReadLock;
+pub use read_write_lock::ReadWriteLock;
 pub use try_lock_error::TryLockError;
+pub use write_lock::WriteLock;

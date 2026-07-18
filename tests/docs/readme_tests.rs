@@ -16,9 +16,10 @@ const CARGO_TOML: &str = include_str!("../../Cargo.toml");
 const README_EN: &str = include_str!("../../README.md");
 const README_ZH: &str = include_str!("../../README.zh_CN.md");
 const LIB_RS: &str = include_str!("../../src/lib.rs");
-const ARC_RW_LOCK_SRC: &str = include_str!("../../src/lock/arc_rw_lock.rs");
-const ARC_ASYNC_RW_LOCK_SRC: &str =
-    include_str!("../../src/lock/arc_async_rw_lock.rs");
+const READ_WRITE_LOCK_SRC: &str =
+    include_str!("../../src/lock/read_write_lock.rs");
+const ASYNC_READ_WRITE_LOCK_SRC: &str =
+    include_str!("../../src/lock/async_read_write_lock.rs");
 
 /// Collapses Markdown whitespace so prose assertions do not depend on line
 /// wrapping.
@@ -42,20 +43,18 @@ fn test_readme_uses_with_lock_api_names() {
 #[test]
 /// Ensures README quick-start snippets import the trait needed for lock
 /// methods.
-fn test_readme_quick_start_imports_lock_trait() {
-    assert!(README_EN.contains("use qubit_lock::{ArcMutex, Lock};"));
-    assert!(README_ZH.contains("use qubit_lock::{ArcMutex, Lock};"));
+fn test_readme_quick_start_imports_data_lock_trait() {
+    assert!(README_EN.contains("use qubit_lock::DataLock;"));
+    assert!(README_ZH.contains("use qubit_lock::DataLock;"));
 }
 
 #[test]
 /// Ensures README files document direct access to wrapped primitives.
-fn test_readme_documents_deref_and_as_ref_support() {
-    assert!(README_EN.contains("Deref"));
-    assert!(README_EN.contains("AsRef"));
-    assert!(README_EN.contains("`lock.read()`"));
-    assert!(README_ZH.contains("Deref"));
-    assert!(README_ZH.contains("AsRef"));
-    assert!(README_ZH.contains("`lock.read()`"));
+fn test_readme_documents_native_lock_support() {
+    assert!(README_EN.contains("`std::sync::Mutex<T>`"));
+    assert!(README_EN.contains("`parking_lot::RwLock<T>`"));
+    assert!(README_ZH.contains("`std::sync::Mutex<T>`"));
+    assert!(README_ZH.contains("`parking_lot::RwLock<T>`"));
 }
 
 #[test]
@@ -178,10 +177,8 @@ fn test_readme_documents_root_only_public_api() {
 #[test]
 /// Ensures lock source examples reference the current trait names.
 fn test_rw_lock_docs_use_current_trait_names() {
-    assert!(!ARC_RW_LOCK_SRC.contains("ReadWriteLock"));
-    assert!(!ARC_ASYNC_RW_LOCK_SRC.contains("AsyncReadWriteLock"));
-    assert!(ARC_RW_LOCK_SRC.contains("ArcRwLock, Lock"));
-    assert!(ARC_ASYNC_RW_LOCK_SRC.contains("ArcAsyncRwLock, AsyncLock"));
+    assert!(READ_WRITE_LOCK_SRC.contains("ReadWriteLock"));
+    assert!(ASYNC_READ_WRITE_LOCK_SRC.contains("AsyncReadWriteLock"));
 }
 
 #[test]
