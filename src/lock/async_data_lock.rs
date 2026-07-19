@@ -56,10 +56,11 @@ use super::try_lock_error::TryLockError;
 /// expensive values before acquiring the lock, or move blocking work to a
 /// dedicated blocking task and keep the locked closure short.
 ///
-/// This crate enables only Tokio's `sync` feature for its normal dependency.
-/// Applications that create a Tokio runtime as shown in the examples must
-/// enable an appropriate Tokio runtime feature such as `rt` or
-/// `rt-multi-thread`.
+/// The `async-lock` feature enables Tokio's `sync` feature. The
+/// `async-monitor` feature additionally enables Tokio's `time` feature for
+/// monitor deadlines. Applications that create a Tokio runtime as shown in
+/// the examples must enable an appropriate Tokio runtime feature such as `rt`
+/// or `rt-multi-thread`.
 ///
 /// The trait intentionally returns `Send` futures. Closures and return values
 /// passed to `with_read` and `with_write` must be `Send`; Tokio mutex
