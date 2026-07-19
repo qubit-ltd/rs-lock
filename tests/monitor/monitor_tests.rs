@@ -24,7 +24,7 @@ fn wait_through_trait<M>(monitor: &M)
 where
     M: Monitor<State = bool>,
 {
-    assert_eq!(
+    assert_time_result_eq!(
         monitor.wait_until_for(Duration::ZERO, |ready| *ready, |_| 7),
         Ok(WaitTimeoutResult::TimedOut),
     );

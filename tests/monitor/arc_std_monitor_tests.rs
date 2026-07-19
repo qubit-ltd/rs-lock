@@ -171,7 +171,7 @@ fn test_arc_std_monitor_traits_delegate_to_monitor_methods() {
         ),
         2,
     );
-    assert_eq!(
+    assert_time_result_eq!(
         <ArcStdMonitor<Vec<i32>> as TimeoutConditionWaiter>::wait_until_for(
             &monitor,
             Duration::ZERO,
@@ -180,7 +180,7 @@ fn test_arc_std_monitor_traits_delegate_to_monitor_methods() {
         ),
         Ok(WaitTimeoutResult::Ready(3)),
     );
-    assert_eq!(
+    assert_time_result_eq!(
         <ArcStdMonitor<Vec<i32>> as TimeoutConditionWaiter>::wait_while_for(
             &monitor,
             Duration::ZERO,
@@ -270,7 +270,7 @@ fn test_arc_std_monitor_wait_until_for_delegates_to_monitor() {
     monitor.with_write(|ready| *ready = true);
     monitor.notify_all();
 
-    assert_eq!(
+    assert_time_result_eq!(
         done_rx
             .recv_timeout(Duration::from_secs(1))
             .expect("waiter should finish after predicate becomes true"),
@@ -351,7 +351,7 @@ fn test_arc_std_monitor_wait_while_for_returns_ready_when_predicate_clears() {
     monitor.with_write(|items| items.push(9));
     monitor.notify_all();
 
-    assert_eq!(
+    assert_time_result_eq!(
         done_rx
             .recv_timeout(Duration::from_secs(1))
             .expect("waiter should finish after predicate becomes ready"),
@@ -364,7 +364,7 @@ fn test_arc_std_monitor_wait_while_for_returns_ready_when_predicate_clears() {
 fn test_arc_std_monitor_wait_while_for_returns_timed_out() {
     let monitor = ArcStdMonitor::new(Vec::<i32>::new());
 
-    assert_eq!(
+    assert_time_result_eq!(
         monitor.wait_while_for(
             Duration::from_millis(30),
             |items| items.is_empty(),

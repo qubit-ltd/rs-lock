@@ -12,12 +12,14 @@ use std::{
     time::Duration,
 };
 
-use super::failing_timer_tests::FailingTimer;
+use super::failing_timer_tests::{
+    FailingTimer,
+    assert_backend_unavailable,
+};
 use qubit_clock::{
     ManualMonotonicClock,
     MonotonicClock,
     TimeError,
-    TimerUnavailableReason,
 };
 use qubit_lock::{
     ParkingLotMonitor,
@@ -78,12 +80,7 @@ fn test_parking_lot_monitor_guard_keeps_lock_after_timer_registration_error() {
         .wait_for(Duration::from_secs(1))
         .expect_err("failing Timer should reject registration");
 
-    assert_eq!(
-        error,
-        TimeError::TimerUnavailable {
-            reason: TimerUnavailableReason::BackendUnavailable,
-        }
-    );
+    assert_backend_unavailable(error);
     *guard += 1;
     assert_eq!(*guard, 2);
 }

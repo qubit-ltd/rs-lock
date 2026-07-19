@@ -118,8 +118,10 @@ let waiter = thread::spawn(move || {
     )
 });
 
-assert!(clock.wait_for_waiters(1, Duration::from_secs(1)));
-let _ = clock.advance_to_next_deadline();
+let _ = clock.advance_to_next_deadline_after_waiters(
+    1,
+    Duration::from_secs(1),
+);
 assert_eq!(waiter.join().unwrap(), Ok(WaitTimeoutResult::TimedOut));
 ```
 

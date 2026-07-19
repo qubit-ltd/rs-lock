@@ -31,7 +31,7 @@ where
 #[tokio::test]
 /// Verifies a Tokio monitor satisfies [`AsyncTimeoutConditionWaiter`].
 async fn test_async_timeout_condition_waiter_trait_accepts_tokio_monitor() {
-    assert_eq!(
+    assert_time_result_eq!(
         wait_through_trait(&TokioMonitor::new(false)).await,
         Ok(WaitTimeoutResult::TimedOut),
     );

@@ -28,12 +28,14 @@ use std::{
     time::Duration,
 };
 
-use super::failing_timer_tests::FailingTimer;
+use super::failing_timer_tests::{
+    FailingTimer,
+    assert_backend_unavailable,
+};
 use qubit_clock::{
     ManualMonotonicClock,
     MonotonicClock,
     TimeError,
-    TimerUnavailableReason,
 };
 use qubit_lock::{
     AsyncConditionWaiter,
@@ -67,7 +69,7 @@ async fn test_tokio_monitor_uses_injected_manual_timer_without_real_delay() {
     let reached = clock.advance_to_next_deadline_async().await;
     assert_eq!(Duration::from_secs(8), reached.elapsed_since_origin());
 
-    assert_eq!(
+    assert_time_result_eq!(
         Ok(WaitTimeoutResult::TimedOut),
         waiter.await.expect("waiter task should finish"),
     );
@@ -106,12 +108,8 @@ async fn test_tokio_monitor_propagates_timer_registration_error() {
         .wait_until_for_async(Duration::from_secs(1), |ready| *ready, |_| ())
         .await;
 
-    assert_eq!(
-        result,
-        Err(TimeError::TimerUnavailable {
-            reason: TimerUnavailableReason::BackendUnavailable,
-        })
-    );
+    let error = result.expect_err("failing Timer should reject registration");
+    assert_backend_unavailable(error);
     assert!(!monitor.with_read_async(|ready| *ready).await);
 }
 
@@ -252,7 +250,7 @@ async fn test_tokio_monitor_signal_reacquire_crossing_deadline_times_out() {
         .expect("holder should receive release permission");
     holder.join().expect("holder thread should finish");
 
-    assert_eq!(wait.await, Ok(WaitTimeoutResult::TimedOut));
+    assert_time_result_eq!(wait.await, Ok(WaitTimeoutResult::TimedOut));
 }
 
 /// Verifies that `Notifier::notify_all` selects every waiter registered at the
@@ -415,10 +413,10 @@ async fn test_tokio_monitor_reports_timeout_duration_overflow() {
         Box::pin(monitor.wait_while_for_async(Duration::MAX, |_| true, |_| ()));
     let wake_counter = Arc::new(WakeCounter::default());
 
-    assert_eq!(
-        Poll::Ready(Err(TimeError::InstantOverflow)),
+    assert!(matches!(
         poll_once(waiter.as_mut(), &wake_counter),
-    );
+        Poll::Ready(Err(TimeError::InstantOverflow)),
+    ));
 }
 
 /// Verifies that all Tokio condition-wait trait methods return `Send` futures.
@@ -446,7 +444,7 @@ async fn test_tokio_monitor_condition_wait_futures_are_send() {
         )
         .await,
     );
-    assert_eq!(
+    assert_time_result_eq!(
         assert_send(
             <TokioMonitor<bool> as AsyncTimeoutConditionWaiter>::wait_until_for_async(
                 &monitor,
@@ -458,7 +456,7 @@ async fn test_tokio_monitor_condition_wait_futures_are_send() {
         .await,
         Ok(WaitTimeoutResult::Ready(true)),
     );
-    assert_eq!(
+    assert_time_result_eq!(
         assert_send(
             <TokioMonitor<bool> as AsyncTimeoutConditionWaiter>::wait_while_for_async(
                 &monitor,
@@ -553,7 +551,7 @@ async fn test_tokio_monitor_traits_delegate_to_monitor_methods() {
     monitor
         .with_write_notify_one_async(|items| items.push(1))
         .await;
-    assert_eq!(
+    assert_time_result_eq!(
         timeout_condition_wait.await,
         Ok(WaitTimeoutResult::Ready(1)),
     );
@@ -590,7 +588,7 @@ async fn test_tokio_monitor_async_wait_while_for_uses_condition_wait_budget() {
         .is_pending(),
     );
     tokio::time::advance(Duration::from_millis(1)).await;
-    assert_eq!(wait.await, Ok(WaitTimeoutResult::TimedOut));
+    assert_time_result_eq!(wait.await, Ok(WaitTimeoutResult::TimedOut));
 }
 
 /// Verifies that initial mutex contention does not consume timeout budget.
@@ -647,7 +645,7 @@ async fn test_tokio_monitor_async_wait_while_for_excludes_initial_lock_contentio
     );
 
     tokio::time::advance(Duration::from_millis(5)).await;
-    assert_eq!(wait.await, Ok(WaitTimeoutResult::TimedOut));
+    assert_time_result_eq!(wait.await, Ok(WaitTimeoutResult::TimedOut));
 }
 
 /// Verifies that notifications reuse one fixed timeout deadline.
@@ -682,7 +680,7 @@ async fn test_tokio_monitor_async_wait_while_for_reuses_fixed_timeout_deadline()
     }
 
     tokio::time::advance(Duration::from_millis(2)).await;
-    assert_eq!(wait.await, Ok(WaitTimeoutResult::TimedOut));
+    assert_time_result_eq!(wait.await, Ok(WaitTimeoutResult::TimedOut));
 }
 
 /// Verifies that zero timeout evaluates the initial predicate exactly once.
@@ -705,7 +703,7 @@ async fn test_tokio_monitor_async_wait_while_for_zero_timeout_checks_predicate_o
         )
         .await;
 
-    assert_eq!(result, Ok(WaitTimeoutResult::TimedOut));
+    assert_time_result_eq!(result, Ok(WaitTimeoutResult::TimedOut));
     assert_eq!(checks.load(std::sync::atomic::Ordering::SeqCst), 1);
 }
 
@@ -759,7 +757,7 @@ async fn test_tokio_monitor_async_wait_while_for_returns_ready_after_notify() {
     monitor.with_write_async(|ready| *ready = true).await;
     monitor.notify_one();
 
-    assert_eq!(
+    assert_time_result_eq!(
         waiter.await.expect("waiter task should finish"),
         Ok(WaitTimeoutResult::Ready(9)),
     );
@@ -791,5 +789,5 @@ async fn test_tokio_monitor_async_wait_while_for_rechecks_state_after_timeout()
     monitor.with_write_async(|ready| *ready = true).await;
     tokio::time::advance(Duration::from_millis(20)).await;
 
-    assert_eq!(wait.await, Ok(WaitTimeoutResult::Ready(9)),);
+    assert_time_result_eq!(wait.await, Ok(WaitTimeoutResult::Ready(9)),);
 }
