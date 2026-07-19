@@ -9,6 +9,25 @@
 //!
 //! Covers behavior corresponding to `src/monitor`.
 
+/// Compares successful time results without requiring time errors to support
+/// value equality.
+macro_rules! assert_time_result_eq {
+    ($actual:expr, Ok($expected:expr) $(,)?) => {{
+        let expected = $expected;
+        match $actual {
+            Ok(actual) => assert_eq!(actual, expected),
+            Err(error) => panic!("time result unexpectedly failed: {error}"),
+        }
+    }};
+    (Ok($expected:expr), $actual:expr $(,)?) => {{
+        let expected = $expected;
+        match $actual {
+            Ok(actual) => assert_eq!(expected, actual),
+            Err(error) => panic!("time result unexpectedly failed: {error}"),
+        }
+    }};
+}
+
 #[cfg(feature = "parking-lot")]
 mod arc_parking_lot_monitor_tests;
 mod arc_std_monitor_tests;

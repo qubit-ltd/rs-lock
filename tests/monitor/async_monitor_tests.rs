@@ -20,7 +20,7 @@ async fn wait_through_trait<M>(monitor: &M)
 where
     M: AsyncMonitor<State = bool>,
 {
-    assert_eq!(
+    assert_time_result_eq!(
         monitor
             .wait_until_for_async(
                 Duration::from_millis(1),

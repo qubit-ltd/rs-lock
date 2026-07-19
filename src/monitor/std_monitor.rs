@@ -554,7 +554,7 @@ impl<T> StdMonitor<T> {
     ///     |items| items.pop(),
     /// );
     ///
-    /// assert_eq!(result, Ok(WaitTimeoutResult::TimedOut));
+    /// assert!(matches!(result, Ok(WaitTimeoutResult::TimedOut)));
     /// ```
     pub fn wait_while_for<R, P, F>(
         &self,
@@ -650,10 +650,11 @@ impl<T> StdMonitor<T> {
     /// monitor.with_write(|ready| *ready = true);
     /// monitor.notify_one();
     ///
-    /// assert_eq!(
-    ///     waiter.join().expect("waiter should finish"),
-    ///     Ok(WaitTimeoutResult::Ready(5)),
-    /// );
+    /// let outcome = waiter
+    ///     .join()
+    ///     .expect("waiter should finish")
+    ///     .expect("timer registration should succeed");
+    /// assert_eq!(outcome, WaitTimeoutResult::Ready(5));
     /// ```
     #[inline(always)]
     pub fn wait_until_for<R, P, F>(

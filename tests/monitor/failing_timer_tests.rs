@@ -7,6 +7,8 @@
 // =============================================================================
 //! Test Timer that rejects every deadline registration.
 
+use std::io;
+
 use qubit_clock::{
     ManualMonotonicClock,
     MonotonicClock,
@@ -14,7 +16,7 @@ use qubit_clock::{
     TimeError,
     Timer,
     TimerFuture,
-    TimerUnavailableReason,
+    TimerUnavailableError,
 };
 
 /// Timer used to verify synchronous registration-error propagation.
@@ -25,7 +27,7 @@ pub(super) struct FailingTimer {
 
 impl FailingTimer {
     /// Creates a Timer that reports [`TimeError::TimerUnavailable`] with
-    /// [`TimerUnavailableReason::BackendUnavailable`].
+    /// [`TimerUnavailableError::BackendUnavailable`].
     ///
     /// # Returns
     ///
@@ -49,7 +51,29 @@ impl Timer for FailingTimer {
         _deadline: MonotonicInstant,
     ) -> Result<TimerFuture, TimeError> {
         Err(TimeError::TimerUnavailable {
-            reason: TimerUnavailableReason::BackendUnavailable,
+            source: TimerUnavailableError::BackendUnavailable {
+                backend: "test",
+                source: Box::new(io::Error::other(
+                    "test timer backend unavailable",
+                )),
+            },
         })
     }
+}
+
+/// Verifies the stable category and source of the failing test Timer.
+///
+/// # Parameters
+///
+/// * `error` - Error propagated from a timed monitor operation.
+pub(super) fn assert_backend_unavailable(error: TimeError) {
+    let TimeError::TimerUnavailable {
+        source:
+            TimerUnavailableError::BackendUnavailable { backend, source },
+    } = error
+    else {
+        panic!("failing Timer should report backend unavailability");
+    };
+    assert_eq!("test", backend);
+    assert_eq!("test timer backend unavailable", source.to_string());
 }

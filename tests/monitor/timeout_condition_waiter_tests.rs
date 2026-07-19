@@ -29,7 +29,7 @@ where
 #[test]
 /// Verifies a concrete monitor satisfies [`TimeoutConditionWaiter`].
 fn test_timeout_condition_waiter_trait_accepts_std_monitor() {
-    assert_eq!(
+    assert_time_result_eq!(
         wait_through_trait(&StdMonitor::new(false)),
         Ok(WaitTimeoutResult::TimedOut),
     );

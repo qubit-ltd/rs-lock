@@ -19,8 +19,6 @@ use std::{
 use qubit_clock::{
     ManualMonotonicClock,
     MonotonicClock,
-    TimeError,
-    TimerUnavailableReason,
 };
 use qubit_lock::{
     ConditionWaiter,
@@ -31,7 +29,10 @@ use qubit_lock::{
     WaitTimeoutStatus,
 };
 
-use super::failing_timer_tests::FailingTimer;
+use super::failing_timer_tests::{
+    FailingTimer,
+    assert_backend_unavailable,
+};
 
 #[test]
 fn test_parking_lot_monitor_new_read_write_updates_state() {
@@ -283,7 +284,7 @@ fn test_parking_lot_monitor_traits_delegate_to_monitor_methods() {
         ),
         2,
     );
-    assert_eq!(
+    assert_time_result_eq!(
         <ParkingLotMonitor<Vec<i32>> as TimeoutConditionWaiter>::wait_until_for(
             &monitor,
             Duration::ZERO,
@@ -292,7 +293,7 @@ fn test_parking_lot_monitor_traits_delegate_to_monitor_methods() {
         ),
         Ok(WaitTimeoutResult::Ready(3)),
     );
-    assert_eq!(
+    assert_time_result_eq!(
         <ParkingLotMonitor<Vec<i32>> as TimeoutConditionWaiter>::wait_while_for(
             &monitor,
             Duration::ZERO,
@@ -431,7 +432,7 @@ fn test_parking_lot_monitor_wait_while_for_returns_timed_out_when_timeout() {
         |_| (),
     );
 
-    assert_eq!(result, Ok(WaitTimeoutResult::TimedOut));
+    assert_time_result_eq!(result, Ok(WaitTimeoutResult::TimedOut));
 }
 
 #[test]
@@ -442,12 +443,8 @@ fn test_parking_lot_monitor_timed_predicate_wait_propagates_timer_error() {
     let result =
         monitor.wait_until_for(Duration::from_secs(1), |ready| *ready, |_| ());
 
-    assert_eq!(
-        result,
-        Err(TimeError::TimerUnavailable {
-            reason: TimerUnavailableReason::BackendUnavailable,
-        })
-    );
+    let error = result.expect_err("failing Timer should reject registration");
+    assert_backend_unavailable(error);
 }
 
 #[test]
@@ -465,12 +462,11 @@ fn test_parking_lot_monitor_uses_injected_manual_timer_without_real_delay() {
         )
     });
 
-    assert!(clock.wait_for_waiters(1, Duration::from_secs(1)));
     let _reached = clock
-        .advance_to_next_deadline()
+        .advance_to_next_deadline_after_waiters(1, Duration::from_secs(1))
         .expect("monitor deadline should be registered");
 
-    assert_eq!(
+    assert_time_result_eq!(
         Ok(WaitTimeoutResult::TimedOut),
         waiter.join().expect("waiter should finish"),
     );
@@ -486,7 +482,7 @@ fn test_parking_lot_monitor_wait_until_for_returns_timed_out_when_timeout() {
         |_| (),
     );
 
-    assert_eq!(result, Ok(WaitTimeoutResult::TimedOut));
+    assert_time_result_eq!(result, Ok(WaitTimeoutResult::TimedOut));
 }
 
 /// Verifies that initial lock contention does not consume timeout budget.
@@ -533,7 +529,7 @@ fn test_parking_lot_monitor_wait_while_for_excludes_initial_lock_contention_from
     drop(monitor.lock());
     monitor.with_write_notify_one(|ready| *ready = true);
 
-    assert_eq!(
+    assert_time_result_eq!(
         done_rx
             .recv_timeout(Duration::from_secs(1))
             .expect("waiter should retain a fresh condition-wait budget"),
@@ -558,7 +554,7 @@ fn test_parking_lot_monitor_wait_while_for_zero_timeout_checks_predicate_once()
         |_| (),
     );
 
-    assert_eq!(result, Ok(WaitTimeoutResult::TimedOut));
+    assert_time_result_eq!(result, Ok(WaitTimeoutResult::TimedOut));
     assert_eq!(checks, 1);
 }
 
@@ -594,7 +590,7 @@ fn test_parking_lot_monitor_wait_while_for_timeout_final_predicate_wins() {
     drop(monitor.lock());
     monitor.with_write(|ready| *ready = true);
 
-    assert_eq!(
+    assert_time_result_eq!(
         done_rx
             .recv_timeout(Duration::from_secs(1))
             .expect("ready predicate should win the final timeout check"),
@@ -636,7 +632,7 @@ fn test_parking_lot_monitor_wait_until_for_returns_result_when_predicate_true()
     });
     monitor.notify_one();
 
-    assert_eq!(
+    assert_time_result_eq!(
         done_rx
             .recv_timeout(Duration::from_secs(1))
             .expect("waiter should finish after notification"),

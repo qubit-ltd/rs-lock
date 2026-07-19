@@ -172,7 +172,7 @@ async fn test_arc_tokio_monitor_traits_delegate_to_inner_monitor() {
     monitor
         .with_write_notify_one_async(|items| items.push(3))
         .await;
-    assert_eq!(timeout_until_wait.await, Ok(WaitTimeoutResult::Ready(3)),);
+    assert_time_result_eq!(timeout_until_wait.await, Ok(WaitTimeoutResult::Ready(3)),);
 
     let timeout_while_wait =
         <ArcTokioMonitor<Vec<i32>> as AsyncTimeoutConditionWaiter>::wait_while_for_async(
@@ -193,7 +193,7 @@ async fn test_arc_tokio_monitor_traits_delegate_to_inner_monitor() {
     monitor
         .with_write_notify_all_async(|items| items.push(4))
         .await;
-    assert_eq!(
+    assert_time_result_eq!(
         timeout_while_wait.await,
         Ok(WaitTimeoutResult::Ready(Some(4))),
     );
@@ -257,7 +257,7 @@ async fn test_arc_tokio_monitor_wait_methods_delegate_to_inner_monitor() {
     monitor
         .with_write_notify_one_async(|items| items.push(3))
         .await;
-    assert_eq!(timeout_until_wait.await, Ok(WaitTimeoutResult::Ready(3)),);
+    assert_time_result_eq!(timeout_until_wait.await, Ok(WaitTimeoutResult::Ready(3)),);
 
     let timeout_while_wait = monitor.wait_while_for_async(
         Duration::from_secs(1),
@@ -276,7 +276,7 @@ async fn test_arc_tokio_monitor_wait_methods_delegate_to_inner_monitor() {
     monitor
         .with_write_notify_all_async(|items| items.push(4))
         .await;
-    assert_eq!(
+    assert_time_result_eq!(
         timeout_while_wait.await,
         Ok(WaitTimeoutResult::Ready(Some(4))),
     );
@@ -286,7 +286,7 @@ async fn test_arc_tokio_monitor_wait_methods_delegate_to_inner_monitor() {
 async fn test_arc_tokio_monitor_async_wait_until_for_times_out() {
     let monitor = ArcTokioMonitor::new(false);
 
-    assert_eq!(
+    assert_time_result_eq!(
         monitor
             .wait_until_for_async(
                 Duration::from_millis(1),

@@ -39,7 +39,8 @@
 ///     },
 /// );
 ///
-/// assert_eq!(result, Ok(WaitTimeoutResult::Ready("ready")));
+/// let outcome = result.expect("timer registration should succeed");
+/// assert_eq!(outcome, WaitTimeoutResult::Ready("ready"));
 /// ```
 ///
 /// Ignoring a predicate-wait result is rejected when unused must-use values

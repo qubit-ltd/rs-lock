@@ -42,7 +42,7 @@ parking-lot = ["dep:parking_lot"]
 [dependencies]
 parking_lot = { version = "0.12", optional = true }
 tokio = { version = "1.52", default-features = false, optional = true }
-qubit-clock = { version = "0.9", path = "../rs-clock", optional = true }
+qubit-clock = { version = "0.10", path = "../rs-clock", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.8.2", default-features = false }
