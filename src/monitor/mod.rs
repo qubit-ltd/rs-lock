@@ -17,13 +17,13 @@
 #[cfg(feature = "parking-lot")]
 mod arc_parking_lot_monitor;
 mod arc_std_monitor;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-monitor")]
 mod arc_tokio_monitor;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-monitor")]
 mod async_condition_waiter;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-monitor")]
 mod async_monitor;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-monitor")]
 mod async_timeout_condition_waiter;
 mod condition_waiter;
 mod internal;
@@ -33,13 +33,13 @@ mod notifier;
 mod parking_lot_monitor;
 #[cfg(feature = "parking-lot")]
 mod parking_lot_monitor_guard;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-monitor")]
 mod shared_async_monitor;
 mod shared_monitor;
 mod std_monitor;
 mod std_monitor_guard;
 mod timeout_condition_waiter;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-monitor")]
 mod tokio_monitor;
 mod wait_timeout_result;
 mod wait_timeout_status;
@@ -47,13 +47,13 @@ mod wait_timeout_status;
 #[cfg(feature = "parking-lot")]
 pub use arc_parking_lot_monitor::ArcParkingLotMonitor;
 pub use arc_std_monitor::ArcStdMonitor;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-monitor")]
 pub use arc_tokio_monitor::ArcTokioMonitor;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-monitor")]
 pub use async_condition_waiter::AsyncConditionWaiter;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-monitor")]
 pub use async_monitor::AsyncMonitor;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-monitor")]
 pub use async_timeout_condition_waiter::AsyncTimeoutConditionWaiter;
 pub use condition_waiter::ConditionWaiter;
 pub use monitor::Monitor;
@@ -62,13 +62,13 @@ pub use notifier::Notifier;
 pub use parking_lot_monitor::ParkingLotMonitor;
 #[cfg(feature = "parking-lot")]
 pub use parking_lot_monitor_guard::ParkingLotMonitorGuard;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-monitor")]
 pub use shared_async_monitor::SharedAsyncMonitor;
 pub use shared_monitor::SharedMonitor;
 pub use std_monitor::StdMonitor;
 pub use std_monitor_guard::StdMonitorGuard;
 pub use timeout_condition_waiter::TimeoutConditionWaiter;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-monitor")]
 pub use tokio_monitor::TokioMonitor;
 pub use wait_timeout_result::WaitTimeoutResult;
 pub use wait_timeout_status::WaitTimeoutStatus;

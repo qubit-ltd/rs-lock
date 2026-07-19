@@ -13,7 +13,9 @@ mod blocking_waiter_registration_tests;
 #[cfg(feature = "parking-lot")]
 mod blocking_waiter_registry_tests;
 mod default_timer_tests;
-#[cfg(feature = "async")]
+#[cfg(feature = "parking-lot")]
+mod mod_tests;
+#[cfg(feature = "async-monitor")]
 mod tokio_condition_waiter_registration_tests;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-monitor")]
 mod tokio_condition_waiter_tests;
