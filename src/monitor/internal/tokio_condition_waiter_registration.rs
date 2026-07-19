@@ -9,13 +9,21 @@
 
 use std::{
     collections::BTreeMap,
+    future::{
+        Future,
+        poll_fn,
+    },
     sync::{
         Arc,
         Mutex,
     },
+    task::Poll,
 };
 
+use qubit_clock::TimerFuture;
+
 use super::TokioConditionWaiter;
+use crate::monitor::WaitTimeoutStatus;
 
 /// Removes an active waiter registration on cancellation or normal exit.
 pub(in crate::monitor) struct TokioConditionWaiterRegistration<'a> {
@@ -28,7 +36,7 @@ pub(in crate::monitor) struct TokioConditionWaiterRegistration<'a> {
 impl<'a> TokioConditionWaiterRegistration<'a> {
     /// Creates a registration for a waiter already stored in `registry`.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `registry` - Registry that currently contains `waiter`.
     /// * `waiter` - Independently signalled waiter owned by the pending wait.
@@ -52,6 +60,35 @@ impl<'a> TokioConditionWaiterRegistration<'a> {
     #[inline(always)]
     pub(in crate::monitor) fn waiter(&self) -> &TokioConditionWaiter {
         &self.waiter
+    }
+
+    /// Waits until this registration is selected or the deadline is reached.
+    ///
+    /// Deadline completion wins when notification and timeout are both ready.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Fixed Timer registration shared across predicate checks.
+    ///
+    /// # Returns
+    ///
+    /// Whether notification or the deadline completed this suspension.
+    pub(in crate::monitor) async fn wait_until_signalled_or_deadline(
+        &self,
+        deadline: &mut TimerFuture,
+    ) -> WaitTimeoutStatus {
+        let notified = self.waiter().signal().notified();
+        tokio::pin!(notified);
+        poll_fn(|context| {
+            if deadline.as_mut().poll(context).is_ready() {
+                Poll::Ready(WaitTimeoutStatus::TimedOut)
+            } else if notified.as_mut().poll(context).is_ready() {
+                Poll::Ready(WaitTimeoutStatus::Woken)
+            } else {
+                Poll::Pending
+            }
+        })
+        .await
     }
 }
 

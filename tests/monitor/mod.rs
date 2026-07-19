@@ -19,12 +19,9 @@ mod async_condition_waiter_tests;
 mod async_monitor_tests;
 #[cfg(feature = "async")]
 mod async_timeout_condition_waiter_tests;
-mod blocking_condition_waiter_tests;
-mod blocking_waiter_registration_tests;
-mod blocking_waiter_registry_tests;
 mod condition_waiter_tests;
-mod default_timer_tests;
 mod failing_timer_tests;
+mod internal;
 mod monitor_tests;
 mod notifier_tests;
 mod parking_lot_monitor_guard_tests;
@@ -35,10 +32,6 @@ mod shared_monitor_tests;
 mod std_monitor_guard_tests;
 mod std_monitor_tests;
 mod timeout_condition_waiter_tests;
-#[cfg(feature = "async")]
-mod tokio_condition_waiter_registration_tests;
-#[cfg(feature = "async")]
-mod tokio_condition_waiter_tests;
 #[cfg(feature = "async")]
 mod tokio_monitor_tests;
 mod wait_timeout_result_tests;

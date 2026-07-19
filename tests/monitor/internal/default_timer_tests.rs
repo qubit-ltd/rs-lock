@@ -10,14 +10,14 @@
 use std::time::Duration;
 
 use qubit_lock::{
-    ParkingLotMonitor,
+    StdMonitor,
     WaitTimeoutResult,
 };
 
 /// Verifies a default blocking timer reports an elapsed wait as timed out.
 #[test]
 fn test_default_timer_drives_blocking_monitor_timeout() {
-    let monitor = ParkingLotMonitor::new(false);
+    let monitor = StdMonitor::new(false);
 
     let result = monitor
         .wait_while_for(Duration::from_millis(1), |ready| !*ready, |_| ())
