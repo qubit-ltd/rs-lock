@@ -38,6 +38,7 @@ impl BlockingConditionWaiter {
     ///
     /// A waiter ready for registry insertion and Timer polling.
     #[must_use]
+    #[inline]
     pub(in crate::monitor) const fn new() -> Self {
         Self {
             state: Mutex::new(BlockingConditionWaiterState {
@@ -57,6 +58,7 @@ impl BlockingConditionWaiter {
     /// # Returns
     ///
     /// [`Poll::Ready`] after the deadline, otherwise [`Poll::Pending`].
+    #[inline]
     pub(in crate::monitor) fn poll_timer(
         waiter: &Arc<Self>,
         future: &mut TimerFuture,
@@ -82,6 +84,7 @@ impl BlockingConditionWaiter {
     }
 
     /// Latches one signal and unparks the blocking thread.
+    #[inline]
     fn signal(&self) {
         let mut state = self
             .state
@@ -94,11 +97,13 @@ impl BlockingConditionWaiter {
 
 impl Wake for BlockingConditionWaiter {
     /// Latches a TimerFuture wake notification.
+    #[inline(always)]
     fn wake(self: Arc<Self>) {
         self.signal();
     }
 
     /// Latches a borrowed TimerFuture wake notification.
+    #[inline(always)]
     fn wake_by_ref(self: &Arc<Self>) {
         self.signal();
     }

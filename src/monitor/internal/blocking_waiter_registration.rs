@@ -15,6 +15,7 @@ use super::{
 };
 
 /// RAII ownership of one active blocking waiter registration.
+#[must_use = "retain the registration while the waiter remains eligible for notification"]
 pub(in crate::monitor) struct BlockingWaiterRegistration<'a> {
     /// Registry from which cancellation removes the waiter.
     registry: &'a BlockingWaiterRegistry,
@@ -26,6 +27,7 @@ pub(in crate::monitor) struct BlockingWaiterRegistration<'a> {
 
 impl<'a> BlockingWaiterRegistration<'a> {
     /// Creates ownership of an already inserted registry entry.
+    #[inline]
     pub(super) const fn new(
         registry: &'a BlockingWaiterRegistry,
         key: usize,

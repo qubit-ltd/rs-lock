@@ -226,6 +226,7 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     /// # Errors
     ///
     /// Returns Timer registration errors without releasing this guard.
+    #[inline(always)]
     pub fn wait_until(
         &mut self,
         deadline: MonotonicInstant,

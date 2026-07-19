@@ -14,6 +14,16 @@ use crate::lock::{
 };
 
 /// Adapts the write mode of a ReadWriteLock to Lock.
+///
+/// ```compile_fail
+/// #![deny(unused_must_use)]
+///
+/// use qubit_lock::ReadWriteLock;
+///
+/// let lock = std::sync::RwLock::new(());
+/// lock.write_lock();
+/// ```
+#[must_use = "use the adapter to acquire a write guard"]
 pub struct WriteLock<'a, L: ?Sized> {
     /// Underlying read-write lock.
     lock: &'a L,

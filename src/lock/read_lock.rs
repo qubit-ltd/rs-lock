@@ -17,6 +17,16 @@ use crate::lock::{
 ///
 /// Multiple guards from this adapter may coexist. It must not be used where
 /// the consumer requires exclusive entry.
+///
+/// ```compile_fail
+/// #![deny(unused_must_use)]
+///
+/// use qubit_lock::ReadWriteLock;
+///
+/// let lock = std::sync::RwLock::new(());
+/// lock.read_lock();
+/// ```
+#[must_use = "use the adapter to acquire a read guard"]
 pub struct ReadLock<'a, L: ?Sized> {
     /// Underlying read-write lock.
     lock: &'a L,

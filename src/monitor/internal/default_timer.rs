@@ -23,6 +23,7 @@ use qubit_clock::{
 /// # Returns
 ///
 /// A shared Timer driven by one standard monotonic clock domain.
+#[inline]
 pub(in crate::monitor) fn default_timer() -> Arc<dyn Timer> {
     static TIMER: OnceLock<Arc<dyn Timer>> = OnceLock::new();
     Arc::clone(TIMER.get_or_init(|| StdMonotonicClock::new().new_timer()))

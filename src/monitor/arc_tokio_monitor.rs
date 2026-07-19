@@ -59,6 +59,7 @@ impl<T> ArcTokioMonitor<T> {
     /// # Returns
     ///
     /// A cloneable Tokio monitor handle bound to `timer`.
+    #[inline]
     pub fn with_timer(state: T, timer: Arc<dyn Timer>) -> Self {
         Self {
             inner: Arc::new(TokioMonitor::with_timer(state, timer)),
