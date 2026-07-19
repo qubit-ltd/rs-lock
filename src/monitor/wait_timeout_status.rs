@@ -12,19 +12,18 @@
 /// Result of a timed wait operation.
 ///
 /// This status is returned by
-/// [`ParkingLotMonitorGuard::wait_for`](super::ParkingLotMonitorGuard::wait_for)
-/// and [`StdMonitorGuard::wait_for`](super::StdMonitorGuard::wait_for). It
+/// [`StdMonitorGuard::wait_for`](super::StdMonitorGuard::wait_for). It
 /// describes why a timed wait returned, but callers must still re-check the
 /// protected state because notification does not imply predicate truth.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```rust
 /// use std::time::Duration;
 ///
-/// use qubit_lock::{ParkingLotMonitor, WaitTimeoutStatus};
+/// use qubit_lock::{StdMonitor, WaitTimeoutStatus};
 ///
-/// let monitor = ParkingLotMonitor::new(false);
+/// let monitor = StdMonitor::new(false);
 /// let mut guard = monitor.lock();
 /// let status = guard
 ///     .wait_for(Duration::from_millis(1))
@@ -38,13 +37,9 @@
 /// ```compile_fail
 /// #![deny(unused_must_use)]
 ///
-/// use std::time::Duration;
+/// use qubit_lock::WaitTimeoutStatus;
 ///
-/// use qubit_lock::ParkingLotMonitor;
-///
-/// let monitor = ParkingLotMonitor::new(false);
-/// let mut guard = monitor.lock();
-/// guard.wait_for(Duration::ZERO);
+/// WaitTimeoutStatus::TimedOut;
 /// ```
 #[must_use = "check whether the condition wait woke or reached its timeout"]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,9 +47,9 @@ pub enum WaitTimeoutStatus {
     /// The wait returned before the timeout elapsed.
     ///
     /// This usually means another thread called
-    /// [`ParkingLotMonitor::notify_one`](super::ParkingLotMonitor::notify_one)
+    /// [`StdMonitor::notify_one`](super::StdMonitor::notify_one)
     /// or
-    /// [`ParkingLotMonitor::notify_all`](super::ParkingLotMonitor::notify_all),
+    /// [`StdMonitor::notify_all`](super::StdMonitor::notify_all),
     /// but it may also be a spurious wakeup. Always re-check the guarded
     /// state before acting on this status.
     Woken,
@@ -73,6 +68,7 @@ impl WaitTimeoutStatus {
     ///
     /// `true` for [`Self::Woken`], otherwise `false`.
     #[inline(always)]
+    #[must_use]
     pub const fn is_woken(&self) -> bool {
         match self {
             Self::Woken => true,
@@ -86,6 +82,7 @@ impl WaitTimeoutStatus {
     ///
     /// `true` for [`Self::TimedOut`], otherwise `false`.
     #[inline(always)]
+    #[must_use]
     pub const fn is_timed_out(&self) -> bool {
         match self {
             Self::Woken => false,

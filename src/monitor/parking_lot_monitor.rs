@@ -90,7 +90,7 @@ use super::{
 ///
 /// * `T` - The state protected by this monitor.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```rust
 /// use std::thread;
@@ -129,7 +129,7 @@ pub struct ParkingLotMonitor<T> {
 impl<T> ParkingLotMonitor<T> {
     /// Creates a monitor protecting the supplied state value.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `state` - Initial state protected by the monitor.
     ///
@@ -137,7 +137,7 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// A monitor initialized with the supplied state.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::ParkingLotMonitor;
@@ -174,6 +174,7 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// The injected Timer and its monotonic clock domain.
     #[must_use]
+    #[inline(always)]
     pub fn timer(&self) -> &dyn Timer {
         self.timer.as_ref()
     }
@@ -191,7 +192,7 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// A guard that provides read and write access to the protected state.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::ParkingLotMonitor;
@@ -214,7 +215,7 @@ impl<T> ParkingLotMonitor<T> {
     /// The closure runs while the mutex is held. Keep the closure short and do
     /// not call code that may block for a long time.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure that receives an immutable reference to the state.
     ///
@@ -222,7 +223,7 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// The value returned by the closure.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::ParkingLotMonitor;
@@ -247,7 +248,7 @@ impl<T> ParkingLotMonitor<T> {
     /// [`Self::notify_all`] after changing a condition that waiters may be
     /// observing.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure that receives a mutable reference to the state.
     ///
@@ -255,7 +256,7 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// The value returned by the closure.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::ParkingLotMonitor;
@@ -285,7 +286,7 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// If `f` panics, the panic is propagated and no notification is sent.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure that receives a mutable reference to the state.
     ///
@@ -293,7 +294,7 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// The value returned by the closure.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::ParkingLotMonitor;
@@ -326,7 +327,7 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// If `f` panics, the panic is propagated and no notification is sent.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure that receives a mutable reference to the state.
     ///
@@ -334,7 +335,7 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// The value returned by the closure.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::ParkingLotMonitor;
@@ -369,7 +370,7 @@ impl<T> ParkingLotMonitor<T> {
     /// This method may block indefinitely if no thread changes the state so
     /// that `waiting` becomes false and sends a notification.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `waiting` - Predicate that returns `true` while the caller should keep
     ///   waiting.
@@ -380,7 +381,7 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// The value returned by `f`.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use std::{
@@ -429,7 +430,7 @@ impl<T> ParkingLotMonitor<T> {
     /// This method may block indefinitely if no thread changes the state to
     /// satisfy the predicate and sends a notification.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `ready` - Predicate that returns `true` when the state is ready.
     /// * `f` - Closure that receives mutable access to the ready state.
@@ -438,7 +439,7 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// The value returned by `f` after the predicate has become true.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use std::{
@@ -493,7 +494,7 @@ impl<T> ParkingLotMonitor<T> {
     /// Timeout status alone is not used as proof that the predicate is still
     /// true; the predicate is always rechecked under the lock.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `timeout` - Maximum total duration to wait.
     /// * `waiting` - Predicate that returns `true` while the caller should
@@ -511,7 +512,7 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// Returns an error when the injected Timer cannot register the deadline.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use std::time::Duration;
@@ -573,7 +574,7 @@ impl<T> ParkingLotMonitor<T> {
     /// Timeout status alone is not used as proof that the predicate is still
     /// false; the predicate is always rechecked under the lock.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `timeout` - Maximum total duration to wait.
     /// * `ready` - Predicate that returns `true` when the caller may continue.
@@ -589,7 +590,7 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// Returns an error when the injected Timer cannot register the deadline.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use std::{
@@ -642,7 +643,7 @@ impl<T> ParkingLotMonitor<T> {
     /// proceeds safely after rechecking the protected state. Call this after
     /// changing state that may make one waiter able to continue.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use std::thread;
@@ -674,7 +675,7 @@ impl<T> ParkingLotMonitor<T> {
     /// must recheck the protected state before continuing. Call this after a
     /// state change that may allow multiple waiters to make progress.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use std::thread;
@@ -750,7 +751,7 @@ impl<T> TimeoutConditionWaiter for ParkingLotMonitor<T> {
 impl<T> From<T> for ParkingLotMonitor<T> {
     /// Creates a monitor from an initial state value.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `value` - Initial state protected by the monitor.
     ///
@@ -770,7 +771,7 @@ impl<T: Default> Default for ParkingLotMonitor<T> {
     ///
     /// A monitor protecting the default value for `T`.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::ParkingLotMonitor;

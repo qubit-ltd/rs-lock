@@ -50,7 +50,7 @@ use super::{
 ///
 /// * `T` - The state protected by the monitor.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```rust
 /// use qubit_lock::ParkingLotMonitor;
@@ -63,6 +63,19 @@ use super::{
 ///
 /// assert_eq!(monitor.with_read(|items| items.len()), 1);
 /// ```
+///
+/// Ignoring a monitor guard is rejected when unused must-use values are
+/// denied:
+///
+/// ```compile_fail
+/// #![deny(unused_must_use)]
+///
+/// use qubit_lock::ParkingLotMonitor;
+///
+/// let monitor = ParkingLotMonitor::new(0);
+/// monitor.lock();
+/// ```
+#[must_use = "dropping the guard immediately releases the monitor lock"]
 pub struct ParkingLotMonitorGuard<'a, T> {
     /// ParkingLotMonitor that owns the state, waiter registry, and Timer.
     monitor: &'a ParkingLotMonitor<T>,
@@ -73,7 +86,7 @@ pub struct ParkingLotMonitorGuard<'a, T> {
 impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     /// Creates a guard from its owning monitor and parking_lot mutex guard.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `monitor` - ParkingLotMonitor whose mutex produced `inner`.
     /// * `inner` - Parking-lot mutex guard protecting the monitor state.
@@ -107,7 +120,7 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     ///
     /// This method returns after this guard has reacquired the monitor lock.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use std::{
@@ -162,7 +175,7 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     /// not remove the need to inspect the state, because another thread may
     /// have changed it while this thread was reacquiring the lock.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `timeout` - Maximum duration to wait before returning
     ///   [`WaitTimeoutStatus::TimedOut`].
@@ -175,7 +188,7 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     ///
     /// Returns Timer registration errors without releasing this guard.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use std::time::Duration;

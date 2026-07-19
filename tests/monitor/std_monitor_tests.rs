@@ -94,6 +94,84 @@ fn test_std_monitor_write_notify_one_updates_state_and_wakes_waiter() {
 }
 
 #[test]
+fn test_std_monitor_notify_one_wakes_exactly_one_waiter() {
+    let monitor = Arc::new(StdMonitor::new(0_usize));
+    let (first_checked_tx, first_checked_rx) = mpsc::channel();
+    let (second_checked_tx, second_checked_rx) = mpsc::channel();
+    let (done_tx, done_rx) = mpsc::channel();
+
+    let first_monitor = Arc::clone(&monitor);
+    let first_done_tx = done_tx.clone();
+    let first_waiter = thread::spawn(move || {
+        let mut checked_tx = Some(first_checked_tx);
+        first_monitor.wait_until(
+            move |available| {
+                if *available == 0
+                    && let Some(checked_tx) = checked_tx.take()
+                {
+                    checked_tx
+                        .send(())
+                        .expect("test should observe first waiter");
+                }
+                *available > 0
+            },
+            |available| *available -= 1,
+        );
+        first_done_tx
+            .send(())
+            .expect("test should receive first waiter result");
+    });
+
+    let second_monitor = Arc::clone(&monitor);
+    let second_waiter = thread::spawn(move || {
+        let mut checked_tx = Some(second_checked_tx);
+        second_monitor.wait_until(
+            move |available| {
+                if *available == 0
+                    && let Some(checked_tx) = checked_tx.take()
+                {
+                    checked_tx
+                        .send(())
+                        .expect("test should observe second waiter");
+                }
+                *available > 0
+            },
+            |available| *available -= 1,
+        );
+        done_tx
+            .send(())
+            .expect("test should receive second waiter result");
+    });
+
+    first_checked_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("first waiter should check state");
+    second_checked_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("second waiter should check state");
+    drop(monitor.lock());
+
+    monitor.with_write(|available| *available = 1);
+    monitor.notify_one();
+    done_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("one waiter should finish after notify_one");
+    assert!(
+        done_rx.try_recv().is_err(),
+        "notify_one must not finish both registered waiters"
+    );
+
+    monitor.with_write_notify_all(|available| *available = 1);
+    done_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("remaining waiter should finish during cleanup");
+    first_waiter.join().expect("first waiter should not panic");
+    second_waiter
+        .join()
+        .expect("second waiter should not panic");
+}
+
+#[test]
 fn test_std_monitor_write_notify_all_wakes_all_waiters() {
     let monitor = Arc::new(StdMonitor::new(false));
     let (first_checked_tx, first_checked_rx) = mpsc::channel();

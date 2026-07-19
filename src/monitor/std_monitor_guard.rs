@@ -48,7 +48,7 @@ use super::{
 ///
 /// * `T` - The state protected by the monitor.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```rust
 /// use qubit_lock::StdMonitor;
@@ -61,6 +61,19 @@ use super::{
 ///
 /// assert_eq!(monitor.with_read(|items| items.len()), 1);
 /// ```
+///
+/// Ignoring a monitor guard is rejected when unused must-use values are
+/// denied:
+///
+/// ```compile_fail
+/// #![deny(unused_must_use)]
+///
+/// use qubit_lock::StdMonitor;
+///
+/// let monitor = StdMonitor::new(0);
+/// monitor.lock();
+/// ```
+#[must_use = "dropping the guard immediately releases the monitor lock"]
 pub struct StdMonitorGuard<'a, T> {
     /// StdMonitor that owns the state, waiter registry, and Timer.
     monitor: &'a StdMonitor<T>,
@@ -71,7 +84,7 @@ pub struct StdMonitorGuard<'a, T> {
 impl<'a, T> StdMonitorGuard<'a, T> {
     /// Creates a guard from its owning monitor and standard mutex guard.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `monitor` - StdMonitor whose mutex produced `inner`.
     /// * `inner` - Standard mutex guard protecting the monitor state.
@@ -108,7 +121,7 @@ impl<'a, T> StdMonitorGuard<'a, T> {
     ///
     /// This method returns after this guard has reacquired the monitor lock.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use std::{
@@ -172,7 +185,7 @@ impl<'a, T> StdMonitorGuard<'a, T> {
     /// If the mutex is poisoned while waiting, the poisoned state is recovered
     /// and returned in the new guard.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `timeout` - Maximum duration to wait before returning
     ///   [`WaitTimeoutStatus::TimedOut`].
@@ -185,7 +198,7 @@ impl<'a, T> StdMonitorGuard<'a, T> {
     ///
     /// Returns Timer registration errors without releasing this guard.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use std::time::Duration;
