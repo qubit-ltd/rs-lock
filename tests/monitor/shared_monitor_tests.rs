@@ -8,7 +8,7 @@
 //! Tests for [`SharedMonitor`](qubit_lock::SharedMonitor).
 
 use qubit_lock::{
-    ArcParkingLotMonitor,
+    ArcStdMonitor,
     SharedMonitor,
 };
 
@@ -22,7 +22,7 @@ where
 
 #[test]
 /// Verifies the parking-lot handle satisfies [`SharedMonitor`].
-fn test_shared_monitor_trait_accepts_parking_lot_monitor_handle() {
-    let monitor = clone_through_trait(ArcParkingLotMonitor::new(false));
+fn test_shared_monitor_trait_accepts_std_monitor_handle() {
+    let monitor = clone_through_trait(ArcStdMonitor::new(false));
     assert!(!monitor.with_read(|ready| *ready));
 }

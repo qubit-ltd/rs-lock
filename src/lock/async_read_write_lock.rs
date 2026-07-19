@@ -41,7 +41,6 @@ pub trait AsyncReadWriteLock: Send + Sync {
     /// # Returns
     ///
     /// A future resolving to a read guard.
-    #[must_use = "futures do nothing unless awaited or polled"]
     fn read(&self) -> impl Future<Output = Self::ReadGuard<'_>> + Send;
 
     /// Asynchronously acquires an exclusive write guard.
@@ -49,7 +48,6 @@ pub trait AsyncReadWriteLock: Send + Sync {
     /// # Returns
     ///
     /// A future resolving to a write guard.
-    #[must_use = "futures do nothing unless awaited or polled"]
     fn write(&self) -> impl Future<Output = Self::WriteGuard<'_>> + Send;
 
     /// Attempts to acquire a shared read guard without waiting.

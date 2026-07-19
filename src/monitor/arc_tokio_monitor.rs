@@ -35,7 +35,7 @@ pub struct ArcTokioMonitor<T> {
 impl<T> ArcTokioMonitor<T> {
     /// Creates an Arc-wrapped Tokio monitor.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `state` - Initial protected state.
     ///
@@ -67,7 +67,7 @@ impl<T> ArcTokioMonitor<T> {
 
     /// Creates a shared handle from an existing Arc-wrapped monitor.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `inner` - Existing shared monitor allocation to wrap.
     ///

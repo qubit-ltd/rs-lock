@@ -35,8 +35,15 @@ generic lock capabilities plus monitor-style coordination.
 qubit-lock = "0.11"
 ```
 
-The default feature set contains the synchronous locks and monitors only.
-Enable asynchronous support explicitly when needed:
+The default feature set enables `monitor` and `parking-lot`, preserving the
+complete synchronous API. Lock-only users can avoid both optional dependencies:
+
+```toml
+[dependencies]
+qubit-lock = { version = "0.11", default-features = false }
+```
+
+Enable asynchronous locks and Tokio monitors explicitly when needed:
 
 ```toml
 [dependencies]
@@ -211,54 +218,42 @@ fn main() {
 - `tests/monitor`: monitor behavior tests.
 - `tests/docs`: README and doctest consistency tests.
 
-## Quality Checks
-
-From a repository checkout:
-
-```bash
-./align-ci.sh
-./ci-check.sh
-./coverage.sh json
-```
-
-## License
-
-Copyright (c) 2025 - 2026. Haixing Hu.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-See [LICENSE](LICENSE) for the full license text.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-### Development Guidelines
-
-- Follow Rust API Guidelines
-- Keep comprehensive test coverage
-- Document and provide examples for all public APIs
-- Ensure all tests pass before submitting a PR
-
-## Author
-
-**Haixing Hu** - *Qubit Co. Ltd.*
-
 ## Related Projects
 
 More Qubit Rust libraries are published under the
 [qubit-ltd](https://github.com/qubit-ltd) GitHub organization.
 
----
+## Testing
+
+```bash
+# Run tests with the default feature set
+cargo test
+
+# Run tests with all declared features
+cargo test --all-features
+
+# Project CI checks
+./ci-check.sh
+
+# Check code coverage
+./coverage.sh
+```
+
+## License
+
+Copyright (c) 2025 - 2026. Haixing Hu. All rights reserved.
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the
+full license text.
+
+## Contributing
+
+Contributions are welcome. Please follow the Rust API guidelines, keep public
+API documentation and tests current, and run `./align-ci.sh` to format code and
+`./ci-check.sh` to satisfy CI requirements before submitting a pull request.
+
+## Author
+
+**Haixing Hu** - *Qubit Co. Ltd.*
 
 Repository: [https://github.com/qubit-ltd/rs-lock](https://github.com/qubit-ltd/rs-lock)

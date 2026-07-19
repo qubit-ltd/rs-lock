@@ -32,7 +32,7 @@ use crate::monitor::{
 pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// Blocks until the predicate becomes true or the timeout expires.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `timeout` - Maximum relative duration to wait.
     /// * `predicate` - Predicate that returns `true` when the state is ready.
@@ -64,7 +64,7 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
 
     /// Blocks while the predicate remains true or until the timeout expires.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `timeout` - Maximum relative duration to wait.
     /// * `predicate` - Predicate that returns `true` while waiting should

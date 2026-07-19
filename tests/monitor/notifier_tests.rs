@@ -9,7 +9,7 @@
 
 use qubit_lock::{
     Notifier,
-    ParkingLotMonitor,
+    StdMonitor,
 };
 
 /// Exercises both notification methods through a generic capability bound.
@@ -20,6 +20,6 @@ fn notify_through_trait<N: Notifier>(notifier: &N) {
 
 #[test]
 /// Verifies that a concrete blocking monitor satisfies [`Notifier`].
-fn test_notifier_trait_accepts_parking_lot_monitor() {
-    notify_through_trait(&ParkingLotMonitor::new(()));
+fn test_notifier_trait_accepts_std_monitor() {
+    notify_through_trait(&StdMonitor::new(()));
 }

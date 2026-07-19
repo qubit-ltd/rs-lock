@@ -7,12 +7,12 @@
 // =============================================================================
 //! Tests for the synchronous write-mode lock adapter.
 
-use parking_lot::RwLock;
 use qubit_lock::{
     Lock,
     ReadWriteLock,
     TryLockError,
 };
+use std::sync::RwLock;
 
 /// Verifies the write adapter provides exclusive acquisition.
 #[test]

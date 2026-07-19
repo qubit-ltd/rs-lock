@@ -18,6 +18,7 @@ use std::{
     },
 };
 
+#[cfg(feature = "parking-lot")]
 use parking_lot::Mutex as ParkingLotMutex;
 use qubit_lock::{
     Lock,
@@ -47,6 +48,7 @@ fn test_lock_std_mutex_releases_on_guard_drop() {
 }
 
 #[test]
+#[cfg(feature = "parking-lot")]
 fn test_lock_parking_lot_mutex_releases_during_unwind() {
     let lock = ParkingLotMutex::new(());
 

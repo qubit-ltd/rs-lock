@@ -36,7 +36,7 @@ pub trait AsyncConditionWaiter {
     /// trait-level laziness and cancellation contract applies to the returned
     /// future.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `predicate` - Predicate that returns `true` when the state is ready.
     /// * `action` - Action to run after the predicate becomes true.
@@ -64,7 +64,7 @@ pub trait AsyncConditionWaiter {
     /// trait-level laziness and cancellation contract applies to the returned
     /// future.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `predicate` - Predicate that returns `true` while waiting should
     ///   continue.

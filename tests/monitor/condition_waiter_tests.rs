@@ -9,7 +9,7 @@
 
 use qubit_lock::{
     ConditionWaiter,
-    ParkingLotMonitor,
+    StdMonitor,
 };
 
 /// Runs an immediately ready condition wait through a generic bound.
@@ -22,6 +22,6 @@ where
 
 #[test]
 /// Verifies that a concrete blocking monitor satisfies [`ConditionWaiter`].
-fn test_condition_waiter_trait_accepts_parking_lot_monitor() {
-    assert_eq!(wait_through_trait(&ParkingLotMonitor::new(true)), 7);
+fn test_condition_waiter_trait_accepts_std_monitor() {
+    assert_eq!(wait_through_trait(&StdMonitor::new(true)), 7);
 }

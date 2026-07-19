@@ -41,7 +41,7 @@ use super::{
 ///
 /// * `T` - The state protected by this monitor.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```rust
 /// use std::thread;
@@ -76,7 +76,7 @@ pub struct ArcStdMonitor<T> {
 impl<T> ArcStdMonitor<T> {
     /// Creates an Arc-wrapped monitor protecting the supplied state value.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `state` - Initial state protected by the monitor.
     ///
@@ -108,7 +108,7 @@ impl<T> ArcStdMonitor<T> {
 
     /// Creates a shared handle from an existing Arc-wrapped monitor.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `inner` - Existing shared monitor allocation to wrap.
     ///
@@ -222,7 +222,7 @@ impl<T> Deref for ArcStdMonitor<T> {
 impl<T> From<T> for ArcStdMonitor<T> {
     /// Creates an Arc-wrapped standard monitor from an initial state value.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `value` - Initial state protected by the monitor.
     ///

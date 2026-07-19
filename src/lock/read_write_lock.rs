@@ -14,6 +14,7 @@ use std::sync::{
     RwLockWriteGuard,
 };
 
+#[cfg(feature = "parking-lot")]
 use parking_lot::{
     RwLock as ParkingLotRwLock,
     RwLockReadGuard as ParkingLotRwLockReadGuard,
@@ -243,6 +244,7 @@ where
     }
 }
 
+#[cfg(feature = "parking-lot")]
 impl<T> ReadWriteLock for ParkingLotRwLock<T>
 where
     T: Send + Sync + ?Sized,

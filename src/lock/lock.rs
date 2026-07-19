@@ -13,6 +13,7 @@ use std::sync::{
     MutexGuard,
 };
 
+#[cfg(feature = "parking-lot")]
 use parking_lot::{
     Mutex as ParkingLotMutex,
     MutexGuard as ParkingLotMutexGuard,
@@ -135,6 +136,7 @@ where
     }
 }
 
+#[cfg(feature = "parking-lot")]
 impl<T> Lock for ParkingLotMutex<T>
 where
     T: Send + ?Sized,

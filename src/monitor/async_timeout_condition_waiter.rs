@@ -44,7 +44,7 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     /// The trait-level timeout, laziness, and cancellation contract applies to
     /// the returned future.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `timeout` - Relative condition-wait budget.
     /// * `predicate` - Predicate that returns `true` when the state is ready.
@@ -85,7 +85,7 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     /// The trait-level timeout, laziness, and cancellation contract applies to
     /// the returned future.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `timeout` - Relative condition-wait budget.
     /// * `predicate` - Predicate that returns `true` while waiting should

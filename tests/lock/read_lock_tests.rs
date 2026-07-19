@@ -7,11 +7,11 @@
 // =============================================================================
 //! Tests for the synchronous read-mode lock adapter.
 
-use parking_lot::RwLock;
 use qubit_lock::{
     Lock,
     ReadWriteLock,
 };
+use std::sync::RwLock;
 
 /// Verifies two read adapters may hold shared guards concurrently.
 #[test]

@@ -20,11 +20,11 @@ use std::{
     time::Duration,
 };
 
-use std::sync::{
-    Mutex,
-    RwLock,
-};
+use std::sync::Mutex;
+#[cfg(feature = "parking-lot")]
+use std::sync::RwLock;
 
+#[cfg(feature = "parking-lot")]
 use parking_lot::RwLock as ParkingLotRwLock;
 use qubit_lock::{
     DataLock,
@@ -513,7 +513,7 @@ mod data_lock_trait_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "parking-lot"))]
 mod rwlock_trait_tests {
     use super::*;
 

@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use qubit_clock::TimeError;
 use qubit_lock::{
-    ParkingLotMonitor,
+    StdMonitor,
     TimeoutConditionWaiter,
     WaitTimeoutResult,
 };
@@ -28,9 +28,9 @@ where
 
 #[test]
 /// Verifies a concrete monitor satisfies [`TimeoutConditionWaiter`].
-fn test_timeout_condition_waiter_trait_accepts_parking_lot_monitor() {
+fn test_timeout_condition_waiter_trait_accepts_std_monitor() {
     assert_eq!(
-        wait_through_trait(&ParkingLotMonitor::new(false)),
+        wait_through_trait(&StdMonitor::new(false)),
         Ok(WaitTimeoutResult::TimedOut),
     );
 }

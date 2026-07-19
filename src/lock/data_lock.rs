@@ -17,6 +17,7 @@ use std::sync::{
     RwLock,
 };
 
+#[cfg(feature = "parking-lot")]
 use parking_lot::{
     Mutex as ParkingLotMutex,
     RwLock as ParkingLotRwLock,
@@ -97,7 +98,7 @@ pub trait DataLock<T: ?Sized>: Send + Sync {
     /// - **RwLock-based locks**: Allows concurrent readers, better for
     ///   read-heavy workloads
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure that receives an immutable reference (`&T`) to the
     ///   protected data
@@ -112,11 +113,11 @@ pub trait DataLock<T: ?Sized>: Send + Sync {
     /// when the lock is poisoned. A panic from `f` is propagated after the
     /// lock guard is dropped.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::DataLock;
-    /// use parking_lot::RwLock;
+    /// use std::sync::RwLock;
     ///
     /// let lock = RwLock::new(vec![1, 2, 3]);
     ///
@@ -157,7 +158,7 @@ pub trait DataLock<T: ?Sized>: Send + Sync {
     /// - **All lock types**: Exclusive access, blocks all other operations
     /// - **RwLock advantage**: Only blocks during actual writes, not reads
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure that receives a mutable reference (`&mut T`) to the
     ///   protected data
@@ -172,11 +173,11 @@ pub trait DataLock<T: ?Sized>: Send + Sync {
     /// when the lock is poisoned. A panic from `f` is propagated after the
     /// lock guard is dropped.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::DataLock;
-    /// use parking_lot::RwLock;
+    /// use std::sync::RwLock;
     ///
     /// let lock = RwLock::new(vec![1, 2, 3]);
     ///
@@ -200,7 +201,7 @@ pub trait DataLock<T: ?Sized>: Send + Sync {
     /// cannot be acquired, it returns a detailed error. Otherwise, it executes
     /// the closure and returns `Ok` containing the result.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure that receives an immutable reference (`&T`) to the
     ///   protected data if the lock is successfully acquired
@@ -217,11 +218,11 @@ pub trait DataLock<T: ?Sized>: Send + Sync {
     /// immediately. Returns [`TryLockError::Poisoned`] for standard-library
     /// locks that were poisoned by a panic.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::DataLock;
-    /// use parking_lot::RwLock;
+    /// use std::sync::RwLock;
     ///
     /// let lock = RwLock::new(42);
     /// if let Ok(value) = lock.try_with_read(|data| *data) {
@@ -240,7 +241,7 @@ pub trait DataLock<T: ?Sized>: Send + Sync {
     /// cannot be acquired, it returns a detailed error. Otherwise, it executes
     /// the closure and returns `Ok` containing the result.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure that receives a mutable reference (`&mut T`) to the
     ///   protected data if the lock is successfully acquired
@@ -257,11 +258,11 @@ pub trait DataLock<T: ?Sized>: Send + Sync {
     /// immediately. Returns [`TryLockError::Poisoned`] for standard-library
     /// locks that were poisoned by a panic.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::DataLock;
-    /// use parking_lot::Mutex;
+    /// use std::sync::Mutex;
     ///
     /// let lock = Mutex::new(42);
     /// if let Ok(result) = lock.try_with_write(|data| {
@@ -372,7 +373,7 @@ where
 impl<T: ?Sized + Send> DataLock<T> for Mutex<T> {
     /// Acquires the mutex and executes a read-only closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving immutable access to the protected value.
     ///
@@ -394,7 +395,7 @@ impl<T: ?Sized + Send> DataLock<T> for Mutex<T> {
 
     /// Acquires the mutex and executes a mutable closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving mutable access to the protected value.
     ///
@@ -416,7 +417,7 @@ impl<T: ?Sized + Send> DataLock<T> for Mutex<T> {
 
     /// Attempts to acquire the mutex without blocking for a read-only closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving immutable access when the mutex is acquired.
     ///
@@ -446,7 +447,7 @@ impl<T: ?Sized + Send> DataLock<T> for Mutex<T> {
 
     /// Attempts to acquire the mutex without blocking for a mutable closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving mutable access when the mutex is acquired.
     ///
@@ -488,7 +489,7 @@ impl<T: ?Sized + Send> DataLock<T> for Mutex<T> {
 impl<T: ?Sized + Send + Sync> DataLock<T> for RwLock<T> {
     /// Acquires a shared read lock and executes a closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving immutable access to the protected value.
     ///
@@ -510,7 +511,7 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for RwLock<T> {
 
     /// Acquires an exclusive write lock and executes a closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving mutable access to the protected value.
     ///
@@ -532,7 +533,7 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for RwLock<T> {
 
     /// Attempts to acquire a shared read lock without blocking.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving immutable access when a read lock is acquired.
     ///
@@ -562,7 +563,7 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for RwLock<T> {
 
     /// Attempts to acquire an exclusive write lock without blocking.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving mutable access when a write lock is acquired.
     ///
@@ -609,10 +610,11 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for RwLock<T> {
 /// - Better handling of contended locks
 /// - Reduced memory overhead
 /// - No risk of lock poisoning (panics don't poison the lock)
+#[cfg(feature = "parking-lot")]
 impl<T: ?Sized + Send> DataLock<T> for ParkingLotMutex<T> {
     /// Acquires the parking_lot mutex and executes a read-only closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving immutable access to the protected value.
     ///
@@ -630,7 +632,7 @@ impl<T: ?Sized + Send> DataLock<T> for ParkingLotMutex<T> {
 
     /// Acquires the parking_lot mutex and executes a mutable closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving mutable access to the protected value.
     ///
@@ -648,7 +650,7 @@ impl<T: ?Sized + Send> DataLock<T> for ParkingLotMutex<T> {
 
     /// Attempts to acquire the parking_lot mutex without blocking for reading.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving immutable access when the mutex is acquired.
     ///
@@ -672,7 +674,7 @@ impl<T: ?Sized + Send> DataLock<T> for ParkingLotMutex<T> {
 
     /// Attempts to acquire the parking_lot mutex without blocking for writing.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving mutable access when the mutex is acquired.
     ///
@@ -705,10 +707,11 @@ impl<T: ?Sized + Send> DataLock<T> for ParkingLotMutex<T> {
 /// # Type Parameters
 ///
 /// * `T` - The type of data protected by the lock
+#[cfg(feature = "parking-lot")]
 impl<T: ?Sized + Send + Sync> DataLock<T> for ParkingLotRwLock<T> {
     /// Acquires a shared read lock and executes a closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving immutable access to the protected value.
     ///
@@ -726,7 +729,7 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for ParkingLotRwLock<T> {
 
     /// Acquires an exclusive write lock and executes a closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving mutable access to the protected value.
     ///
@@ -744,7 +747,7 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for ParkingLotRwLock<T> {
 
     /// Attempts to acquire a shared read lock without blocking.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving immutable access when a read lock is acquired.
     ///
@@ -768,7 +771,7 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for ParkingLotRwLock<T> {
 
     /// Attempts to acquire an exclusive write lock without blocking.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving mutable access when a write lock is acquired.
     ///
