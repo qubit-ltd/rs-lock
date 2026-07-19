@@ -11,18 +11,19 @@
 //! including tests for traits and their implementations.
 
 // Trait tests
-#[cfg(feature = "async")]
+#[cfg(feature = "async-lock")]
 mod async_data_lock_tests;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-lock")]
 mod async_lock_tests;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-lock")]
 mod async_read_lock_tests;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-lock")]
 mod async_read_write_lock_tests;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-lock")]
 mod async_write_lock_tests;
 mod data_lock_tests;
 mod lock_tests;
+mod mod_tests;
 mod read_lock_tests;
 mod read_write_lock_tests;
 mod write_lock_tests;

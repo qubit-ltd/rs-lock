@@ -36,15 +36,37 @@
       ]
     },
     {
-      "name": "async-monitor",
+      "name": "async-locks",
       "defaultFeatures": false,
       "features": [
-        "async"
+        "async-lock"
       ],
       "commands": [
         "test",
         "doc",
         "clippy"
+      ]
+    },
+    {
+      "name": "async-monitor",
+      "defaultFeatures": false,
+      "features": [
+        "async-monitor"
+      ],
+      "commands": [
+        "test",
+        "doc",
+        "clippy"
+      ]
+    },
+    {
+      "name": "async-compatibility",
+      "defaultFeatures": false,
+      "features": [
+        "async"
+      ],
+      "commands": [
+        "check"
       ]
     },
     {

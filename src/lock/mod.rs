@@ -16,15 +16,15 @@
 // intentional module boundary.
 #![allow(clippy::module_inception)]
 
-#[cfg(feature = "async")]
+#[cfg(feature = "async-lock")]
 mod async_data_lock;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-lock")]
 mod async_lock;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-lock")]
 mod async_read_lock;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-lock")]
 mod async_read_write_lock;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-lock")]
 mod async_write_lock;
 mod data_lock;
 mod lock;
@@ -33,15 +33,15 @@ mod read_write_lock;
 mod try_lock_error;
 mod write_lock;
 
-#[cfg(feature = "async")]
+#[cfg(feature = "async-lock")]
 pub use async_data_lock::AsyncDataLock;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-lock")]
 pub use async_lock::AsyncLock;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-lock")]
 pub use async_read_lock::AsyncReadLock;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-lock")]
 pub use async_read_write_lock::AsyncReadWriteLock;
-#[cfg(feature = "async")]
+#[cfg(feature = "async-lock")]
 pub use async_write_lock::AsyncWriteLock;
 pub use data_lock::DataLock;
 pub use lock::Lock;
