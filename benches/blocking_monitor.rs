@@ -147,6 +147,67 @@ fn prepare_condvar_waiters(waiter_count: usize) -> CondvarWaiters {
     (condition, waiters, done_rx)
 }
 
+/// Prepares one ParkingLotMonitor waiter performing a nonzero timed wait.
+///
+/// # Returns
+///
+/// The monitor, waiter handle, and completion receiver.
+fn prepare_timed_monitor_waiter() -> MonitorWaiters {
+    let monitor = Arc::new(ParkingLotMonitor::new(false));
+    let (registered_tx, registered_rx) = mpsc::channel();
+    let (done_tx, done_rx) = mpsc::channel();
+    let waiter_monitor = Arc::clone(&monitor);
+    let waiter = thread::spawn(move || {
+        let mut guard = waiter_monitor.lock();
+        registered_tx
+            .send(())
+            .expect("benchmark should observe registration");
+        let status = guard
+            .wait_for(Duration::from_secs(1))
+            .expect("standard Timer should register");
+        let _ = black_box(status);
+        done_tx
+            .send(())
+            .expect("benchmark should observe waiter completion");
+    });
+
+    registered_rx
+        .recv()
+        .expect("benchmark timed waiter should register");
+    drop(monitor.lock());
+    (monitor, vec![waiter], done_rx)
+}
+
+/// Prepares one parking_lot Condvar waiter performing a nonzero timed wait.
+///
+/// # Returns
+///
+/// The shared condition state, waiter handle, and completion receiver.
+fn prepare_timed_condvar_waiter() -> CondvarWaiters {
+    let condition = Arc::new((Mutex::new(false), Condvar::new()));
+    let (registered_tx, registered_rx) = mpsc::channel();
+    let (done_tx, done_rx) = mpsc::channel();
+    let waiter_condition = Arc::clone(&condition);
+    let waiter = thread::spawn(move || {
+        let (state, changed) = &*waiter_condition;
+        let mut guard = state.lock();
+        registered_tx
+            .send(())
+            .expect("benchmark should observe registration");
+        let status = changed.wait_for(&mut guard, Duration::from_secs(1));
+        black_box(status.timed_out());
+        done_tx
+            .send(())
+            .expect("benchmark should observe waiter completion");
+    });
+
+    registered_rx
+        .recv()
+        .expect("benchmark timed waiter should register");
+    drop(condition.0.lock());
+    (condition, vec![waiter], done_rx)
+}
+
 /// Waits for every prepared thread to complete and joins it.
 ///
 /// # Parameters
@@ -250,5 +311,40 @@ fn benchmark_notify_all(criterion: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, benchmark_zero_timeout, benchmark_notify_all);
+/// Measures one-waiter notify-one completion for blocking monitor users.
+///
+/// # Parameters
+///
+/// * `criterion` - Criterion runner receiving the benchmark cases.
+fn benchmark_notify_one(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("blocking_notify_one");
+    group.bench_function("parking_lot_monitor", |bencher| {
+        bencher.iter_batched(
+            prepare_timed_monitor_waiter,
+            |(monitor, waiters, done_rx)| {
+                monitor.notify_one();
+                finish_waiters(1, done_rx, waiters);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+    group.bench_function("parking_lot_condvar", |bencher| {
+        bencher.iter_batched(
+            prepare_timed_condvar_waiter,
+            |(condition, waiters, done_rx)| {
+                condition.1.notify_one();
+                finish_waiters(1, done_rx, waiters);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+    group.finish();
+}
+
+criterion_group!(
+    benches,
+    benchmark_zero_timeout,
+    benchmark_notify_all,
+    benchmark_notify_one
+);
 criterion_main!(benches);
