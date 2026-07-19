@@ -25,6 +25,7 @@ use qubit_clock::{
     MonotonicClock,
     TimeError,
     Timer,
+    TimerFuture,
     TokioMonotonicClock,
 };
 use tokio::sync::Mutex;
@@ -74,7 +75,7 @@ pub struct TokioMonitor<T> {
 impl<T> TokioMonitor<T> {
     /// Creates an asynchronous monitor protecting the supplied state.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `state` - Initial protected state.
     ///
@@ -110,13 +111,14 @@ impl<T> TokioMonitor<T> {
     ///
     /// The injected Timer and its monotonic clock domain.
     #[must_use]
+    #[inline(always)]
     pub fn timer(&self) -> &dyn Timer {
         self.timer.as_ref()
     }
 
     /// Acquires the monitor and reads the protected state.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure that receives an immutable reference to the state.
     ///
@@ -136,7 +138,7 @@ impl<T> TokioMonitor<T> {
     ///
     /// This does not notify waiters automatically.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure that receives a mutable reference to the state.
     ///
@@ -157,7 +159,7 @@ impl<T> TokioMonitor<T> {
     /// The state lock is released before notification is sent. If `f` panics,
     /// the panic propagates and no notification is sent.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure that receives a mutable reference to the state.
     ///
@@ -179,7 +181,7 @@ impl<T> TokioMonitor<T> {
     /// The state lock is released before notification is sent. If `f` panics,
     /// the panic propagates and no notification is sent.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure that receives a mutable reference to the state.
     ///
@@ -242,6 +244,22 @@ impl<T> TokioMonitor<T> {
             .insert(waiter_key, Arc::clone(&waiter));
         assert!(previous.is_none(), "Tokio monitor waiter pointer reused");
         TokioConditionWaiterRegistration::new(&self.waiters, waiter)
+    }
+
+    /// Polls a fixed Timer registration once after state reacquisition.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Timer registration shared across condition wakeups.
+    ///
+    /// # Returns
+    ///
+    /// `true` when the deadline has completed.
+    async fn deadline_reached(deadline: &mut TimerFuture) -> bool {
+        poll_fn(|context| {
+            Poll::Ready(deadline.as_mut().poll(context).is_ready())
+        })
+        .await
     }
 }
 
@@ -411,39 +429,17 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
             loop {
                 let registration = self.register_waiter();
                 drop(guard);
-                let timed_out = {
-                    let notified = registration.waiter().signal().notified();
-                    tokio::pin!(notified);
-                    poll_fn(|context| {
-                        if deadline.as_mut().poll(context).is_ready() {
-                            Poll::Ready(true)
-                        } else if notified.as_mut().poll(context).is_ready() {
-                            Poll::Ready(false)
-                        } else {
-                            Poll::Pending
-                        }
-                    })
-                    .await
-                };
+                let status = registration
+                    .wait_until_signalled_or_deadline(&mut deadline)
+                    .await;
                 drop(registration);
-                if timed_out {
-                    guard = self.state.lock().await;
-                    if !predicate(&*guard) {
-                        return Ok(WaitTimeoutResult::Ready(action(
-                            &mut *guard,
-                        )));
-                    }
-                    return Ok(WaitTimeoutResult::TimedOut);
-                }
                 guard = self.state.lock().await;
                 if !predicate(&*guard) {
                     return Ok(WaitTimeoutResult::Ready(action(&mut *guard)));
                 }
-                let deadline_reached = poll_fn(|context| {
-                    Poll::Ready(deadline.as_mut().poll(context).is_ready())
-                })
-                .await;
-                if deadline_reached {
+                if status.is_timed_out()
+                    || Self::deadline_reached(&mut deadline).await
+                {
                     return Ok(WaitTimeoutResult::TimedOut);
                 }
             }

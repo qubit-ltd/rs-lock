@@ -21,11 +21,7 @@ use std::task::{
 
 use qubit_clock::TimerFuture;
 
-/// Mutable notification state protected by the waiter's private lock.
-struct BlockingConditionWaiterState {
-    /// Whether a notification or Timer wake has been latched.
-    signalled: bool,
-}
+use super::blocking_condition_waiter_state::BlockingConditionWaiterState;
 
 /// Private signal shared by monitor notification and a TimerFuture Waker.
 pub(in crate::monitor) struct BlockingConditionWaiter {

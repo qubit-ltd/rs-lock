@@ -8,6 +8,7 @@
 //! Private implementation types shared by monitor implementations.
 
 mod blocking_condition_waiter;
+mod blocking_condition_waiter_state;
 mod blocking_waiter_registration;
 mod blocking_waiter_registry;
 mod default_timer;
