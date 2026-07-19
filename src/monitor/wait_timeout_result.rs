@@ -12,8 +12,8 @@
 /// Result of waiting for a predicate with an overall timeout.
 ///
 /// This type is returned by
-/// [`ParkingLotMonitor::wait_while_for`](super::ParkingLotMonitor::wait_while_for) and
-/// [`ParkingLotMonitor::wait_until_for`](super::ParkingLotMonitor::wait_until_for). It is
+/// [`StdMonitor::wait_while_for`](super::StdMonitor::wait_while_for) and
+/// [`StdMonitor::wait_until_for`](super::StdMonitor::wait_until_for). It is
 /// more explicit than `Option<R>`: a ready predicate produces [`Self::Ready`],
 /// while an expired timeout produces [`Self::TimedOut`].
 ///
@@ -22,14 +22,14 @@
 /// * `R` - The value produced after the protected state satisfies the
 ///   predicate.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```rust
 /// use std::time::Duration;
 ///
-/// use qubit_lock::{ParkingLotMonitor, WaitTimeoutResult};
+/// use qubit_lock::{StdMonitor, WaitTimeoutResult};
 ///
-/// let monitor = ParkingLotMonitor::new(true);
+/// let monitor = StdMonitor::new(true);
 /// let result = monitor.wait_until_for(
 ///     Duration::from_secs(1),
 ///     |ready| *ready,
@@ -48,16 +48,9 @@
 /// ```compile_fail
 /// #![deny(unused_must_use)]
 ///
-/// use std::time::Duration;
+/// use qubit_lock::WaitTimeoutResult;
 ///
-/// use qubit_lock::ParkingLotMonitor;
-///
-/// let monitor = ParkingLotMonitor::new(true);
-/// monitor.wait_until_for(
-///     Duration::ZERO,
-///     |ready| *ready,
-///     |ready| *ready = false,
-/// );
+/// WaitTimeoutResult::<()>::TimedOut;
 /// ```
 #[must_use = "check whether the predicate became ready or the wait timed out"]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,6 +68,7 @@ impl<R> WaitTimeoutResult<R> {
     ///
     /// `true` for [`Self::Ready`], otherwise `false`.
     #[inline(always)]
+    #[must_use]
     pub const fn is_ready(&self) -> bool {
         match self {
             Self::Ready(_) => true,
@@ -88,6 +82,7 @@ impl<R> WaitTimeoutResult<R> {
     ///
     /// `true` for [`Self::TimedOut`], otherwise `false`.
     #[inline(always)]
+    #[must_use]
     pub const fn is_timed_out(&self) -> bool {
         match self {
             Self::Ready(_) => false,
@@ -110,7 +105,7 @@ impl<R> WaitTimeoutResult<R> {
 
     /// Maps a ready value while preserving timeout status.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure applied to the contained value when this result is
     ///   [`Self::Ready`].

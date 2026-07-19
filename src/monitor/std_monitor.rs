@@ -88,7 +88,7 @@ use super::{
 ///
 /// * `T` - The state protected by this monitor.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```rust
 /// use std::thread;
@@ -127,7 +127,7 @@ pub struct StdMonitor<T> {
 impl<T> StdMonitor<T> {
     /// Creates a monitor protecting the supplied state value.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `state` - Initial state protected by the monitor.
     ///
@@ -135,7 +135,7 @@ impl<T> StdMonitor<T> {
     ///
     /// A monitor initialized with the supplied state.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::StdMonitor;
@@ -172,6 +172,7 @@ impl<T> StdMonitor<T> {
     ///
     /// The injected Timer and its monotonic clock domain.
     #[must_use]
+    #[inline(always)]
     pub fn timer(&self) -> &dyn Timer {
         self.timer.as_ref()
     }
@@ -192,7 +193,7 @@ impl<T> StdMonitor<T> {
     ///
     /// A guard that provides read and write access to the protected state.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::StdMonitor;
@@ -223,7 +224,7 @@ impl<T> StdMonitor<T> {
     /// If the mutex is poisoned, this method recovers the inner state and still
     /// executes the closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure that receives an immutable reference to the state.
     ///
@@ -231,7 +232,7 @@ impl<T> StdMonitor<T> {
     ///
     /// The value returned by the closure.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::StdMonitor;
@@ -259,7 +260,7 @@ impl<T> StdMonitor<T> {
     /// If the mutex is poisoned, this method recovers the inner state and still
     /// executes the closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure that receives a mutable reference to the state.
     ///
@@ -267,7 +268,7 @@ impl<T> StdMonitor<T> {
     ///
     /// The value returned by the closure.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::StdMonitor;
@@ -299,7 +300,7 @@ impl<T> StdMonitor<T> {
     /// running the closure. If `f` panics, the panic is propagated and no
     /// notification is sent.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure that receives a mutable reference to the state.
     ///
@@ -307,7 +308,7 @@ impl<T> StdMonitor<T> {
     ///
     /// The value returned by the closure.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::StdMonitor;
@@ -342,7 +343,7 @@ impl<T> StdMonitor<T> {
     /// running the closure. If `f` panics, the panic is propagated and no
     /// notification is sent.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure that receives a mutable reference to the state.
     ///
@@ -350,7 +351,7 @@ impl<T> StdMonitor<T> {
     ///
     /// The value returned by the closure.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::StdMonitor;
@@ -389,7 +390,7 @@ impl<T> StdMonitor<T> {
     /// If the mutex is poisoned before or during the wait, this method recovers
     /// the inner state and continues waiting or executes the closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `waiting` - Predicate that returns `true` while the caller should keep
     ///   waiting.
@@ -400,7 +401,7 @@ impl<T> StdMonitor<T> {
     ///
     /// The value returned by `f`.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use std::{
@@ -452,7 +453,7 @@ impl<T> StdMonitor<T> {
     /// If the mutex is poisoned before or during the wait, this method recovers
     /// the inner state and continues waiting or executes the closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `ready` - Predicate that returns `true` when the state is ready.
     /// * `f` - Closure that receives mutable access to the ready state.
@@ -461,7 +462,7 @@ impl<T> StdMonitor<T> {
     ///
     /// The value returned by `f` after the predicate has become true.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use std::{
@@ -520,7 +521,7 @@ impl<T> StdMonitor<T> {
     /// If the mutex is poisoned before or during the wait, this method recovers
     /// the inner state and continues waiting or executes the closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `timeout` - Maximum total duration to wait.
     /// * `waiting` - Predicate that returns `true` while the caller should
@@ -538,7 +539,7 @@ impl<T> StdMonitor<T> {
     ///
     /// Returns an error when the injected Timer cannot register the deadline.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use std::time::Duration;
@@ -604,7 +605,7 @@ impl<T> StdMonitor<T> {
     /// If the mutex is poisoned before or during the wait, this method recovers
     /// the inner state and continues waiting or executes the closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `timeout` - Maximum total duration to wait.
     /// * `ready` - Predicate that returns `true` when the caller may continue.
@@ -620,7 +621,7 @@ impl<T> StdMonitor<T> {
     ///
     /// Returns an error when the injected Timer cannot register the deadline.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use std::{
@@ -673,7 +674,7 @@ impl<T> StdMonitor<T> {
     /// proceeds safely after rechecking the protected state. Call this after
     /// changing state that may make one waiter able to continue.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use std::thread;
@@ -705,7 +706,7 @@ impl<T> StdMonitor<T> {
     /// must recheck the protected state before continuing. Call this after a
     /// state change that may allow multiple waiters to make progress.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use std::thread;
@@ -781,7 +782,7 @@ impl<T> TimeoutConditionWaiter for StdMonitor<T> {
 impl<T> From<T> for StdMonitor<T> {
     /// Creates a standard monitor from an initial state value.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `value` - Initial state protected by the monitor.
     ///
@@ -801,7 +802,7 @@ impl<T: Default> Default for StdMonitor<T> {
     ///
     /// A monitor protecting the default value for `T`.
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::StdMonitor;
