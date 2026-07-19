@@ -19,11 +19,11 @@ generic lock capabilities plus monitor-style coordination.
 - `DataLock<T>`: closure-based access to data protected by any supported mutex
   or read-write lock.
 - `AsyncLock`, `AsyncReadWriteLock`, and `AsyncDataLock<T>`: equivalent Tokio
-  capabilities behind the optional `async` feature.
+  lock capabilities behind the optional `async-lock` feature.
 - `ParkingLotMonitor`, `ArcParkingLotMonitor`, `ParkingLotMonitorGuard`: parking_lot-based condition coordination.
 - `StdMonitor`, `ArcStdMonitor`, `StdMonitorGuard`: std-based condition coordination.
 - `TokioMonitor`, `ArcTokioMonitor`: async monitor coordination behind the
-  optional `async` feature.
+  optional `async-monitor` feature.
 - Timer injection on every monitor for deterministic integration tests that
   execute the production wait algorithm.
 - Implementations for borrowed and `Arc`-owned locks, without wrapper types.
@@ -43,15 +43,23 @@ complete synchronous API. Lock-only users can avoid both optional dependencies:
 qubit-lock = { version = "0.11", default-features = false }
 ```
 
-Enable asynchronous locks and Tokio monitors explicitly when needed:
+Enable asynchronous locks without Tokio monitor deadlines when needed:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", features = ["async"] }
+qubit-lock = { version = "0.11", features = ["async-lock"] }
 ```
 
-If your application creates a Tokio runtime, enable the appropriate Tokio
-runtime features in your own `Cargo.toml`, such as `rt` or `rt-multi-thread`.
+Enable Tokio monitor coordination, including timed waits, when needed:
+
+```toml
+[dependencies]
+qubit-lock = { version = "0.11", features = ["async-monitor"] }
+```
+
+The legacy `async` compatibility alias enables `async-monitor`. If your
+application creates a Tokio runtime, enable the appropriate Tokio runtime
+features in your own `Cargo.toml`, such as `rt` or `rt-multi-thread`.
 `AsyncLock` and `AsyncReadWriteLock` return `Send` futures. Tokio mutexes
 implement the former when `T: Send`; Tokio read-write locks implement the
 latter when `T: Send + Sync`.

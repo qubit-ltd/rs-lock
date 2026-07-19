@@ -149,17 +149,22 @@ fn test_readme_documents_timer_ioc_testing() {
 }
 
 #[test]
-/// Ensures README files document the default and async feature tiers.
+/// Ensures README files document the default, async-lock, and async-monitor
+/// feature tiers.
 fn test_readme_documents_feature_tiers() {
     assert!(README_EN.contains("default feature set"));
     assert!(README_EN.contains("`monitor` and `parking-lot`"));
     assert!(README_EN.contains("default-features = false"));
-    assert!(README_EN.contains("`async`"));
+    assert!(README_EN.contains("`async-lock`"));
+    assert!(README_EN.contains("`async-monitor`"));
+    assert!(README_EN.contains("`async` compatibility alias"));
     assert!(!README_EN.contains("`mock` feature"));
     assert!(README_ZH.contains("默认特性集"));
     assert!(README_ZH.contains("`monitor` 和 `parking-lot`"));
     assert!(README_ZH.contains("default-features = false"));
-    assert!(README_ZH.contains("`async`"));
+    assert!(README_ZH.contains("`async-lock`"));
+    assert!(README_ZH.contains("`async-monitor`"));
+    assert!(README_ZH.contains("`async` 兼容别名"));
     assert!(!README_ZH.contains("`mock` feature"));
 }
 

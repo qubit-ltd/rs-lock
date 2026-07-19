@@ -16,12 +16,12 @@
 - `ReadWriteLock`：与数据无关的共享/独占锁能力，由
   `std::sync::RwLock<T>` 和 `parking_lot::RwLock<T>` 实现。
 - `DataLock<T>`：以闭包访问受支持 mutex 或读写锁所保护的数据。
-- `AsyncLock`、`AsyncReadWriteLock` 和 `AsyncDataLock<T>`：由可选 `async`
-  特性启用的对应 Tokio 能力。
+- `AsyncLock`、`AsyncReadWriteLock` 和 `AsyncDataLock<T>`：由可选
+  `async-lock` 特性启用的对应 Tokio 锁能力。
 - `ParkingLotMonitor`、`ArcParkingLotMonitor`、`ParkingLotMonitorGuard`：基于 parking_lot 的条件变量协调工具。
 - `StdMonitor`、`ArcStdMonitor`、`StdMonitorGuard`：基于标准库的条件变量协调工具。
-- `TokioMonitor`、`ArcTokioMonitor`：由可选 `async` 特性启用的 Tokio
-  异步 monitor 协调工具。
+- `TokioMonitor`、`ArcTokioMonitor`：由可选 `async-monitor` 特性启用的
+  Tokio 异步 monitor 协调工具。
 - 所有 monitor 都支持注入 Timer，使集成测试直接运行生产等待算法。
 - 直接支持借用和 `Arc` 持有的锁，无需额外包装类型。
 
@@ -40,14 +40,23 @@ trait 的用户可以关闭全部默认特性，从依赖图中移除这两个�
 qubit-lock = { version = "0.11", default-features = false }
 ```
 
-需要异步锁和 Tokio monitor 时显式启用：
+只需要异步锁、但不需要 Tokio monitor deadline 时显式启用：
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", features = ["async"] }
+qubit-lock = { version = "0.11", features = ["async-lock"] }
 ```
 
-如果应用需要创建 Tokio runtime，请在应用自己的 `Cargo.toml` 中启用合适的 Tokio runtime 特性，例如 `rt` 或 `rt-multi-thread`。
+需要 Tokio monitor 协调和计时等待时显式启用：
+
+```toml
+[dependencies]
+qubit-lock = { version = "0.11", features = ["async-monitor"] }
+```
+
+历史 `async` 兼容别名会启用 `async-monitor`。如果应用需要创建 Tokio runtime，
+请在应用自己的 `Cargo.toml` 中启用合适的 Tokio runtime 特性，例如 `rt` 或
+`rt-multi-thread`。
 `AsyncLock` 和 `AsyncReadWriteLock` 返回 `Send` future。Tokio mutex 在
 `T: Send` 时实现前者；Tokio 读写锁在 `T: Send + Sync` 时实现后者。
 
