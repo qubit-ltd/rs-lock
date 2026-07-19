@@ -5,7 +5,7 @@
 [![Crates.io](https://img.shields.io/crates/v/qubit-lock.svg?color=blue)](https://crates.io/crates/qubit-lock)
 [![Rust](https://img.shields.io/badge/rust-1.94+-blue.svg?logo=rust)](https://www.rust-lang.org)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![English Doc](https://img.shields.io/badge/docs-English-blue.svg)](README.md)
+[![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
 
 面向 Qubit Rust 库的锁工具 crate。它提供通用锁能力与基于条件变量的 monitor 协调能力。
 
@@ -32,7 +32,15 @@
 qubit-lock = "0.11"
 ```
 
-默认特性集只包含同步锁与同步 monitor。需要异步能力时显式启用：
+默认特性集启用 `monitor` 和 `parking-lot`，保留完整同步 API。只需要基础锁
+trait 的用户可以关闭全部默认特性，从依赖图中移除这两个可选依赖：
+
+```toml
+[dependencies]
+qubit-lock = { version = "0.11", default-features = false }
+```
+
+需要异步锁和 Tokio monitor 时显式启用：
 
 ```toml
 [dependencies]
@@ -184,51 +192,40 @@ fn main() {
 - `tests/monitor`：monitor 相关行为测试。
 - `tests/docs`：README 与文档文本一致性测试。
 
-## 质量检查
-
-在仓库 checkout 中执行：
-
-```bash
-./align-ci.sh
-./ci-check.sh
-./coverage.sh json
-```
-
-## 许可证
-
-Copyright (c) 2025 - 2026. Haixing Hu.
-
-根据 Apache 许可证 2.0 版（"许可证"）授权；
-除非遵守许可证，否则您不得使用此文件。
-您可以在以下位置获取许可证副本：
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-除非适用法律要求或书面同意，否则根据许可证分发的软件
-按"原样"分发，不附带任何明示或暗示的担保或条件。
-有关许可证下的特定语言管理权限和限制，请参阅许可证。
-
-完整的许可证文本请参阅 [LICENSE](LICENSE)。
-
-## 贡献
-
-欢迎贡献！请随时提交 Pull Request。
-
-### 开发指南
-
-- 遵循 Rust API 指南
-- 保持全面的测试覆盖
-- 为所有公共 API 编写文档和示例
-- 提交 PR 前确保所有测试通过
-
-## 作者
-
-**胡海星** - *Qubit Co. Ltd.*
-
 ## 相关项目
 
 Qubit 旗下的更多 Rust 库发布在 GitHub 组织 [qubit-ltd](https://github.com/qubit-ltd)。
 
----
+## 测试
+
+```bash
+# 使用默认 feature 集运行测试
+cargo test
+
+# 使用项目声明的全部 feature 运行测试
+cargo test --all-features
+
+# 运行项目 CI 检查
+./ci-check.sh
+
+# 检查代码覆盖率
+./coverage.sh
+```
+
+## 许可证
+
+Copyright (c) 2025 - 2026. Haixing Hu. All rights reserved.
+
+本项目基于 Apache License 2.0 授权。完整许可证文本请参阅
+[LICENSE](LICENSE)。
+
+## 贡献
+
+欢迎贡献。请遵循 Rust API 指南，及时更新公共 API 文档与测试，并在提交
+Pull Request 前运行 `./align-ci.sh`格式化代码，运行`./ci-check.sh`对齐CI要求。
+
+## 作者
+
+**Haixing Hu** - *Qubit Co. Ltd.*
 
 仓库地址：[https://github.com/qubit-ltd/rs-lock](https://github.com/qubit-ltd/rs-lock)

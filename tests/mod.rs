@@ -11,4 +11,5 @@
 
 mod docs;
 mod lock;
+#[cfg(feature = "monitor")]
 mod monitor;

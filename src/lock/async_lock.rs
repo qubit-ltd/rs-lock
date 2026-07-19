@@ -40,7 +40,6 @@ pub trait AsyncLock: Send + Sync {
     /// # Returns
     ///
     /// A future resolving to a guard that releases the lock when dropped.
-    #[must_use = "futures do nothing unless awaited or polled"]
     fn lock(&self) -> impl Future<Output = Self::Guard<'_>> + Send;
 
     /// Attempts to acquire the lock without waiting.

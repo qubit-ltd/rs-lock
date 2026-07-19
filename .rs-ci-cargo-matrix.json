@@ -2,7 +2,7 @@
   "version": 1,
   "checks": [
     {
-      "name": "sync-only",
+      "name": "base-locks",
       "defaultFeatures": false,
       "features": [],
       "commands": [
@@ -12,8 +12,44 @@
       ]
     },
     {
-      "name": "async-only",
+      "name": "parking-lot-locks",
       "defaultFeatures": false,
+      "features": [
+        "parking-lot"
+      ],
+      "commands": [
+        "test",
+        "doc",
+        "clippy"
+      ]
+    },
+    {
+      "name": "std-monitor",
+      "defaultFeatures": false,
+      "features": [
+        "monitor"
+      ],
+      "commands": [
+        "test",
+        "doc",
+        "clippy"
+      ]
+    },
+    {
+      "name": "async-monitor",
+      "defaultFeatures": false,
+      "features": [
+        "async"
+      ],
+      "commands": [
+        "test",
+        "doc",
+        "clippy"
+      ]
+    },
+    {
+      "name": "all-features",
+      "defaultFeatures": true,
       "features": [
         "async"
       ],

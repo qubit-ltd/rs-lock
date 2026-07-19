@@ -15,14 +15,11 @@ categories = ["concurrency", "asynchronous"]
 include = [
     "/Cargo.toml",
     "/LICENSE",
+    "/CHANGELOG.md",
     "/README.md",
     "/README.zh_CN.md",
-    "/RUST_CODING_STYLE.md",
-    "/RUST_CODING_STYLE.zh_CN.md",
     "/benches/**",
-    "/doc/**/user_guide*.md",
     "/examples/**",
-    "/resources/**",
     "/src/**",
     "/tests/**",
 ]
@@ -35,20 +32,31 @@ name = "qubit_lock"
 doctest = true
 
 [features]
-default = []
-async = ["dep:tokio", "qubit-clock/tokio"]
+default = ["monitor", "parking-lot"]
+async = ["monitor", "dep:tokio", "qubit-clock/tokio"]
+monitor = ["dep:qubit-clock"]
+parking-lot = ["dep:parking_lot"]
 
 [dependencies]
-parking_lot = "0.12"
+parking_lot = { version = "0.12", optional = true }
 tokio = { version = "1.52", default-features = false, features = ["sync", "time"], optional = true }
-qubit-clock = { version = "0.9", path = "../rs-clock" }
+qubit-clock = { version = "0.9", path = "../rs-clock", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.8.2", default-features = false }
 semver = { version = "1.0", default-features = false }
 tokio = { version = "1.52", default-features = false, features = ["macros", "rt-multi-thread", "test-util", "time"] }
 
+[[example]]
+name = "clone_test"
+required-features = ["monitor", "parking-lot"]
+
 [[bench]]
 name = "tokio_monitor_cancellation"
 harness = false
 required-features = ["async"]
+
+[[bench]]
+name = "blocking_monitor"
+harness = false
+required-features = ["monitor", "parking-lot"]

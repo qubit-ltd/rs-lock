@@ -9,6 +9,7 @@
 //!
 //! Covers behavior corresponding to `src/monitor`.
 
+#[cfg(feature = "parking-lot")]
 mod arc_parking_lot_monitor_tests;
 mod arc_std_monitor_tests;
 #[cfg(feature = "async")]
@@ -24,7 +25,9 @@ mod failing_timer_tests;
 mod internal;
 mod monitor_tests;
 mod notifier_tests;
+#[cfg(feature = "parking-lot")]
 mod parking_lot_monitor_guard_tests;
+#[cfg(feature = "parking-lot")]
 mod parking_lot_monitor_tests;
 #[cfg(feature = "async")]
 mod shared_async_monitor_tests;

@@ -13,9 +13,9 @@ use std::{
 };
 
 use qubit_lock::{
-    ArcParkingLotMonitor,
+    ArcStdMonitor,
     Monitor,
-    ParkingLotMonitor,
+    StdMonitor,
     WaitTimeoutResult,
 };
 
@@ -32,12 +32,12 @@ where
 
 #[test]
 /// Verifies a named shared monitor handle satisfies [`Monitor`].
-fn test_monitor_trait_accepts_parking_lot_monitor() {
-    wait_through_trait(&ArcParkingLotMonitor::new(false));
+fn test_monitor_trait_accepts_std_monitor() {
+    wait_through_trait(&ArcStdMonitor::new(false));
 }
 
 #[test]
 /// Verifies blanket Arc delegation satisfies [`Monitor`].
 fn test_monitor_trait_accepts_arc_wrapped_implementation() {
-    wait_through_trait(&Arc::new(ParkingLotMonitor::new(false)));
+    wait_through_trait(&Arc::new(StdMonitor::new(false)));
 }

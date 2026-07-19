@@ -108,7 +108,7 @@ pub trait AsyncDataLock<T: ?Sized>: Send + Sync {
     /// - **RwLock-based async locks**: Allows concurrent readers, better for
     ///   read-heavy async workloads
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure that receives an immutable reference (`&T`) to the
     ///   protected data
@@ -117,7 +117,7 @@ pub trait AsyncDataLock<T: ?Sized>: Send + Sync {
     ///
     /// Returns a future that resolves to the result produced by the closure
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::AsyncDataLock;
@@ -167,7 +167,7 @@ pub trait AsyncDataLock<T: ?Sized>: Send + Sync {
     ///   operations
     /// - **RwLock advantage**: Only blocks during actual writes, not reads
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure that receives a mutable reference (`&mut T`) to the
     ///   protected data
@@ -176,7 +176,7 @@ pub trait AsyncDataLock<T: ?Sized>: Send + Sync {
     ///
     /// Returns a future that resolves to the result produced by the closure
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::AsyncDataLock;
@@ -212,7 +212,7 @@ pub trait AsyncDataLock<T: ?Sized>: Send + Sync {
     /// waiting. Otherwise, it executes the closure and returns `Ok` containing
     /// the result.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure that receives an immutable reference (`&T`) to the
     ///   protected data if the lock is successfully acquired
@@ -228,7 +228,7 @@ pub trait AsyncDataLock<T: ?Sized>: Send + Sync {
     /// acquired immediately. Tokio locks are not poisoned, so this method does
     /// not return [`TryLockError::Poisoned`].
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::AsyncDataLock;
@@ -252,7 +252,7 @@ pub trait AsyncDataLock<T: ?Sized>: Send + Sync {
     /// without waiting. Otherwise, it executes the closure and returns `Ok`
     /// containing the result.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure that receives a mutable reference (`&mut T`) to the
     ///   protected data if the lock is successfully acquired
@@ -268,7 +268,7 @@ pub trait AsyncDataLock<T: ?Sized>: Send + Sync {
     /// acquired immediately. Tokio locks are not poisoned, so this method does
     /// not return [`TryLockError::Poisoned`].
     ///
-    /// # Example
+    /// # Examples
     ///
     /// ```rust
     /// use qubit_lock::AsyncDataLock;
@@ -388,7 +388,7 @@ where
 impl<T: ?Sized + Send> AsyncDataLock<T> for AsyncMutex<T> {
     /// Acquires the mutex and executes a read-only closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving immutable access to the protected value.
     ///
@@ -407,7 +407,7 @@ impl<T: ?Sized + Send> AsyncDataLock<T> for AsyncMutex<T> {
 
     /// Acquires the mutex and executes a mutable closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving mutable access to the protected value.
     ///
@@ -426,7 +426,7 @@ impl<T: ?Sized + Send> AsyncDataLock<T> for AsyncMutex<T> {
 
     /// Attempts to acquire the mutex without waiting for a read-only closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving immutable access when the mutex is acquired.
     ///
@@ -446,7 +446,7 @@ impl<T: ?Sized + Send> AsyncDataLock<T> for AsyncMutex<T> {
 
     /// Attempts to acquire the mutex without waiting for a mutable closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving mutable access when the mutex is acquired.
     ///
@@ -479,7 +479,7 @@ impl<T: ?Sized + Send> AsyncDataLock<T> for AsyncMutex<T> {
 impl<T: ?Sized + Send + Sync> AsyncDataLock<T> for AsyncRwLock<T> {
     /// Acquires a shared read lock and executes a closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving immutable access to the protected value.
     ///
@@ -498,7 +498,7 @@ impl<T: ?Sized + Send + Sync> AsyncDataLock<T> for AsyncRwLock<T> {
 
     /// Acquires an exclusive write lock and executes a closure.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving mutable access to the protected value.
     ///
@@ -517,7 +517,7 @@ impl<T: ?Sized + Send + Sync> AsyncDataLock<T> for AsyncRwLock<T> {
 
     /// Attempts to acquire a shared read lock without waiting.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving immutable access when the read lock is
     ///   acquired.
@@ -538,7 +538,7 @@ impl<T: ?Sized + Send + Sync> AsyncDataLock<T> for AsyncRwLock<T> {
 
     /// Attempts to acquire an exclusive write lock without waiting.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `f` - Closure receiving mutable access when the write lock is
     ///   acquired.

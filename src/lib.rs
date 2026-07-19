@@ -14,8 +14,10 @@
 //! - Data-independent synchronous RAII lock capabilities.
 //! - Closure-based protected-data access capabilities.
 //! - Optional asynchronous Tokio lock capabilities behind the `async` feature.
-//! - Blocking parking_lot and standard-library monitor implementations.
-//! - Tokio monitors behind the optional `async` feature.
+//! - Standard-library monitors behind the optional `monitor` feature.
+//! - parking_lot locks behind `parking-lot`, with parking_lot monitors
+//!   available when `monitor` is also enabled.
+//! - Tokio locks and monitors behind the optional `async` feature.
 //!
 //! Public API items are re-exported from the crate root. The internal
 //! `lock` and `monitor` modules are implementation details and are not public
@@ -105,6 +107,7 @@
 //! ```
 
 mod lock;
+#[cfg(feature = "monitor")]
 mod monitor;
 #[cfg(feature = "async")]
 pub use lock::{
@@ -122,14 +125,18 @@ pub use lock::{
     TryLockError,
     WriteLock,
 };
+#[cfg(all(feature = "monitor", feature = "parking-lot"))]
 pub use monitor::{
     ArcParkingLotMonitor,
+    ParkingLotMonitor,
+    ParkingLotMonitorGuard,
+};
+#[cfg(feature = "monitor")]
+pub use monitor::{
     ArcStdMonitor,
     ConditionWaiter,
     Monitor,
     Notifier,
-    ParkingLotMonitor,
-    ParkingLotMonitorGuard,
     SharedMonitor,
     StdMonitor,
     StdMonitorGuard,

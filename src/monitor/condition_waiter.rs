@@ -28,7 +28,7 @@ pub trait ConditionWaiter {
     ///
     /// The predicate and action run while the monitor state is locked.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `predicate` - Predicate that returns `true` when the state is ready.
     /// * `action` - Action to run after the predicate becomes true.
@@ -49,7 +49,7 @@ pub trait ConditionWaiter {
     ///
     /// The predicate and action run while the monitor state is locked.
     ///
-    /// # Arguments
+    /// # Parameters
     ///
     /// * `predicate` - Predicate that returns `true` while waiting should
     ///   continue.

@@ -28,6 +28,8 @@ mod read_write_lock_tests;
 mod write_lock_tests;
 
 // Implementation tests
+#[cfg(feature = "parking-lot")]
 mod parking_lot_mutex_tests;
+#[cfg(feature = "parking-lot")]
 mod parking_lot_rw_lock_tests;
 mod try_lock_error_tests;

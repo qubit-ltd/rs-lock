@@ -14,6 +14,7 @@
 // intentional so each public trait can live in its matching source file.
 #![allow(clippy::module_inception)]
 
+#[cfg(feature = "parking-lot")]
 mod arc_parking_lot_monitor;
 mod arc_std_monitor;
 #[cfg(feature = "async")]
@@ -28,7 +29,9 @@ mod condition_waiter;
 mod internal;
 mod monitor;
 mod notifier;
+#[cfg(feature = "parking-lot")]
 mod parking_lot_monitor;
+#[cfg(feature = "parking-lot")]
 mod parking_lot_monitor_guard;
 #[cfg(feature = "async")]
 mod shared_async_monitor;
@@ -41,6 +44,7 @@ mod tokio_monitor;
 mod wait_timeout_result;
 mod wait_timeout_status;
 
+#[cfg(feature = "parking-lot")]
 pub use arc_parking_lot_monitor::ArcParkingLotMonitor;
 pub use arc_std_monitor::ArcStdMonitor;
 #[cfg(feature = "async")]
@@ -54,7 +58,9 @@ pub use async_timeout_condition_waiter::AsyncTimeoutConditionWaiter;
 pub use condition_waiter::ConditionWaiter;
 pub use monitor::Monitor;
 pub use notifier::Notifier;
+#[cfg(feature = "parking-lot")]
 pub use parking_lot_monitor::ParkingLotMonitor;
+#[cfg(feature = "parking-lot")]
 pub use parking_lot_monitor_guard::ParkingLotMonitorGuard;
 #[cfg(feature = "async")]
 pub use shared_async_monitor::SharedAsyncMonitor;
