@@ -97,6 +97,7 @@ impl<T> TokioMonitor<T> {
     /// # Returns
     ///
     /// A Tokio monitor bound to `timer`.
+    #[inline]
     pub fn with_timer(state: T, timer: Arc<dyn Timer>) -> Self {
         Self {
             state: Mutex::new(state),
@@ -255,6 +256,7 @@ impl<T> TokioMonitor<T> {
     /// # Returns
     ///
     /// `true` when the deadline has completed.
+    #[inline]
     async fn deadline_reached(deadline: &mut TimerFuture) -> bool {
         poll_fn(|context| {
             Poll::Ready(deadline.as_mut().poll(context).is_ready())

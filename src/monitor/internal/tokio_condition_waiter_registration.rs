@@ -26,6 +26,7 @@ use super::TokioConditionWaiter;
 use crate::monitor::WaitTimeoutStatus;
 
 /// Removes an active waiter registration on cancellation or normal exit.
+#[must_use = "retain the registration while the waiter remains eligible for notification"]
 pub(in crate::monitor) struct TokioConditionWaiterRegistration<'a> {
     /// Registry containing this waiter while it remains selectable.
     registry: &'a Mutex<BTreeMap<usize, Arc<TokioConditionWaiter>>>,

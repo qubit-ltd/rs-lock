@@ -158,6 +158,7 @@ impl<T> StdMonitor<T> {
     /// # Returns
     ///
     /// A monitor bound to the supplied Timer domain.
+    #[inline]
     pub fn with_timer(state: T, timer: Arc<dyn Timer>) -> Self {
         Self {
             state: Mutex::new(state),

@@ -100,6 +100,7 @@ impl<T> ArcStdMonitor<T> {
     /// # Returns
     ///
     /// A cloneable monitor handle bound to `timer`.
+    #[inline]
     pub fn with_timer(state: T, timer: Arc<dyn Timer>) -> Self {
         Self {
             inner: Arc::new(StdMonitor::with_timer(state, timer)),

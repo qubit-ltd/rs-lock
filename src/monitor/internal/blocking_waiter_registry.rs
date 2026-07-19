@@ -32,6 +32,7 @@ impl BlockingWaiterRegistry {
     ///
     /// A registry containing no notification permits or waiters.
     #[must_use]
+    #[inline]
     pub(in crate::monitor) const fn new() -> Self {
         Self {
             waiters: Mutex::new(BTreeMap::new()),
