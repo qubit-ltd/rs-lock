@@ -95,6 +95,45 @@ async fn test_tokio_monitor_uses_injected_manual_timer_without_real_delay() {
     );
 }
 
+/// Verifies that the monitor's retained Tokio timer can be polled by another
+/// runtime while the captured runtime remains responsible for time progress.
+#[test]
+fn test_tokio_monitor_uses_timer_across_runtimes() {
+    let target = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .start_paused(true)
+        .build()
+        .expect("target runtime should build");
+    let polling = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .start_paused(true)
+        .build()
+        .expect("polling runtime should build");
+    let monitor = target.block_on(async { TokioMonitor::current(false) });
+    let mut wait = Box::pin(monitor.wait_until_for_async(
+        Duration::from_secs(5),
+        |ready| *ready,
+        |_| (),
+    ));
+
+    let early_result = polling.block_on(async {
+        tokio::select! {
+            result = &mut wait => Some(result),
+            () = tokio::time::sleep(Duration::from_secs(1)) => None,
+        }
+    });
+    assert!(
+        early_result.is_none(),
+        "advancing the polling runtime must not complete the timeout"
+    );
+
+    target.block_on(tokio::time::advance(Duration::from_secs(5)));
+    assert_time_result_eq!(
+        Ok(WaitTimeoutResult::TimedOut),
+        polling.block_on(wait),
+    );
+}
+
 #[tokio::test]
 async fn test_tokio_monitor_cancellation_removes_manual_timer_registration() {
     let clock = ManualMonotonicClock::new_shared();
