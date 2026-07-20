@@ -59,10 +59,12 @@ use super::{
 /// wakeups. Registration and state-reacquisition time consume the
 /// condition-wait budget; a signal cannot restart or extend it. When a signal
 /// and the deadline are both ready, the deadline is selected first, followed
-/// by one final locked predicate check. The default Tokio Timer requires a
-/// runtime with the time driver enabled; injected Timers may have different
-/// runtime requirements. Initial mutex contention, an immediately ready
-/// predicate, and a zero budget do not create a Timer future.
+/// by one final locked predicate check. The default Tokio timer captures a
+/// runtime handle during monitor construction. Its target runtime must remain
+/// alive with time enabled and be driven while a timed wait is pending, though
+/// the wait future may be polled from another runtime context. Injected timers
+/// retain their own progress requirements. Initial mutex contention, an
+/// immediately ready predicate, and a zero budget do not create a timer future.
 pub struct TokioMonitor<T> {
     /// Protected monitor state.
     state: Mutex<T>,
@@ -73,7 +75,7 @@ pub struct TokioMonitor<T> {
 }
 
 impl<T> TokioMonitor<T> {
-    /// Creates a monitor bound to the currently entered Tokio runtime.
+    /// Creates a monitor by capturing the currently entered Tokio runtime.
     ///
     /// # Parameters
     ///
@@ -81,7 +83,7 @@ impl<T> TokioMonitor<T> {
     ///
     /// # Returns
     ///
-    /// A Tokio monitor bound to the current runtime.
+    /// A Tokio monitor retaining the current runtime's timer capability.
     ///
     /// # Panics
     ///
@@ -96,7 +98,7 @@ impl<T> TokioMonitor<T> {
         })
     }
 
-    /// Tries to create a monitor bound to the currently entered Tokio runtime.
+    /// Tries to create a monitor by capturing the current Tokio runtime.
     ///
     /// # Parameters
     ///
@@ -104,7 +106,7 @@ impl<T> TokioMonitor<T> {
     ///
     /// # Returns
     ///
-    /// A Tokio monitor bound to the current runtime.
+    /// A Tokio monitor retaining the current runtime's timer capability.
     ///
     /// # Errors
     ///
@@ -129,7 +131,11 @@ impl<T> TokioMonitor<T> {
     ///
     /// # Returns
     ///
-    /// A Tokio monitor bound to `timer`.
+    /// A Tokio monitor using `timer`.
+    ///
+    /// The monitor does not drive the injected backend. Its owner must keep the
+    /// timer's clock and deadline driver alive and progressing while waits are
+    /// pending.
     #[inline]
     pub fn with_timer(state: T, timer: Arc<dyn Timer>) -> Self {
         Self {
@@ -385,11 +391,12 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// that already selected this waiter is discarded rather than transferred.
     /// After an initial blocking predicate with a nonzero budget, the method
     /// creates one Timer future before waiter registration. The default Tokio
-    /// Timer requires a runtime with its time driver enabled; injected Timers
-    /// may have different runtime requirements. Registration time consumes the
-    /// budget. Initial mutex contention, an immediately ready predicate, and a
-    /// zero budget do not create a Timer future. The fixed deadline is reused
-    /// across wakeups and followed by one
+    /// timer uses its retained runtime handle; that runtime must stay alive,
+    /// have time enabled, and be driven while the wait is pending. Injected
+    /// timers retain their own progress requirements. Registration time
+    /// consumes the budget. Initial mutex contention, an immediately ready
+    /// predicate, and a zero budget do not create a Timer future. The fixed
+    /// deadline is reused across wakeups and followed by one
     /// final locked predicate check. Predicate readiness wins over timeout. If
     /// a signal wins before the timer is ready but reacquiring the state
     /// exhausts the fixed deadline, a still-blocking predicate times out
@@ -425,11 +432,12 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// that already selected this waiter is discarded rather than transferred.
     /// After an initial blocking predicate with a nonzero budget, the method
     /// creates one Timer future before waiter registration. The default Tokio
-    /// Timer requires a runtime with its time driver enabled; injected Timers
-    /// may have different runtime requirements. Registration time consumes the
-    /// budget. Initial mutex contention, an immediately ready predicate, and a
-    /// zero budget do not create a Timer future. The fixed deadline is reused
-    /// across wakeups and followed by one
+    /// timer uses its retained runtime handle; that runtime must stay alive,
+    /// have time enabled, and be driven while the wait is pending. Injected
+    /// timers retain their own progress requirements. Registration time
+    /// consumes the budget. Initial mutex contention, an immediately ready
+    /// predicate, and a zero budget do not create a Timer future. The fixed
+    /// deadline is reused across wakeups and followed by one
     /// final locked predicate check. Predicate readiness wins over timeout. If
     /// a signal wins before the timer is ready but reacquiring the state
     /// exhausts the fixed deadline, a still-blocking predicate times out

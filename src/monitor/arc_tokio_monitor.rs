@@ -34,7 +34,7 @@ pub struct ArcTokioMonitor<T> {
 }
 
 impl<T> ArcTokioMonitor<T> {
-    /// Creates an Arc-wrapped monitor bound to the current Tokio runtime.
+    /// Creates an Arc-wrapped monitor by capturing the current Tokio runtime.
     ///
     /// # Parameters
     ///
@@ -42,7 +42,7 @@ impl<T> ArcTokioMonitor<T> {
     ///
     /// # Returns
     ///
-    /// A cloneable Tokio monitor handle bound to the current runtime.
+    /// A cloneable monitor retaining the current runtime's timer capability.
     ///
     /// # Panics
     ///
@@ -57,7 +57,7 @@ impl<T> ArcTokioMonitor<T> {
         })
     }
 
-    /// Tries to create an Arc-wrapped monitor bound to the current runtime.
+    /// Tries to create an Arc-wrapped monitor by capturing the current runtime.
     ///
     /// # Parameters
     ///
@@ -65,7 +65,7 @@ impl<T> ArcTokioMonitor<T> {
     ///
     /// # Returns
     ///
-    /// A cloneable Tokio monitor handle bound to the current runtime.
+    /// A cloneable monitor retaining the current runtime's timer capability.
     ///
     /// # Errors
     ///
@@ -91,7 +91,11 @@ impl<T> ArcTokioMonitor<T> {
     ///
     /// # Returns
     ///
-    /// A cloneable Tokio monitor handle bound to `timer`.
+    /// A cloneable Tokio monitor handle using `timer`.
+    ///
+    /// The monitor does not drive the injected backend. Its owner must keep the
+    /// timer's clock and deadline driver alive and progressing while waits are
+    /// pending.
     #[inline]
     pub fn with_timer(state: T, timer: Arc<dyn Timer>) -> Self {
         Self {

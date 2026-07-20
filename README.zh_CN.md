@@ -73,10 +73,11 @@ timeout。
 
 异步 monitor trait 返回 `impl Future`；返回的 future 是惰性的，所以构造 future 和首次
 poll 之前的时间不消耗 timeout 预算。`TokioMonitor::current` 和
-`ArcTokioMonitor::current` 会把默认 Timer 绑定到当前进入的 runtime；对应的
-`try_current` 可以在缺少 runtime 时返回错误而不 panic。非零计时等待真正挂起时，
-绑定的 runtime 必须启用 time driver。`with_timer` 仍是显式注入入口，其驱动要求由
-传入的 Timer 决定。drop 一个 pending future 会注销其活跃 waiter，不会执行 action，
+`ArcTokioMonitor::current` 会为默认 timer 捕获当前 runtime Handle；对应的
+`try_current` 可以在缺少当前 runtime 时返回错误而不 panic。计时等待 future 可以在
+其他 runtime context 中 poll，但目标 runtime 必须保持存活、启用 time driver，并持续
+运行到 deadline 完成。`with_timer` 仍是显式注入入口，并继承传入 timer 的生命周期与
+驱动要求。drop 一个 pending future 会注销其活跃 waiter，不会执行 action，
 也不会回滚受保护状态的变化。如果 `notify_one` 已选择该 waiter，取消会丢弃该次选择，
 不会转交给其他或未来 waiter。
 
