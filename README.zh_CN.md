@@ -72,10 +72,13 @@ waiter；没有已注册 waiter 时发出的 notification 对未来没有影响�
 timeout。
 
 异步 monitor trait 返回 `impl Future`；返回的 future 是惰性的，所以构造 future 和首次
-poll 之前的时间不消耗 timeout 预算。默认 Tokio Timer 在非零计时等待真正挂起时要求
-runtime 启用 time driver；注入其他 Timer 时由该 Timer 决定驱动要求。drop 一个 pending future 会注销其活跃 waiter，
-不会执行 action，也不会回滚受保护状态的变化。如果 `notify_one` 已选择该 waiter，
-取消会丢弃该次选择，不会转交给其他或未来 waiter。
+poll 之前的时间不消耗 timeout 预算。`TokioMonitor::current` 和
+`ArcTokioMonitor::current` 会把默认 Timer 绑定到当前进入的 runtime；对应的
+`try_current` 可以在缺少 runtime 时返回错误而不 panic。非零计时等待真正挂起时，
+绑定的 runtime 必须启用 time driver。`with_timer` 仍是显式注入入口，其驱动要求由
+传入的 Timer 决定。drop 一个 pending future 会注销其活跃 waiter，不会执行 action，
+也不会回滚受保护状态的变化。如果 `notify_one` 已选择该 waiter，取消会丢弃该次选择，
+不会转交给其他或未来 waiter。
 
 基于 Arc 的 monitor 包装器保留了供泛型代码使用的显式 trait 实现；普通 monitor 方法
 调用通过 `Deref` 解析。`from_arc`、`as_arc` 和 `into_arc` 明确表达共享所有权边界。
