@@ -23,6 +23,6 @@ where
 #[tokio::test]
 /// Verifies a Tokio handle satisfies [`SharedAsyncMonitor`].
 async fn test_shared_async_monitor_trait_accepts_tokio_monitor_handle() {
-    let monitor = clone_through_trait(ArcTokioMonitor::new(false));
+    let monitor = clone_through_trait(ArcTokioMonitor::current(false));
     assert!(!monitor.with_read_async(|ready| *ready).await);
 }

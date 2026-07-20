@@ -68,8 +68,7 @@ impl Timer for FailingTimer {
 /// * `error` - Error propagated from a timed monitor operation.
 pub(super) fn assert_backend_unavailable(error: TimeError) {
     let TimeError::TimerUnavailable {
-        source:
-            TimerUnavailableError::BackendUnavailable { backend, source },
+        source: TimerUnavailableError::BackendUnavailable { backend, source },
     } = error
     else {
         panic!("failing Timer should report backend unavailability");

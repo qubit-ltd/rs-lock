@@ -23,5 +23,5 @@ where
 #[tokio::test]
 /// Verifies a Tokio monitor satisfies [`AsyncConditionWaiter`].
 async fn test_async_condition_waiter_trait_accepts_tokio_monitor() {
-    assert_eq!(wait_through_trait(&TokioMonitor::new(true)).await, 7);
+    assert_eq!(wait_through_trait(&TokioMonitor::current(true)).await, 7);
 }

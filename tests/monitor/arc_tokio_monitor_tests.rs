@@ -15,6 +15,7 @@ use std::{
 use qubit_clock::{
     ManualMonotonicClock,
     MonotonicClock,
+    TokioRuntimeError,
 };
 use qubit_lock::{
     ArcTokioMonitor,
@@ -24,6 +25,26 @@ use qubit_lock::{
     TokioMonitor,
     WaitTimeoutResult,
 };
+
+/// Verifies that fallible shared-monitor construction reports a missing
+/// runtime.
+#[test]
+fn test_arc_tokio_monitor_try_current_reports_missing_runtime() {
+    let error = match ArcTokioMonitor::try_current(false) {
+        Ok(_) => panic!("construction outside a runtime should fail"),
+        Err(error) => error,
+    };
+
+    assert!(matches!(error, TokioRuntimeError::NotEntered { .. }));
+}
+
+/// Verifies that infallible shared-monitor construction identifies its runtime
+/// requirement in the panic message.
+#[test]
+#[should_panic(expected = "cannot create Arc-wrapped Tokio monitor")]
+fn test_arc_tokio_monitor_current_panics_outside_runtime() {
+    let _monitor = ArcTokioMonitor::current(false);
+}
 
 #[test]
 fn test_arc_tokio_monitor_with_timer_preserves_timer_domain() {
@@ -35,7 +56,7 @@ fn test_arc_tokio_monitor_with_timer_preserves_timer_domain() {
 
 #[tokio::test(start_paused = true)]
 async fn test_arc_tokio_monitor_preserves_inner_arc_identity() {
-    let inner = Arc::new(TokioMonitor::new(1usize));
+    let inner = Arc::new(TokioMonitor::current(1usize));
     let monitor = ArcTokioMonitor::from_arc(Arc::clone(&inner));
 
     assert!(Arc::ptr_eq(&inner, monitor.as_arc()));
@@ -51,7 +72,7 @@ async fn test_arc_tokio_monitor_preserves_inner_arc_identity() {
 
 #[tokio::test(start_paused = true)]
 async fn test_arc_tokio_monitor_clone_shares_state() {
-    let monitor = ArcTokioMonitor::new(Vec::<i32>::new());
+    let monitor = ArcTokioMonitor::current(Vec::<i32>::new());
     let cloned = monitor.clone();
 
     cloned.with_write_async(|items| items.push(7)).await;
@@ -63,9 +84,8 @@ async fn test_arc_tokio_monitor_clone_shares_state() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn test_arc_tokio_monitor_helpers_and_conversions_delegate_to_inner_monitor()
- {
-    let monitor = ArcTokioMonitor::from(vec![1]);
+async fn test_arc_tokio_monitor_helpers_delegate_to_inner_monitor() {
+    let monitor = ArcTokioMonitor::current(vec![1]);
 
     monitor.with_write_async(|items| items.push(2)).await;
     assert_eq!(
@@ -97,9 +117,9 @@ async fn test_arc_tokio_monitor_helpers_and_conversions_delegate_to_inner_monito
     );
     assert_eq!((*monitor).with_read_async(|items| items.len()).await, 4);
 
-    let default_monitor = ArcTokioMonitor::<Vec<i32>>::default();
+    let empty_monitor = ArcTokioMonitor::current(Vec::<i32>::default());
     assert!(
-        default_monitor
+        empty_monitor
             .with_read_async(|items| items.is_empty())
             .await
     );
@@ -107,7 +127,7 @@ async fn test_arc_tokio_monitor_helpers_and_conversions_delegate_to_inner_monito
 
 #[tokio::test(start_paused = true)]
 async fn test_arc_tokio_monitor_traits_delegate_to_inner_monitor() {
-    let monitor = ArcTokioMonitor::new(vec![1, 2]);
+    let monitor = ArcTokioMonitor::current(vec![1, 2]);
 
     <ArcTokioMonitor<Vec<i32>> as Notifier>::notify_one(&monitor);
     <ArcTokioMonitor<Vec<i32>> as Notifier>::notify_all(&monitor);
@@ -172,7 +192,10 @@ async fn test_arc_tokio_monitor_traits_delegate_to_inner_monitor() {
     monitor
         .with_write_notify_one_async(|items| items.push(3))
         .await;
-    assert_time_result_eq!(timeout_until_wait.await, Ok(WaitTimeoutResult::Ready(3)),);
+    assert_time_result_eq!(
+        timeout_until_wait.await,
+        Ok(WaitTimeoutResult::Ready(3)),
+    );
 
     let timeout_while_wait =
         <ArcTokioMonitor<Vec<i32>> as AsyncTimeoutConditionWaiter>::wait_while_for_async(
@@ -201,7 +224,7 @@ async fn test_arc_tokio_monitor_traits_delegate_to_inner_monitor() {
 
 #[tokio::test(start_paused = true)]
 async fn test_arc_tokio_monitor_wait_methods_delegate_to_inner_monitor() {
-    let monitor = ArcTokioMonitor::new(vec![1, 2]);
+    let monitor = ArcTokioMonitor::current(vec![1, 2]);
 
     monitor.with_write_async(|items| items.clear()).await;
     let condition_until_wait = monitor.wait_until_async(
@@ -257,7 +280,10 @@ async fn test_arc_tokio_monitor_wait_methods_delegate_to_inner_monitor() {
     monitor
         .with_write_notify_one_async(|items| items.push(3))
         .await;
-    assert_time_result_eq!(timeout_until_wait.await, Ok(WaitTimeoutResult::Ready(3)),);
+    assert_time_result_eq!(
+        timeout_until_wait.await,
+        Ok(WaitTimeoutResult::Ready(3)),
+    );
 
     let timeout_while_wait = monitor.wait_while_for_async(
         Duration::from_secs(1),
@@ -284,7 +310,7 @@ async fn test_arc_tokio_monitor_wait_methods_delegate_to_inner_monitor() {
 
 #[tokio::test(start_paused = true)]
 async fn test_arc_tokio_monitor_async_wait_until_for_times_out() {
-    let monitor = ArcTokioMonitor::new(false);
+    let monitor = ArcTokioMonitor::current(false);
 
     assert_time_result_eq!(
         monitor

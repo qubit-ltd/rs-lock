@@ -10,6 +10,7 @@
 use qubit_clock::{
     TimeError,
     Timer,
+    TokioRuntimeError,
 };
 use std::{
     future::Future,
@@ -33,7 +34,7 @@ pub struct ArcTokioMonitor<T> {
 }
 
 impl<T> ArcTokioMonitor<T> {
-    /// Creates an Arc-wrapped Tokio monitor.
+    /// Creates an Arc-wrapped monitor bound to the current Tokio runtime.
     ///
     /// # Parameters
     ///
@@ -41,12 +42,44 @@ impl<T> ArcTokioMonitor<T> {
     ///
     /// # Returns
     ///
-    /// A cloneable Tokio monitor handle.
+    /// A cloneable Tokio monitor handle bound to the current runtime.
+    ///
+    /// # Panics
+    ///
+    /// Panics when no Tokio runtime is entered or all process-wide clock-domain
+    /// identifiers are exhausted.
+    #[must_use]
+    #[track_caller]
     #[inline]
-    pub fn new(state: T) -> Self {
-        Self {
-            inner: Arc::new(TokioMonitor::new(state)),
-        }
+    pub fn current(state: T) -> Self {
+        Self::try_current(state).unwrap_or_else(|error| {
+            panic!("cannot create Arc-wrapped Tokio monitor: {error}")
+        })
+    }
+
+    /// Tries to create an Arc-wrapped monitor bound to the current runtime.
+    ///
+    /// # Parameters
+    ///
+    /// * `state` - Initial protected state.
+    ///
+    /// # Returns
+    ///
+    /// A cloneable Tokio monitor handle bound to the current runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TokioRuntimeError::NotEntered`] when no Tokio runtime is
+    /// entered.
+    ///
+    /// # Panics
+    ///
+    /// Panics if all process-wide clock-domain identifiers are exhausted.
+    #[inline]
+    pub fn try_current(state: T) -> Result<Self, TokioRuntimeError> {
+        TokioMonitor::try_current(state).map(|monitor| Self {
+            inner: Arc::new(monitor),
+        })
     }
 
     /// Creates an Arc-wrapped Tokio monitor using an injected Timer.
@@ -178,21 +211,5 @@ impl<T> Clone for ArcTokioMonitor<T> {
         Self {
             inner: self.inner.clone(),
         }
-    }
-}
-
-impl<T> From<T> for ArcTokioMonitor<T> {
-    /// Creates an Arc-wrapped Tokio monitor from an initial state value.
-    #[inline(always)]
-    fn from(value: T) -> Self {
-        Self::new(value)
-    }
-}
-
-impl<T: Default> Default for ArcTokioMonitor<T> {
-    /// Creates an Arc-wrapped Tokio monitor containing `T::default()`.
-    #[inline(always)]
-    fn default() -> Self {
-        Self::new(T::default())
     }
 }
