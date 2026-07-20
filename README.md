@@ -80,10 +80,12 @@ timeout still checks the predicate, and the final locked predicate check wins
 over timeout.
 
 Async monitor traits return `impl Future`; the returned future is lazy, so
-construction and time before its first poll consume no timeout budget. The
-default Tokio Timer requires a runtime with its time driver enabled when a
-nonzero timed wait actually suspends. An injected Timer determines the driver
-requirements for customized monitors.
+construction and time before its first poll consume no timeout budget.
+`TokioMonitor::current` and `ArcTokioMonitor::current` bind their default Timer
+to the currently entered runtime; their `try_current` variants report a missing
+runtime without panicking. The bound runtime must have its time driver enabled
+when a nonzero timed wait actually suspends. `with_timer` remains the explicit
+injection path and inherits the supplied Timer's driver requirements.
 Dropping a pending future unregisters its active waiter, does not run the
 action, and does not roll back protected-state changes made by other tasks. If
 `notify_one` already selected that waiter, cancellation discards that selection
