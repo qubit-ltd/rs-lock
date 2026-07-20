@@ -91,11 +91,15 @@ fn test_readme_documents_async_monitor_contract() {
     let readme_en = normalize_readme_text(README_EN);
     let readme_zh = normalize_readme_text(README_ZH);
     assert!(readme_en.contains("returned future is lazy"));
-    assert!(readme_en.contains("time driver enabled"));
+    assert!(readme_en.contains("may be polled from another runtime context"));
+    assert!(readme_en.contains("target runtime must remain alive"));
+    assert!(readme_en.contains("have time enabled"));
     assert!(readme_en.contains("does not run the action"));
     assert!(readme_en.contains("does not roll back protected-state changes"));
     assert!(readme_en.contains("discards that selection"));
     assert!(readme_zh.contains("返回的 future 是惰性的"));
+    assert!(readme_zh.contains("其他 runtime context 中 poll"));
+    assert!(readme_zh.contains("目标 runtime 必须保持存活"));
     assert!(readme_zh.contains("启用 time driver"));
     assert!(readme_zh.contains("不会执行 action"));
     assert!(readme_zh.contains("不会回滚受保护状态的变化"));
