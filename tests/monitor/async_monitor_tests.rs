@@ -35,5 +35,5 @@ where
 #[tokio::test(start_paused = true)]
 /// Verifies a Tokio handle satisfies [`AsyncMonitor`].
 async fn test_async_monitor_trait_accepts_tokio_monitor() {
-    wait_through_trait(&ArcTokioMonitor::new(false)).await;
+    wait_through_trait(&ArcTokioMonitor::current(false)).await;
 }

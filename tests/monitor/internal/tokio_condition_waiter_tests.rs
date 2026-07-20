@@ -17,7 +17,7 @@ use qubit_lock::{
 /// Verifies a Tokio waiter resumes and rechecks state after notification.
 #[tokio::test]
 async fn test_tokio_condition_waiter_observes_ready_state() {
-    let monitor = Arc::new(TokioMonitor::new(false));
+    let monitor = Arc::new(TokioMonitor::current(false));
     let waiter_monitor = Arc::clone(&monitor);
     let waiter = tokio::spawn(async move {
         waiter_monitor.wait_until_async(|ready| *ready, |_| 7).await

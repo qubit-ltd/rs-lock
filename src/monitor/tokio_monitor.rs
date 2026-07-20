@@ -22,11 +22,11 @@ use std::{
 };
 
 use qubit_clock::{
-    MonotonicClock,
     TimeError,
     Timer,
     TimerFuture,
-    TokioMonotonicClock,
+    TokioRuntimeError,
+    TokioTimer,
 };
 use tokio::sync::Mutex;
 
@@ -73,7 +73,7 @@ pub struct TokioMonitor<T> {
 }
 
 impl<T> TokioMonitor<T> {
-    /// Creates an asynchronous monitor protecting the supplied state.
+    /// Creates a monitor bound to the currently entered Tokio runtime.
     ///
     /// # Parameters
     ///
@@ -81,10 +81,43 @@ impl<T> TokioMonitor<T> {
     ///
     /// # Returns
     ///
-    /// A Tokio-based monitor.
+    /// A Tokio monitor bound to the current runtime.
+    ///
+    /// # Panics
+    ///
+    /// Panics when no Tokio runtime is entered or all process-wide clock-domain
+    /// identifiers are exhausted.
+    #[must_use]
+    #[track_caller]
     #[inline]
-    pub fn new(state: T) -> Self {
-        Self::with_timer(state, TokioMonotonicClock::new().new_timer())
+    pub fn current(state: T) -> Self {
+        Self::try_current(state).unwrap_or_else(|error| {
+            panic!("cannot create Tokio monitor: {error}")
+        })
+    }
+
+    /// Tries to create a monitor bound to the currently entered Tokio runtime.
+    ///
+    /// # Parameters
+    ///
+    /// * `state` - Initial protected state.
+    ///
+    /// # Returns
+    ///
+    /// A Tokio monitor bound to the current runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TokioRuntimeError::NotEntered`] when no Tokio runtime is
+    /// entered.
+    ///
+    /// # Panics
+    ///
+    /// Panics if all process-wide clock-domain identifiers are exhausted.
+    #[inline]
+    pub fn try_current(state: T) -> Result<Self, TokioRuntimeError> {
+        TokioTimer::try_current()
+            .map(|timer| Self::with_timer(state, Arc::new(timer)))
     }
 
     /// Creates a Tokio monitor using an injected Timer.
@@ -446,21 +479,5 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
                 }
             }
         }
-    }
-}
-
-impl<T> From<T> for TokioMonitor<T> {
-    /// Creates a Tokio monitor from an initial state value.
-    #[inline(always)]
-    fn from(value: T) -> Self {
-        Self::new(value)
-    }
-}
-
-impl<T: Default> Default for TokioMonitor<T> {
-    /// Creates a Tokio monitor containing `T::default()`.
-    #[inline(always)]
-    fn default() -> Self {
-        Self::new(T::default())
     }
 }

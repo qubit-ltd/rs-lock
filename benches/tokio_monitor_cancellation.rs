@@ -45,7 +45,7 @@ type OwnedWaitFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 ///
 /// Registered pending futures whose drop path performs cancellation.
 fn create_registered_waiters(count: usize) -> Vec<OwnedWaitFuture> {
-    let monitor = ArcTokioMonitor::new(false);
+    let monitor = ArcTokioMonitor::current(false);
     let mut waiters = Vec::with_capacity(count);
     for _ in 0..count {
         let waiter_monitor = monitor.clone();

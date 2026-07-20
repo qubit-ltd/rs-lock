@@ -36,6 +36,7 @@ use qubit_clock::{
     ManualMonotonicClock,
     MonotonicClock,
     TimeError,
+    TokioRuntimeError,
 };
 use qubit_lock::{
     AsyncConditionWaiter,
@@ -48,6 +49,25 @@ use qubit_lock::{
 /// Returns a future after proving at compile time that it is sendable.
 fn assert_send<F: Future + Send>(future: F) -> F {
     future
+}
+
+/// Verifies that fallible ambient construction reports a missing runtime.
+#[test]
+fn test_tokio_monitor_try_current_reports_missing_runtime() {
+    let error = match TokioMonitor::try_current(false) {
+        Ok(_) => panic!("construction outside a runtime should fail"),
+        Err(error) => error,
+    };
+
+    assert!(matches!(error, TokioRuntimeError::NotEntered { .. }));
+}
+
+/// Verifies that infallible ambient construction identifies its runtime
+/// requirement in the panic message.
+#[test]
+#[should_panic(expected = "cannot create Tokio monitor")]
+fn test_tokio_monitor_current_panics_outside_runtime() {
+    let _monitor = TokioMonitor::current(false);
 }
 
 #[tokio::test]
@@ -157,7 +177,8 @@ fn poll_once<F: Future + ?Sized>(
 /// condition waiter registered later.
 #[test]
 fn test_tokio_monitor_notify_one_without_waiter_is_not_retained() {
-    let monitor = TokioMonitor::new(());
+    let clock = ManualMonotonicClock::new_shared();
+    let monitor = TokioMonitor::with_timer((), clock.new_timer());
     monitor.notify_one();
 
     let predicate_checks = Arc::new(AtomicUsize::new(0));
@@ -182,7 +203,7 @@ fn test_tokio_monitor_notify_one_without_waiter_is_not_retained() {
 /// Verifies that two registered condition waiters receive two notifications.
 #[tokio::test]
 async fn test_tokio_monitor_notify_one_does_not_lose_registered_waiter() {
-    let monitor = TokioMonitor::new(0_usize);
+    let monitor = TokioMonitor::current(0_usize);
     let first = monitor.wait_until_async(
         |available| *available > 0,
         |available| *available -= 1,
@@ -213,7 +234,7 @@ async fn test_tokio_monitor_signal_reacquire_crossing_deadline_times_out() {
     const TIMEOUT: Duration = Duration::from_millis(5);
     const REAL_TIMEOUT: Duration = Duration::from_secs(1);
 
-    let monitor = Arc::new(TokioMonitor::new(()));
+    let monitor = Arc::new(TokioMonitor::current(()));
     let wait = monitor.wait_while_for_async(TIMEOUT, |_| true, |_| ());
     tokio::pin!(wait);
     let wake_counter = Arc::new(WakeCounter::default());
@@ -259,7 +280,8 @@ async fn test_tokio_monitor_signal_reacquire_crossing_deadline_times_out() {
 fn test_tokio_monitor_notify_all_selects_registered_waiters_only() {
     const REGISTERED_WAITERS: usize = 2;
 
-    let monitor = TokioMonitor::new(true);
+    let clock = ManualMonotonicClock::new_shared();
+    let monitor = TokioMonitor::with_timer(true, clock.new_timer());
     let predicate_checks = Arc::new(AtomicUsize::new(0));
     let mut waiters = Vec::with_capacity(REGISTERED_WAITERS);
     let mut wake_counters = Vec::with_capacity(REGISTERED_WAITERS);
@@ -306,7 +328,8 @@ fn test_tokio_monitor_notify_all_selects_registered_waiters_only() {
 /// selection instead of transferring it to another waiter.
 #[test]
 fn test_tokio_monitor_cancelled_selected_waiter_discards_notification() {
-    let monitor = TokioMonitor::new(());
+    let clock = ManualMonotonicClock::new_shared();
+    let monitor = TokioMonitor::with_timer((), clock.new_timer());
     let predicate_checks =
         [Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0))];
     let mut waiters: Vec<Option<Pin<Box<dyn Future<Output = ()> + Send>>>> =
@@ -408,7 +431,7 @@ fn test_tokio_monitor_cancelled_selected_waiter_discards_notification() {
 /// Verifies that an unrepresentable relative deadline is reported by Timer.
 #[tokio::test(flavor = "current_thread")]
 async fn test_tokio_monitor_reports_timeout_duration_overflow() {
-    let monitor = TokioMonitor::new(());
+    let monitor = TokioMonitor::current(());
     let mut waiter =
         Box::pin(monitor.wait_while_for_async(Duration::MAX, |_| true, |_| ()));
     let wake_counter = Arc::new(WakeCounter::default());
@@ -422,7 +445,7 @@ async fn test_tokio_monitor_reports_timeout_duration_overflow() {
 /// Verifies that all Tokio condition-wait trait methods return `Send` futures.
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_condition_wait_futures_are_send() {
-    let monitor = TokioMonitor::new(true);
+    let monitor = TokioMonitor::current(true);
 
     assert!(
         assert_send(
@@ -471,8 +494,8 @@ async fn test_tokio_monitor_condition_wait_futures_are_send() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn test_tokio_monitor_helpers_and_conversions_delegate_to_state() {
-    let monitor = TokioMonitor::from(vec![1]);
+async fn test_tokio_monitor_helpers_delegate_to_state() {
+    let monitor = TokioMonitor::current(vec![1]);
 
     monitor.with_write_async(|items| items.push(2)).await;
     assert_eq!(
@@ -499,9 +522,9 @@ async fn test_tokio_monitor_helpers_and_conversions_delegate_to_state() {
     monitor.notify_one();
     monitor.notify_all();
 
-    let default_monitor = TokioMonitor::<Vec<i32>>::default();
+    let empty_monitor = TokioMonitor::current(Vec::<i32>::default());
     assert!(
-        default_monitor
+        empty_monitor
             .with_read_async(|items| items.is_empty())
             .await
     );
@@ -509,7 +532,7 @@ async fn test_tokio_monitor_helpers_and_conversions_delegate_to_state() {
 
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_traits_delegate_to_monitor_methods() {
-    let monitor = TokioMonitor::new(vec![1, 2]);
+    let monitor = TokioMonitor::current(vec![1, 2]);
 
     <TokioMonitor<Vec<i32>> as Notifier>::notify_one(&monitor);
     <TokioMonitor<Vec<i32>> as Notifier>::notify_all(&monitor);
@@ -560,7 +583,7 @@ async fn test_tokio_monitor_traits_delegate_to_monitor_methods() {
 /// Verifies that time before the first poll does not consume timeout budget.
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_while_for_uses_condition_wait_budget() {
-    let monitor = TokioMonitor::new(false);
+    let monitor = TokioMonitor::current(false);
     let wait = monitor.wait_while_for_async(
         Duration::from_millis(5),
         |ready| !*ready,
@@ -595,7 +618,7 @@ async fn test_tokio_monitor_async_wait_while_for_uses_condition_wait_budget() {
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_while_for_excludes_initial_lock_contention_from_timeout()
  {
-    let monitor = Arc::new(TokioMonitor::new(false));
+    let monitor = Arc::new(TokioMonitor::current(false));
     let holder_monitor = Arc::clone(&monitor);
     let (holding_tx, holding_rx) = mpsc::sync_channel(1);
     let (release_tx, release_rx) = mpsc::sync_channel(1);
@@ -652,7 +675,7 @@ async fn test_tokio_monitor_async_wait_while_for_excludes_initial_lock_contentio
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_while_for_reuses_fixed_timeout_deadline()
 {
-    let monitor = TokioMonitor::new(false);
+    let monitor = TokioMonitor::current(false);
     let wait = monitor.wait_while_for_async(
         Duration::from_millis(10),
         |ready| !*ready,
@@ -689,7 +712,7 @@ async fn test_tokio_monitor_async_wait_while_for_zero_timeout_checks_predicate_o
  {
     let checks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     let predicate_checks = Arc::clone(&checks);
-    let monitor = TokioMonitor::new(false);
+    let monitor = TokioMonitor::current(false);
 
     let result = monitor
         .wait_while_for_async(
@@ -710,7 +733,7 @@ async fn test_tokio_monitor_async_wait_while_for_zero_timeout_checks_predicate_o
 /// Verifies that a condition wait runs its action after notification.
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_until_runs_action_after_notify() {
-    let monitor = Arc::new(TokioMonitor::new(false));
+    let monitor = Arc::new(TokioMonitor::current(false));
     let waiter_monitor = Arc::clone(&monitor);
 
     let waiter = tokio::spawn(async move {
@@ -737,7 +760,7 @@ async fn test_tokio_monitor_async_wait_until_runs_action_after_notify() {
 /// Verifies that notification returns a ready timed condition-wait result.
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_while_for_returns_ready_after_notify() {
-    let monitor = Arc::new(TokioMonitor::new(false));
+    let monitor = Arc::new(TokioMonitor::current(false));
     let waiter_monitor = Arc::clone(&monitor);
 
     let waiter = tokio::spawn(async move {
@@ -767,7 +790,7 @@ async fn test_tokio_monitor_async_wait_while_for_returns_ready_after_notify() {
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_while_for_rechecks_state_after_timeout()
 {
-    let monitor = TokioMonitor::new(false);
+    let monitor = TokioMonitor::current(false);
     let wait = monitor.wait_while_for_async(
         Duration::from_millis(20),
         |ready| !*ready,

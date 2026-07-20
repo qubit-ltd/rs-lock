@@ -17,7 +17,7 @@ use qubit_lock::{
 /// Verifies cancelling a pending Tokio wait removes its registration.
 #[tokio::test]
 async fn test_tokio_waiter_registration_is_removed_after_cancellation() {
-    let monitor = TokioMonitor::new(false);
+    let monitor = TokioMonitor::current(false);
     let mut cancelled =
         Box::pin(monitor.wait_until_async(|ready| *ready, |_| unreachable!()));
 
