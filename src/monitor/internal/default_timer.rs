@@ -13,8 +13,7 @@ use std::sync::{
 };
 
 use qubit_clock::{
-    MonotonicClock,
-    StdMonotonicClock,
+    StdTimer,
     Timer,
 };
 
@@ -26,5 +25,5 @@ use qubit_clock::{
 #[inline]
 pub(in crate::monitor) fn default_timer() -> Arc<dyn Timer> {
     static TIMER: OnceLock<Arc<dyn Timer>> = OnceLock::new();
-    Arc::clone(TIMER.get_or_init(|| StdMonotonicClock::new().new_timer()))
+    Arc::clone(TIMER.get_or_init(|| Arc::new(StdTimer::new())))
 }
