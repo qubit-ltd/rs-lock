@@ -29,6 +29,7 @@ use std::{
 };
 
 use super::failing_timer_tests::{
+    CompletionFailingTimer,
     FailingTimer,
     assert_backend_unavailable,
 };
@@ -49,6 +50,21 @@ use qubit_lock::{
 /// Returns a future after proving at compile time that it is sendable.
 fn assert_send<F: Future + Send>(future: F) -> F {
     future
+}
+
+#[tokio::test]
+async fn test_tokio_monitor_propagates_timer_completion_error() {
+    let monitor = TokioMonitor::with_timer(
+        false,
+        Arc::new(CompletionFailingTimer::new()),
+    );
+
+    let result = monitor
+        .wait_until_for_async(Duration::from_secs(1), |ready| *ready, |_| ())
+        .await;
+
+    let error = result.expect_err("failing Timer should fail completion");
+    assert_backend_unavailable(error);
 }
 
 /// Verifies that fallible ambient construction reports a missing runtime.

@@ -30,6 +30,7 @@ use qubit_lock::{
 };
 
 use super::failing_timer_tests::{
+    CompletionFailingTimer,
     FailingTimer,
     assert_backend_unavailable,
 };
@@ -43,6 +44,18 @@ fn test_std_monitor_new_read_write_updates_state() {
     });
 
     assert_eq!(monitor.with_read(|items| items.clone()), vec![1, 2, 3, 4]);
+}
+
+#[test]
+fn test_std_monitor_timed_predicate_wait_propagates_completion_error() {
+    let monitor =
+        StdMonitor::with_timer(false, Arc::new(CompletionFailingTimer::new()));
+
+    let result =
+        monitor.wait_until_for(Duration::from_secs(1), |ready| *ready, |_| ());
+
+    let error = result.expect_err("failing Timer should fail completion");
+    assert_backend_unavailable(error);
 }
 
 #[test]

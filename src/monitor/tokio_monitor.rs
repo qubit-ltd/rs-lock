@@ -296,9 +296,12 @@ impl<T> TokioMonitor<T> {
     ///
     /// `true` when the deadline has completed.
     #[inline]
-    async fn deadline_reached(deadline: &mut TimerFuture) -> bool {
-        poll_fn(|context| {
-            Poll::Ready(deadline.as_mut().poll(context).is_ready())
+    async fn deadline_reached(
+        deadline: &mut TimerFuture,
+    ) -> Result<bool, TimeError> {
+        poll_fn(|context| match deadline.as_mut().poll(context) {
+            Poll::Pending => Poll::Ready(Ok(false)),
+            Poll::Ready(result) => Poll::Ready(result.map(|()| true)),
         })
         .await
     }
@@ -480,8 +483,8 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
                 if !predicate(&*guard) {
                     return Ok(WaitTimeoutResult::Ready(action(&mut *guard)));
                 }
-                if status.is_timed_out()
-                    || Self::deadline_reached(&mut deadline).await
+                if status?.is_timed_out()
+                    || Self::deadline_reached(&mut deadline).await?
                 {
                     return Ok(WaitTimeoutResult::TimedOut);
                 }
