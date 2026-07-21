@@ -552,6 +552,7 @@ impl<T> ParkingLotMonitor<T> {
             if !waiting(&*guard) {
                 return Ok(WaitTimeoutResult::Ready(f(&mut *guard)));
             }
+            let status = status?;
             if status.is_timed_out() {
                 return Ok(WaitTimeoutResult::TimedOut);
             }

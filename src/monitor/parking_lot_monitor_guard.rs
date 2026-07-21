@@ -17,6 +17,7 @@ use std::{
         Deref,
         DerefMut,
     },
+    task::Poll,
     time::Duration,
 };
 
@@ -210,7 +211,7 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
         timeout: Duration,
     ) -> Result<WaitTimeoutStatus, TimeError> {
         let mut future = self.monitor.timer().after(timeout)?;
-        Ok(self.wait_with_timer(&mut future))
+        self.wait_with_timer(&mut future)
     }
 
     /// Waits for a notification or an absolute Timer deadline.
@@ -232,20 +233,22 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
         deadline: MonotonicInstant,
     ) -> Result<WaitTimeoutStatus, TimeError> {
         let mut future = self.monitor.timer().at(deadline)?;
-        Ok(self.wait_with_timer(&mut future))
+        self.wait_with_timer(&mut future)
     }
 
     /// Releases and reacquires the state guard around one fixed TimerFuture.
     pub(super) fn wait_with_timer(
         &mut self,
         future: &mut TimerFuture,
-    ) -> WaitTimeoutStatus {
+    ) -> Result<WaitTimeoutStatus, TimeError> {
         let registration = self.monitor.waiters.register();
         let waiter = std::sync::Arc::clone(registration.waiter());
-        if super::internal::BlockingConditionWaiter::poll_timer(&waiter, future)
-            .is_ready()
+        if let Poll::Ready(result) =
+            super::internal::BlockingConditionWaiter::poll_timer(
+                &waiter, future,
+            )
         {
-            return WaitTimeoutStatus::TimedOut;
+            return result.map(|()| WaitTimeoutStatus::TimedOut);
         }
         let inner = self
             .inner
@@ -255,12 +258,11 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
         waiter.wait();
         drop(registration);
         self.inner = Some(self.monitor.state.lock());
-        if super::internal::BlockingConditionWaiter::poll_timer(&waiter, future)
-            .is_ready()
-        {
-            WaitTimeoutStatus::TimedOut
-        } else {
-            WaitTimeoutStatus::Woken
+        match super::internal::BlockingConditionWaiter::poll_timer(
+            &waiter, future,
+        ) {
+            Poll::Ready(result) => result.map(|()| WaitTimeoutStatus::TimedOut),
+            Poll::Pending => Ok(WaitTimeoutStatus::Woken),
         }
     }
 }

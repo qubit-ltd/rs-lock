@@ -19,7 +19,10 @@ use std::task::{
     Waker,
 };
 
-use qubit_clock::TimerFuture;
+use qubit_clock::{
+    TimeError,
+    TimerFuture,
+};
 
 use super::blocking_condition_waiter_state::BlockingConditionWaiterState;
 
@@ -62,7 +65,7 @@ impl BlockingConditionWaiter {
     pub(in crate::monitor) fn poll_timer(
         waiter: &Arc<Self>,
         future: &mut TimerFuture,
-    ) -> Poll<()> {
+    ) -> Poll<Result<(), TimeError>> {
         let waker = Waker::from(Arc::clone(waiter));
         let mut context = Context::from_waker(&waker);
         future.as_mut().poll(&mut context)

@@ -20,7 +20,10 @@ use std::{
     task::Poll,
 };
 
-use qubit_clock::TimerFuture;
+use qubit_clock::{
+    TimeError,
+    TimerFuture,
+};
 
 use super::TokioConditionWaiter;
 use crate::monitor::WaitTimeoutStatus;
@@ -77,14 +80,14 @@ impl<'a> TokioConditionWaiterRegistration<'a> {
     pub(in crate::monitor) async fn wait_until_signalled_or_deadline(
         &self,
         deadline: &mut TimerFuture,
-    ) -> WaitTimeoutStatus {
+    ) -> Result<WaitTimeoutStatus, TimeError> {
         let notified = self.waiter().signal().notified();
         tokio::pin!(notified);
         poll_fn(|context| {
-            if deadline.as_mut().poll(context).is_ready() {
-                Poll::Ready(WaitTimeoutStatus::TimedOut)
+            if let Poll::Ready(result) = deadline.as_mut().poll(context) {
+                Poll::Ready(result.map(|()| WaitTimeoutStatus::TimedOut))
             } else if notified.as_mut().poll(context).is_ready() {
-                Poll::Ready(WaitTimeoutStatus::Woken)
+                Poll::Ready(Ok(WaitTimeoutStatus::Woken))
             } else {
                 Poll::Pending
             }

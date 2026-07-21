@@ -25,6 +25,18 @@ pub(super) struct FailingTimer {
     clock: ManualMonotonicClock,
 }
 
+pub(super) struct CompletionFailingTimer {
+    clock: ManualMonotonicClock,
+}
+
+impl CompletionFailingTimer {
+    pub(super) fn new() -> Self {
+        Self {
+            clock: ManualMonotonicClock::new(),
+        }
+    }
+}
+
 impl FailingTimer {
     /// Creates a Timer that reports [`TimeError::TimerUnavailable`] with
     /// [`TimerUnavailableError::BackendUnavailable`].
@@ -58,6 +70,28 @@ impl Timer for FailingTimer {
                 )),
             },
         })
+    }
+}
+
+impl Timer for CompletionFailingTimer {
+    fn clock(&self) -> &dyn MonotonicClock {
+        &self.clock
+    }
+
+    fn at(
+        &self,
+        _deadline: MonotonicInstant,
+    ) -> Result<TimerFuture, TimeError> {
+        Ok(Box::pin(std::future::ready(Err(
+            TimeError::TimerUnavailable {
+                source: TimerUnavailableError::BackendUnavailable {
+                    backend: "test",
+                    source: Box::new(io::Error::other(
+                        "test timer backend unavailable",
+                    )),
+                },
+            },
+        ))))
     }
 }
 
