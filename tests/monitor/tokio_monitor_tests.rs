@@ -209,7 +209,7 @@ impl WakeCounter {
 
 /// Polls one future once with a wake-counting context.
 ///
-/// # Arguments
+/// # Parameters
 ///
 /// * `future` - Pinned future to poll.
 /// * `wake_counter` - Counter backing the poll context's waker.
@@ -479,6 +479,77 @@ fn test_tokio_monitor_cancelled_selected_waiter_discards_notification() {
         future_checks.load(Ordering::SeqCst),
         "cancelled selection must not be retained for a future waiter"
     );
+}
+
+/// Verifies a deadline wins when both timeout and notification are ready
+/// before the waiter is polled again.
+#[tokio::test]
+async fn test_tokio_monitor_deadline_wins_over_simultaneous_notification() {
+    let clock = ManualMonotonicClock::new_shared();
+    let monitor = TokioMonitor::with_timer(false, clock.new_timer());
+    let mut waiter = Box::pin(monitor.wait_until_for_async(
+        Duration::from_secs(1),
+        |ready| *ready,
+        |_| (),
+    ));
+    let wake_counter = Arc::new(WakeCounter::default());
+
+    assert!(poll_once(waiter.as_mut(), &wake_counter).is_pending());
+    monitor.notify_one();
+    clock
+        .advance(Duration::from_secs(1))
+        .expect("manual clock should reach the deadline");
+
+    assert!(matches!(
+        poll_once(waiter.as_mut(), &wake_counter),
+        Poll::Ready(Ok(WaitTimeoutResult::TimedOut)),
+    ));
+}
+
+/// Verifies a panicking combined mutation does not notify one waiter.
+#[tokio::test]
+async fn test_tokio_monitor_panicking_write_notify_one_does_not_notify() {
+    assert_panicking_combined_mutation_does_not_notify(false).await;
+}
+
+/// Verifies a panicking combined mutation does not notify all waiters.
+#[tokio::test]
+async fn test_tokio_monitor_panicking_write_notify_all_does_not_notify() {
+    assert_panicking_combined_mutation_does_not_notify(true).await;
+}
+
+/// Checks that notification is skipped when a combined mutation panics.
+///
+/// # Parameters
+///
+/// * `notify_all` - Whether to exercise the notify-all variant.
+async fn assert_panicking_combined_mutation_does_not_notify(notify_all: bool) {
+    let monitor = Arc::new(TokioMonitor::current(false));
+    let mut waiter = Box::pin(monitor.wait_until_async(|ready| *ready, |_| ()));
+    let wake_counter = Arc::new(WakeCounter::default());
+    assert!(poll_once(waiter.as_mut(), &wake_counter).is_pending());
+
+    let mutation_monitor = Arc::clone(&monitor);
+    let mutation = tokio::spawn(async move {
+        if notify_all {
+            mutation_monitor
+                .with_write_notify_all_async(|_| panic!("mutation failed"))
+                .await;
+        } else {
+            mutation_monitor
+                .with_write_notify_one_async(|_| panic!("mutation failed"))
+                .await;
+        }
+    });
+
+    assert!(
+        mutation
+            .await
+            .expect_err("mutation should panic")
+            .is_panic()
+    );
+    assert_eq!(wake_counter.count(), 0);
+    drop(waiter);
 }
 
 /// Verifies that an unrepresentable relative deadline is reported by Timer.
@@ -786,57 +857,44 @@ async fn test_tokio_monitor_async_wait_while_for_zero_timeout_checks_predicate_o
 /// Verifies that a condition wait runs its action after notification.
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_until_runs_action_after_notify() {
-    let monitor = Arc::new(TokioMonitor::current(false));
-    let waiter_monitor = Arc::clone(&monitor);
+    let monitor = TokioMonitor::current(false);
+    let mut waiter = Box::pin(monitor.wait_until_async(
+        |ready| *ready,
+        |ready| {
+            *ready = false;
+            7
+        },
+    ));
+    let wake_counter = Arc::new(WakeCounter::default());
 
-    let waiter = tokio::spawn(async move {
-        waiter_monitor
-            .wait_until_async(
-                |ready| *ready,
-                |ready| {
-                    *ready = false;
-                    7
-                },
-            )
-            .await
-    });
-
-    tokio::task::yield_now().await;
+    assert!(poll_once(waiter.as_mut(), &wake_counter).is_pending());
     monitor
         .with_write_notify_one_async(|ready| *ready = true)
         .await;
 
-    assert_eq!(waiter.await.expect("waiter task should finish"), 7);
+    assert_eq!(waiter.await, 7);
     assert!(!monitor.with_read_async(|ready| *ready).await);
 }
 
 /// Verifies that notification returns a ready timed condition-wait result.
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_while_for_returns_ready_after_notify() {
-    let monitor = Arc::new(TokioMonitor::current(false));
-    let waiter_monitor = Arc::clone(&monitor);
+    let monitor = TokioMonitor::current(false);
+    let mut waiter = Box::pin(monitor.wait_while_for_async(
+        Duration::from_secs(1),
+        |ready| !*ready,
+        |ready| {
+            *ready = false;
+            9
+        },
+    ));
+    let wake_counter = Arc::new(WakeCounter::default());
 
-    let waiter = tokio::spawn(async move {
-        waiter_monitor
-            .wait_while_for_async(
-                Duration::from_secs(1),
-                |ready| !*ready,
-                |ready| {
-                    *ready = false;
-                    9
-                },
-            )
-            .await
-    });
-
-    tokio::task::yield_now().await;
+    assert!(poll_once(waiter.as_mut(), &wake_counter).is_pending());
     monitor.with_write_async(|ready| *ready = true).await;
     monitor.notify_one();
 
-    assert_time_result_eq!(
-        waiter.await.expect("waiter task should finish"),
-        Ok(WaitTimeoutResult::Ready(9)),
-    );
+    assert_time_result_eq!(waiter.await, Ok(WaitTimeoutResult::Ready(9)),);
 }
 
 /// Verifies that an unnotified ready predicate wins the final deadline check.

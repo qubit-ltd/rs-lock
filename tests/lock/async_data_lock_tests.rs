@@ -199,7 +199,9 @@ mod async_data_lock_trait_tests {
     }
 
     #[tokio::test]
-    async fn test_async_mutex_fairness() {
+    /// Verifies all concurrent writes complete without claiming an ordering
+    /// guarantee.
+    async fn test_async_mutex_concurrent_writes_complete() {
         use std::sync::Arc;
 
         let async_mutex = Arc::new(AsyncMutex::new(Vec::new()));
