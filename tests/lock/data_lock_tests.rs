@@ -63,6 +63,17 @@ mod data_lock_trait_tests {
     }
 
     #[test]
+    fn test_data_lock_accepts_borrowed_forwarding() {
+        let mutex = Mutex::new(0);
+        let borrowed = &mutex;
+
+        assert_eq!(DataLock::with_read(&borrowed, read_i32), 0);
+        assert_eq!(DataLock::with_write(&borrowed, increment_i32), 1);
+        assert_eq!(DataLock::try_with_read(&borrowed, read_i32), Ok(1));
+        assert_eq!(DataLock::try_with_write(&borrowed, increment_i32), Ok(2),);
+    }
+
+    #[test]
     fn test_mutex_read_write_basic_operations() {
         let mutex = Mutex::new(0);
 

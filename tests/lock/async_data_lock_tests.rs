@@ -31,7 +31,36 @@ fn increment_i32(value: &mut i32) -> i32 {
 
 #[cfg(test)]
 mod async_data_lock_trait_tests {
+    use std::sync::Arc;
+
     use super::*;
+
+    #[tokio::test]
+    async fn test_async_data_lock_accepts_borrowed_forwarding() {
+        let mutex = AsyncMutex::new(0);
+        let borrowed = &mutex;
+
+        assert_eq!(AsyncDataLock::with_read(&borrowed, read_i32).await, 0,);
+        assert_eq!(
+            AsyncDataLock::with_write(&borrowed, increment_i32).await,
+            1,
+        );
+        assert_eq!(AsyncDataLock::try_with_read(&borrowed, read_i32), Ok(1),);
+        assert_eq!(
+            AsyncDataLock::try_with_write(&borrowed, increment_i32),
+            Ok(2),
+        );
+    }
+
+    #[tokio::test]
+    async fn test_async_data_lock_accepts_arc_forwarding() {
+        let mutex = Arc::new(AsyncMutex::new(0));
+
+        assert_eq!(AsyncDataLock::with_read(&mutex, read_i32).await, 0);
+        assert_eq!(AsyncDataLock::with_write(&mutex, increment_i32).await, 1,);
+        assert_eq!(AsyncDataLock::try_with_read(&mutex, read_i32), Ok(1));
+        assert_eq!(AsyncDataLock::try_with_write(&mutex, increment_i32), Ok(2),);
+    }
 
     #[tokio::test]
     async fn test_async_mutex_read_write_basic_operations() {
