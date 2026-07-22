@@ -133,9 +133,9 @@ assert_eq!(waiter.join().unwrap(), Ok(WaitTimeoutResult::TimedOut));
 无需用真实 sleep 猜测注册时机。Monitor 和 Timer 注册都支持安全取消；多个组件也可
 共享同一个手动时间域。
 
-带超时的 predicate API 返回 `Result<WaitTimeoutResult<_>, TimeError>`，Timer 注册错误
+带超时的 predicate API 返回 `Result<WaitTimeoutResult<_>, TimeError>`，Timer 注册或完成错误
 不会伪装成超时。Guard 使用原地更新的 `wait`、`wait_for` 和 `wait_until`；Timer 出错时
-guard 仍然持有且可继续使用。
+guard 仍然持有且可继续使用，包括在 guard 释放并重新获取后才报告的完成错误。
 
 ## 快速开始
 
@@ -145,7 +145,7 @@ guard 仍然持有且可继续使用。
 use qubit_lock::DataLock;
 
 fn main() {
-    let counter = parking_lot::Mutex::new(0);
+    let counter = std::sync::Mutex::new(0);
     counter.with_write(|value| *value += 1);
     assert_eq!(counter.with_read(|value| *value), 1);
 }

@@ -47,7 +47,8 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     ///
     /// # Errors
     ///
-    /// Returns an error when the monitor's Timer cannot register the deadline.
+    /// Returns Timer registration or completion errors rather than reporting
+    /// them as timeouts.
     #[inline(always)]
     fn wait_until_for<R, P, F>(
         &self,
@@ -80,7 +81,8 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     ///
     /// # Errors
     ///
-    /// Returns an error when the monitor's Timer cannot register the deadline.
+    /// Returns Timer registration or completion errors rather than reporting
+    /// them as timeouts.
     fn wait_while_for<R, P, F>(
         &self,
         timeout: Duration,

@@ -558,7 +558,8 @@ impl<T> StdMonitor<T> {
     ///
     /// # Errors
     ///
-    /// Returns an error when the injected Timer cannot register the deadline.
+    /// Returns Timer registration or completion errors rather than reporting
+    /// them as timeouts.
     ///
     /// # Examples
     ///
@@ -641,7 +642,8 @@ impl<T> StdMonitor<T> {
     ///
     /// # Errors
     ///
-    /// Returns an error when the injected Timer cannot register the deadline.
+    /// Returns Timer registration or completion errors rather than reporting
+    /// them as timeouts.
     ///
     /// # Examples
     ///

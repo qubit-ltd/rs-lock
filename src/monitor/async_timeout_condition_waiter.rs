@@ -59,8 +59,8 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     ///
     /// # Errors
     ///
-    /// The future resolves to an error when the monitor's Timer cannot
-    /// register the deadline.
+    /// The future resolves to Timer registration or completion errors rather
+    /// than reporting them as timeouts.
     #[inline(always)]
     fn wait_until_for_async<'a, R, P, F>(
         &'a self,
@@ -101,8 +101,8 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     ///
     /// # Errors
     ///
-    /// The future resolves to an error when the monitor's Timer cannot
-    /// register the deadline.
+    /// The future resolves to Timer registration or completion errors rather
+    /// than reporting them as timeouts.
     fn wait_while_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
@@ -134,8 +134,8 @@ where
     ///
     /// # Errors
     ///
-    /// The future resolves to an error when the wrapped monitor's timer
-    /// cannot register the deadline.
+    /// The future resolves to Timer registration or completion errors from the
+    /// wrapped monitor rather than reporting them as timeouts.
     #[inline(always)]
     fn wait_while_for_async<'a, R, P, F>(
         &'a self,
