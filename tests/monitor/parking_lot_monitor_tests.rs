@@ -508,23 +508,31 @@ fn test_parking_lot_monitor_wait_while_for_excludes_initial_lock_contention_from
  {
     const WAIT_TIMEOUT: Duration = Duration::from_millis(20);
 
-    let monitor = Arc::new(ParkingLotMonitor::new(false));
+    let clock = ManualMonotonicClock::new_shared();
+    let monitor =
+        Arc::new(ParkingLotMonitor::with_timer(false, clock.new_timer()));
     let guard = monitor.lock();
     let (started_tx, started_rx) = mpsc::channel();
     let (checked_tx, checked_rx) = mpsc::channel();
+    let (continue_tx, continue_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
     let waiter_monitor = Arc::clone(&monitor);
     let waiter = thread::spawn(move || {
         started_tx.send(()).expect("test should observe wait start");
         let mut checked_tx = Some(checked_tx);
+        let mut continue_rx = Some(continue_rx);
         let result = waiter_monitor.wait_while_for(
             WAIT_TIMEOUT,
             move |ready| {
                 if let Some(checked_tx) = checked_tx.take() {
-                    thread::sleep(WAIT_TIMEOUT.saturating_mul(3));
                     checked_tx.send(()).expect(
                         "test should observe the initial predicate check",
                     );
+                    continue_rx
+                        .take()
+                        .expect("predicate should pause once")
+                        .recv()
+                        .expect("test should release the predicate check");
                 }
                 !*ready
             },
@@ -537,13 +545,25 @@ fn test_parking_lot_monitor_wait_while_for_excludes_initial_lock_contention_from
     started_rx
         .recv_timeout(Duration::from_secs(1))
         .expect("waiter should begin while the state lock is held");
-    thread::sleep(WAIT_TIMEOUT.saturating_mul(3));
+    clock
+        .advance(WAIT_TIMEOUT.saturating_mul(3))
+        .expect("manual clock should advance during lock contention");
+    assert_eq!(clock.pending_waiters(), 0);
     drop(guard);
 
     checked_rx
         .recv_timeout(Duration::from_secs(1))
         .expect("waiter should check the predicate after acquiring the lock");
-    drop(monitor.lock());
+    clock
+        .advance(WAIT_TIMEOUT.saturating_mul(3))
+        .expect("manual clock should advance during the predicate check");
+    assert_eq!(clock.pending_waiters(), 0);
+    continue_tx
+        .send(())
+        .expect("test should release the predicate check");
+    let _deadline = clock
+        .wait_for_next_deadline(Duration::from_secs(1))
+        .expect("condition-wait deadline should be registered");
     monitor.with_write_notify_one(|ready| *ready = true);
 
     assert_time_result_eq!(

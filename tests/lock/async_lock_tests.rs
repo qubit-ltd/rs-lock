@@ -7,7 +7,14 @@
 // =============================================================================
 //! Tests for data-independent asynchronous RAII locks.
 
-use std::sync::Arc;
+use std::{
+    future::{
+        Future,
+        poll_fn,
+    },
+    sync::Arc,
+    task::Poll,
+};
 
 use qubit_lock::{
     AsyncLock,
@@ -38,17 +45,18 @@ async fn test_async_lock_accepts_arc_forwarding() {
 }
 
 #[tokio::test]
+/// Verifies dropping a waiter after registration does not retain the lock.
 async fn test_async_lock_cancelled_waiter_does_not_retain_lock() {
-    let lock = Arc::new(Mutex::new(()));
+    let lock = Mutex::new(());
     let guard = AsyncLock::lock(&lock).await;
-    let waiting_lock = Arc::clone(&lock);
-    let waiter = tokio::spawn(async move {
-        let _guard = AsyncLock::lock(&waiting_lock).await;
-    });
+    let mut waiter = Box::pin(AsyncLock::lock(&lock));
 
-    tokio::task::yield_now().await;
-    waiter.abort();
-    let _ = waiter.await;
+    poll_fn(|context| {
+        assert!(waiter.as_mut().poll(context).is_pending());
+        Poll::Ready(())
+    })
+    .await;
+    drop(waiter);
     drop(guard);
 
     assert!(AsyncLock::try_lock(&lock).is_ok());
