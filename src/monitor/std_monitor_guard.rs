@@ -201,7 +201,9 @@ impl<'a, T> StdMonitorGuard<'a, T> {
     ///
     /// # Errors
     ///
-    /// Returns Timer registration errors without releasing this guard.
+    /// Returns Timer registration or completion errors. This guard remains
+    /// held and usable in either case; a completion error may be reported after
+    /// the guard was released and reacquired.
     ///
     /// # Examples
     ///
@@ -240,7 +242,9 @@ impl<'a, T> StdMonitorGuard<'a, T> {
     ///
     /// # Errors
     ///
-    /// Returns Timer registration errors without releasing this guard.
+    /// Returns Timer registration or completion errors. This guard remains
+    /// held and usable in either case; a completion error may be reported after
+    /// the guard was released and reacquired.
     #[inline(always)]
     pub fn wait_until(
         &mut self,

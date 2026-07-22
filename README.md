@@ -155,9 +155,10 @@ The Monitor and Timer registrations are cancellation-safe, and multiple
 components can share one manual clock domain.
 
 Timed predicate methods return `Result<WaitTimeoutResult<_>, TimeError>` so
-Timer registration failures remain distinct from a real timeout. Guard waits
-use in-place `wait`, `wait_for`, and `wait_until` methods; a Timer error leaves
-the guard held and usable.
+Timer registration or completion errors remain distinct from a real timeout.
+Guard waits use in-place `wait`, `wait_for`, and `wait_until` methods; a Timer
+error leaves the guard held and usable, including when completion fails after
+the guard was released and reacquired.
 
 ## Quick Start
 
@@ -167,7 +168,7 @@ the guard held and usable.
 use qubit_lock::DataLock;
 
 fn main() {
-    let counter = parking_lot::Mutex::new(0);
+    let counter = std::sync::Mutex::new(0);
     counter.with_write(|value| *value += 1);
     assert_eq!(counter.with_read(|value| *value), 1);
 }

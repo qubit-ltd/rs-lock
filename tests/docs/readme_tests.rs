@@ -20,6 +20,17 @@ const READ_WRITE_LOCK_SRC: &str =
     include_str!("../../src/lock/read_write_lock.rs");
 const ASYNC_READ_WRITE_LOCK_SRC: &str =
     include_str!("../../src/lock/async_read_write_lock.rs");
+const TIMEOUT_CONDITION_WAITER_SRC: &str =
+    include_str!("../../src/monitor/timeout_condition_waiter.rs");
+const ASYNC_TIMEOUT_CONDITION_WAITER_SRC: &str =
+    include_str!("../../src/monitor/async_timeout_condition_waiter.rs");
+const PARKING_LOT_MONITOR_SRC: &str =
+    include_str!("../../src/monitor/parking_lot_monitor.rs");
+const PARKING_LOT_MONITOR_GUARD_SRC: &str =
+    include_str!("../../src/monitor/parking_lot_monitor_guard.rs");
+const STD_MONITOR_SRC: &str = include_str!("../../src/monitor/std_monitor.rs");
+const STD_MONITOR_GUARD_SRC: &str =
+    include_str!("../../src/monitor/std_monitor_guard.rs");
 
 /// Collapses Markdown whitespace so prose assertions do not depend on line
 /// wrapping.
@@ -46,6 +57,39 @@ fn test_readme_uses_with_lock_api_names() {
 fn test_readme_quick_start_imports_data_lock_trait() {
     assert!(README_EN.contains("use qubit_lock::DataLock;"));
     assert!(README_ZH.contains("use qubit_lock::DataLock;"));
+    assert!(README_EN.contains("let counter = std::sync::Mutex::new(0);"));
+    assert!(README_ZH.contains("let counter = std::sync::Mutex::new(0);"));
+    assert!(!README_EN.contains("let counter = parking_lot::Mutex::new(0);"));
+    assert!(!README_ZH.contains("let counter = parking_lot::Mutex::new(0);"));
+}
+
+#[test]
+/// Ensures timed-wait API docs cover failures after Timer registration.
+fn test_monitor_docs_cover_timer_registration_and_completion_errors() {
+    let sources = [
+        ("timeout_condition_waiter.rs", TIMEOUT_CONDITION_WAITER_SRC),
+        (
+            "async_timeout_condition_waiter.rs",
+            ASYNC_TIMEOUT_CONDITION_WAITER_SRC,
+        ),
+        ("parking_lot_monitor.rs", PARKING_LOT_MONITOR_SRC),
+        (
+            "parking_lot_monitor_guard.rs",
+            PARKING_LOT_MONITOR_GUARD_SRC,
+        ),
+        ("std_monitor.rs", STD_MONITOR_SRC),
+        ("std_monitor_guard.rs", STD_MONITOR_GUARD_SRC),
+    ];
+
+    for (filename, source) in sources {
+        assert!(
+            source.contains("Timer registration or completion errors"),
+            "{filename} omits Timer completion errors",
+        );
+    }
+
+    assert!(README_EN.contains("Timer registration or completion errors"));
+    assert!(README_ZH.contains("Timer 注册或完成错误"));
 }
 
 #[test]
