@@ -65,6 +65,8 @@ use super::{
 /// the wait future may be polled from another runtime context. Injected timers
 /// retain their own progress requirements. Initial mutex contention, an
 /// immediately ready predicate, and a zero budget do not create a timer future.
+/// Closures and predicates execute while the state mutex is held and must not
+/// re-enter the same monitor; doing so can deadlock.
 pub struct TokioMonitor<T> {
     /// Protected monitor state.
     state: Mutex<T>,
@@ -165,6 +167,10 @@ impl<T> TokioMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f`.
     #[inline]
     pub async fn with_read_async<R, F>(&self, f: F) -> R
     where
@@ -206,6 +212,10 @@ impl<T> TokioMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f`. In that case no notification is sent.
     #[inline]
     pub async fn with_write_notify_one_async<R, F>(&self, f: F) -> R
     where
@@ -228,6 +238,10 @@ impl<T> TokioMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f`. In that case no notification is sent.
     #[inline]
     pub async fn with_write_notify_all_async<R, F>(&self, f: F) -> R
     where
@@ -273,6 +287,11 @@ impl<T> TokioMonitor<T> {
     ///
     /// A registration that removes the waiter if it is cancelled or leaves the
     /// wait before notification selects it.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an allocation address unexpectedly collides with an active
+    /// waiter key.
     #[inline]
     fn register_waiter(&self) -> TokioConditionWaiterRegistration<'_> {
         let waiter = Arc::new(TokioConditionWaiter::new());

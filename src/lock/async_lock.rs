@@ -29,6 +29,11 @@ use tokio::sync::{
 use crate::lock::TryLockError;
 
 /// Represents one asynchronous lock-acquisition mode.
+///
+/// Futures returned by this crate's implementations are lazy: constructing
+/// one does not acquire the lock. Dropping a pending acquisition future
+/// cancels that attempt and does not produce a guard. Once acquisition
+/// resolves, the returned guard owns the lock until the guard is dropped.
 pub trait AsyncLock: Send + Sync {
     /// RAII guard returned by this asynchronous lock.
     type Guard<'a>: 'a

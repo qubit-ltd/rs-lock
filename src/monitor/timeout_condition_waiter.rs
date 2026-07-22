@@ -97,6 +97,20 @@ where
     M: TimeoutConditionWaiter,
 {
     /// Delegates a timed blocking condition wait to the shared monitor.
+    ///
+    /// # Parameters
+    ///
+    /// * `timeout` - Relative condition-wait budget.
+    /// * `predicate` - Predicate that remains true while waiting continues.
+    /// * `action` - Action to run after the predicate becomes false.
+    ///
+    /// # Returns
+    ///
+    /// The timed-wait result returned by the wrapped monitor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the wrapped monitor's Timer fails.
     #[inline(always)]
     fn wait_while_for<R, P, F>(
         &self,

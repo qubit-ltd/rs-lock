@@ -56,6 +56,18 @@ use super::try_lock_error::TryLockError;
 /// expensive values before acquiring the lock, or move blocking work to a
 /// dedicated blocking task and keep the locked closure short.
 ///
+/// Futures returned by this crate's implementations are lazy. Dropping one
+/// before acquisition completes cancels the queued acquisition and does not
+/// run its closure. After the lock is acquired there is no suspension point
+/// before the synchronous closure finishes, so cancellation cannot interrupt
+/// a partially executed closure. A closure panic propagates to the caller;
+/// Tokio locks are not poisoned and state changes made before the panic are
+/// not rolled back.
+///
+/// The closure executes while the lock is held. It must not synchronously
+/// re-enter the same lock; doing so can deadlock, panic, or fail depending on
+/// the underlying lock implementation.
+///
 /// The `async-lock` feature enables Tokio's `sync` feature. The
 /// `async-monitor` feature additionally enables Tokio's `time` feature for
 /// monitor deadlines. Applications that create a Tokio runtime as shown in

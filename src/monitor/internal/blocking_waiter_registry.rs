@@ -44,6 +44,11 @@ impl BlockingWaiterRegistry {
     /// # Returns
     ///
     /// An RAII registration that removes an unselected waiter on drop.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an allocation address unexpectedly collides with an active
+    /// waiter key.
     pub(in crate::monitor) fn register(
         &self,
     ) -> BlockingWaiterRegistration<'_> {
@@ -86,6 +91,10 @@ impl BlockingWaiterRegistry {
     }
 
     /// Removes an active registration without signalling it.
+    ///
+    /// # Parameters
+    ///
+    /// * `key` - Stable allocation-address key to remove.
     pub(super) fn unregister(&self, key: usize) {
         let waiter = self
             .waiters

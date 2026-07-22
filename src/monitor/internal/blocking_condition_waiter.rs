@@ -61,6 +61,10 @@ impl BlockingConditionWaiter {
     /// # Returns
     ///
     /// [`Poll::Ready`] after the deadline, otherwise [`Poll::Pending`].
+    ///
+    /// # Errors
+    ///
+    /// A ready result contains any Timer completion error.
     #[inline]
     pub(in crate::monitor) fn poll_timer(
         waiter: &Arc<Self>,

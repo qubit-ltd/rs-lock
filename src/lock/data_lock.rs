@@ -52,6 +52,11 @@ use super::try_lock_error::TryLockError;
 /// - Generic code that works with any lock type
 /// - Performance optimization through appropriate lock selection
 ///
+/// Each closure executes while its corresponding lock guard is held. A
+/// closure must not re-enter the same lock: implementations are not required
+/// to be reentrant, so doing so can deadlock, panic, or return a contention
+/// error depending on the operation and backend.
+///
 /// # Performance Characteristics
 ///
 /// Different lock implementations have different performance characteristics:

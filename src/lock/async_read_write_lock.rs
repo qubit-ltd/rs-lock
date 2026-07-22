@@ -25,6 +25,11 @@ use crate::lock::{
 };
 
 /// Represents an asynchronous lock with shared and exclusive modes.
+///
+/// Futures returned by this crate's implementations are lazy. Dropping a
+/// pending read or write acquisition cancels that attempt without producing a
+/// guard. A completed acquisition remains active until its returned guard is
+/// dropped.
 pub trait AsyncReadWriteLock: Send + Sync {
     /// Shared asynchronous read guard.
     type ReadGuard<'a>: 'a

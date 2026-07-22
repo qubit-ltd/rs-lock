@@ -27,6 +27,16 @@ pub enum TryLockError {
 }
 
 impl fmt::Display for TryLockError {
+    /// Formats this acquisition error for user-facing diagnostics.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Destination formatter.
+    ///
+    /// # Returns
+    ///
+    /// The formatter result.
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::WouldBlock => f.write_str("lock acquisition would block"),

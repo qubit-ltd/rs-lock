@@ -71,6 +71,15 @@ where
     type State = M::State;
 
     /// Delegates a blocking condition wait to the shared monitor.
+    ///
+    /// # Parameters
+    ///
+    /// * `predicate` - Predicate that remains true while waiting continues.
+    /// * `action` - Action to run after the predicate becomes false.
+    ///
+    /// # Returns
+    ///
+    /// The value returned by `action`.
     #[inline(always)]
     fn wait_while<R, P, F>(&self, predicate: P, action: F) -> R
     where

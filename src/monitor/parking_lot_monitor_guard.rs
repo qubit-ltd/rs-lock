@@ -151,6 +151,10 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     /// waiter.join().expect("waiter should finish");
     /// assert!(!monitor.with_read(|ready| *ready));
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics only if the guard's internal ownership invariant is violated.
     #[inline]
     pub fn wait(&mut self) {
         let registration = self.monitor.waiters.register();
@@ -237,6 +241,22 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     }
 
     /// Releases and reacquires the state guard around one fixed TimerFuture.
+    ///
+    /// # Parameters
+    ///
+    /// * `future` - Fixed Timer registration to race against notification.
+    ///
+    /// # Returns
+    ///
+    /// Whether notification or the deadline completed the wait.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when polling the Timer registration fails.
+    ///
+    /// # Panics
+    ///
+    /// Panics only if the guard's internal ownership invariant is violated.
     pub(super) fn wait_with_timer(
         &mut self,
         future: &mut TimerFuture,
@@ -271,6 +291,14 @@ impl<T> Deref for ParkingLotMonitorGuard<'_, T> {
     type Target = T;
 
     /// Returns an immutable reference to the protected state.
+    ///
+    /// # Returns
+    ///
+    /// An immutable reference tied to this guard.
+    ///
+    /// # Panics
+    ///
+    /// Panics only if the guard's internal ownership invariant is violated.
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
         self.inner
@@ -281,6 +309,14 @@ impl<T> Deref for ParkingLotMonitorGuard<'_, T> {
 
 impl<T> DerefMut for ParkingLotMonitorGuard<'_, T> {
     /// Returns a mutable reference to the protected state.
+    ///
+    /// # Returns
+    ///
+    /// A mutable reference tied to this guard.
+    ///
+    /// # Panics
+    ///
+    /// Panics only if the guard's internal ownership invariant is violated.
     #[inline(always)]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.inner
