@@ -123,7 +123,7 @@ Every concrete monitor exposes `with_timer`. Integration tests inject a
 `ManualTimer` into the same `ParkingLotMonitor`, `StdMonitor`, or
 `TokioMonitor` type used in production; there is no separate mock wait
 algorithm. Code that constructs the manual clock declares
-`qubit-clock = "0.9"` as a direct dependency:
+`qubit-clock = "0.10"` as a direct dependency:
 
 ```rust
 use std::{sync::Arc, thread, time::Duration};

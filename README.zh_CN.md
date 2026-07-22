@@ -103,7 +103,7 @@ wait 使用对应的 `AsyncConditionWaiter` 或 `AsyncTimeoutConditionWaiter`。
 
 每个具体 monitor 都提供 `with_timer`。集成测试把 `ManualTimer` 注入生产所用的
 `ParkingLotMonitor`、`StdMonitor` 或 `TokioMonitor`，不再维护另一套 mock 等待算法。
-构造手动 clock 的代码需要直接依赖 `qubit-clock = "0.9"`：
+构造手动 clock 的代码需要直接依赖 `qubit-clock = "0.10"`：
 
 ```rust
 use std::{sync::Arc, thread, time::Duration};

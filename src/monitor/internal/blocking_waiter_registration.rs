@@ -56,6 +56,7 @@ impl<'a> BlockingWaiterRegistration<'a> {
 
 impl Drop for BlockingWaiterRegistration<'_> {
     /// Cancels an active registration without transferring notification.
+    #[inline(always)]
     fn drop(&mut self) {
         self.registry.unregister(self.key);
     }

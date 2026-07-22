@@ -68,6 +68,10 @@ use super::{
 /// while holding the lock. This keeps monitor coordination state observable
 /// after panic unwinding.
 ///
+/// Closures and predicates execute while the state mutex is held. They must
+/// not re-enter the same monitor; the mutex is not reentrant and doing so can
+/// deadlock.
+///
 /// # Difference from raw synchronization primitives
 ///
 /// With raw parking_lot primitives, callers usually store multiple fields and
@@ -224,6 +228,10 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// The value returned by the closure.
     ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f`.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -256,6 +264,10 @@ impl<T> ParkingLotMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f`.
     ///
     /// # Examples
     ///
@@ -294,6 +306,10 @@ impl<T> ParkingLotMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f`. In that case no notification is sent.
     ///
     /// # Examples
     ///
@@ -335,6 +351,10 @@ impl<T> ParkingLotMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f`. In that case no notification is sent.
     ///
     /// # Examples
     ///

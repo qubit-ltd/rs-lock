@@ -241,6 +241,29 @@ fn test_readme_dependency_versions_match_cargo_toml() {
     );
 }
 
+#[test]
+/// Ensures both README files use the same `qubit-clock` requirement as
+/// Cargo.toml.
+fn test_readme_qubit_clock_dependency_version_matches_cargo_toml() {
+    let cargo_requirement =
+        extract_cargo_dependency_version(CARGO_TOML, "qubit-clock")
+            .expect("Cargo.toml does not declare qubit-clock");
+
+    for (filename, content) in
+        [("README.md", README_EN), ("README.zh_CN.md", README_ZH)]
+    {
+        let readme_requirement =
+            extract_inline_dependency_version(content, "qubit-clock")
+                .unwrap_or_else(|| {
+                    panic!("{filename} does not mention qubit-clock")
+                });
+        assert_eq!(
+            readme_requirement, cargo_requirement,
+            "{filename} qubit-clock version differs from Cargo.toml",
+        );
+    }
+}
+
 /// Extracts the first package version entry from Cargo.toml content.
 fn extract_package_version(content: &str) -> Option<&str> {
     for line in content.lines() {
@@ -249,6 +272,50 @@ fn extract_package_version(content: &str) -> Option<&str> {
         }
     }
     None
+}
+
+/// Extracts a dependency version requirement from Cargo.toml content.
+///
+/// # Parameters
+///
+/// * `content` - Cargo.toml content to inspect.
+/// * `dependency` - Dependency name to locate.
+///
+/// # Returns
+///
+/// The first matching dependency version requirement, if present.
+fn extract_cargo_dependency_version<'a>(
+    content: &'a str,
+    dependency: &str,
+) -> Option<&'a str> {
+    content.lines().find_map(|line| {
+        let value = line.trim().strip_prefix(dependency)?.trim();
+        let value = value.strip_prefix('=')?.trim();
+        let version = value
+            .strip_prefix('{')?
+            .split(',')
+            .find_map(|field| field.trim().strip_prefix("version = \""))?;
+        version.split_once('"').map(|(requirement, _)| requirement)
+    })
+}
+
+/// Extracts an inline dependency version from prose or a code snippet.
+///
+/// # Parameters
+///
+/// * `content` - Documentation content to inspect.
+/// * `dependency` - Dependency name to locate.
+///
+/// # Returns
+///
+/// The first quoted version following `dependency =`, if present.
+fn extract_inline_dependency_version<'a>(
+    content: &'a str,
+    dependency: &str,
+) -> Option<&'a str> {
+    let marker = format!("{dependency} = \"");
+    let (_, value) = content.split_once(&marker)?;
+    value.split_once('"').map(|(requirement, _)| requirement)
 }
 
 /// Asserts that every README dependency version accepts the package version.

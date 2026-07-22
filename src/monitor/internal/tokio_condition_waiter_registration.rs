@@ -61,6 +61,7 @@ impl<'a> TokioConditionWaiterRegistration<'a> {
     /// # Returns
     ///
     /// The registered waiter selected by monitor notifications.
+    #[must_use]
     #[inline(always)]
     pub(in crate::monitor) fn waiter(&self) -> &TokioConditionWaiter {
         &self.waiter
@@ -98,6 +99,7 @@ impl<'a> TokioConditionWaiterRegistration<'a> {
 
 impl Drop for TokioConditionWaiterRegistration<'_> {
     /// Removes this waiter if no notification has selected it yet.
+    #[inline]
     fn drop(&mut self) {
         let waiter_key = Arc::as_ptr(&self.waiter) as usize;
         let mut registry = self

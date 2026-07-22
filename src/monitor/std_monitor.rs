@@ -66,6 +66,10 @@ use super::{
 /// `StdMonitor` suitable for coordination state that should remain observable
 /// after another thread panics while holding the lock.
 ///
+/// Closures and predicates execute while the state mutex is held. They must
+/// not re-enter the same monitor; the mutex is not reentrant and doing so can
+/// deadlock.
+///
 /// # Difference from raw synchronization primitives
 ///
 /// With raw standard-library primitives, callers usually store multiple fields
@@ -233,6 +237,10 @@ impl<T> StdMonitor<T> {
     ///
     /// The value returned by the closure.
     ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f`.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -268,6 +276,10 @@ impl<T> StdMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f`.
     ///
     /// # Examples
     ///
@@ -308,6 +320,10 @@ impl<T> StdMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f`. In that case no notification is sent.
     ///
     /// # Examples
     ///
@@ -351,6 +367,10 @@ impl<T> StdMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f`. In that case no notification is sent.
     ///
     /// # Examples
     ///

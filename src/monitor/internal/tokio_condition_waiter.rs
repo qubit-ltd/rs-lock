@@ -21,6 +21,7 @@ impl TokioConditionWaiter {
     /// # Returns
     ///
     /// A waiter with no retained notification.
+    #[must_use]
     #[inline]
     pub(in crate::monitor) fn new() -> Self {
         Self {
@@ -33,6 +34,7 @@ impl TokioConditionWaiter {
     /// # Returns
     ///
     /// The private signal used to select this waiter.
+    #[must_use]
     #[inline(always)]
     pub(in crate::monitor) fn signal(&self) -> &Notify {
         &self.signal
