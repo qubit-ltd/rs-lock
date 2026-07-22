@@ -24,6 +24,10 @@ use criterion::{
     criterion_group,
     criterion_main,
 };
+use qubit_clock::{
+    ManualMonotonicClock,
+    MonotonicClock,
+};
 use qubit_lock::{
     ArcTokioMonitor,
     AsyncConditionWaiter,
@@ -37,7 +41,7 @@ type OwnedWaitFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 
 /// Creates `count` futures and polls each one until it registers as a waiter.
 ///
-/// # Arguments
+/// # Parameters
 ///
 /// * `count` - Number of pending wait futures to register.
 ///
@@ -45,7 +49,8 @@ type OwnedWaitFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 ///
 /// Registered pending futures whose drop path performs cancellation.
 fn create_registered_waiters(count: usize) -> Vec<OwnedWaitFuture> {
-    let monitor = ArcTokioMonitor::current(false);
+    let clock = ManualMonotonicClock::new_shared();
+    let monitor = ArcTokioMonitor::with_timer(false, clock.new_timer());
     let mut waiters = Vec::with_capacity(count);
     for _ in 0..count {
         let waiter_monitor = monitor.clone();
@@ -67,7 +72,7 @@ fn create_registered_waiters(count: usize) -> Vec<OwnedWaitFuture> {
 
 /// Benchmarks dropping all registered waiters for several registry sizes.
 ///
-/// # Arguments
+/// # Parameters
 ///
 /// * `criterion` - Criterion benchmark coordinator.
 fn benchmark_tokio_monitor_cancellation(criterion: &mut Criterion) {
