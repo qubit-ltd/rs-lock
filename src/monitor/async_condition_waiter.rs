@@ -7,7 +7,10 @@
 // =============================================================================
 //! Asynchronous condition-wait capability.
 
-use std::future::Future;
+use std::{
+    future::Future,
+    sync::Arc,
+};
 
 /// Waits asynchronously for predicates over protected monitor state.
 ///
@@ -82,4 +85,36 @@ pub trait AsyncConditionWaiter {
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a;
+}
+
+impl<M> AsyncConditionWaiter for Arc<M>
+where
+    M: AsyncConditionWaiter + ?Sized,
+{
+    type State = M::State;
+
+    /// Forwards the asynchronous wait to the wrapped monitor.
+    ///
+    /// # Parameters
+    ///
+    /// * `predicate` - Predicate that returns `true` while waiting should
+    ///   continue.
+    /// * `action` - Action to run after the predicate becomes false.
+    ///
+    /// # Returns
+    ///
+    /// The future returned by the wrapped monitor.
+    #[inline(always)]
+    fn wait_while_async<'a, R, P, F>(
+        &'a self,
+        predicate: P,
+        action: F,
+    ) -> impl Future<Output = R> + Send + 'a
+    where
+        R: Send + 'a,
+        P: FnMut(&Self::State) -> bool + Send + 'a,
+        F: FnOnce(&mut Self::State) -> R + Send + 'a,
+    {
+        self.as_ref().wait_while_async(predicate, action)
+    }
 }

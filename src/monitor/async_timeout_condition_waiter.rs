@@ -10,6 +10,7 @@
 use qubit_clock::TimeError;
 use std::{
     future::Future,
+    sync::Arc,
     time::Duration,
 };
 
@@ -112,4 +113,42 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a;
+}
+
+impl<M> AsyncTimeoutConditionWaiter for Arc<M>
+where
+    M: AsyncTimeoutConditionWaiter + ?Sized,
+{
+    /// Forwards the timed asynchronous wait to the wrapped monitor.
+    ///
+    /// # Parameters
+    ///
+    /// * `timeout` - Relative condition-wait budget.
+    /// * `predicate` - Predicate that returns `true` while waiting should
+    ///   continue.
+    /// * `action` - Action to run after the predicate becomes false.
+    ///
+    /// # Returns
+    ///
+    /// The future returned by the wrapped monitor.
+    ///
+    /// # Errors
+    ///
+    /// The future resolves to an error when the wrapped monitor's timer
+    /// cannot register the deadline.
+    #[inline(always)]
+    fn wait_while_for_async<'a, R, P, F>(
+        &'a self,
+        timeout: Duration,
+        predicate: P,
+        action: F,
+    ) -> impl Future<Output = Result<WaitTimeoutResult<R>, TimeError>> + Send + 'a
+    where
+        R: Send + 'a,
+        P: FnMut(&Self::State) -> bool + Send + 'a,
+        F: FnOnce(&mut Self::State) -> R + Send + 'a,
+    {
+        self.as_ref()
+            .wait_while_for_async(timeout, predicate, action)
+    }
 }
