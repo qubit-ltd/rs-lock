@@ -67,6 +67,8 @@ fn test_lock_accepts_arc_and_borrowed_forwarding() {
 
     acquire_once(&lock);
     acquire_once(&&*lock);
+    assert!(Lock::try_lock(&lock).is_ok());
+    assert!(Lock::try_lock(&&*lock).is_ok());
 }
 
 #[test]

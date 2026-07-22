@@ -45,6 +45,16 @@ async fn test_async_lock_accepts_arc_forwarding() {
 }
 
 #[tokio::test]
+async fn test_async_lock_accepts_borrowed_forwarding() {
+    let lock = Mutex::new(());
+    let borrowed = &lock;
+
+    let guard = AsyncLock::lock(&borrowed).await;
+    drop(guard);
+    assert!(AsyncLock::try_lock(&borrowed).is_ok());
+}
+
+#[tokio::test]
 /// Verifies dropping a waiter after registration does not retain the lock.
 async fn test_async_lock_cancelled_waiter_does_not_retain_lock() {
     let lock = Mutex::new(());
