@@ -29,9 +29,9 @@ use std::{
 };
 
 use super::failing_timer_tests::{
-    CompletionFailingTimer,
-    FailingTimer,
     assert_backend_unavailable,
+    completion_failing_timer,
+    registration_failing_timer,
 };
 use qubit_clock::{
     ManualMonotonicClock,
@@ -54,10 +54,8 @@ fn assert_send<F: Future + Send>(future: F) -> F {
 
 #[tokio::test]
 async fn test_tokio_monitor_propagates_timer_completion_error() {
-    let monitor = TokioMonitor::with_timer(
-        false,
-        Arc::new(CompletionFailingTimer::new()),
-    );
+    let monitor =
+        TokioMonitor::with_timer(false, Arc::new(completion_failing_timer()));
 
     let result = monitor
         .wait_until_for_async(Duration::from_secs(1), |ready| *ready, |_| ())
@@ -177,7 +175,7 @@ async fn test_tokio_monitor_cancellation_removes_manual_timer_registration() {
 #[tokio::test]
 async fn test_tokio_monitor_propagates_timer_registration_error() {
     let monitor =
-        TokioMonitor::with_timer(false, Arc::new(FailingTimer::new()));
+        TokioMonitor::with_timer(false, Arc::new(registration_failing_timer()));
 
     let result = monitor
         .wait_until_for_async(Duration::from_secs(1), |ready| *ready, |_| ())

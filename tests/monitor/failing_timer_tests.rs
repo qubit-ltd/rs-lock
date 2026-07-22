@@ -5,94 +5,41 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-//! Test Timer that rejects every deadline registration.
-
-use std::io;
+//! Shared fault-injecting Timer factories and assertions.
 
 use qubit_clock::{
-    ManualMonotonicClock,
-    MonotonicClock,
-    MonotonicInstant,
     TimeError,
-    Timer,
-    TimerFuture,
     TimerUnavailableError,
+    test_util::{
+        FaultInjectingTimer,
+        TimerFailurePoint,
+    },
 };
 
-/// Timer used to verify synchronous registration-error propagation.
-pub(super) struct FailingTimer {
-    /// Clock defining the Timer's otherwise valid domain.
-    clock: ManualMonotonicClock,
+/// Creates a Timer that rejects every future-deadline registration.
+///
+/// # Returns
+///
+/// A fault-injecting Timer reporting backend unavailability at registration.
+pub(super) fn registration_failing_timer() -> FaultInjectingTimer {
+    FaultInjectingTimer::backend_unavailable(
+        TimerFailurePoint::Registration,
+        "test",
+        "test timer backend unavailable",
+    )
 }
 
-pub(super) struct CompletionFailingTimer {
-    clock: ManualMonotonicClock,
-}
-
-impl CompletionFailingTimer {
-    pub(super) fn new() -> Self {
-        Self {
-            clock: ManualMonotonicClock::new(),
-        }
-    }
-}
-
-impl FailingTimer {
-    /// Creates a Timer that reports [`TimeError::TimerUnavailable`] with
-    /// [`TimerUnavailableError::BackendUnavailable`].
-    ///
-    /// # Returns
-    ///
-    /// A failing Timer with its own monotonic domain.
-    pub(super) fn new() -> Self {
-        Self {
-            clock: ManualMonotonicClock::new(),
-        }
-    }
-}
-
-impl Timer for FailingTimer {
-    /// Returns this Timer's manual monotonic clock.
-    fn clock(&self) -> &dyn MonotonicClock {
-        &self.clock
-    }
-
-    /// Rejects every deadline registration.
-    fn at(
-        &self,
-        _deadline: MonotonicInstant,
-    ) -> Result<TimerFuture, TimeError> {
-        Err(TimeError::TimerUnavailable {
-            source: TimerUnavailableError::BackendUnavailable {
-                backend: "test",
-                source: Box::new(io::Error::other(
-                    "test timer backend unavailable",
-                )),
-            },
-        })
-    }
-}
-
-impl Timer for CompletionFailingTimer {
-    fn clock(&self) -> &dyn MonotonicClock {
-        &self.clock
-    }
-
-    fn at(
-        &self,
-        _deadline: MonotonicInstant,
-    ) -> Result<TimerFuture, TimeError> {
-        Ok(Box::pin(std::future::ready(Err(
-            TimeError::TimerUnavailable {
-                source: TimerUnavailableError::BackendUnavailable {
-                    backend: "test",
-                    source: Box::new(io::Error::other(
-                        "test timer backend unavailable",
-                    )),
-                },
-            },
-        ))))
-    }
+/// Creates a Timer whose registered futures fail on completion.
+///
+/// # Returns
+///
+/// A fault-injecting Timer reporting backend unavailability at completion.
+pub(super) fn completion_failing_timer() -> FaultInjectingTimer {
+    FaultInjectingTimer::backend_unavailable(
+        TimerFailurePoint::Completion,
+        "test",
+        "test timer backend unavailable",
+    )
 }
 
 /// Verifies the stable category and source of the failing test Timer.

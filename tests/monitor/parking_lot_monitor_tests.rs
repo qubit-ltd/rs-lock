@@ -30,9 +30,9 @@ use qubit_lock::{
 };
 
 use super::failing_timer_tests::{
-    CompletionFailingTimer,
-    FailingTimer,
     assert_backend_unavailable,
+    completion_failing_timer,
+    registration_failing_timer,
 };
 
 #[test]
@@ -50,7 +50,7 @@ fn test_parking_lot_monitor_new_read_write_updates_state() {
 fn test_parking_lot_monitor_timed_wait_propagates_completion_error() {
     let monitor = ParkingLotMonitor::with_timer(
         false,
-        Arc::new(CompletionFailingTimer::new()),
+        Arc::new(completion_failing_timer()),
     );
 
     let result =
@@ -452,8 +452,10 @@ fn test_parking_lot_monitor_wait_while_for_returns_timed_out_when_timeout() {
 
 #[test]
 fn test_parking_lot_monitor_timed_predicate_wait_propagates_timer_error() {
-    let monitor =
-        ParkingLotMonitor::with_timer(false, Arc::new(FailingTimer::new()));
+    let monitor = ParkingLotMonitor::with_timer(
+        false,
+        Arc::new(registration_failing_timer()),
+    );
 
     let result =
         monitor.wait_until_for(Duration::from_secs(1), |ready| *ready, |_| ());

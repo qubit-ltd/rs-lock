@@ -13,8 +13,8 @@ use std::{
 };
 
 use super::failing_timer_tests::{
-    FailingTimer,
     assert_backend_unavailable,
+    registration_failing_timer,
 };
 use qubit_clock::{
     ManualMonotonicClock,
@@ -72,8 +72,10 @@ fn test_parking_lot_monitor_guard_wait_until_accepts_reached_local_deadline() {
 
 #[test]
 fn test_parking_lot_monitor_guard_keeps_lock_after_timer_registration_error() {
-    let monitor =
-        ParkingLotMonitor::with_timer(1, Arc::new(FailingTimer::new()));
+    let monitor = ParkingLotMonitor::with_timer(
+        1,
+        Arc::new(registration_failing_timer()),
+    );
     let mut guard = monitor.lock();
 
     let error = guard
