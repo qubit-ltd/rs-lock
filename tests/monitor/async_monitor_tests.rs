@@ -7,11 +7,15 @@
 // =============================================================================
 //! Tests for [`AsyncMonitor`](qubit_lock::AsyncMonitor).
 
-use std::time::Duration;
+use std::{
+    sync::Arc,
+    time::Duration,
+};
 
 use qubit_lock::{
     ArcTokioMonitor,
     AsyncMonitor,
+    TokioMonitor,
     WaitTimeoutResult,
 };
 
@@ -36,4 +40,11 @@ where
 /// Verifies a Tokio handle satisfies [`AsyncMonitor`].
 async fn test_async_monitor_trait_accepts_tokio_monitor() {
     wait_through_trait(&ArcTokioMonitor::current(false)).await;
+}
+
+#[tokio::test(start_paused = true)]
+/// Verifies [`Arc`] forwards the aggregate async monitor capability.
+async fn test_async_monitor_trait_accepts_arc_forwarding() {
+    let monitor = Arc::new(TokioMonitor::current(false));
+    wait_through_trait(&monitor).await;
 }

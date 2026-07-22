@@ -7,9 +7,12 @@
 // =============================================================================
 //! Tests for [`SharedAsyncMonitor`](qubit_lock::SharedAsyncMonitor).
 
+use std::sync::Arc;
+
 use qubit_lock::{
     ArcTokioMonitor,
     SharedAsyncMonitor,
+    TokioMonitor,
 };
 
 /// Clones a monitor through the aggregate shared async capability.
@@ -24,5 +27,13 @@ where
 /// Verifies a Tokio handle satisfies [`SharedAsyncMonitor`].
 async fn test_shared_async_monitor_trait_accepts_tokio_monitor_handle() {
     let monitor = clone_through_trait(ArcTokioMonitor::current(false));
+    assert!(!monitor.with_read_async(|ready| *ready).await);
+}
+
+#[tokio::test]
+/// Verifies [`Arc`] forwarding also satisfies [`SharedAsyncMonitor`].
+async fn test_shared_async_monitor_trait_accepts_arc_forwarding() {
+    let monitor = Arc::new(TokioMonitor::current(false));
+    let monitor = clone_through_trait(monitor);
     assert!(!monitor.with_read_async(|ready| *ready).await);
 }
