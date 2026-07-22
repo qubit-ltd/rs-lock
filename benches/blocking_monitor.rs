@@ -37,7 +37,12 @@ use parking_lot::{
 use qubit_lock::{
     ParkingLotMonitor,
     StdMonitor,
+    WaitTimeoutStatus,
 };
+
+/// Generous safety deadline that detects stalled notify-one benchmarks without
+/// allowing ordinary setup delays to select the timeout path.
+const NOTIFY_WAIT_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Resources for one prepared ParkingLotMonitor notify-all measurement.
 type MonitorWaiters = (
@@ -52,6 +57,17 @@ type CondvarWaiters = (
     Vec<JoinHandle<()>>,
     Receiver<()>,
 );
+
+/// Resources for one timed ParkingLotMonitor notify-one measurement.
+type TimedMonitorWaiter = (
+    Arc<ParkingLotMonitor<bool>>,
+    JoinHandle<()>,
+    Receiver<WaitTimeoutStatus>,
+);
+
+/// Resources for one timed parking_lot Condvar notify-one measurement.
+type TimedCondvarWaiter =
+    (Arc<(Mutex<bool>, Condvar)>, JoinHandle<()>, Receiver<bool>);
 
 /// Prepares registered ParkingLotMonitor waiters outside the measured routine.
 ///
@@ -152,7 +168,7 @@ fn prepare_condvar_waiters(waiter_count: usize) -> CondvarWaiters {
 /// # Returns
 ///
 /// The monitor, waiter handle, and completion receiver.
-fn prepare_timed_monitor_waiter() -> MonitorWaiters {
+fn prepare_timed_monitor_waiter() -> TimedMonitorWaiter {
     let monitor = Arc::new(ParkingLotMonitor::new(false));
     let (registered_tx, registered_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
@@ -163,11 +179,10 @@ fn prepare_timed_monitor_waiter() -> MonitorWaiters {
             .send(())
             .expect("benchmark should observe registration");
         let status = guard
-            .wait_for(Duration::from_secs(1))
+            .wait_for(NOTIFY_WAIT_TIMEOUT)
             .expect("standard Timer should register");
-        let _ = black_box(status);
         done_tx
-            .send(())
+            .send(status)
             .expect("benchmark should observe waiter completion");
     });
 
@@ -175,7 +190,7 @@ fn prepare_timed_monitor_waiter() -> MonitorWaiters {
         .recv()
         .expect("benchmark timed waiter should register");
     drop(monitor.lock());
-    (monitor, vec![waiter], done_rx)
+    (monitor, waiter, done_rx)
 }
 
 /// Prepares one parking_lot Condvar waiter performing a nonzero timed wait.
@@ -183,7 +198,7 @@ fn prepare_timed_monitor_waiter() -> MonitorWaiters {
 /// # Returns
 ///
 /// The shared condition state, waiter handle, and completion receiver.
-fn prepare_timed_condvar_waiter() -> CondvarWaiters {
+fn prepare_timed_condvar_waiter() -> TimedCondvarWaiter {
     let condition = Arc::new((Mutex::new(false), Condvar::new()));
     let (registered_tx, registered_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
@@ -194,10 +209,9 @@ fn prepare_timed_condvar_waiter() -> CondvarWaiters {
         registered_tx
             .send(())
             .expect("benchmark should observe registration");
-        let status = changed.wait_for(&mut guard, Duration::from_secs(1));
-        black_box(status.timed_out());
+        let status = changed.wait_for(&mut guard, NOTIFY_WAIT_TIMEOUT);
         done_tx
-            .send(())
+            .send(status.timed_out())
             .expect("benchmark should observe waiter completion");
     });
 
@@ -205,7 +219,23 @@ fn prepare_timed_condvar_waiter() -> CondvarWaiters {
         .recv()
         .expect("benchmark timed waiter should register");
     drop(condition.0.lock());
-    (condition, vec![waiter], done_rx)
+    (condition, waiter, done_rx)
+}
+
+/// Receives one timed waiter outcome and joins its thread.
+///
+/// # Parameters
+///
+/// * `done_rx` - Receiver carrying the timed waiter outcome.
+/// * `waiter` - Thread to join after completion.
+///
+/// # Returns
+///
+/// The outcome reported by the timed wait.
+fn finish_timed_waiter<T>(done_rx: Receiver<T>, waiter: JoinHandle<()>) -> T {
+    let outcome = done_rx.recv().expect("benchmark waiter should complete");
+    waiter.join().expect("benchmark waiter should not panic");
+    outcome
 }
 
 /// Waits for every prepared thread to complete and joins it.
@@ -321,9 +351,10 @@ fn benchmark_notify_one(criterion: &mut Criterion) {
     group.bench_function("parking_lot_monitor", |bencher| {
         bencher.iter_batched(
             prepare_timed_monitor_waiter,
-            |(monitor, waiters, done_rx)| {
+            |(monitor, waiter, done_rx)| {
                 monitor.notify_one();
-                finish_waiters(1, done_rx, waiters);
+                let status = finish_timed_waiter(done_rx, waiter);
+                assert_eq!(status, WaitTimeoutStatus::Woken);
             },
             BatchSize::SmallInput,
         );
@@ -331,9 +362,10 @@ fn benchmark_notify_one(criterion: &mut Criterion) {
     group.bench_function("parking_lot_condvar", |bencher| {
         bencher.iter_batched(
             prepare_timed_condvar_waiter,
-            |(condition, waiters, done_rx)| {
+            |(condition, waiter, done_rx)| {
                 condition.1.notify_one();
-                finish_waiters(1, done_rx, waiters);
+                let timed_out = finish_timed_waiter(done_rx, waiter);
+                assert!(!timed_out, "notify-one benchmark waiter timed out");
             },
             BatchSize::SmallInput,
         );
