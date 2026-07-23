@@ -26,6 +26,11 @@ use crate::lock::TryLockError;
 /// The trait is independent of protected data. Its associated guard may carry
 /// backend-specific state, but generic users receive no data-access contract
 /// and can only retain or drop that guard.
+///
+/// `Lock` does not imply exclusive entry. For example, a
+/// [`crate::ReadLock`] implements this trait and permits multiple guards to
+/// coexist. Generic APIs that require mutual exclusion should additionally
+/// require [`crate::ExclusiveLock`].
 pub trait Lock: Send + Sync {
     /// RAII guard returned by this lock implementation.
     type Guard<'a>: 'a
