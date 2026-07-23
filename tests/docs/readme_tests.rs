@@ -18,6 +18,10 @@ const README_ZH: &str = include_str!("../../README.zh_CN.md");
 const LIB_RS: &str = include_str!("../../src/lib.rs");
 const READ_WRITE_LOCK_SRC: &str =
     include_str!("../../src/lock/read_write_lock.rs");
+const CONDITION_WAITER_SRC: &str =
+    include_str!("../../src/monitor/condition_waiter.rs");
+const ASYNC_CONDITION_WAITER_SRC: &str =
+    include_str!("../../src/monitor/async_condition_waiter.rs");
 const ASYNC_READ_WRITE_LOCK_SRC: &str =
     include_str!("../../src/lock/async_read_write_lock.rs");
 const TIMEOUT_CONDITION_WAITER_SRC: &str =
@@ -102,6 +106,21 @@ fn test_readme_documents_native_lock_support() {
 }
 
 #[test]
+/// Ensures both READMEs distinguish generic acquisition modes from exclusive
+/// ones.
+fn test_readme_documents_exclusive_lock_capability() {
+    let readme_en = normalize_readme_text(README_EN);
+    let readme_zh = normalize_readme_text(README_ZH);
+
+    assert!(readme_en.contains("`Lock` represents one acquisition mode"));
+    assert!(readme_en.contains("`ExclusiveLock` marks acquisition modes"));
+    assert!(readme_en.contains("`ReadLock` implements `Lock` only"));
+    assert!(readme_zh.contains("`Lock` 表示一种获取模式"));
+    assert!(readme_zh.contains("`ExclusiveLock` 标记"));
+    assert!(readme_zh.contains("`ReadLock` 只实现 `Lock`"));
+}
+
+#[test]
 /// Ensures README monitor snippets show the combined write-and-notify API.
 fn test_readme_monitor_example_uses_with_write_notify_one() {
     assert!(README_EN.contains("use qubit_lock::ArcParkingLotMonitor;"));
@@ -121,12 +140,48 @@ fn test_readme_documents_monitor_wait_semantics() {
     assert!(readme_en.contains("one fixed deadline"));
     assert!(readme_en.contains("A zero timeout still checks the predicate"));
     assert!(readme_en.contains("final locked predicate check wins"));
+    assert!(readme_en.contains(
+        "Timer registration or completion error takes precedence over every post-wait predicate result"
+    ));
+    assert!(readme_en.contains("the action is not run"));
     assert!(readme_zh.contains("无记忆的条件变量语义"));
     assert!(readme_zh.contains("已经注册的 waiter"));
     assert!(readme_zh.contains("条件等待预算"));
     assert!(readme_zh.contains("同一个固定 deadline"));
     assert!(readme_zh.contains("零 timeout 仍会检查 predicate"));
     assert!(readme_zh.contains("最后一次持锁 predicate 检查优先"));
+    assert!(
+        readme_zh
+            .contains("Timer 注册或完成错误优先于任何等待后的 predicate 结果")
+    );
+    assert!(readme_zh.contains("不会执行 action"));
+}
+
+#[test]
+/// Ensures public docs explain the monitor handshake for external predicate
+/// state.
+fn test_monitor_docs_cover_external_predicate_state_handshake() {
+    let readme_en = normalize_readme_text(README_EN);
+    let readme_zh = normalize_readme_text(README_ZH);
+
+    assert!(readme_en.contains("external predicate state"));
+    assert!(readme_en.contains("Atomic ordering alone cannot prevent"));
+    assert!(readme_en.contains("same monitor-lock handshake"));
+    assert!(readme_zh.contains("monitor 外部的 predicate 状态"));
+    assert!(readme_zh.contains("仅靠 atomic ordering 无法防止"));
+    assert!(readme_zh.contains("同一个 monitor-lock handshake"));
+
+    for source in [CONDITION_WAITER_SRC, ASYNC_CONDITION_WAITER_SRC] {
+        assert!(source.contains("External predicate state"));
+        assert!(source.contains("Atomic ordering alone"));
+        assert!(source.contains("same monitor lock"));
+    }
+    assert!(ASYNC_CONDITION_WAITER_SRC.contains("let waiter = tokio::spawn"));
+    assert!(
+        ASYNC_CONDITION_WAITER_SRC.contains(".with_write_notify_all_async")
+    );
+    assert!(readme_en.contains("with_write_notify_all_async"));
+    assert!(readme_zh.contains("with_write_notify_all_async"));
 }
 
 #[test]

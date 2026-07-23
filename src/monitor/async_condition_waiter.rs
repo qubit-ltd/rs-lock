@@ -20,6 +20,55 @@ use std::{
 /// have memoryless condition-variable semantics, so every wakeup rechecks the
 /// predicate and no fairness is guaranteed.
 ///
+/// # External predicate state
+///
+/// If a predicate reads state outside [`Self::State`], every predicate-changing
+/// update must participate in the same monitor lock handshake before notifying
+/// the monitor. Atomic ordering alone cannot close the scheduling window
+/// between the waiter's predicate check and waiter registration. Use the
+/// concrete monitor's asynchronous combined helper, such as
+/// `with_write_notify_all_async`, to update that external state while holding
+/// the monitor lock and then notify waiters.
+///
+/// ```
+/// use std::sync::{
+///     Arc,
+///     atomic::{
+///         AtomicBool,
+///         Ordering,
+///     },
+/// };
+///
+/// use qubit_lock::{
+///     ArcTokioMonitor,
+///     AsyncConditionWaiter,
+/// };
+///
+/// # #[tokio::main]
+/// # async fn main() {
+/// let ready = Arc::new(AtomicBool::new(false));
+/// let monitor = ArcTokioMonitor::current(());
+/// let waiter_ready = Arc::clone(&ready);
+/// let waiter_monitor = monitor.clone();
+///
+/// let waiter = tokio::spawn(async move {
+///     waiter_monitor
+///         .wait_until_async(
+///             |_| waiter_ready.load(Ordering::Acquire),
+///             |_| (),
+///         )
+///         .await;
+/// });
+///
+/// monitor
+///     .with_write_notify_all_async(|_| {
+///         ready.store(true, Ordering::Release);
+///     })
+///     .await;
+/// waiter.await.expect("waiter should finish");
+/// # }
+/// ```
+///
 /// Dropping a pending future cancels and unregisters its active wait. It does
 /// not run the action or roll back protected-state changes made while the wait
 /// existed. If a notification already selected that waiter, cancellation

@@ -11,8 +11,10 @@
 
 ## 特性
 
-- `Lock`：与数据无关、返回 RAII guard 的独占锁能力，由
-  `std::sync::Mutex<T>` 和 `parking_lot::Mutex<T>` 实现。
+- `Lock`：与数据无关、返回 RAII guard 的一种同步获取模式；该模式可以共享，
+  也可以独占。
+- `ExclusiveLock`：标记排除所有竞争 guard 的 `Lock` 获取模式，包括 mutex 和
+  write-mode adapter。
 - `ReadWriteLock`：与数据无关的共享/独占锁能力，由
   `std::sync::RwLock<T>` 和 `parking_lot::RwLock<T>` 实现。
 - `DataLock<T>`：以闭包访问受支持 mutex 或读写锁所保护的数据。
@@ -66,10 +68,77 @@ monitor notification 使用无记忆的条件变量语义。`notify_one` 最多�
 waiter；没有已注册 waiter 时发出的 notification 对未来没有影响。唤醒只会触发下一次
 受保护的 predicate 检查，既不会让 predicate 自动变为 true，也不保证公平性。
 
+当 predicate 读取 monitor 外部的 predicate 状态时，所有可能使其就绪的更新都必须
+参与同一个 monitor-lock handshake。仅靠 atomic ordering 无法防止 notification
+落在 predicate 检查与 waiter 注册之间。正确顺序是获取 monitor lock、更新外部状态、
+释放 lock、再通知；`with_write_notify_all` 等组合 helper 会执行这一协议：
+
+```rust
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    thread,
+};
+
+use qubit_lock::ArcStdMonitor;
+
+let ready = Arc::new(AtomicBool::new(false));
+let monitor = ArcStdMonitor::new(());
+let waiter_ready = Arc::clone(&ready);
+let waiter_monitor = monitor.clone();
+let waiter = thread::spawn(move || {
+    waiter_monitor.wait_until(
+        |_| waiter_ready.load(Ordering::Acquire),
+        |_| (),
+    );
+});
+
+monitor.with_write_notify_all(|_| ready.store(true, Ordering::Release));
+waiter.join().expect("waiter should finish");
+```
+
+异步协议完全相同；应使用对应的组合 helper，确保外部状态更新与 notification 不会
+跨过 waiter 注册窗口：
+
+```rust
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
+
+use qubit_lock::{ArcTokioMonitor, AsyncConditionWaiter};
+
+#[tokio::main]
+async fn main() {
+    let ready = Arc::new(AtomicBool::new(false));
+    let monitor = ArcTokioMonitor::current(());
+    let waiter_ready = Arc::clone(&ready);
+    let waiter_monitor = monitor.clone();
+    let waiter = tokio::spawn(async move {
+        waiter_monitor
+            .wait_until_async(
+                |_| waiter_ready.load(Ordering::Acquire),
+                |_| (),
+            )
+            .await;
+    });
+
+    monitor
+        .with_write_notify_all_async(|_| {
+            ready.store(true, Ordering::Release);
+        })
+        .await;
+    waiter.await.expect("waiter should finish");
+}
+```
+
 相对 timeout 是条件等待预算。初始状态锁竞争和初始 predicate 检查不计入预算。初始
 检查确认必须等待后，monitor 会在首次条件等待挂起前立即建立同一个固定 deadline，并
-在后续唤醒中复用。零 timeout 仍会检查 predicate，最后一次持锁 predicate 检查优先于
-timeout。
+在后续唤醒中复用。零 timeout 仍会检查 predicate；Timer 正常完成 timeout 时，
+最后一次持锁 predicate 检查优先。Timer 注册或完成错误优先于任何等待后的 predicate
+结果，此时不会执行 action。初始 predicate 已就绪时不会启动 Timer。
 
 异步 monitor trait 返回 `impl Future`；返回的 future 是惰性的，所以构造 future 和首次
 poll 之前的时间不消耗 timeout 预算。`TokioMonitor::current` 和
@@ -133,9 +202,10 @@ assert_eq!(waiter.join().unwrap(), Ok(WaitTimeoutResult::TimedOut));
 无需用真实 sleep 猜测注册时机。Monitor 和 Timer 注册都支持安全取消；多个组件也可
 共享同一个手动时间域。
 
-带超时的 predicate API 返回 `Result<WaitTimeoutResult<_>, TimeError>`，Timer 注册或完成错误
-不会伪装成超时。Guard 使用原地更新的 `wait`、`wait_for` 和 `wait_until`；Timer 出错时
-guard 仍然持有且可继续使用，包括在 guard 释放并重新获取后才报告的完成错误。
+带超时的 predicate API 返回 `Result<WaitTimeoutResult<_>, TimeError>`，Timer 注册或
+完成错误不会伪装成超时，也不会被等待后的就绪状态掩盖。Guard 使用原地更新的
+`wait`、`wait_for` 和 `wait_until`；Timer 出错时 guard 仍然持有且可继续使用，包括
+在 guard 释放并重新获取后才报告的完成错误。
 
 ## 快速开始
 
@@ -154,6 +224,8 @@ fn main() {
 ### 与数据无关的锁
 
 当受保护状态位于锁外部（例如 atomic）时使用 `Lock`。guard 离开作用域时自动解锁。
+`Lock` 表示一种获取模式，本身不承诺互斥；`ExclusiveLock` 标记能够排除所有竞争
+guard 的获取模式。泛型代码要求独占进入时应增加这一约束。
 
 ```rust
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -175,7 +247,8 @@ fn main() {
 
 `std::sync::Mutex<T>`、`std::sync::RwLock<T>`、`parking_lot::Mutex<T>` 和
 `parking_lot::RwLock<T>` 都实现 `DataLock<T>`。读写锁实现 `ReadWriteLock`；
-可用 `read_lock()` 或 `write_lock()` 将其中一侧适配为独占 `Lock` 能力。
+可用 `read_lock()` 或 `write_lock()` 将其中一侧适配为 `Lock`。`ReadLock`
+只实现 `Lock`，允许多个 reader 并发；`WriteLock` 还实现 `ExclusiveLock`。
 
 ### ParkingLotMonitor
 

@@ -17,6 +17,50 @@ use std::sync::Arc;
 /// fairness or make the predicate true. The action runs only after the
 /// predicate reaches its completion condition.
 ///
+/// # External predicate state
+///
+/// If a predicate reads state stored outside [`Self::State`], every update
+/// that may change the predicate must participate in the same monitor lock
+/// handshake. The updater acquires the monitor lock, changes the external
+/// state, releases the lock, and notifies the monitor. Atomic ordering alone
+/// cannot prevent a notification from falling between the waiter's predicate
+/// check and waiter registration.
+///
+/// Concrete monitors provide combined helpers such as
+/// `with_write_notify_all` for this protocol:
+///
+/// ```
+/// use std::{
+///     sync::{
+///         Arc,
+///         atomic::{
+///             AtomicBool,
+///             Ordering,
+///         },
+///     },
+///     thread,
+/// };
+///
+/// use qubit_lock::ArcStdMonitor;
+///
+/// let ready = Arc::new(AtomicBool::new(false));
+/// let monitor = ArcStdMonitor::new(());
+/// let waiter_ready = Arc::clone(&ready);
+/// let waiter_monitor = monitor.clone();
+///
+/// let waiter = thread::spawn(move || {
+///     waiter_monitor.wait_until(
+///         |_| waiter_ready.load(Ordering::Acquire),
+///         |_| (),
+///     );
+/// });
+///
+/// monitor.with_write_notify_all(|_| {
+///     ready.store(true, Ordering::Release);
+/// });
+/// waiter.join().expect("waiter should finish");
+/// ```
+///
 /// Use this trait as a static generic bound when blocking code needs predicate
 /// waits but no timeout. Its generic methods make it unsuitable as a `dyn`
 /// trait-object interface.
