@@ -12,8 +12,10 @@ generic lock capabilities plus monitor-style coordination.
 
 ## Features
 
-- `Lock`: data-independent exclusive locking with an RAII guard, implemented
-  by `std::sync::Mutex<T>` and `parking_lot::Mutex<T>`.
+- `Lock`: one data-independent synchronous acquisition mode with an RAII
+  guard. The mode may be shared or exclusive.
+- `ExclusiveLock`: marker for `Lock` acquisition modes that exclude every
+  competing guard, including mutexes and write-mode adapters.
 - `ReadWriteLock`: data-independent shared/exclusive locking, implemented by
   `std::sync::RwLock<T>` and `parking_lot::RwLock<T>`.
 - `DataLock<T>`: closure-based access to data protected by any supported mutex
@@ -72,12 +74,82 @@ notification with no registered waiter has no future effect. A wakeup only
 prompts another protected predicate check; it neither makes the predicate true
 nor guarantees fairness.
 
+When a predicate reads external predicate state, every update that may make it
+ready must participate in the same monitor-lock handshake. Atomic ordering
+alone cannot prevent a notification from falling between the predicate check
+and waiter registration. Acquire the monitor lock, update the external state,
+release the lock, and notify; combined helpers such as
+`with_write_notify_all` perform that sequence:
+
+```rust
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    thread,
+};
+
+use qubit_lock::ArcStdMonitor;
+
+let ready = Arc::new(AtomicBool::new(false));
+let monitor = ArcStdMonitor::new(());
+let waiter_ready = Arc::clone(&ready);
+let waiter_monitor = monitor.clone();
+let waiter = thread::spawn(move || {
+    waiter_monitor.wait_until(
+        |_| waiter_ready.load(Ordering::Acquire),
+        |_| (),
+    );
+});
+
+monitor.with_write_notify_all(|_| ready.store(true, Ordering::Release));
+waiter.join().expect("waiter should finish");
+```
+
+The asynchronous protocol is identical; use the matching combined helper so
+the external update and notification cannot straddle waiter registration:
+
+```rust
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
+
+use qubit_lock::{ArcTokioMonitor, AsyncConditionWaiter};
+
+#[tokio::main]
+async fn main() {
+    let ready = Arc::new(AtomicBool::new(false));
+    let monitor = ArcTokioMonitor::current(());
+    let waiter_ready = Arc::clone(&ready);
+    let waiter_monitor = monitor.clone();
+    let waiter = tokio::spawn(async move {
+        waiter_monitor
+            .wait_until_async(
+                |_| waiter_ready.load(Ordering::Acquire),
+                |_| (),
+            )
+            .await;
+    });
+
+    monitor
+        .with_write_notify_all_async(|_| {
+            ready.store(true, Ordering::Release);
+        })
+        .await;
+    waiter.await.expect("waiter should finish");
+}
+```
+
 A relative timeout is a condition-wait budget. Initial state-lock contention
 and the initial predicate check are excluded. Once that check determines that
 waiting is required, the monitor establishes one fixed deadline immediately
 before the first condition-wait suspension and reuses it across wakeups. A zero
 timeout still checks the predicate, and the final locked predicate check wins
-over timeout.
+over a successfully completed timeout. A Timer registration or completion
+error takes precedence over every post-wait predicate result, and the action is
+not run. An initially ready predicate returns without starting a Timer.
 
 Async monitor traits return `impl Future`; the returned future is lazy, so
 construction and time before its first poll consume no timeout budget.
@@ -155,10 +227,11 @@ The Monitor and Timer registrations are cancellation-safe, and multiple
 components can share one manual clock domain.
 
 Timed predicate methods return `Result<WaitTimeoutResult<_>, TimeError>` so
-Timer registration or completion errors remain distinct from a real timeout.
-Guard waits use in-place `wait`, `wait_for`, and `wait_until` methods; a Timer
-error leaves the guard held and usable, including when completion fails after
-the guard was released and reacquired.
+Timer registration or completion errors remain distinct from a real timeout
+and cannot be hidden by post-wait readiness. Guard waits use in-place `wait`,
+`wait_for`, and `wait_until` methods; a Timer error leaves the guard held and
+usable, including when completion fails after the guard was released and
+reacquired.
 
 ## Quick Start
 
@@ -177,7 +250,10 @@ fn main() {
 ### Data-independent lock
 
 Use `Lock` when the protected state lives elsewhere, for example in atomics.
-The guard releases the lock automatically when it leaves scope.
+The guard releases the lock automatically when it leaves scope. `Lock`
+represents one acquisition mode and does not itself promise mutual exclusion;
+`ExclusiveLock` marks acquisition modes that exclude every competing guard.
+Use that stronger bound when generic code requires exclusive entry.
 
 ```rust
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -199,8 +275,9 @@ fn main() {
 
 `std::sync::Mutex<T>`, `std::sync::RwLock<T>`, `parking_lot::Mutex<T>`, and
 `parking_lot::RwLock<T>` implement `DataLock<T>`. Read-write locks implement
-`ReadWriteLock`; use `read_lock()` or `write_lock()` to adapt one side to the
-exclusive `Lock` capability.
+`ReadWriteLock`; use `read_lock()` or `write_lock()` to adapt one side to
+`Lock`. `ReadLock` implements `Lock` only and permits concurrent readers;
+`WriteLock` also implements `ExclusiveLock`.
 
 ### ParkingLotMonitor
 
