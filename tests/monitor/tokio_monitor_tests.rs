@@ -36,7 +36,10 @@ use super::failing_timer_tests::{
 use qubit_clock::{
     ManualMonotonicClock,
     MonotonicClock,
+    MonotonicInstant,
     TimeError,
+    Timer,
+    TimerFuture,
     TokioRuntimeError,
 };
 use qubit_lock::{
@@ -52,17 +55,129 @@ fn assert_send<F: Future + Send>(future: F) -> F {
     future
 }
 
+/// Timer wrapper that stays pending for two polls before forwarding completion.
+struct TwicePendingTimer<T> {
+    /// Wrapped Timer providing the eventual result.
+    inner: T,
+    /// Number of times the registered future has been polled.
+    poll_count: Arc<AtomicUsize>,
+}
+
+impl<T> TwicePendingTimer<T> {
+    /// Creates a wrapper and exposes its poll counter to the test.
+    ///
+    /// # Parameters
+    ///
+    /// * `inner` - Timer whose completion is deferred.
+    ///
+    /// # Returns
+    ///
+    /// The wrapper and its shared poll counter.
+    fn new(inner: T) -> (Self, Arc<AtomicUsize>) {
+        let poll_count = Arc::new(AtomicUsize::new(0));
+        (
+            Self {
+                inner,
+                poll_count: Arc::clone(&poll_count),
+            },
+            poll_count,
+        )
+    }
+}
+
+impl<T> Timer for TwicePendingTimer<T>
+where
+    T: Timer,
+{
+    /// Returns the wrapped Timer's monotonic clock.
+    fn clock(&self) -> &dyn MonotonicClock {
+        self.inner.clock()
+    }
+
+    /// Defers the wrapped future's completion until its third poll.
+    fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
+        let mut future = self.inner.at(deadline)?;
+        let poll_count = Arc::clone(&self.poll_count);
+        Ok(Box::pin(std::future::poll_fn(move |context| {
+            let prior_polls = poll_count.fetch_add(1, Ordering::SeqCst);
+            if prior_polls < 2 {
+                Poll::Pending
+            } else {
+                future.as_mut().poll(context)
+            }
+        })))
+    }
+}
+
 #[tokio::test]
-async fn test_tokio_monitor_propagates_timer_completion_error() {
+async fn test_tokio_monitor_completion_error_wins_over_post_wait_readiness() {
     let monitor =
         TokioMonitor::with_timer(false, Arc::new(completion_failing_timer()));
+    let mut predicate_checks = 0;
+    let mut action_calls = 0;
 
     let result = monitor
-        .wait_until_for_async(Duration::from_secs(1), |ready| *ready, |_| ())
+        .wait_until_for_async(
+            Duration::from_secs(1),
+            |_| {
+                predicate_checks += 1;
+                predicate_checks > 1
+            },
+            |_| {
+                action_calls += 1;
+            },
+        )
         .await;
 
-    let error = result.expect_err("failing Timer should fail completion");
+    let error =
+        result.expect_err("Timer completion failure should outrank readiness");
     assert_backend_unavailable(error);
+    assert_eq!(predicate_checks, 1);
+    assert_eq!(action_calls, 0);
+}
+
+/// Verifies a Timer failure observed after notification still outranks the
+/// newly ready predicate.
+#[tokio::test]
+async fn test_tokio_monitor_post_notification_timer_error_wins_over_readiness()
+{
+    let (timer, timer_polls) =
+        TwicePendingTimer::new(completion_failing_timer());
+    let monitor = TokioMonitor::with_timer(false, Arc::new(timer));
+    let predicate_checks = Arc::new(AtomicUsize::new(0));
+    let action_calls = Arc::new(AtomicUsize::new(0));
+    let predicate_check_counter = Arc::clone(&predicate_checks);
+    let action_call_counter = Arc::clone(&action_calls);
+    let mut waiter = Box::pin(monitor.wait_until_for_async(
+        Duration::from_secs(1),
+        move |ready| {
+            predicate_check_counter.fetch_add(1, Ordering::SeqCst);
+            *ready
+        },
+        move |_| {
+            action_call_counter.fetch_add(1, Ordering::SeqCst);
+        },
+    ));
+    let wake_counter = Arc::new(WakeCounter::default());
+
+    assert!(poll_once(waiter.as_mut(), &wake_counter).is_pending());
+    assert_eq!(timer_polls.load(Ordering::SeqCst), 1);
+
+    monitor
+        .with_write_notify_one_async(|ready| *ready = true)
+        .await;
+    let result = match poll_once(waiter.as_mut(), &wake_counter) {
+        Poll::Ready(result) => result,
+        Poll::Pending => panic!("notification should complete the wait"),
+    };
+    drop(waiter);
+
+    let error =
+        result.expect_err("post-notification Timer failure should be visible");
+    assert_backend_unavailable(error);
+    assert_eq!(timer_polls.load(Ordering::SeqCst), 3);
+    assert_eq!(predicate_checks.load(Ordering::SeqCst), 1);
+    assert_eq!(action_calls.load(Ordering::SeqCst), 0);
 }
 
 /// Verifies that fallible ambient construction reports a missing runtime.

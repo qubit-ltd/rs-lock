@@ -24,7 +24,13 @@ use crate::monitor::{
 /// initial locked predicate check are excluded. If waiting is required, one
 /// fixed deadline is established immediately before the first condition-wait
 /// suspension and reused across wakeups. A zero timeout still checks the
-/// predicate, and a final locked predicate check wins over timeout.
+/// predicate. After waiting begins, Timer registration or completion errors
+/// take precedence over every post-wait predicate result, and the action is not
+/// run. When the Timer completes successfully, a final locked predicate check
+/// still wins over timeout.
+///
+/// The external predicate state handshake documented by
+/// [`ConditionWaiter`] also applies to timed waits.
 ///
 /// Use this trait as a static generic bound when blocking code needs timed
 /// predicate waits. Its generic methods make it unsuitable as a `dyn`
@@ -48,7 +54,8 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// # Errors
     ///
     /// Returns Timer registration or completion errors rather than reporting
-    /// them as timeouts.
+    /// them as timeouts. After waiting begins, such an error takes precedence
+    /// over a post-wait ready predicate and prevents `action` from running.
     #[inline(always)]
     fn wait_until_for<R, P, F>(
         &self,
@@ -82,7 +89,8 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// # Errors
     ///
     /// Returns Timer registration or completion errors rather than reporting
-    /// them as timeouts.
+    /// them as timeouts. After waiting begins, such an error takes precedence
+    /// over a post-wait ready predicate and prevents `action` from running.
     fn wait_while_for<R, P, F>(
         &self,
         timeout: Duration,
