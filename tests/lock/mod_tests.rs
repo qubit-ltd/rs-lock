@@ -8,6 +8,7 @@
 //! Tests for the lock module's crate-root exports.
 
 use qubit_lock::{
+    ExclusiveLock,
     Lock,
     ReadWriteLock,
 };
@@ -16,9 +17,11 @@ use qubit_lock::{
 /// features.
 #[test]
 fn test_lock_module_exports_synchronous_lock_traits() {
+    fn accepts_exclusive_lock<L: ExclusiveLock + ?Sized>() {}
     fn accepts_lock<L: Lock + ?Sized>() {}
     fn accepts_read_write_lock<L: ReadWriteLock + ?Sized>() {}
 
+    accepts_exclusive_lock::<std::sync::Mutex<usize>>();
     accepts_lock::<std::sync::Mutex<usize>>();
     accepts_read_write_lock::<std::sync::RwLock<usize>>();
 }

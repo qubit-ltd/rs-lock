@@ -27,6 +27,7 @@ mod async_read_write_lock;
 #[cfg(feature = "async-lock")]
 mod async_write_lock;
 mod data_lock;
+mod exclusive_lock;
 mod lock;
 mod read_lock;
 mod read_write_lock;
@@ -44,6 +45,7 @@ pub use async_read_write_lock::AsyncReadWriteLock;
 #[cfg(feature = "async-lock")]
 pub use async_write_lock::AsyncWriteLock;
 pub use data_lock::DataLock;
+pub use exclusive_lock::ExclusiveLock;
 pub use lock::Lock;
 pub use read_lock::ReadLock;
 pub use read_write_lock::ReadWriteLock;

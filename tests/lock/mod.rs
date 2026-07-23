@@ -22,6 +22,7 @@ mod async_read_write_lock_tests;
 #[cfg(feature = "async-lock")]
 mod async_write_lock_tests;
 mod data_lock_tests;
+mod exclusive_lock_tests;
 mod lock_tests;
 mod mod_tests;
 mod read_lock_tests;

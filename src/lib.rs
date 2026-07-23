@@ -120,6 +120,7 @@ pub use lock::{
 };
 pub use lock::{
     DataLock,
+    ExclusiveLock,
     Lock,
     ReadLock,
     ReadWriteLock,
