@@ -26,8 +26,14 @@ use crate::monitor::{
 /// state-lock contention and the initial locked predicate check are also
 /// excluded. If waiting is required, one fixed deadline is established
 /// immediately before the first condition-wait suspension and reused across
-/// wakeups. A zero timeout still checks the predicate, and a final locked
-/// predicate check wins over timeout.
+/// wakeups. A zero timeout still checks the predicate. After waiting begins,
+/// Timer registration or completion errors take precedence over every
+/// post-wait predicate result, and the action is not run. When the Timer
+/// completes successfully, a final locked predicate check still wins over
+/// timeout.
+///
+/// The external predicate state handshake documented by
+/// [`AsyncConditionWaiter`] also applies to timed asynchronous waits.
 ///
 /// Dropping a pending future cancels and unregisters its active wait. It does
 /// not run the action or roll back protected-state changes made while the wait
@@ -60,7 +66,9 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     /// # Errors
     ///
     /// The future resolves to Timer registration or completion errors rather
-    /// than reporting them as timeouts.
+    /// than reporting them as timeouts. After waiting begins, such an error
+    /// takes precedence over a post-wait ready predicate and prevents `action`
+    /// from running.
     #[inline(always)]
     fn wait_until_for_async<'a, R, P, F>(
         &'a self,
@@ -102,7 +110,9 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     /// # Errors
     ///
     /// The future resolves to Timer registration or completion errors rather
-    /// than reporting them as timeouts.
+    /// than reporting them as timeouts. After waiting begins, such an error
+    /// takes precedence over a post-wait ready predicate and prevents `action`
+    /// from running.
     fn wait_while_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,

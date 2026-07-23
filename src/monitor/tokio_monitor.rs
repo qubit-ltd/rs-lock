@@ -418,13 +418,15 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// timers retain their own progress requirements. Registration time
     /// consumes the budget. Initial mutex contention, an immediately ready
     /// predicate, and a zero budget do not create a Timer future. The fixed
-    /// deadline is reused across wakeups and followed by one
-    /// final locked predicate check. Predicate readiness wins over timeout. If
-    /// a signal wins before the timer is ready but reacquiring the state
-    /// exhausts the fixed deadline, a still-blocking predicate times out
-    /// without another waiter registration. When the signal and deadline are
-    /// both ready, the deadline is selected first. A zero timeout still checks
-    /// the predicate once.
+    /// deadline is reused across wakeups and followed by one final locked
+    /// predicate check. Predicate readiness wins over a successful timeout. A
+    /// Timer registration or completion error is settled before every
+    /// post-wait predicate result and prevents `action` from running. If a
+    /// signal wins before the timer is ready but reacquiring the state exhausts
+    /// the fixed deadline, a still-blocking predicate times out without another
+    /// waiter registration. When the signal and deadline are both ready, the
+    /// deadline is selected first. A zero timeout still checks the predicate
+    /// once.
     #[inline(always)]
     fn wait_until_for_async<'a, R, P, F>(
         &'a self,
@@ -459,13 +461,15 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// timers retain their own progress requirements. Registration time
     /// consumes the budget. Initial mutex contention, an immediately ready
     /// predicate, and a zero budget do not create a Timer future. The fixed
-    /// deadline is reused across wakeups and followed by one
-    /// final locked predicate check. Predicate readiness wins over timeout. If
-    /// a signal wins before the timer is ready but reacquiring the state
-    /// exhausts the fixed deadline, a still-blocking predicate times out
-    /// without another waiter registration. When the signal and deadline are
-    /// both ready, the deadline is selected first. A zero timeout still checks
-    /// the predicate once.
+    /// deadline is reused across wakeups and followed by one final locked
+    /// predicate check. Predicate readiness wins over a successful timeout. A
+    /// Timer registration or completion error is settled before every
+    /// post-wait predicate result and prevents `action` from running. If a
+    /// signal wins before the timer is ready but reacquiring the state exhausts
+    /// the fixed deadline, a still-blocking predicate times out without another
+    /// waiter registration. When the signal and deadline are both ready, the
+    /// deadline is selected first. A zero timeout still checks the predicate
+    /// once.
     #[allow(
         clippy::manual_async_fn,
         reason = "the explicit Send bound is part of the trait contract"
@@ -499,12 +503,16 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
                     .await;
                 drop(registration);
                 guard = self.state.lock().await;
+                let status = status?;
+                let deadline_reached = if status.is_timed_out() {
+                    true
+                } else {
+                    Self::deadline_reached(&mut deadline).await?
+                };
                 if !predicate(&*guard) {
                     return Ok(WaitTimeoutResult::Ready(action(&mut *guard)));
                 }
-                if status?.is_timed_out()
-                    || Self::deadline_reached(&mut deadline).await?
-                {
+                if deadline_reached {
                     return Ok(WaitTimeoutResult::TimedOut);
                 }
             }

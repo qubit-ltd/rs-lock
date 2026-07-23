@@ -47,15 +47,28 @@ fn test_std_monitor_new_read_write_updates_state() {
 }
 
 #[test]
-fn test_std_monitor_timed_predicate_wait_propagates_completion_error() {
+fn test_std_monitor_completion_error_wins_over_post_wait_readiness() {
     let monitor =
         StdMonitor::with_timer(false, Arc::new(completion_failing_timer()));
+    let mut predicate_checks = 0;
+    let mut action_calls = 0;
 
-    let result =
-        monitor.wait_until_for(Duration::from_secs(1), |ready| *ready, |_| ());
+    let result = monitor.wait_until_for(
+        Duration::from_secs(1),
+        |_| {
+            predicate_checks += 1;
+            predicate_checks > 1
+        },
+        |_| {
+            action_calls += 1;
+        },
+    );
 
-    let error = result.expect_err("failing Timer should fail completion");
+    let error =
+        result.expect_err("Timer completion failure should outrank readiness");
     assert_backend_unavailable(error);
+    assert_eq!(predicate_checks, 1);
+    assert_eq!(action_calls, 0);
 }
 
 #[test]

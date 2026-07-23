@@ -532,8 +532,10 @@ impl<T> StdMonitor<T> {
     /// initial predicate check still requires waiting, immediately before the
     /// first condition-wait suspension. Initial lock contention and that
     /// predicate check do not consume the budget. One fixed deadline is reused
-    /// across wakeups. At the deadline, readiness wins one final locked
-    /// predicate check. A zero timeout still checks the predicate once.
+    /// across wakeups. After a successful Timer completion, readiness wins one
+    /// final locked predicate check. A Timer registration or completion error
+    /// takes precedence over every post-wait predicate result and prevents
+    /// `f` from running. A zero timeout still checks the predicate once.
     ///
     /// Condition variables may wake spuriously, and timeout status alone is not
     /// used as proof that the predicate is still true; the predicate is always
@@ -559,7 +561,8 @@ impl<T> StdMonitor<T> {
     /// # Errors
     ///
     /// Returns Timer registration or completion errors rather than reporting
-    /// them as timeouts.
+    /// them as timeouts. After waiting begins, such an error takes precedence
+    /// over post-wait readiness.
     ///
     /// # Examples
     ///
@@ -596,11 +599,10 @@ impl<T> StdMonitor<T> {
         }
         let mut future = self.timer.after(timeout)?;
         loop {
-            let status = guard.wait_with_timer(&mut future);
+            let status = guard.wait_with_timer(&mut future)?;
             if !waiting(&*guard) {
                 return Ok(WaitTimeoutResult::Ready(f(&mut *guard)));
             }
-            let status = status?;
             if status.is_timed_out() {
                 return Ok(WaitTimeoutResult::TimedOut);
             }
@@ -618,8 +620,10 @@ impl<T> StdMonitor<T> {
     /// initial predicate check still requires waiting, immediately before the
     /// first condition-wait suspension. Initial lock contention and that
     /// predicate check do not consume the budget. One fixed deadline is reused
-    /// across wakeups. At the deadline, readiness wins one final locked
-    /// predicate check. A zero timeout still checks the predicate once.
+    /// across wakeups. After a successful Timer completion, readiness wins one
+    /// final locked predicate check. A Timer registration or completion error
+    /// takes precedence over every post-wait predicate result and prevents
+    /// `f` from running. A zero timeout still checks the predicate once.
     ///
     /// Condition variables may wake spuriously, and timeout status alone is not
     /// used as proof that the predicate is still false; the predicate is always
@@ -643,7 +647,8 @@ impl<T> StdMonitor<T> {
     /// # Errors
     ///
     /// Returns Timer registration or completion errors rather than reporting
-    /// them as timeouts.
+    /// them as timeouts. After waiting begins, such an error takes precedence
+    /// over post-wait readiness.
     ///
     /// # Examples
     ///
