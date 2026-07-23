@@ -283,6 +283,7 @@ dependencies = [
 name = "qubit-clock"
 version = "0.10.0"
 dependencies = [
+ "pin-project-lite",
  "thiserror",
  "tokio",
 ]
