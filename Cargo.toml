@@ -63,3 +63,8 @@ required-features = ["async-monitor"]
 name = "blocking_monitor"
 harness = false
 required-features = ["monitor", "parking-lot"]
+
+[[bench]]
+name = "blocking_wait_registration"
+harness = false
+required-features = ["monitor", "parking-lot"]
