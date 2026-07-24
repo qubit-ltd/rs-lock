@@ -60,10 +60,9 @@ use super::{
 ///     );
 /// });
 ///
-/// monitor.with_write(|ready| {
+/// monitor.with_write_notify_all(|ready| {
 ///     *ready = true;
 /// });
-/// monitor.notify_all();
 ///
 /// waiter.join().expect("waiter should finish");
 /// assert!(!monitor.with_read(|ready| *ready));

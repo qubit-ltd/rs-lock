@@ -281,6 +281,10 @@ fn main() {
 
 ### ParkingLotMonitor
 
+Use the combined write-and-notify helpers by default whenever a state change
+may let waiters proceed. Keep raw notification for code that already holds an
+explicit guard or needs conditional notification.
+
 ```rust
 use qubit_lock::ArcParkingLotMonitor;
 

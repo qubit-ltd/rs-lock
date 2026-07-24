@@ -39,8 +39,7 @@ fn main() {
             .is_timed_out()
     );
 
-    monitor.with_write(|items| items.push(7));
-    monitor.notify_one();
+    monitor.with_write_notify_one(|items| items.push(7));
     let result = monitor.wait_until_for(
         Duration::from_millis(1),
         |items| !items.is_empty(),
