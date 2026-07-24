@@ -111,10 +111,9 @@ use super::{
 ///     );
 /// });
 ///
-/// monitor.with_write(|ready| {
+/// monitor.with_write_notify_all(|ready| {
 ///     *ready = true;
 /// });
-/// monitor.notify_all();
 ///
 /// waiter.join().expect("waiter should finish");
 /// assert!(!monitor.with_read(|ready| *ready));
@@ -262,9 +261,10 @@ impl<T> StdMonitor<T> {
     /// Acquires the monitor and mutates the protected state.
     ///
     /// The closure runs while the mutex is held. This method only changes the
-    /// state; callers should explicitly call [`Self::notify_one`] or
-    /// [`Self::notify_all`] after changing a condition that waiters may be
-    /// observing.
+    /// state. Prefer [`Self::with_write_notify_one`] or
+    /// [`Self::with_write_notify_all`] when the state change may let waiters
+    /// proceed. Use this lower-level helper when no notification is needed or
+    /// notification is controlled separately.
     ///
     /// If the mutex is poisoned, this method recovers the inner state and still
     /// executes the closure.
@@ -442,8 +442,7 @@ impl<T> StdMonitor<T> {
     ///     )
     /// });
     ///
-    /// monitor.with_write(|items| items.push(7));
-    /// monitor.notify_one();
+    /// monitor.with_write_notify_one(|items| items.push(7));
     ///
     /// assert_eq!(worker.join().expect("worker should finish"), 7);
     /// ```
@@ -506,8 +505,7 @@ impl<T> StdMonitor<T> {
     ///     )
     /// });
     ///
-    /// monitor.with_write(|ready| *ready = true);
-    /// monitor.notify_one();
+    /// monitor.with_write_notify_one(|ready| *ready = true);
     ///
     /// assert_eq!(waiter.join().expect("waiter should finish"), "done");
     /// ```
@@ -675,8 +673,7 @@ impl<T> StdMonitor<T> {
     ///     )
     /// });
     ///
-    /// monitor.with_write(|ready| *ready = true);
-    /// monitor.notify_one();
+    /// monitor.with_write_notify_one(|ready| *ready = true);
     ///
     /// let outcome = waiter
     ///     .join()
@@ -701,8 +698,11 @@ impl<T> StdMonitor<T> {
     /// Wakes one thread waiting on this monitor's condition variable.
     ///
     /// Notifications do not carry state by themselves. A waiting thread only
-    /// proceeds safely after rechecking the protected state. Call this after
-    /// changing state that may make one waiter able to continue.
+    /// proceeds safely after rechecking the protected state. Prefer
+    /// [`Self::with_write_notify_one`] when one operation both changes the
+    /// condition and wakes a waiter. This lower-level method remains useful
+    /// when state was changed through an explicit guard or notification is
+    /// conditional.
     ///
     /// # Examples
     ///
@@ -721,7 +721,10 @@ impl<T> StdMonitor<T> {
     ///     })
     /// };
     ///
-    /// monitor.with_write(|n| *n = 1);
+    /// {
+    ///     let mut n = monitor.lock();
+    ///     *n = 1;
+    /// }
     /// monitor.notify_one();
     /// waiter.join().expect("waiter should finish");
     /// ```
@@ -733,8 +736,11 @@ impl<T> StdMonitor<T> {
     /// Wakes all threads waiting on this monitor's condition variable.
     ///
     /// Notifications do not carry state by themselves. Every awakened thread
-    /// must recheck the protected state before continuing. Call this after a
-    /// state change that may allow multiple waiters to make progress.
+    /// must recheck the protected state before continuing. Prefer
+    /// [`Self::with_write_notify_all`] when one operation both changes the
+    /// condition and wakes waiters. This lower-level method remains useful
+    /// when state was changed through an explicit guard or notification is
+    /// conditional.
     ///
     /// # Examples
     ///
@@ -752,7 +758,10 @@ impl<T> StdMonitor<T> {
     ///     }));
     /// }
     ///
-    /// monitor.with_write(|ready| *ready = true);
+    /// {
+    ///     let mut ready = monitor.lock();
+    ///     *ready = true;
+    /// }
     /// monitor.notify_all();
     /// for h in handles {
     ///     h.join().expect("waiter should finish");

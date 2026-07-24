@@ -125,8 +125,10 @@ fn test_readme_documents_exclusive_lock_capability() {
 fn test_readme_monitor_example_uses_with_write_notify_one() {
     assert!(README_EN.contains("use qubit_lock::ArcParkingLotMonitor;"));
     assert!(README_EN.contains("with_write_notify_one"));
+    assert!(README_EN.contains("combined write-and-notify helpers by default"));
     assert!(README_ZH.contains("use qubit_lock::ArcParkingLotMonitor;"));
     assert!(README_ZH.contains("with_write_notify_one"));
+    assert!(README_ZH.contains("默认使用组合 write-and-notify helper"));
 }
 
 #[test]

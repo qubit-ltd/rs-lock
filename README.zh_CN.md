@@ -252,6 +252,9 @@ fn main() {
 
 ### ParkingLotMonitor
 
+当状态变化可能让 waiter 继续执行时，默认使用组合 write-and-notify helper。仅在代码
+已经持有显式 guard，或需要条件通知时使用 raw notification。
+
 ```rust
 use qubit_lock::ArcParkingLotMonitor;
 
