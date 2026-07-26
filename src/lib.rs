@@ -127,8 +127,8 @@ pub use lock::{
     TryLockError,
     WriteLock,
 };
-#[cfg(feature = "test-util")]
-#[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
+#[cfg(all(feature = "loom-model", loom))]
+#[doc(hidden)]
 pub mod test_util;
 #[cfg(all(feature = "monitor", feature = "parking-lot"))]
 pub use monitor::{
