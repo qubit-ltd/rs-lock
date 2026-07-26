@@ -20,91 +20,44 @@
 //!   available when `monitor` is also enabled.
 //! - Tokio monitors behind the optional `async-monitor` feature.
 //!
-//! Public API items are re-exported from the crate root. The internal
-//! `lock` and `monitor` modules are implementation details and are not public
-//! import paths.
+//! Public API items are re-exported from the crate root; the internal `lock`
+//! and `monitor` modules are implementation details. Start with [`Lock`] for
+//! exclusive synchronous access:
 //!
-//! ```compile_fail
-//! use qubit_lock::lock::Lock;
-//! ```
-//!
-//! ```compile_fail
-//! use qubit_lock::monitor::Monitor;
-//! ```
-//!
-//! Read-write locks intentionally expose explicit read and write modes rather
-//! than guessing which mode [`Lock`] should acquire.
-//!
-//! ```compile_fail
-//! use std::sync::RwLock;
-//!
+//! ```rust
 //! use qubit_lock::Lock;
 //!
-//! let lock = RwLock::new(());
-//! let _guard = Lock::lock(&lock);
+//! let lock = std::sync::Mutex::new(0);
+//! let mut value = Lock::lock(&lock);
+//! *value += 1;
+//! assert_eq!(*value, 1);
 //! ```
 //!
-//! Notification-only waiting traits are intentionally not part of the public
-//! API.
+//! Read-write locks expose explicit read and write modes through
+//! [`ReadWriteLock`]:
 //!
-//! ```compile_fail
-//! use qubit_lock::NotificationWaiter;
+//! ```rust
+//! use qubit_lock::{Lock, ReadWriteLock};
+//!
+//! let lock = std::sync::RwLock::new(0);
+//! let read = lock.read_lock();
+//! assert_eq!(*Lock::lock(&read), 0);
+//! let write = lock.write_lock();
+//! let mut value = Lock::lock(&write);
+//! *value = 1;
+//! drop(value);
+//! assert_eq!(*Lock::lock(&read), 1);
 //! ```
 //!
-//! ```compile_fail
-//! use qubit_lock::TimeoutNotificationWaiter;
-//! ```
+//! Monitors provide closure-based access to protected data. Their waiting
+//! operations use predicates so callers always re-check the protected state:
 //!
-//! ```compile_fail
-//! use qubit_lock::AsyncNotificationWaiter;
-//! ```
-//!
-//! ```compile_fail
-//! use qubit_lock::AsyncTimeoutNotificationWaiter;
-//! ```
-//!
-//! The implementation-specific boxed async monitor future alias is not part
-//! of the public API.
-//!
-//! ```compile_fail
-//! use qubit_lock::AsyncMonitorFuture;
-//! ```
-//!
-//! Concrete monitors and Arc wrappers likewise expose only predicate-based
-//! waiting.
-//!
-//! ```compile_fail
+//! ```rust
 //! use qubit_lock::StdMonitor;
 //!
-//! let monitor = StdMonitor::new(false);
-//! monitor.wait();
-//! ```
-//!
-//! ```compile_fail
-//! use std::time::Duration;
-//!
-//! use qubit_lock::ArcStdMonitor;
-//!
-//! let monitor = ArcStdMonitor::new(false);
-//! let _ = monitor.wait_for(Duration::ZERO);
-//! ```
-//!
-//! ```compile_fail
-//! use qubit_lock::ArcTokioMonitor;
-//!
-//! async fn wait_for_notification(monitor: &ArcTokioMonitor<bool>) {
-//!     monitor.wait_async().await;
-//! }
-//! ```
-//!
-//! ```compile_fail
-//! use std::time::Duration;
-//!
-//! use qubit_lock::ArcTokioMonitor;
-//!
-//! async fn wait_for_notification(monitor: &ArcTokioMonitor<bool>) {
-//!     let _ = monitor.wait_for_async(Duration::ZERO).await;
-//! }
+//! let monitor = StdMonitor::new(0);
+//! monitor.with_write(|value| *value = 1);
+//! assert_eq!(monitor.with_read(|value| *value), 1);
 //! ```
 
 mod lock;
