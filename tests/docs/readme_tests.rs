@@ -128,6 +128,26 @@ fn test_readme_monitor_example_uses_with_write_notify_one() {
 }
 
 #[test]
+/// Ensures both READMEs explain the untimed and timed monitor aggregates.
+fn test_readme_documents_monitor_capability_split() {
+    let readme_en = normalize_readme_text(README_EN);
+    let readme_zh = normalize_readme_text(README_ZH);
+
+    assert!(readme_en.contains(
+        "`Monitor` and `AsyncMonitor` combine state access, notification, and untimed predicate waits"
+    ));
+    assert!(readme_en.contains(
+        "`TimedMonitor` and `AsyncTimedMonitor` add timeout-based waits"
+    ));
+    assert!(readme_zh.contains(
+        "`Monitor` 和 `AsyncMonitor` 聚合状态访问、通知以及无时限 predicate wait"
+    ));
+    assert!(readme_zh.contains(
+        "`TimedMonitor` 和 `AsyncTimedMonitor` 额外提供带时限的 wait"
+    ));
+}
+
+#[test]
 /// Ensures both READMEs describe monitor notification and timeout semantics.
 fn test_readme_documents_monitor_wait_semantics() {
     let readme_en = normalize_readme_text(README_EN);
