@@ -7,7 +7,10 @@
 // =============================================================================
 //! Tests for [`AsyncConditionWaiter`](qubit_lock::AsyncConditionWaiter).
 
-use qubit_lock::{AsyncConditionWaiter, TokioMonitor};
+use qubit_lock::{
+    AsyncConditionWaiter,
+    TokioMonitor,
+};
 
 /// Runs an immediately ready async wait through a generic capability bound.
 async fn wait_through_trait<W>(waiter: &W) -> i32

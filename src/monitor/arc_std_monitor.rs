@@ -10,10 +10,23 @@
 //! Provides an Arc-wrapped synchronous monitor for condition-based state
 //! coordination across threads.
 
-use qubit_clock::{TimeError, Timer};
-use std::{ops::Deref, sync::Arc, time::Duration};
+use qubit_clock::{
+    TimeError,
+    Timer,
+};
+use std::{
+    ops::Deref,
+    sync::Arc,
+    time::Duration,
+};
 
-use super::{ConditionWaiter, Notifier, StdMonitor, TimeoutConditionWaiter, WaitTimeoutResult};
+use super::{
+    ConditionWaiter,
+    Notifier,
+    StdMonitor,
+    TimeoutConditionWaiter,
+    WaitTimeoutResult,
+};
 
 /// Arc-wrapped monitor for shared condition-based state coordination.
 ///
@@ -173,7 +186,11 @@ impl<T> ConditionWaiter for ArcStdMonitor<T> {
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,
     {
-        <StdMonitor<T> as ConditionWaiter>::wait_while(self.inner.as_ref(), predicate, action)
+        <StdMonitor<T> as ConditionWaiter>::wait_while(
+            self.inner.as_ref(),
+            predicate,
+            action,
+        )
     }
 }
 

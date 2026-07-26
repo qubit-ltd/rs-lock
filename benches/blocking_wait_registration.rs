@@ -15,14 +15,31 @@
 use std::{
     sync::{
         Arc,
-        mpsc::{self, Receiver, Sender},
+        mpsc::{
+            self,
+            Receiver,
+            Sender,
+        },
     },
-    thread::{self, JoinHandle},
-    time::{Duration, Instant},
+    thread::{
+        self,
+        JoinHandle,
+    },
+    time::{
+        Duration,
+        Instant,
+    },
 };
 
-use criterion::{Criterion, criterion_group, criterion_main};
-use parking_lot::{Condvar, Mutex};
+use criterion::{
+    Criterion,
+    criterion_group,
+    criterion_main,
+};
+use parking_lot::{
+    Condvar,
+    Mutex,
+};
 use qubit_lock::ParkingLotMonitor;
 
 /// Command sent to a long-lived benchmark worker.
@@ -66,9 +83,9 @@ impl MonitorWaitRegistration {
                 {
                     WorkerCommand::Start => {
                         state.wait();
-                        done_sender
-                            .send(())
-                            .expect("benchmark should observe the woken worker");
+                        done_sender.send(()).expect(
+                            "benchmark should observe the woken worker",
+                        );
                     }
                     WorkerCommand::Stop => return,
                 }
@@ -154,9 +171,9 @@ impl CondvarWaitRegistration {
                 {
                     WorkerCommand::Start => {
                         changed.wait(&mut state);
-                        done_sender
-                            .send(())
-                            .expect("benchmark should observe the woken worker");
+                        done_sender.send(()).expect(
+                            "benchmark should observe the woken worker",
+                        );
                     }
                     WorkerCommand::Stop => return,
                 }
@@ -216,7 +233,8 @@ impl CondvarWaitRegistration {
 ///
 /// * `criterion` - Criterion runner receiving the benchmark cases.
 fn benchmark_blocking_wait_registration_round_trip(criterion: &mut Criterion) {
-    let mut group = criterion.benchmark_group("blocking_wait_registration_round_trip");
+    let mut group =
+        criterion.benchmark_group("blocking_wait_registration_round_trip");
 
     let monitor = MonitorWaitRegistration::new();
     group.bench_function("parking_lot_monitor", |bencher| {

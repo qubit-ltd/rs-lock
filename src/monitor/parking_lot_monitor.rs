@@ -22,15 +22,26 @@
 //! [`ParkingLotMonitorGuard::wait_until`] for more complex state machines such
 //! as thread pools.
 
-use qubit_clock::{TimeError, Timer};
-use std::{sync::Arc, time::Duration};
+use qubit_clock::{
+    TimeError,
+    Timer,
+};
+use std::{
+    sync::Arc,
+    time::Duration,
+};
 
 use parking_lot::Mutex;
 
 use super::parking_lot_monitor_guard::ParkingLotMonitorGuard;
 use super::{
-    ConditionWaiter, Notifier, TimeoutConditionWaiter,
-    internal::{BlockingWaiterRegistry, default_timer},
+    ConditionWaiter,
+    Notifier,
+    TimeoutConditionWaiter,
+    internal::{
+        BlockingWaiterRegistry,
+        default_timer,
+    },
     wait_timeout_result::WaitTimeoutResult,
 };
 

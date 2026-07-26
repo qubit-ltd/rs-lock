@@ -8,12 +8,18 @@
 //! Tests for data-independent asynchronous RAII locks.
 
 use std::{
-    future::{Future, poll_fn},
+    future::{
+        Future,
+        poll_fn,
+    },
     sync::Arc,
     task::Poll,
 };
 
-use qubit_lock::{AsyncLock, TryLockError};
+use qubit_lock::{
+    AsyncLock,
+    TryLockError,
+};
 use tokio::sync::Mutex;
 
 #[tokio::test]

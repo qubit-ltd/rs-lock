@@ -8,9 +8,16 @@
 //! Asynchronous timeout condition-wait capability.
 
 use qubit_clock::TimeError;
-use std::{future::Future, sync::Arc, time::Duration};
+use std::{
+    future::Future,
+    sync::Arc,
+    time::Duration,
+};
 
-use crate::monitor::{AsyncConditionWaiter, WaitTimeoutResult};
+use crate::monitor::{
+    AsyncConditionWaiter,
+    WaitTimeoutResult,
+};
 
 /// Waits asynchronously for predicates over protected state with timeouts.
 ///
@@ -74,7 +81,11 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
-        self.wait_while_for_async(timeout, move |state| !predicate(state), action)
+        self.wait_while_for_async(
+            timeout,
+            move |state| !predicate(state),
+            action,
+        )
     }
 
     /// Returns a future that waits while the predicate remains true or times

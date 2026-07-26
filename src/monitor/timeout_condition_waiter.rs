@@ -8,9 +8,15 @@
 //! Blocking timeout condition-wait capability.
 
 use qubit_clock::TimeError;
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::Duration,
+};
 
-use crate::monitor::{ConditionWaiter, WaitTimeoutResult};
+use crate::monitor::{
+    ConditionWaiter,
+    WaitTimeoutResult,
+};
 
 /// Waits for predicates over protected state with relative timeouts.
 ///
@@ -126,6 +132,11 @@ where
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,
     {
-        <M as TimeoutConditionWaiter>::wait_while_for(self.as_ref(), timeout, predicate, action)
+        <M as TimeoutConditionWaiter>::wait_while_for(
+            self.as_ref(),
+            timeout,
+            predicate,
+            action,
+        )
     }
 }

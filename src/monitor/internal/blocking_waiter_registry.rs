@@ -7,10 +7,17 @@
 // =============================================================================
 //! Stores active blocking Monitor waiters with memoryless notification.
 
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    Arc,
+    Mutex,
+};
 use std::task::Wake;
 
-use super::{BlockingConditionWaiter, BlockingWaiterRegistration, WaiterRegistry};
+use super::{
+    BlockingConditionWaiter,
+    BlockingWaiterRegistration,
+    WaiterRegistry,
+};
 
 /// Registry of blocking waiters eligible for current notifications.
 pub(in crate::monitor) struct BlockingWaiterRegistry {
@@ -41,7 +48,9 @@ impl BlockingWaiterRegistry {
     /// # Panics
     ///
     /// Panics if the registry exhausts registration identifiers.
-    pub(in crate::monitor) fn register(&self) -> BlockingWaiterRegistration<'_> {
+    pub(in crate::monitor) fn register(
+        &self,
+    ) -> BlockingWaiterRegistration<'_> {
         let waiter = Arc::new(BlockingConditionWaiter::new());
         let waiter_id = self
             .waiters

@@ -8,14 +8,26 @@
 //! Cancellation-safe registration for a Tokio condition waiter.
 
 use std::{
-    future::{Future, poll_fn},
-    sync::{Arc, Mutex},
+    future::{
+        Future,
+        poll_fn,
+    },
+    sync::{
+        Arc,
+        Mutex,
+    },
     task::Poll,
 };
 
-use qubit_clock::{TimeError, TimerFuture};
+use qubit_clock::{
+    TimeError,
+    TimerFuture,
+};
 
-use super::{TokioConditionWaiter, WaiterRegistry};
+use super::{
+    TokioConditionWaiter,
+    WaiterRegistry,
+};
 use crate::monitor::WaitTimeoutStatus;
 
 /// Removes an active waiter registration on cancellation or normal exit.

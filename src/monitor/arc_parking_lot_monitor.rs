@@ -10,11 +10,22 @@
 //! Provides an Arc-wrapped synchronous monitor for condition-based state
 //! coordination across threads.
 
-use qubit_clock::{TimeError, Timer};
-use std::{ops::Deref, sync::Arc, time::Duration};
+use qubit_clock::{
+    TimeError,
+    Timer,
+};
+use std::{
+    ops::Deref,
+    sync::Arc,
+    time::Duration,
+};
 
 use super::{
-    ConditionWaiter, Notifier, ParkingLotMonitor, TimeoutConditionWaiter, WaitTimeoutResult,
+    ConditionWaiter,
+    Notifier,
+    ParkingLotMonitor,
+    TimeoutConditionWaiter,
+    WaitTimeoutResult,
 };
 
 /// Arc-wrapped monitor for shared condition-based state coordination.

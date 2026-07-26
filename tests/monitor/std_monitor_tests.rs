@@ -8,19 +8,31 @@
 //! Tests for [`StdMonitor`](qubit_lock::StdMonitor).
 
 use std::{
-    sync::{Arc, mpsc},
+    sync::{
+        Arc,
+        mpsc,
+    },
     thread,
     time::Duration,
 };
 
-use qubit_clock::{ManualMonotonicClock, MonotonicClock};
+use qubit_clock::{
+    ManualMonotonicClock,
+    MonotonicClock,
+};
 use qubit_lock::{
-    ConditionWaiter, Notifier, StdMonitor, TimeoutConditionWaiter, WaitTimeoutResult,
+    ConditionWaiter,
+    Notifier,
+    StdMonitor,
+    TimeoutConditionWaiter,
+    WaitTimeoutResult,
     WaitTimeoutStatus,
 };
 
 use super::failing_timer_tests::{
-    assert_backend_unavailable, completion_failing_timer, registration_failing_timer,
+    assert_backend_unavailable,
+    completion_failing_timer,
+    registration_failing_timer,
 };
 
 #[test]
@@ -36,7 +48,8 @@ fn test_std_monitor_new_read_write_updates_state() {
 
 #[test]
 fn test_std_monitor_completion_error_wins_over_post_wait_readiness() {
-    let monitor = StdMonitor::with_timer(false, Arc::new(completion_failing_timer()));
+    let monitor =
+        StdMonitor::with_timer(false, Arc::new(completion_failing_timer()));
     let mut predicate_checks = 0;
     let mut action_calls = 0;
 
@@ -51,7 +64,8 @@ fn test_std_monitor_completion_error_wins_over_post_wait_readiness() {
         },
     );
 
-    let error = result.expect_err("Timer completion failure should outrank readiness");
+    let error =
+        result.expect_err("Timer completion failure should outrank readiness");
     assert_backend_unavailable(error);
     assert_eq!(predicate_checks, 1);
     assert_eq!(action_calls, 0);
@@ -69,9 +83,9 @@ fn test_std_monitor_write_notify_one_updates_state_and_wakes_waiter() {
         let result = waiter_monitor.wait_until(
             move |ready| {
                 if !*ready && let Some(checked_tx) = checked_tx.take() {
-                    checked_tx
-                        .send(())
-                        .expect("test should observe waiter before notification");
+                    checked_tx.send(()).expect(
+                        "test should observe waiter before notification",
+                    );
                 }
                 *ready
             },
@@ -438,16 +452,22 @@ fn test_std_monitor_guard_wait_for_returns_woken_when_notified() {
 fn test_std_monitor_wait_while_for_returns_timed_out_when_timeout() {
     let monitor = StdMonitor::new(false);
 
-    let result = monitor.wait_while_for(Duration::from_millis(20), |ready| !*ready, |_| ());
+    let result = monitor.wait_while_for(
+        Duration::from_millis(20),
+        |ready| !*ready,
+        |_| (),
+    );
 
     assert_time_result_eq!(result, Ok(WaitTimeoutResult::TimedOut));
 }
 
 #[test]
 fn test_std_monitor_timed_predicate_wait_propagates_timer_error() {
-    let monitor = StdMonitor::with_timer(false, Arc::new(registration_failing_timer()));
+    let monitor =
+        StdMonitor::with_timer(false, Arc::new(registration_failing_timer()));
 
-    let result = monitor.wait_until_for(Duration::from_secs(1), |ready| *ready, |_| ());
+    let result =
+        monitor.wait_until_for(Duration::from_secs(1), |ready| *ready, |_| ());
 
     let error = result.expect_err("failing Timer should reject registration");
     assert_backend_unavailable(error);
@@ -460,7 +480,11 @@ fn test_std_monitor_uses_injected_manual_timer_without_real_delay() {
     assert_eq!(clock.now().domain(), monitor.timer().clock().now().domain(),);
     let waiter_monitor = Arc::clone(&monitor);
     let waiter = thread::spawn(move || {
-        waiter_monitor.wait_until_for(Duration::from_secs(8), |ready| *ready, |_| ())
+        waiter_monitor.wait_until_for(
+            Duration::from_secs(8),
+            |ready| *ready,
+            |_| (),
+        )
     });
 
     let _reached = clock
@@ -477,14 +501,19 @@ fn test_std_monitor_uses_injected_manual_timer_without_real_delay() {
 fn test_std_monitor_wait_until_for_returns_timed_out_when_timeout() {
     let monitor = StdMonitor::new(false);
 
-    let result = monitor.wait_until_for(Duration::from_millis(20), |ready| *ready, |_| ());
+    let result = monitor.wait_until_for(
+        Duration::from_millis(20),
+        |ready| *ready,
+        |_| (),
+    );
 
     assert_time_result_eq!(result, Ok(WaitTimeoutResult::TimedOut));
 }
 
 /// Verifies that initial lock contention does not consume timeout budget.
 #[test]
-fn test_std_monitor_wait_while_for_excludes_initial_lock_contention_from_timeout() {
+fn test_std_monitor_wait_while_for_excludes_initial_lock_contention_from_timeout()
+ {
     const WAIT_TIMEOUT: Duration = Duration::from_millis(20);
 
     let clock = ManualMonotonicClock::new_shared();
@@ -503,9 +532,9 @@ fn test_std_monitor_wait_while_for_excludes_initial_lock_contention_from_timeout
             WAIT_TIMEOUT,
             move |ready| {
                 if let Some(checked_tx) = checked_tx.take() {
-                    checked_tx
-                        .send(())
-                        .expect("test should observe the initial predicate check");
+                    checked_tx.send(()).expect(
+                        "test should observe the initial predicate check",
+                    );
                     continue_rx
                         .take()
                         .expect("predicate should pause once")
@@ -585,9 +614,9 @@ fn test_std_monitor_wait_while_for_timeout_final_predicate_wins() {
             Duration::from_millis(20),
             move |ready| {
                 if let Some(checked_tx) = checked_tx.take() {
-                    checked_tx
-                        .send(())
-                        .expect("test should observe the initial predicate check");
+                    checked_tx.send(()).expect(
+                        "test should observe the initial predicate check",
+                    );
                 }
                 !*ready
             },

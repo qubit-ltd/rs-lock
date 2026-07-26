@@ -7,11 +7,24 @@
 // =============================================================================
 //! Arc-wrapped Tokio monitor.
 
-use qubit_clock::{TimeError, Timer, TokioRuntimeError};
-use std::{future::Future, ops::Deref, sync::Arc, time::Duration};
+use qubit_clock::{
+    TimeError,
+    Timer,
+    TokioRuntimeError,
+};
+use std::{
+    future::Future,
+    ops::Deref,
+    sync::Arc,
+    time::Duration,
+};
 
 use super::{
-    AsyncConditionWaiter, AsyncTimeoutConditionWaiter, Notifier, TokioMonitor, WaitTimeoutResult,
+    AsyncConditionWaiter,
+    AsyncTimeoutConditionWaiter,
+    Notifier,
+    TokioMonitor,
+    WaitTimeoutResult,
 };
 
 /// Cloneable handle around a [`TokioMonitor`].
@@ -39,8 +52,9 @@ impl<T> ArcTokioMonitor<T> {
     #[track_caller]
     #[inline]
     pub fn current(state: T) -> Self {
-        Self::try_current(state)
-            .unwrap_or_else(|error| panic!("cannot create Arc-wrapped Tokio monitor: {error}"))
+        Self::try_current(state).unwrap_or_else(|error| {
+            panic!("cannot create Arc-wrapped Tokio monitor: {error}")
+        })
     }
 
     /// Tries to create an Arc-wrapped monitor by capturing the current runtime.
