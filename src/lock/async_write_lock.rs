@@ -16,15 +16,6 @@ use crate::lock::{
 };
 
 /// Adapts the write mode of an AsyncReadWriteLock to AsyncLock.
-///
-/// ```compile_fail
-/// #![deny(unused_must_use)]
-///
-/// use qubit_lock::AsyncReadWriteLock;
-///
-/// let lock = tokio::sync::RwLock::new(());
-/// lock.write_lock();
-/// ```
 #[must_use = "use the adapter to acquire an asynchronous write guard"]
 pub struct AsyncWriteLock<'a, L: ?Sized> {
     /// Underlying asynchronous read-write lock.

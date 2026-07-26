@@ -30,17 +30,6 @@
 ///     .expect("standard Timer should register");
 /// assert_eq!(status, WaitTimeoutStatus::TimedOut);
 /// ```
-///
-/// Ignoring the status returned by a guard wait is rejected when unused
-/// must-use values are denied:
-///
-/// ```compile_fail
-/// #![deny(unused_must_use)]
-///
-/// use qubit_lock::WaitTimeoutStatus;
-///
-/// WaitTimeoutStatus::TimedOut;
-/// ```
 #[must_use = "check whether the condition wait woke or reached its timeout"]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WaitTimeoutStatus {

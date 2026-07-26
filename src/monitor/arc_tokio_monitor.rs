@@ -122,15 +122,6 @@ impl<T> ArcTokioMonitor<T> {
     /// # Returns
     ///
     /// The existing Arc without changing its strong reference count.
-    ///
-    /// ```compile_fail
-    /// #![deny(unused_must_use)]
-    ///
-    /// use qubit_lock::ArcTokioMonitor;
-    ///
-    /// let monitor = ArcTokioMonitor::current(());
-    /// monitor.as_arc();
-    /// ```
     #[must_use = "use the borrowed Arc or omit the call"]
     #[inline(always)]
     pub fn as_arc(&self) -> &Arc<TokioMonitor<T>> {

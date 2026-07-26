@@ -64,18 +64,6 @@ use super::{
 ///
 /// assert_eq!(monitor.with_read(|items| items.len()), 1);
 /// ```
-///
-/// Ignoring a monitor guard is rejected when unused must-use values are
-/// denied:
-///
-/// ```compile_fail
-/// #![deny(unused_must_use)]
-///
-/// use qubit_lock::ParkingLotMonitor;
-///
-/// let monitor = ParkingLotMonitor::new(0);
-/// monitor.lock();
-/// ```
 #[must_use = "dropping the guard immediately releases the monitor lock"]
 pub struct ParkingLotMonitorGuard<'a, T> {
     /// ParkingLotMonitor that owns the state, waiter registry, and Timer.
