@@ -20,27 +20,16 @@
 //! [`StdMonitorGuard::wait_until`] for more complex state machines such as
 //! thread pools.
 
-use qubit_clock::{
-    TimeError,
-    Timer,
-};
+use qubit_clock::{TimeError, Timer};
 use std::{
-    sync::{
-        Arc,
-        Mutex,
-    },
+    sync::{Arc, Mutex},
     time::Duration,
 };
 
 use super::std_monitor_guard::StdMonitorGuard;
 use super::{
-    ConditionWaiter,
-    Notifier,
-    TimeoutConditionWaiter,
-    internal::{
-        BlockingWaiterRegistry,
-        default_timer,
-    },
+    ConditionWaiter, Notifier, TimeoutConditionWaiter,
+    internal::{BlockingWaiterRegistry, default_timer},
     wait_timeout_result::WaitTimeoutResult,
 };
 
@@ -343,8 +332,9 @@ impl<T> StdMonitor<T> {
     where
         F: FnOnce(&mut T) -> R,
     {
-        let result = self.with_write(f);
-        self.notify_one();
+        let mut guard = self.lock();
+        let result = f(&mut guard);
+        guard.notify_one();
         result
     }
 
@@ -390,8 +380,9 @@ impl<T> StdMonitor<T> {
     where
         F: FnOnce(&mut T) -> R,
     {
-        let result = self.with_write(f);
-        self.notify_all();
+        let mut guard = self.lock();
+        let result = f(&mut guard);
+        guard.notify_all();
         result
     }
 

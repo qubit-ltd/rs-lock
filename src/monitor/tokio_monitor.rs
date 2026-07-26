@@ -8,37 +8,18 @@
 //! Tokio-based asynchronous monitor.
 
 use std::{
-    collections::BTreeMap,
-    future::{
-        Future,
-        poll_fn,
-    },
-    sync::{
-        Arc,
-        Mutex as StdMutex,
-    },
+    future::{Future, poll_fn},
+    sync::{Arc, Mutex as StdMutex},
     task::Poll,
     time::Duration,
 };
 
-use qubit_clock::{
-    TimeError,
-    Timer,
-    TimerFuture,
-    TokioRuntimeError,
-    TokioTimer,
-};
+use qubit_clock::{TimeError, Timer, TimerFuture, TokioRuntimeError, TokioTimer};
 use tokio::sync::Mutex;
 
 use super::{
-    AsyncConditionWaiter,
-    AsyncTimeoutConditionWaiter,
-    Notifier,
-    WaitTimeoutResult,
-    internal::{
-        TokioConditionWaiter,
-        TokioConditionWaiterRegistration,
-    },
+    AsyncConditionWaiter, AsyncTimeoutConditionWaiter, Notifier, WaitTimeoutResult,
+    internal::{TokioConditionWaiter, TokioConditionWaiterRegistration, WaiterRegistry},
 };
 
 /// Asynchronous monitor built on Tokio synchronization primitives.
@@ -70,8 +51,8 @@ use super::{
 pub struct TokioMonitor<T> {
     /// Protected monitor state.
     state: Mutex<T>,
-    /// Active condition waiters eligible for memoryless notification.
-    waiters: StdMutex<BTreeMap<usize, Arc<TokioConditionWaiter>>>,
+    /// Active condition waiters selected in FIFO registration order.
+    waiters: StdMutex<WaiterRegistry<Arc<TokioConditionWaiter>>>,
     /// Timer driving every asynchronous deadline wait.
     timer: Arc<dyn Timer>,
 }
@@ -95,9 +76,8 @@ impl<T> TokioMonitor<T> {
     #[track_caller]
     #[inline]
     pub fn current(state: T) -> Self {
-        Self::try_current(state).unwrap_or_else(|error| {
-            panic!("cannot create Tokio monitor: {error}")
-        })
+        Self::try_current(state)
+            .unwrap_or_else(|error| panic!("cannot create Tokio monitor: {error}"))
     }
 
     /// Tries to create a monitor by capturing the current Tokio runtime.
@@ -120,8 +100,7 @@ impl<T> TokioMonitor<T> {
     /// Panics if all process-wide clock-domain identifiers are exhausted.
     #[inline]
     pub fn try_current(state: T) -> Result<Self, TokioRuntimeError> {
-        TokioTimer::try_current()
-            .map(|timer| Self::with_timer(state, Arc::new(timer)))
+        TokioTimer::try_current().map(|timer| Self::with_timer(state, Arc::new(timer)))
     }
 
     /// Creates a Tokio monitor using an injected Timer.
@@ -142,7 +121,7 @@ impl<T> TokioMonitor<T> {
     pub fn with_timer(state: T, timer: Arc<dyn Timer>) -> Self {
         Self {
             state: Mutex::new(state),
-            waiters: StdMutex::new(BTreeMap::new()),
+            waiters: StdMutex::new(WaiterRegistry::new()),
             timer,
         }
     }
@@ -252,16 +231,16 @@ impl<T> TokioMonitor<T> {
         result
     }
 
-    /// Selects at most one registered async waiter without a fairness
-    /// guarantee.
+    /// Selects the longest-waiting registered async waiter.
+    ///
+    /// This does not guarantee scheduling or mutex reacquisition order.
     #[inline]
     pub fn notify_one(&self) {
         let waiter = self
             .waiters
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .pop_last()
-            .map(|(_, waiter)| waiter);
+            .take_one();
         if let Some(waiter) = waiter {
             waiter.signal().notify_one();
         }
@@ -274,9 +253,9 @@ impl<T> TokioMonitor<T> {
                 .waiters
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            std::mem::take(&mut *registry)
+            registry.take_all()
         };
-        for waiter in waiters.into_values() {
+        for waiter in waiters {
             waiter.signal().notify_one();
         }
     }
@@ -290,19 +269,16 @@ impl<T> TokioMonitor<T> {
     ///
     /// # Panics
     ///
-    /// Panics if an allocation address unexpectedly collides with an active
-    /// waiter key.
+    /// Panics if the registry exhausts registration identifiers.
     #[inline]
     fn register_waiter(&self) -> TokioConditionWaiterRegistration<'_> {
         let waiter = Arc::new(TokioConditionWaiter::new());
-        let waiter_key = Arc::as_ptr(&waiter) as usize;
-        let previous = self
+        let waiter_id = self
             .waiters
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .insert(waiter_key, Arc::clone(&waiter));
-        assert!(previous.is_none(), "Tokio monitor waiter pointer reused");
-        TokioConditionWaiterRegistration::new(&self.waiters, waiter)
+            .register(Arc::clone(&waiter));
+        TokioConditionWaiterRegistration::new(&self.waiters, waiter_id, waiter)
     }
 
     /// Polls a fixed Timer registration once after state reacquisition.
@@ -315,9 +291,7 @@ impl<T> TokioMonitor<T> {
     ///
     /// `true` when the deadline has completed.
     #[inline]
-    async fn deadline_reached(
-        deadline: &mut TimerFuture,
-    ) -> Result<bool, TimeError> {
+    async fn deadline_reached(deadline: &mut TimerFuture) -> Result<bool, TimeError> {
         poll_fn(|context| match deadline.as_mut().poll(context) {
             Poll::Pending => Poll::Ready(Ok(false)),
             Poll::Ready(result) => Poll::Ready(result.map(|()| true)),
@@ -327,8 +301,9 @@ impl<T> TokioMonitor<T> {
 }
 
 impl<T> Notifier for TokioMonitor<T> {
-    /// Selects at most one registered async waiter without a fairness
-    /// guarantee.
+    /// Selects the longest-waiting registered async waiter.
+    ///
+    /// This does not guarantee scheduling or mutex reacquisition order.
     #[inline(always)]
     fn notify_one(&self) {
         Self::notify_one(self);
@@ -439,11 +414,7 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
-        self.wait_while_for_async(
-            timeout,
-            move |state| !predicate(state),
-            action,
-        )
+        self.wait_while_for_async(timeout, move |state| !predicate(state), action)
     }
 
     /// Returns a future that rechecks the predicate while it remains true or

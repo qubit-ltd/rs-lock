@@ -7,18 +7,11 @@
 // =============================================================================
 //! Tests for exclusive synchronous lock-acquisition modes.
 
-use std::sync::{
-    Arc,
-    Mutex,
-    RwLock,
-};
+use std::sync::{Arc, Mutex, RwLock};
 
 #[cfg(feature = "parking-lot")]
 use parking_lot::Mutex as ParkingLotMutex;
-use qubit_lock::{
-    ExclusiveLock,
-    ReadWriteLock,
-};
+use qubit_lock::{ExclusiveLock, ReadWriteLock};
 
 /// Accepts any acquisition mode that promises exclusive entry.
 fn require_exclusive<L>(lock: &L)

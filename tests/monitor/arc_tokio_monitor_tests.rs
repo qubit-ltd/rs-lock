@@ -7,22 +7,11 @@
 // =============================================================================
 //! Tests for [`ArcTokioMonitor`](qubit_lock::ArcTokioMonitor).
 
-use std::{
-    sync::Arc,
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 
-use qubit_clock::{
-    ManualMonotonicClock,
-    MonotonicClock,
-    TokioRuntimeError,
-};
+use qubit_clock::{ManualMonotonicClock, MonotonicClock, TokioRuntimeError};
 use qubit_lock::{
-    ArcTokioMonitor,
-    AsyncConditionWaiter,
-    AsyncTimeoutConditionWaiter,
-    Notifier,
-    TokioMonitor,
+    ArcTokioMonitor, AsyncConditionWaiter, AsyncTimeoutConditionWaiter, Notifier, TokioMonitor,
     WaitTimeoutResult,
 };
 
@@ -141,12 +130,9 @@ async fn test_arc_tokio_monitor_traits_delegate_to_inner_monitor() {
         );
     tokio::pin!(condition_until_wait);
     assert!(
-        tokio::time::timeout(
-            Duration::from_millis(10),
-            &mut condition_until_wait
-        )
-        .await
-        .is_err()
+        tokio::time::timeout(Duration::from_millis(10), &mut condition_until_wait)
+            .await
+            .is_err()
     );
     monitor
         .with_write_notify_one_async(|items| items.push(2))
@@ -161,12 +147,9 @@ async fn test_arc_tokio_monitor_traits_delegate_to_inner_monitor() {
         );
     tokio::pin!(condition_while_wait);
     assert!(
-        tokio::time::timeout(
-            Duration::from_millis(10),
-            &mut condition_while_wait
-        )
-        .await
-        .is_err()
+        tokio::time::timeout(Duration::from_millis(10), &mut condition_while_wait)
+            .await
+            .is_err()
     );
     monitor
         .with_write_notify_one_async(|items| items.push(1))
@@ -182,20 +165,14 @@ async fn test_arc_tokio_monitor_traits_delegate_to_inner_monitor() {
         );
     tokio::pin!(timeout_until_wait);
     assert!(
-        tokio::time::timeout(
-            Duration::from_millis(10),
-            &mut timeout_until_wait
-        )
-        .await
-        .is_err()
+        tokio::time::timeout(Duration::from_millis(10), &mut timeout_until_wait)
+            .await
+            .is_err()
     );
     monitor
         .with_write_notify_one_async(|items| items.push(3))
         .await;
-    assert_time_result_eq!(
-        timeout_until_wait.await,
-        Ok(WaitTimeoutResult::Ready(3)),
-    );
+    assert_time_result_eq!(timeout_until_wait.await, Ok(WaitTimeoutResult::Ready(3)),);
 
     let timeout_while_wait =
         <ArcTokioMonitor<Vec<i32>> as AsyncTimeoutConditionWaiter>::wait_while_for_async(
@@ -206,12 +183,9 @@ async fn test_arc_tokio_monitor_traits_delegate_to_inner_monitor() {
         );
     tokio::pin!(timeout_while_wait);
     assert!(
-        tokio::time::timeout(
-            Duration::from_millis(10),
-            &mut timeout_while_wait
-        )
-        .await
-        .is_err()
+        tokio::time::timeout(Duration::from_millis(10), &mut timeout_while_wait)
+            .await
+            .is_err()
     );
     monitor
         .with_write_notify_all_async(|items| items.push(4))
@@ -233,12 +207,9 @@ async fn test_arc_tokio_monitor_wait_methods_delegate_to_inner_monitor() {
     );
     tokio::pin!(condition_until_wait);
     assert!(
-        tokio::time::timeout(
-            Duration::from_millis(10),
-            &mut condition_until_wait
-        )
-        .await
-        .is_err()
+        tokio::time::timeout(Duration::from_millis(10), &mut condition_until_wait)
+            .await
+            .is_err()
     );
     monitor
         .with_write_notify_one_async(|items| items.push(2))
@@ -251,12 +222,9 @@ async fn test_arc_tokio_monitor_wait_methods_delegate_to_inner_monitor() {
     );
     tokio::pin!(condition_while_wait);
     assert!(
-        tokio::time::timeout(
-            Duration::from_millis(10),
-            &mut condition_while_wait
-        )
-        .await
-        .is_err()
+        tokio::time::timeout(Duration::from_millis(10), &mut condition_while_wait)
+            .await
+            .is_err()
     );
     monitor
         .with_write_notify_one_async(|items| items.push(1))
@@ -270,20 +238,14 @@ async fn test_arc_tokio_monitor_wait_methods_delegate_to_inner_monitor() {
     );
     tokio::pin!(timeout_until_wait);
     assert!(
-        tokio::time::timeout(
-            Duration::from_millis(10),
-            &mut timeout_until_wait
-        )
-        .await
-        .is_err()
+        tokio::time::timeout(Duration::from_millis(10), &mut timeout_until_wait)
+            .await
+            .is_err()
     );
     monitor
         .with_write_notify_one_async(|items| items.push(3))
         .await;
-    assert_time_result_eq!(
-        timeout_until_wait.await,
-        Ok(WaitTimeoutResult::Ready(3)),
-    );
+    assert_time_result_eq!(timeout_until_wait.await, Ok(WaitTimeoutResult::Ready(3)),);
 
     let timeout_while_wait = monitor.wait_while_for_async(
         Duration::from_secs(1),
@@ -292,12 +254,9 @@ async fn test_arc_tokio_monitor_wait_methods_delegate_to_inner_monitor() {
     );
     tokio::pin!(timeout_while_wait);
     assert!(
-        tokio::time::timeout(
-            Duration::from_millis(10),
-            &mut timeout_while_wait
-        )
-        .await
-        .is_err()
+        tokio::time::timeout(Duration::from_millis(10), &mut timeout_while_wait)
+            .await
+            .is_err()
     );
     monitor
         .with_write_notify_all_async(|items| items.push(4))
@@ -314,11 +273,7 @@ async fn test_arc_tokio_monitor_async_wait_until_for_times_out() {
 
     assert_time_result_eq!(
         monitor
-            .wait_until_for_async(
-                Duration::from_millis(1),
-                |ready| *ready,
-                |_| 7
-            )
+            .wait_until_for_async(Duration::from_millis(1), |ready| *ready, |_| 7)
             .await,
         Ok(WaitTimeoutResult::TimedOut),
     );

@@ -11,19 +11,13 @@
 //! Tests for the parking_lot::RwLock implementation of the DataLock trait.
 
 use std::{
-    sync::{
-        Arc,
-        mpsc,
-    },
+    sync::{Arc, mpsc},
     thread,
     time::Duration,
 };
 
 use parking_lot::RwLock as ParkingLotRwLock;
-use qubit_lock::{
-    DataLock,
-    TryLockError,
-};
+use qubit_lock::{DataLock, TryLockError};
 
 #[cfg(test)]
 #[allow(clippy::module_inception)]
@@ -50,8 +44,7 @@ mod parking_lot_rw_lock_tests {
     }
 
     #[test]
-    fn test_parking_lot_rw_lock_try_read_returns_would_block_when_write_locked()
-    {
+    fn test_parking_lot_rw_lock_try_read_returns_would_block_when_write_locked() {
         let rw_lock = Arc::new(ParkingLotRwLock::new(0));
         let (locked_tx, locked_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
@@ -87,8 +80,7 @@ mod parking_lot_rw_lock_tests {
     }
 
     #[test]
-    fn test_parking_lot_rw_lock_try_write_returns_would_block_when_read_locked()
-    {
+    fn test_parking_lot_rw_lock_try_write_returns_would_block_when_read_locked() {
         let rw_lock = Arc::new(ParkingLotRwLock::new(0));
         let (locked_tx, locked_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();

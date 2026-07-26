@@ -26,7 +26,7 @@ mod async_monitor;
 #[cfg(feature = "async-monitor")]
 mod async_timeout_condition_waiter;
 mod condition_waiter;
-mod internal;
+pub(crate) mod internal;
 mod monitor;
 mod notifier;
 #[cfg(feature = "parking-lot")]

@@ -7,10 +7,7 @@
 // =============================================================================
 //! Public behavior tests backed by the blocking waiter registry.
 
-use std::{
-    sync::Arc,
-    thread,
-};
+use std::{sync::Arc, thread};
 
 use qubit_lock::ParkingLotMonitor;
 

@@ -7,22 +7,10 @@
 // =============================================================================
 //! Defines one latched blocking condition waiter and Timer waker.
 
-use std::sync::{
-    Arc,
-    Condvar,
-    Mutex,
-};
-use std::task::{
-    Context,
-    Poll,
-    Wake,
-    Waker,
-};
+use std::sync::{Arc, Condvar, Mutex};
+use std::task::{Context, Poll, Wake, Waker};
 
-use qubit_clock::{
-    TimeError,
-    TimerFuture,
-};
+use qubit_clock::{TimeError, TimerFuture};
 
 use super::blocking_condition_waiter_state::BlockingConditionWaiterState;
 
@@ -44,9 +32,7 @@ impl BlockingConditionWaiter {
     #[inline]
     pub(in crate::monitor) const fn new() -> Self {
         Self {
-            state: Mutex::new(BlockingConditionWaiterState {
-                signalled: false,
-            }),
+            state: Mutex::new(BlockingConditionWaiterState { signalled: false }),
             changed: Condvar::new(),
         }
     }

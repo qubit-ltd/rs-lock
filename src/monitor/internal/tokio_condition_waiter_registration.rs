@@ -8,31 +8,23 @@
 //! Cancellation-safe registration for a Tokio condition waiter.
 
 use std::{
-    collections::BTreeMap,
-    future::{
-        Future,
-        poll_fn,
-    },
-    sync::{
-        Arc,
-        Mutex,
-    },
+    future::{Future, poll_fn},
+    sync::{Arc, Mutex},
     task::Poll,
 };
 
-use qubit_clock::{
-    TimeError,
-    TimerFuture,
-};
+use qubit_clock::{TimeError, TimerFuture};
 
-use super::TokioConditionWaiter;
+use super::{TokioConditionWaiter, WaiterRegistry};
 use crate::monitor::WaitTimeoutStatus;
 
 /// Removes an active waiter registration on cancellation or normal exit.
 #[must_use = "retain the registration while the waiter remains eligible for notification"]
 pub(in crate::monitor) struct TokioConditionWaiterRegistration<'a> {
     /// Registry containing this waiter while it remains selectable.
-    registry: &'a Mutex<BTreeMap<usize, Arc<TokioConditionWaiter>>>,
+    registry: &'a Mutex<WaiterRegistry<Arc<TokioConditionWaiter>>>,
+    /// Stable registry identifier for cancellation.
+    waiter_id: u64,
     /// Independently signalled waiter owned by the pending condition wait.
     waiter: Arc<TokioConditionWaiter>,
 }
@@ -50,10 +42,15 @@ impl<'a> TokioConditionWaiterRegistration<'a> {
     /// A guard that unregisters `waiter` when dropped.
     #[inline]
     pub(in crate::monitor) fn new(
-        registry: &'a Mutex<BTreeMap<usize, Arc<TokioConditionWaiter>>>,
+        registry: &'a Mutex<WaiterRegistry<Arc<TokioConditionWaiter>>>,
+        waiter_id: u64,
         waiter: Arc<TokioConditionWaiter>,
     ) -> Self {
-        Self { registry, waiter }
+        Self {
+            registry,
+            waiter_id,
+            waiter,
+        }
     }
 
     /// Returns the waiter owned by this registration.
@@ -101,11 +98,10 @@ impl Drop for TokioConditionWaiterRegistration<'_> {
     /// Removes this waiter if no notification has selected it yet.
     #[inline]
     fn drop(&mut self) {
-        let waiter_key = Arc::as_ptr(&self.waiter) as usize;
         let mut registry = self
             .registry
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        registry.remove(&waiter_key);
+        registry.unregister(self.waiter_id);
     }
 }

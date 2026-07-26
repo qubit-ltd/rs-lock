@@ -9,11 +9,7 @@
 
 use std::sync::Arc;
 
-use qubit_lock::{
-    ArcTokioMonitor,
-    SharedAsyncMonitor,
-    TokioMonitor,
-};
+use qubit_lock::{ArcTokioMonitor, SharedAsyncMonitor, TokioMonitor};
 
 /// Clones a monitor through the aggregate shared async capability.
 fn clone_through_trait<M>(monitor: M) -> M

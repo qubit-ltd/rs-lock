@@ -7,22 +7,15 @@
 // =============================================================================
 //! Stores active blocking Monitor waiters with memoryless notification.
 
-use std::collections::BTreeMap;
-use std::sync::{
-    Arc,
-    Mutex,
-};
+use std::sync::{Arc, Mutex};
 use std::task::Wake;
 
-use super::{
-    BlockingConditionWaiter,
-    BlockingWaiterRegistration,
-};
+use super::{BlockingConditionWaiter, BlockingWaiterRegistration, WaiterRegistry};
 
 /// Registry of blocking waiters eligible for current notifications.
 pub(in crate::monitor) struct BlockingWaiterRegistry {
-    /// Active waiters keyed by stable allocation address.
-    waiters: Mutex<BTreeMap<usize, Arc<BlockingConditionWaiter>>>,
+    /// Active waiters with FIFO notification selection.
+    waiters: Mutex<WaiterRegistry<Arc<BlockingConditionWaiter>>>,
 }
 
 impl BlockingWaiterRegistry {
@@ -33,9 +26,9 @@ impl BlockingWaiterRegistry {
     /// A registry containing no notification permits or waiters.
     #[must_use]
     #[inline]
-    pub(in crate::monitor) const fn new() -> Self {
+    pub(in crate::monitor) fn new() -> Self {
         Self {
-            waiters: Mutex::new(BTreeMap::new()),
+            waiters: Mutex::new(WaiterRegistry::new()),
         }
     }
 
@@ -47,20 +40,15 @@ impl BlockingWaiterRegistry {
     ///
     /// # Panics
     ///
-    /// Panics if an allocation address unexpectedly collides with an active
-    /// waiter key.
-    pub(in crate::monitor) fn register(
-        &self,
-    ) -> BlockingWaiterRegistration<'_> {
+    /// Panics if the registry exhausts registration identifiers.
+    pub(in crate::monitor) fn register(&self) -> BlockingWaiterRegistration<'_> {
         let waiter = Arc::new(BlockingConditionWaiter::new());
-        let key = Arc::as_ptr(&waiter) as usize;
-        let previous = self
+        let waiter_id = self
             .waiters
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .insert(key, Arc::clone(&waiter));
-        assert!(previous.is_none(), "blocking monitor waiter pointer reused");
-        BlockingWaiterRegistration::new(self, key, waiter)
+            .register(Arc::clone(&waiter));
+        BlockingWaiterRegistration::new(self, waiter_id, waiter)
     }
 
     /// Selects and signals at most one currently registered waiter.
@@ -69,8 +57,7 @@ impl BlockingWaiterRegistry {
             .waiters
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .pop_last()
-            .map(|(_, waiter)| waiter);
+            .take_one();
         if let Some(waiter) = waiter {
             Wake::wake(waiter);
         }
@@ -83,9 +70,9 @@ impl BlockingWaiterRegistry {
                 .waiters
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
-            std::mem::take(&mut *registry)
+            registry.take_all()
         };
-        for waiter in waiters.into_values() {
+        for waiter in waiters {
             Wake::wake(waiter);
         }
     }
@@ -94,13 +81,13 @@ impl BlockingWaiterRegistry {
     ///
     /// # Parameters
     ///
-    /// * `key` - Stable allocation-address key to remove.
-    pub(super) fn unregister(&self, key: usize) {
+    /// * `waiter_id` - Stable registration identifier to remove.
+    pub(super) fn unregister(&self, waiter_id: u64) {
         let waiter = self
             .waiters
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .remove(&key);
+            .unregister(waiter_id);
         drop(waiter);
     }
 }

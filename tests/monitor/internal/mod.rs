@@ -19,3 +19,5 @@ mod mod_tests;
 mod tokio_condition_waiter_registration_tests;
 #[cfg(feature = "async-monitor")]
 mod tokio_condition_waiter_tests;
+#[cfg(all(loom, feature = "loom-model"))]
+mod waiter_registry_loom_tests;

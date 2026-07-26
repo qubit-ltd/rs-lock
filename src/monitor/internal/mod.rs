@@ -16,6 +16,7 @@ mod default_timer;
 mod tokio_condition_waiter;
 #[cfg(feature = "async-monitor")]
 mod tokio_condition_waiter_registration;
+mod waiter_registry;
 
 pub(in crate::monitor) use blocking_condition_waiter::BlockingConditionWaiter;
 pub(in crate::monitor) use blocking_waiter_registration::BlockingWaiterRegistration;
@@ -25,3 +26,4 @@ pub(in crate::monitor) use default_timer::default_timer;
 pub(in crate::monitor) use tokio_condition_waiter::TokioConditionWaiter;
 #[cfg(feature = "async-monitor")]
 pub(in crate::monitor) use tokio_condition_waiter_registration::TokioConditionWaiterRegistration;
+pub(crate) use waiter_registry::WaiterRegistry;

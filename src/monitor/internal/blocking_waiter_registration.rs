@@ -9,18 +9,15 @@
 
 use std::sync::Arc;
 
-use super::{
-    BlockingConditionWaiter,
-    BlockingWaiterRegistry,
-};
+use super::{BlockingConditionWaiter, BlockingWaiterRegistry};
 
 /// RAII ownership of one active blocking waiter registration.
 #[must_use = "retain the registration while the waiter remains eligible for notification"]
 pub(in crate::monitor) struct BlockingWaiterRegistration<'a> {
     /// Registry from which cancellation removes the waiter.
     registry: &'a BlockingWaiterRegistry,
-    /// Stable allocation-address key.
-    key: usize,
+    /// Stable registry identifier.
+    waiter_id: u64,
     /// Waiter shared with notifications and Timer Wakers.
     waiter: Arc<BlockingConditionWaiter>,
 }
@@ -30,12 +27,12 @@ impl<'a> BlockingWaiterRegistration<'a> {
     #[inline]
     pub(super) const fn new(
         registry: &'a BlockingWaiterRegistry,
-        key: usize,
+        waiter_id: u64,
         waiter: Arc<BlockingConditionWaiter>,
     ) -> Self {
         Self {
             registry,
-            key,
+            waiter_id,
             waiter,
         }
     }
@@ -47,9 +44,7 @@ impl<'a> BlockingWaiterRegistration<'a> {
     /// A shared reference to this registration's waiter allocation.
     #[must_use]
     #[inline(always)]
-    pub(in crate::monitor) const fn waiter(
-        &self,
-    ) -> &Arc<BlockingConditionWaiter> {
+    pub(in crate::monitor) const fn waiter(&self) -> &Arc<BlockingConditionWaiter> {
         &self.waiter
     }
 }
@@ -58,6 +53,6 @@ impl Drop for BlockingWaiterRegistration<'_> {
     /// Cancels an active registration without transferring notification.
     #[inline(always)]
     fn drop(&mut self) {
-        self.registry.unregister(self.key);
+        self.registry.unregister(self.waiter_id);
     }
 }

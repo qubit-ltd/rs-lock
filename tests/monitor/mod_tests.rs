@@ -7,10 +7,7 @@
 // =============================================================================
 //! Tests for monitor module crate-root exports.
 
-use qubit_lock::{
-    Monitor,
-    StdMonitor,
-};
+use qubit_lock::{Monitor, StdMonitor};
 
 /// Verifies that the monitor feature exposes the standard monitor contract.
 #[test]
