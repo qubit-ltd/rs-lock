@@ -49,15 +49,20 @@
 //! assert_eq!(*Lock::lock(&read), 1);
 //! ```
 //!
-//! Monitors provide closure-based access to protected data. Their waiting
-//! operations use predicates so callers always re-check the protected state:
+//! Monitors provide closure-based access to protected data. `Monitor` and
+//! `AsyncMonitor` combine state access, notification, and untimed predicate
+//! waits. `TimedMonitor` and `AsyncTimedMonitor` additionally support
+//! timeout-based waits:
 //!
 //! ```rust
+//! # #[cfg(feature = "monitor")]
+//! # {
 //! use qubit_lock::StdMonitor;
 //!
 //! let monitor = StdMonitor::new(0);
 //! monitor.with_write(|value| *value = 1);
 //! assert_eq!(monitor.with_read(|value| *value), 1);
+//! # }
 //! ```
 
 mod lock;
@@ -98,6 +103,7 @@ pub use monitor::{
     SharedMonitor,
     StdMonitor,
     StdMonitorGuard,
+    TimedMonitor,
     TimeoutConditionWaiter,
     WaitTimeoutResult,
     WaitTimeoutStatus,
@@ -107,6 +113,7 @@ pub use monitor::{
     ArcTokioMonitor,
     AsyncConditionWaiter,
     AsyncMonitor,
+    AsyncTimedMonitor,
     AsyncTimeoutConditionWaiter,
     SharedAsyncMonitor,
     TokioMonitor,

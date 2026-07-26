@@ -7,37 +7,64 @@
 // =============================================================================
 //! Tests for [`Monitor`](qubit_lock::Monitor).
 
-use std::{
-    sync::Arc,
-    time::Duration,
-};
+use std::sync::Arc;
 
+#[cfg(feature = "parking-lot")]
+use qubit_lock::{
+    ArcParkingLotMonitor,
+    ParkingLotMonitor,
+};
 use qubit_lock::{
     ArcStdMonitor,
     Monitor,
     StdMonitor,
-    WaitTimeoutResult,
 };
 
-/// Exercises timed waiting through the aggregate blocking capability.
-fn wait_through_trait<M>(monitor: &M)
+/// Exercises state access, notification, and untimed waiting through the
+/// aggregate blocking capability.
+fn use_monitor<M>(monitor: &M)
 where
     M: Monitor<State = bool>,
 {
-    assert_time_result_eq!(
-        monitor.wait_until_for(Duration::ZERO, |ready| *ready, |_| 7),
-        Ok(WaitTimeoutResult::TimedOut),
+    <M as Monitor>::with_write(monitor, |ready| *ready = true);
+    assert!(<M as Monitor>::with_read(monitor, |ready| *ready));
+    <M as Monitor>::with_write_notify_one(monitor, |ready| *ready = false);
+    <M as Monitor>::with_write_notify_all(monitor, |ready| *ready = true);
+    assert_eq!(
+        monitor.wait_until(
+            |ready| *ready,
+            |ready| {
+                *ready = false;
+                7
+            },
+        ),
+        7,
     );
+    assert!(!<M as Monitor>::with_read(monitor, |ready| *ready));
 }
 
 #[test]
 /// Verifies a named shared monitor handle satisfies [`Monitor`].
 fn test_monitor_trait_accepts_std_monitor() {
-    wait_through_trait(&ArcStdMonitor::new(false));
+    use_monitor(&ArcStdMonitor::new(false));
 }
 
 #[test]
 /// Verifies blanket Arc delegation satisfies [`Monitor`].
 fn test_monitor_trait_accepts_arc_wrapped_implementation() {
-    wait_through_trait(&Arc::new(StdMonitor::new(false)));
+    use_monitor(&Arc::new(StdMonitor::new(false)));
+}
+
+#[cfg(feature = "parking-lot")]
+#[test]
+/// Verifies a parking-lot handle satisfies [`Monitor`].
+fn test_monitor_trait_accepts_parking_lot_monitor() {
+    use_monitor(&ArcParkingLotMonitor::new(false));
+}
+
+#[cfg(feature = "parking-lot")]
+#[test]
+/// Verifies [`Arc`] forwards a parking-lot monitor's aggregate capability.
+fn test_monitor_trait_accepts_arc_wrapped_parking_lot_implementation() {
+    use_monitor(&Arc::new(ParkingLotMonitor::new(false)));
 }

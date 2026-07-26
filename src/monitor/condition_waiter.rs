@@ -26,8 +26,8 @@ use std::sync::Arc;
 /// cannot prevent a notification from falling between the waiter's predicate
 /// check and waiter registration.
 ///
-/// Concrete monitors provide combined helpers such as
-/// `with_write_notify_all` for this protocol:
+/// The [`crate::monitor::Monitor`] trait provides combined helpers such as
+/// [`crate::monitor::Monitor::with_write_notify_all`] for this protocol:
 ///
 /// ```
 /// use std::{

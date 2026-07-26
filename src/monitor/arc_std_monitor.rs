@@ -22,6 +22,7 @@ use std::{
 
 use super::{
     ConditionWaiter,
+    Monitor,
     Notifier,
     StdMonitor,
     TimeoutConditionWaiter,
@@ -182,6 +183,26 @@ impl<T> ConditionWaiter for ArcStdMonitor<T> {
             predicate,
             action,
         )
+    }
+}
+
+impl<T> Monitor for ArcStdMonitor<T> {
+    /// Delegates protected-state reading to the wrapped monitor.
+    #[inline(always)]
+    fn with_read<R, F>(&self, f: F) -> R
+    where
+        F: FnOnce(&Self::State) -> R,
+    {
+        self.inner.with_read(f)
+    }
+
+    /// Delegates protected-state mutation to the wrapped monitor.
+    #[inline(always)]
+    fn with_write<R, F>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut Self::State) -> R,
+    {
+        self.inner.with_write(f)
     }
 }
 

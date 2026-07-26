@@ -21,6 +21,7 @@ use std::{
 
 use super::{
     AsyncConditionWaiter,
+    AsyncMonitor,
     AsyncTimeoutConditionWaiter,
     Notifier,
     TokioMonitor,
@@ -169,6 +170,34 @@ impl<T: Send> AsyncConditionWaiter for ArcTokioMonitor<T> {
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
         self.inner.wait_while_async(predicate, action)
+    }
+}
+
+impl<T: Send> AsyncMonitor for ArcTokioMonitor<T> {
+    /// Acquires the wrapped monitor and reads its protected state.
+    #[inline(always)]
+    fn with_read_async<'a, R, F>(
+        &'a self,
+        f: F,
+    ) -> impl Future<Output = R> + Send + 'a
+    where
+        R: Send + 'a,
+        F: FnOnce(&Self::State) -> R + Send + 'a,
+    {
+        self.inner.with_read_async(f)
+    }
+
+    /// Acquires the wrapped monitor and mutates its protected state.
+    #[inline(always)]
+    fn with_write_async<'a, R, F>(
+        &'a self,
+        f: F,
+    ) -> impl Future<Output = R> + Send + 'a
+    where
+        R: Send + 'a,
+        F: FnOnce(&mut Self::State) -> R + Send + 'a,
+    {
+        self.inner.with_write_async(f)
     }
 }
 

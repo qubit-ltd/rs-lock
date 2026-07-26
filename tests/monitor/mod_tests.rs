@@ -10,12 +10,15 @@
 use qubit_lock::{
     Monitor,
     StdMonitor,
+    TimedMonitor,
 };
 
 /// Verifies that the monitor feature exposes the standard monitor contract.
 #[test]
 fn test_monitor_module_exports_standard_monitor_contract() {
     fn accepts_monitor<M: Monitor>() {}
+    fn accepts_timed_monitor<M: TimedMonitor>() {}
 
     accepts_monitor::<StdMonitor<usize>>();
+    accepts_timed_monitor::<StdMonitor<usize>>();
 }
