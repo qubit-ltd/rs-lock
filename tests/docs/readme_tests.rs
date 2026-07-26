@@ -18,8 +18,11 @@ const README_ZH: &str = include_str!("../../README.zh_CN.md");
 const USER_GUIDE_EN: &str = include_str!("../../doc/user_guide.md");
 const USER_GUIDE_ZH: &str = include_str!("../../doc/user_guide.zh_CN.md");
 const LIB_RS: &str = include_str!("../../src/lib.rs");
+const LOCK_SRC: &str = include_str!("../../src/lock/lock.rs");
 const READ_WRITE_LOCK_SRC: &str =
     include_str!("../../src/lock/read_write_lock.rs");
+const WAIT_TIMEOUT_RESULT_SRC: &str =
+    include_str!("../../src/monitor/wait_timeout_result.rs");
 const CONDITION_WAITER_SRC: &str =
     include_str!("../../src/monitor/condition_waiter.rs");
 const ASYNC_CONDITION_WAITER_SRC: &str =
@@ -37,6 +40,8 @@ const PARKING_LOT_MONITOR_GUARD_SRC: &str =
 const STD_MONITOR_SRC: &str = include_str!("../../src/monitor/std_monitor.rs");
 const STD_MONITOR_GUARD_SRC: &str =
     include_str!("../../src/monitor/std_monitor_guard.rs");
+const TOKIO_MONITOR_SRC: &str =
+    include_str!("../../src/monitor/tokio_monitor.rs");
 
 /// Collapses Markdown whitespace so prose assertions do not depend on line
 /// wrapping.
@@ -291,6 +296,29 @@ fn test_readme_documents_root_only_public_api() {
 fn test_rw_lock_docs_use_current_trait_names() {
     assert!(READ_WRITE_LOCK_SRC.contains("ReadWriteLock"));
     assert!(ASYNC_READ_WRITE_LOCK_SRC.contains("AsyncReadWriteLock"));
+}
+
+#[test]
+/// Ensures root and monitor Rustdoc preserve the implemented lock contracts.
+fn test_rustdoc_contracts_match_lock_and_monitor_semantics() {
+    assert!(LIB_RS.contains("synchronous lock acquisition"));
+    assert!(LOCK_SRC.contains("`Lock` does not imply exclusive entry."));
+    assert!(
+        WAIT_TIMEOUT_RESULT_SRC.contains("deciding locked predicate check")
+    );
+
+    for source in [PARKING_LOT_MONITOR_SRC, STD_MONITOR_SRC] {
+        assert!(
+            source.contains("predicate stops blocking on the deciding locked check")
+        );
+    }
+
+    assert!(
+        TOKIO_MONITOR_SRC
+            .matches("fairness or FIFO")
+            .count()
+            >= 3
+    );
 }
 
 #[test]

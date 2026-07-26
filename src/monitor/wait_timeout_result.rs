@@ -15,7 +15,8 @@
 /// [`StdMonitor::wait_while_for`](super::StdMonitor::wait_while_for) and
 /// [`StdMonitor::wait_until_for`](super::StdMonitor::wait_until_for). It is
 /// more explicit than `Option<R>`: a ready predicate produces [`Self::Ready`],
-/// while an expired timeout produces [`Self::TimedOut`].
+/// while a completed timeout with a still-blocking predicate produces
+/// [`Self::TimedOut`].
 ///
 /// # Type Parameters
 ///
@@ -45,9 +46,11 @@
 #[must_use = "check whether the predicate became ready or the wait timed out"]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WaitTimeoutResult<R> {
-    /// The predicate became ready before the timeout and produced this value.
+    /// The predicate was ready on the deciding locked predicate check and
+    /// produced this value.
     Ready(R),
-    /// The timeout elapsed before the predicate became ready.
+    /// The timeout completed and the predicate still blocked on the deciding
+    /// locked predicate check.
     TimedOut,
 }
 
@@ -66,7 +69,8 @@ impl<R> WaitTimeoutResult<R> {
         }
     }
 
-    /// Returns `true` when the timeout elapsed before the predicate was ready.
+    /// Returns `true` when the timeout completed and the predicate still
+    /// blocked on the deciding locked predicate check.
     ///
     /// # Returns
     ///
