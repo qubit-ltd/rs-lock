@@ -18,6 +18,7 @@ include = [
     "/README.md",
     "/README.zh_CN.md",
     "/benches/**",
+    "/doc/**",
     "/examples/**",
     "/src/**",
     "/tests/**",

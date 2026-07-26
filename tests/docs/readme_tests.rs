@@ -15,6 +15,8 @@ use semver::{
 const CARGO_TOML: &str = include_str!("../../Cargo.toml");
 const README_EN: &str = include_str!("../../README.md");
 const README_ZH: &str = include_str!("../../README.zh_CN.md");
+const USER_GUIDE_EN: &str = include_str!("../../doc/user_guide.md");
+const USER_GUIDE_ZH: &str = include_str!("../../doc/user_guide.zh_CN.md");
 const LIB_RS: &str = include_str!("../../src/lib.rs");
 const READ_WRITE_LOCK_SRC: &str =
     include_str!("../../src/lock/read_write_lock.rs");
@@ -64,7 +66,7 @@ fn test_readme_quick_start_imports_data_lock_trait() {
 }
 
 #[test]
-/// Ensures timed-wait API docs cover failures after Timer registration.
+/// Ensures public docs cover failures after Timer registration.
 fn test_monitor_docs_cover_timer_registration_and_completion_errors() {
     let sources = [
         ("timeout_condition_waiter.rs", TIMEOUT_CONDITION_WAITER_SRC),
@@ -88,8 +90,8 @@ fn test_monitor_docs_cover_timer_registration_and_completion_errors() {
         );
     }
 
-    assert!(README_EN.contains("Timer registration or completion errors"));
-    assert!(README_ZH.contains("Timer 注册或完成错误"));
+    assert!(USER_GUIDE_EN.contains("Timer registration or completion errors"));
+    assert!(USER_GUIDE_ZH.contains("Timer 注册或完成错误"));
 }
 
 #[test]
@@ -102,92 +104,83 @@ fn test_readme_documents_native_lock_support() {
 }
 
 #[test]
-/// Ensures both READMEs distinguish generic acquisition modes from exclusive
-/// ones.
+/// Ensures both user guides distinguish generic acquisition modes from
+/// exclusive ones.
 fn test_readme_documents_exclusive_lock_capability() {
-    let readme_en = normalize_readme_text(README_EN);
-    let readme_zh = normalize_readme_text(README_ZH);
+    let guide_en = normalize_readme_text(USER_GUIDE_EN);
+    let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
 
-    assert!(readme_en.contains("`Lock` represents one acquisition mode"));
-    assert!(readme_en.contains("`ExclusiveLock` marks acquisition modes"));
-    assert!(readme_en.contains("`ReadLock` implements `Lock` only"));
-    assert!(readme_zh.contains("`Lock` 表示一种获取模式"));
-    assert!(readme_zh.contains("`ExclusiveLock` 标记"));
-    assert!(readme_zh.contains("`ReadLock` 只实现 `Lock`"));
+    assert!(guide_en.contains("`Lock` does not promise"));
+    assert!(guide_en.contains("marker trait `ExclusiveLock`"));
+    assert!(guide_en.contains("`ReadLock` implements `Lock`"));
+    assert!(guide_zh.contains("`Lock` 不承诺"));
+    assert!(guide_zh.contains("标记 trait `ExclusiveLock`"));
+    assert!(guide_zh.contains("`ReadLock` 实现 `Lock`"));
 }
 
 #[test]
-/// Ensures README monitor snippets show the combined write-and-notify API.
+/// Ensures guide monitor snippets show the combined write-and-notify API.
 fn test_readme_monitor_example_uses_with_write_notify_one() {
-    assert!(README_EN.contains("use qubit_lock::ArcParkingLotMonitor;"));
-    assert!(README_EN.contains("with_write_notify_one"));
-    assert!(README_EN.contains("combined write-and-notify helpers by default"));
-    assert!(README_ZH.contains("use qubit_lock::ArcParkingLotMonitor;"));
-    assert!(README_ZH.contains("with_write_notify_one"));
-    assert!(README_ZH.contains("默认使用组合 write-and-notify helper"));
+    assert!(USER_GUIDE_EN.contains("use qubit_lock::ArcParkingLotMonitor;"));
+    assert!(USER_GUIDE_EN.contains("with_write_notify_one"));
+    assert!(USER_GUIDE_EN.contains("state-update-and-notify protocol"));
+    assert!(USER_GUIDE_ZH.contains("use qubit_lock::ArcParkingLotMonitor;"));
+    assert!(USER_GUIDE_ZH.contains("with_write_notify_one"));
+    assert!(USER_GUIDE_ZH.contains("状态更新与通知协议"));
 }
 
 #[test]
-/// Ensures both READMEs explain the untimed and timed monitor aggregates.
+/// Ensures both guides explain the untimed and timed monitor aggregates.
 fn test_readme_documents_monitor_capability_split() {
-    let readme_en = normalize_readme_text(README_EN);
-    let readme_zh = normalize_readme_text(README_ZH);
+    let guide_en = normalize_readme_text(USER_GUIDE_EN);
+    let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
 
-    assert!(readme_en.contains(
-        "`Monitor` and `AsyncMonitor` combine state access, notification, and untimed predicate waits"
-    ));
-    assert!(readme_en.contains(
-        "`TimedMonitor` and `AsyncTimedMonitor` add timeout-based waits"
-    ));
-    assert!(readme_zh.contains(
-        "`Monitor` 和 `AsyncMonitor` 聚合状态访问、通知以及无时限 predicate wait"
-    ));
-    assert!(readme_zh.contains(
-        "`TimedMonitor` 和 `AsyncTimedMonitor` 额外提供带时限的 wait"
-    ));
+    assert!(guide_en.contains("`Monitor` plus timed synchronous waits"));
+    assert!(guide_en.contains("`AsyncMonitor` plus timed waits"));
+    assert!(guide_zh.contains("`Monitor` 加同步计时等待"));
+    assert!(guide_zh.contains("`AsyncMonitor` 加计时等待"));
 }
 
 #[test]
-/// Ensures both READMEs describe monitor notification and timeout semantics.
+/// Ensures both guides describe monitor notification and timeout semantics.
 fn test_readme_documents_monitor_wait_semantics() {
-    let readme_en = normalize_readme_text(README_EN);
-    let readme_zh = normalize_readme_text(README_ZH);
-    assert!(readme_en.contains("memoryless condition-variable semantics"));
-    assert!(readme_en.contains("already registered waiters"));
-    assert!(readme_en.contains("condition-wait budget"));
-    assert!(readme_en.contains("one fixed deadline"));
-    assert!(readme_en.contains("A zero timeout still checks the predicate"));
-    assert!(readme_en.contains("final locked predicate check wins"));
-    assert!(readme_en.contains(
-        "Timer registration or completion error takes precedence over every post-wait predicate result"
-    ));
-    assert!(readme_en.contains("the action is not run"));
-    assert!(readme_zh.contains("无记忆的条件变量语义"));
-    assert!(readme_zh.contains("已经注册的 waiter"));
-    assert!(readme_zh.contains("条件等待预算"));
-    assert!(readme_zh.contains("同一个固定 deadline"));
-    assert!(readme_zh.contains("零 timeout 仍会检查 predicate"));
-    assert!(readme_zh.contains("最后一次持锁 predicate 检查优先"));
+    let guide_en = normalize_readme_text(USER_GUIDE_EN);
+    let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
+    assert!(guide_en.contains("Notifications are memoryless"));
+    assert!(guide_en.contains("already registered waiter"));
+    assert!(guide_en.contains("condition-wait budget"));
+    assert!(guide_en.contains("one fixed deadline"));
+    assert!(guide_en.contains("A zero timeout still performs"));
+    assert!(guide_en.contains("final predicate check under the lock wins"));
     assert!(
-        readme_zh
-            .contains("Timer 注册或完成错误优先于任何等待后的 predicate 结果")
+        guide_en.contains(
+            "Timer registration or completion errors take precedence"
+        )
     );
-    assert!(readme_zh.contains("不会执行 action"));
+    assert!(guide_en.contains("the action is not run"));
+    assert!(guide_zh.contains("Notification 是无记忆的"));
+    assert!(guide_zh.contains("已经注册的 waiter"));
+    assert!(guide_zh.contains("条件等待预算"));
+    assert!(guide_zh.contains("固定 deadline"));
+    assert!(guide_zh.contains("零时长 timeout 仍会执行初始 predicate 检查"));
+    assert!(guide_zh.contains("最后一次持锁 predicate 检查优先"));
+    assert!(guide_zh.contains("Timer 注册或完成错误优先"));
+    assert!(guide_zh.contains("不会执行 action"));
 }
 
 #[test]
 /// Ensures public docs explain the monitor handshake for external predicate
 /// state.
 fn test_monitor_docs_cover_external_predicate_state_handshake() {
-    let readme_en = normalize_readme_text(README_EN);
-    let readme_zh = normalize_readme_text(README_ZH);
+    let guide_en = normalize_readme_text(USER_GUIDE_EN);
+    let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
 
-    assert!(readme_en.contains("external predicate state"));
-    assert!(readme_en.contains("Atomic ordering alone cannot prevent"));
-    assert!(readme_en.contains("same monitor-lock handshake"));
-    assert!(readme_zh.contains("monitor 外部的 predicate 状态"));
-    assert!(readme_zh.contains("仅靠 atomic ordering 无法防止"));
-    assert!(readme_zh.contains("同一个 monitor-lock handshake"));
+    assert!(guide_en.contains("predicate reads state outside the monitor"));
+    assert!(guide_en.contains("Atomic ordering alone cannot stop"));
+    assert!(guide_en.contains("monitor-lock handshake"));
+    assert!(guide_zh.contains("predicate 读取 monitor 外的状态"));
+    assert!(guide_zh.contains("仅靠 atomic ordering 无法阻止"));
+    assert!(guide_zh.contains("monitor-lock handshake"));
 
     for source in [CONDITION_WAITER_SRC, ASYNC_CONDITION_WAITER_SRC] {
         assert!(source.contains("External predicate state"));
@@ -198,68 +191,66 @@ fn test_monitor_docs_cover_external_predicate_state_handshake() {
     assert!(
         ASYNC_CONDITION_WAITER_SRC.contains(".with_write_notify_all_async")
     );
-    assert!(readme_en.contains("with_write_notify_all_async"));
-    assert!(readme_zh.contains("with_write_notify_all_async"));
+    assert!(guide_en.contains("with_write_notify_all_async"));
+    assert!(guide_zh.contains("with_write_notify_all_async"));
 }
 
 #[test]
-/// Ensures both READMEs describe async cancellation and Tokio timer needs.
+/// Ensures both guides describe async cancellation and Tokio timer needs.
 fn test_readme_documents_async_monitor_contract() {
-    let readme_en = normalize_readme_text(README_EN);
-    let readme_zh = normalize_readme_text(README_ZH);
-    assert!(readme_en.contains("returned future is lazy"));
-    assert!(readme_en.contains("may be polled from another runtime context"));
-    assert!(readme_en.contains("target runtime must remain alive"));
-    assert!(readme_en.contains("have time enabled"));
-    assert!(readme_en.contains("does not run the action"));
-    assert!(readme_en.contains("does not roll back protected-state changes"));
-    assert!(readme_en.contains("discards that selection"));
-    assert!(readme_zh.contains("返回的 future 是惰性的"));
-    assert!(readme_zh.contains("其他 runtime context 中 poll"));
-    assert!(readme_zh.contains("目标 runtime 必须保持存活"));
-    assert!(readme_zh.contains("启用 time driver"));
-    assert!(readme_zh.contains("不会执行 action"));
-    assert!(readme_zh.contains("不会回滚受保护状态的变化"));
-    assert!(readme_zh.contains("丢弃该次选择"));
+    let guide_en = normalize_readme_text(USER_GUIDE_EN);
+    let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
+    assert!(guide_en.contains("Async wait futures are lazy"));
+    assert!(guide_en.contains("may be polled from another runtime context"));
+    assert!(guide_en.contains("target runtime must stay alive"));
+    assert!(guide_en.contains("have time enabled"));
+    assert!(guide_en.contains("does not run the action"));
+    assert!(guide_en.contains("does not roll back protected-state changes"));
+    assert!(guide_en.contains("cancellation discards the selection"));
+    assert!(guide_zh.contains("异步等待 future 是惰性的"));
+    assert!(guide_zh.contains("另一个 runtime context 中 poll"));
+    assert!(guide_zh.contains("目标 runtime 必须保持存活"));
+    assert!(guide_zh.contains("启用 time driver"));
+    assert!(guide_zh.contains("不会执行 action"));
+    assert!(guide_zh.contains("不会回滚受保护状态的变化"));
+    assert!(guide_zh.contains("取消会丢弃这次选择"));
 }
 
 #[test]
-/// Ensures both READMEs describe RPITIT and Arc monitor ownership boundaries.
+/// Ensures both guides describe RPITIT and Arc monitor ownership boundaries.
 fn test_readme_documents_monitor_api_boundaries() {
-    assert!(README_EN.contains("return `impl Future`"));
-    assert!(README_EN.contains("`from_arc`, `as_arc`, and `into_arc`"));
-    assert!(README_EN.contains("resolve through `Deref`"));
-    assert!(README_ZH.contains("返回 `impl Future`"));
-    assert!(README_ZH.contains("`from_arc`、`as_arc` 和 `into_arc`"));
-    assert!(README_ZH.contains("通过 `Deref` 解析"));
+    assert!(USER_GUIDE_EN.contains("return-position `impl Future`"));
+    assert!(USER_GUIDE_EN.contains("`from_arc`, `as_arc`, and"));
+    assert!(USER_GUIDE_EN.contains("dereferences to its inner monitor"));
+    assert!(USER_GUIDE_ZH.contains("返回位置的 `impl Future`"));
+    assert!(USER_GUIDE_ZH.contains("`from_arc`、`as_arc` 和"));
+    assert!(USER_GUIDE_ZH.contains("通过 `Deref` 访问内部 monitor"));
 }
 
 #[test]
-/// Ensures both READMEs explain concrete and generic monitor selection.
+/// Ensures both guides explain concrete and generic monitor selection.
 fn test_readme_documents_monitor_capability_selection() {
-    let readme_en = normalize_readme_text(README_EN);
-    let readme_zh = normalize_readme_text(README_ZH);
-    assert!(readme_en.contains("Choosing monitor capabilities"));
-    assert!(readme_en.contains("use the narrowest capability"));
-    assert!(readme_en.contains("static generic bounds"));
-    assert!(readme_en.contains("Every concrete monitor exposes `with_timer`"));
-    assert!(readme_zh.contains("选择 monitor 能力"));
-    assert!(readme_zh.contains("使用能够表达操作的最小能力"));
-    assert!(readme_zh.contains("静态泛型约束"));
-    assert!(readme_zh.contains("每个具体 monitor 都提供 `with_timer`"));
+    let guide_en = normalize_readme_text(USER_GUIDE_EN);
+    let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
+    assert!(guide_en.contains("Choosing components and avoiding mistakes"));
+    assert!(guide_en.contains("narrowest capability trait"));
+    assert!(guide_en.contains("static generic bounds"));
+    assert!(guide_en.contains("Every concrete monitor provides `with_timer`"));
+    assert!(guide_zh.contains("组件选择与常见错误"));
+    assert!(guide_zh.contains("最小能力 trait"));
+    assert!(guide_zh.contains("静态泛型约束"));
+    assert!(guide_zh.contains("每个具体 monitor 都提供 `with_timer`"));
 }
 
 #[test]
-/// Ensures both READMEs describe deterministic testing through Timer IOC.
+/// Ensures both guides describe deterministic testing through Timer IOC.
 fn test_readme_documents_timer_ioc_testing() {
-    let readme_en = normalize_readme_text(README_EN);
-    let readme_zh = normalize_readme_text(README_ZH);
-    assert!(readme_en.contains("there is no separate mock wait algorithm"));
-    assert!(
-        readme_en.contains("`ManualMonotonicClock` is the test control plane")
-    );
-    assert!(readme_zh.contains("不再维护另一套 mock 等待算法"));
-    assert!(readme_zh.contains("`ManualMonotonicClock` 是测试控制面"));
+    let guide_en = normalize_readme_text(USER_GUIDE_EN);
+    let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
+    assert!(guide_en.contains("production wait algorithm runs"));
+    assert!(guide_en.contains("`ManualMonotonicClock`"));
+    assert!(guide_zh.contains("生产环境使用的 monitor 类型和等待算法"));
+    assert!(guide_zh.contains("`ManualMonotonicClock`"));
 }
 
 #[test]
@@ -319,6 +310,12 @@ fn test_cargo_features_match_current_api() {
 }
 
 #[test]
+/// Ensures the published crate contains the guides linked from both READMEs.
+fn test_cargo_package_includes_user_guides() {
+    assert!(CARGO_TOML.contains("\"/doc/**\""));
+}
+
+#[test]
 /// Ensures all README `qubit-lock` version requirements accept the crate
 /// version in Cargo.toml.
 fn test_readme_dependency_versions_match_cargo_toml() {
@@ -366,16 +363,17 @@ fn test_readme_dependency_versions_match_cargo_toml() {
 }
 
 #[test]
-/// Ensures both README files use the same `qubit-clock` requirement as
+/// Ensures both user guides use the same `qubit-clock` requirement as
 /// Cargo.toml.
 fn test_readme_qubit_clock_dependency_version_matches_cargo_toml() {
     let cargo_requirement =
         extract_cargo_dependency_version(CARGO_TOML, "qubit-clock")
             .expect("Cargo.toml does not declare qubit-clock");
 
-    for (filename, content) in
-        [("README.md", README_EN), ("README.zh_CN.md", README_ZH)]
-    {
+    for (filename, content) in [
+        ("doc/user_guide.md", USER_GUIDE_EN),
+        ("doc/user_guide.zh_CN.md", USER_GUIDE_ZH),
+    ] {
         let readme_requirement =
             extract_inline_dependency_version(content, "qubit-clock")
                 .unwrap_or_else(|| {
@@ -450,9 +448,15 @@ fn extract_inline_dependency_version<'a>(
     content: &'a str,
     dependency: &str,
 ) -> Option<&'a str> {
-    let marker = format!("{dependency} = \"");
-    let (_, value) = content.split_once(&marker)?;
-    value.split_once('"').map(|(requirement, _)| requirement)
+    content.lines().find_map(|line| {
+        let value = line.trim().strip_prefix(dependency)?.trim();
+        let value = value.strip_prefix('=')?.trim();
+        if let Some(value) = value.strip_prefix('"') {
+            return value.split_once('"').map(|(requirement, _)| requirement);
+        }
+        let (_, value) = value.split_once("version = \"")?;
+        value.split_once('"').map(|(requirement, _)| requirement)
+    })
 }
 
 /// Asserts that every README dependency version accepts the package version.

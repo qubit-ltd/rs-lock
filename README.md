@@ -7,237 +7,26 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
-Lock-focused utilities for the Qubit Rust libraries. The crate provides
-generic lock capabilities plus monitor-style coordination.
+## The problem
 
-## Features
+Rust applications often mix `std`, `parking_lot`, and Tokio locks. Their
+concrete APIs differ, so reusable code becomes tied to a backend even when it
+only needs to acquire a lock or access protected data.
 
-- `Lock`: one data-independent synchronous acquisition mode with an RAII
-  guard. The mode may be shared or exclusive.
-- `ExclusiveLock`: marker for `Lock` acquisition modes that exclude every
-  competing guard, including mutexes and write-mode adapters.
-- `ReadWriteLock`: data-independent shared/exclusive locking, implemented by
-  `std::sync::RwLock<T>` and `parking_lot::RwLock<T>`.
-- `DataLock<T>`: closure-based access to data protected by any supported mutex
-  or read-write lock.
-- `AsyncLock`, `AsyncReadWriteLock`, and `AsyncDataLock<T>`: equivalent Tokio
-  lock capabilities behind the optional `async-lock` feature.
-- `ParkingLotMonitor`, `ArcParkingLotMonitor`, `ParkingLotMonitorGuard`: parking_lot-based condition coordination.
-- `StdMonitor`, `ArcStdMonitor`, `StdMonitorGuard`: std-based condition coordination.
-- `TokioMonitor`, `ArcTokioMonitor`: async monitor coordination behind the
-  optional `async-monitor` feature.
-- Timer injection on every monitor for deterministic integration tests that
-  execute the production wait algorithm.
-- Implementations for borrowed and `Arc`-owned locks, without wrapper types.
+Condition coordination adds another problem: a lock alone cannot express
+"wait until this predicate becomes true." Correct condition-variable code must
+keep state updates, predicate checks, waiter registration, and notification in
+one protocol. Timeout tests then become slow and flaky when they depend on real
+sleeps.
 
-## Installation
+`qubit-lock` provides backend-independent lock capabilities, closure-based data
+access, synchronous and asynchronous monitors, and injectable timers for
+deterministic tests.
 
-```toml
-[dependencies]
-qubit-lock = "0.11"
-```
+## Quick start
 
-The default feature set enables `monitor` and `parking-lot`, preserving the
-complete synchronous API. Lock-only users can avoid both optional dependencies:
-
-```toml
-[dependencies]
-qubit-lock = { version = "0.11", default-features = false }
-```
-
-Enable asynchronous locks without Tokio monitor deadlines when needed:
-
-```toml
-[dependencies]
-qubit-lock = { version = "0.11", features = ["async-lock"] }
-```
-
-Enable Tokio monitor coordination, including timed waits, when needed:
-
-```toml
-[dependencies]
-qubit-lock = { version = "0.11", features = ["async-monitor"] }
-```
-
-If your application creates a Tokio runtime, enable the appropriate Tokio runtime
-features in your own `Cargo.toml`, such as `rt` or `rt-multi-thread`.
-`AsyncLock` and `AsyncReadWriteLock` return `Send` futures. Tokio mutexes
-implement the former when `T: Send`; Tokio read-write locks implement the
-latter when `T: Send + Sync`.
-
-## Monitor semantics
-
-Monitor notifications use memoryless condition-variable semantics.
-`notify_one` selects at most one of the already registered waiters, while a
-notification with no registered waiter has no future effect. A wakeup only
-prompts another protected predicate check; it neither makes the predicate true
-nor guarantees fairness.
-
-When a predicate reads external predicate state, every update that may make it
-ready must participate in the same monitor-lock handshake. Atomic ordering
-alone cannot prevent a notification from falling between the predicate check
-and waiter registration. Acquire the monitor lock, update the external state,
-release the lock, and notify; combined helpers such as
-`with_write_notify_all` perform that sequence:
-
-```rust
-use std::{
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-    thread,
-};
-
-use qubit_lock::ArcStdMonitor;
-
-let ready = Arc::new(AtomicBool::new(false));
-let monitor = ArcStdMonitor::new(());
-let waiter_ready = Arc::clone(&ready);
-let waiter_monitor = monitor.clone();
-let waiter = thread::spawn(move || {
-    waiter_monitor.wait_until(
-        |_| waiter_ready.load(Ordering::Acquire),
-        |_| (),
-    );
-});
-
-monitor.with_write_notify_all(|_| ready.store(true, Ordering::Release));
-waiter.join().expect("waiter should finish");
-```
-
-The asynchronous protocol is identical; use the matching combined helper so
-the external update and notification cannot straddle waiter registration:
-
-```rust
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
-
-use qubit_lock::{ArcTokioMonitor, AsyncConditionWaiter};
-
-#[tokio::main]
-async fn main() {
-    let ready = Arc::new(AtomicBool::new(false));
-    let monitor = ArcTokioMonitor::current(());
-    let waiter_ready = Arc::clone(&ready);
-    let waiter_monitor = monitor.clone();
-    let waiter = tokio::spawn(async move {
-        waiter_monitor
-            .wait_until_async(
-                |_| waiter_ready.load(Ordering::Acquire),
-                |_| (),
-            )
-            .await;
-    });
-
-    monitor
-        .with_write_notify_all_async(|_| {
-            ready.store(true, Ordering::Release);
-        })
-        .await;
-    waiter.await.expect("waiter should finish");
-}
-```
-
-A relative timeout is a condition-wait budget. Initial state-lock contention
-and the initial predicate check are excluded. Once that check determines that
-waiting is required, the monitor establishes one fixed deadline immediately
-before the first condition-wait suspension and reuses it across wakeups. A zero
-timeout still checks the predicate, and the final locked predicate check wins
-over a successfully completed timeout. A Timer registration or completion
-error takes precedence over every post-wait predicate result, and the action is
-not run. An initially ready predicate returns without starting a Timer.
-
-Async monitor traits return `impl Future`; the returned future is lazy, so
-construction and time before its first poll consume no timeout budget.
-`TokioMonitor::current` and `ArcTokioMonitor::current` capture a runtime Handle
-for their default timer; their `try_current` variants report a missing ambient
-runtime without panicking. A timed-wait future may be polled from another
-runtime context, but the captured target runtime must remain alive, have time
-enabled, and continue running until the deadline completes. `with_timer`
-remains the explicit injection path and inherits the supplied timer's lifetime
-and driver requirements.
-Dropping a pending future unregisters its active waiter, does not run the
-action, and does not roll back protected-state changes made by other tasks. If
-`notify_one` already selected that waiter, cancellation discards that selection
-instead of transferring it to another or future waiter.
-
-Arc-backed monitor wrappers keep explicit trait implementations for generic
-code, while ordinary monitor method calls resolve through `Deref`. Their
-`from_arc`, `as_arc`, and `into_arc` methods make the shared-ownership boundary
-explicit.
-
-### Choosing monitor capabilities
-
-For ordinary application code, prefer a concrete implementation:
-`ParkingLotMonitor` or `StdMonitor` for blocking coordination and
-`TokioMonitor` for asynchronous coordination. Choose the corresponding
-`Arc*Monitor` handle when ownership must be cloned or retained.
-
-At generic API boundaries, use the narrowest capability that expresses the
-operation: `Notifier` for signaling, `ConditionWaiter` or
-`TimeoutConditionWaiter` for blocking predicate waits, and their
-`AsyncConditionWaiter` or `AsyncTimeoutConditionWaiter` counterparts for
-asynchronous waits. `Monitor` and `AsyncMonitor` combine state access,
-notification, and untimed predicate waits; their default
-`with_write_notify_one` and `with_write_notify_all` helpers implement the
-state-update-and-notify handshake. `TimedMonitor` and `AsyncTimedMonitor` add
-timeout-based waits. Use `SharedMonitor` or `SharedAsyncMonitor` when the
-generic API also retains a cloneable untimed monitor handle. These waiter and
-aggregate traits are intended for static generic bounds, not `dyn`
-trait-object interfaces.
-
-Import public types directly from the crate root.
-
-### Deterministic monitor time
-
-Every concrete monitor exposes `with_timer`. Integration tests inject a
-`ManualTimer` into the same `ParkingLotMonitor`, `StdMonitor`, or
-`TokioMonitor` type used in production; there is no separate mock wait
-algorithm. Code that constructs the manual clock declares
-`qubit-clock = "0.10"` as a direct dependency:
-
-```rust
-use std::{sync::Arc, thread, time::Duration};
-
-use qubit_clock::{ManualMonotonicClock, MonotonicClock};
-use qubit_lock::{ParkingLotMonitor, WaitTimeoutResult};
-
-let clock = ManualMonotonicClock::new_shared();
-let monitor = Arc::new(ParkingLotMonitor::with_timer(false, clock.new_timer()));
-let waiter_monitor = Arc::clone(&monitor);
-let waiter = thread::spawn(move || {
-    waiter_monitor.wait_until_for(
-        Duration::from_secs(16),
-        |ready| *ready,
-        |_| (),
-    )
-});
-
-let _ = clock.advance_to_next_deadline_after_waiters(
-    1,
-    Duration::from_secs(1),
-);
-assert_eq!(waiter.join().unwrap(), Ok(WaitTimeoutResult::TimedOut));
-```
-
-`ManualMonotonicClock` is the test control plane. Its waiter/deadline observer
-APIs coordinate advancement without guessing registration with a real sleep.
-The Monitor and Timer registrations are cancellation-safe, and multiple
-components can share one manual clock domain.
-
-Timed predicate methods return `Result<WaitTimeoutResult<_>, TimeError>` so
-Timer registration or completion errors remain distinct from a real timeout
-and cannot be hidden by post-wait readiness. Guard waits use in-place `wait`,
-`wait_for`, and `wait_until` methods; a Timer error leaves the guard held and
-usable, including when completion fails after the guard was released and
-reacquired.
-
-## Quick Start
-
-### Data-bound lock
+`DataLock` gives supported mutexes and read-write locks the same closure-based
+read/write interface:
 
 ```rust
 use qubit_lock::DataLock;
@@ -249,74 +38,75 @@ fn main() {
 }
 ```
 
-### Data-independent lock
+## Complete user guide
 
-Use `Lock` when the protected state lives elsewhere, for example in atomics.
-The guard releases the lock automatically when it leaves scope. `Lock`
-represents one acquisition mode and does not itself promise mutual exclusion;
-`ExclusiveLock` marks acquisition modes that exclude every competing guard.
-Use that stronger bound when generic code requires exclusive entry.
+The [English user guide](doc/user_guide.md) explains the motivating
+producer-consumer example, every public component, feature selection, monitor
+semantics, timed waits, deterministic testing, and common mistakes.
 
-```rust
-use std::sync::atomic::{AtomicUsize, Ordering};
+The [Chinese user guide](doc/user_guide.zh_CN.md) covers the same material in
+Chinese.
 
-use qubit_lock::Lock;
+## Features
 
-fn main() {
-    let gate = std::sync::Mutex::new(());
-    let counter = AtomicUsize::new(0);
+- `Lock`, `ExclusiveLock`, `ReadWriteLock`, and `DataLock<T>` provide common
+  synchronous capabilities for `std::sync::Mutex<T>`,
+  `std::sync::RwLock<T>`, `parking_lot::Mutex<T>`, and
+  `parking_lot::RwLock<T>`.
+- `AsyncLock`, `AsyncReadWriteLock`, and `AsyncDataLock<T>` provide matching
+  Tokio capabilities behind `async-lock`.
+- `ParkingLotMonitor`, `StdMonitor`, and their `Arc*` handles provide blocking
+  predicate coordination.
+- `TokioMonitor` and `ArcTokioMonitor` provide asynchronous coordination behind
+  `async-monitor`.
+- Every concrete monitor supports Timer injection for deterministic tests.
 
-    {
-        let _guard = Lock::lock(&gate);
-        counter.fetch_add(1, Ordering::Relaxed);
-    }
+Import public types directly from the crate root.
 
-    assert_eq!(counter.load(Ordering::Relaxed), 1);
-}
+## Installation
+
+The default feature set enables `monitor` and `parking-lot`:
+
+```toml
+[dependencies]
+qubit-lock = "0.11"
 ```
 
-`std::sync::Mutex<T>`, `std::sync::RwLock<T>`, `parking_lot::Mutex<T>`, and
-`parking_lot::RwLock<T>` implement `DataLock<T>`. Read-write locks implement
-`ReadWriteLock`; use `read_lock()` or `write_lock()` to adapt one side to
-`Lock`. `ReadLock` implements `Lock` only and permits concurrent readers;
-`WriteLock` also implements `ExclusiveLock`.
+Use only the synchronous lock traits and standard-library implementations:
 
-### ParkingLotMonitor
-
-Use the combined write-and-notify helpers by default whenever a state change
-may let waiters proceed. Keep raw notification for code that already holds an
-explicit guard or needs conditional notification.
-
-```rust
-use qubit_lock::ArcParkingLotMonitor;
-
-fn main() {
-    let monitor = ArcParkingLotMonitor::new(Vec::<i32>::new());
-    let worker_monitor = monitor.clone();
-
-    let worker = std::thread::spawn(move || {
-        worker_monitor.wait_until(
-            |items| !items.is_empty(),
-            |items| items.pop().expect("item should be ready"),
-        )
-    });
-
-    monitor.with_write_notify_one(|items| items.push(7));
-
-    assert_eq!(worker.join().expect("worker should finish"), 7);
-}
+```toml
+[dependencies]
+qubit-lock = { version = "0.11", default-features = false }
 ```
 
-## Project Layout
+Enable Tokio locks without Tokio monitors:
 
-- `src/lock`: lock traits and lock wrappers.
-- `src/monitor`: monitor traits plus parking_lot, std, and Tokio monitor
+```toml
+[dependencies]
+qubit-lock = { version = "0.11", features = ["async-lock"] }
+```
+
+Enable Tokio monitors and timed waits:
+
+```toml
+[dependencies]
+qubit-lock = { version = "0.11", features = ["async-monitor"] }
+```
+
+If the application creates a Tokio runtime, enable its required runtime
+features in the application's own `Cargo.toml`.
+
+## Project layout
+
+- `src/lock`: lock traits and native lock adapters.
+- `src/monitor`: monitor traits and parking_lot, std, and Tokio
   implementations.
+- `doc`: English and Chinese user guides.
 - `tests/lock`: lock behavior tests.
 - `tests/monitor`: monitor behavior tests.
-- `tests/docs`: README and doctest consistency tests.
+- `tests/docs`: public-document consistency tests.
 
-## Related Projects
+## Related projects
 
 More Qubit Rust libraries are published under the
 [qubit-ltd](https://github.com/qubit-ltd) GitHub organization.

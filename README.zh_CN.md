@@ -7,212 +7,21 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
 
-面向 Qubit Rust 库的锁工具 crate。它提供通用锁能力与基于条件变量的 monitor 协调能力。
+## 解决的问题
 
-## 特性
+Rust 应用经常混用 `std`、`parking_lot` 和 Tokio 锁。它们的具体 API 不同，因此即使
+可复用代码只需要获取锁或访问受保护数据，也容易被绑定到某个后端。
 
-- `Lock`：与数据无关、返回 RAII guard 的一种同步获取模式；该模式可以共享，
-  也可以独占。
-- `ExclusiveLock`：标记排除所有竞争 guard 的 `Lock` 获取模式，包括 mutex 和
-  write-mode adapter。
-- `ReadWriteLock`：与数据无关的共享/独占锁能力，由
-  `std::sync::RwLock<T>` 和 `parking_lot::RwLock<T>` 实现。
-- `DataLock<T>`：以闭包访问受支持 mutex 或读写锁所保护的数据。
-- `AsyncLock`、`AsyncReadWriteLock` 和 `AsyncDataLock<T>`：由可选
-  `async-lock` 特性启用的对应 Tokio 锁能力。
-- `ParkingLotMonitor`、`ArcParkingLotMonitor`、`ParkingLotMonitorGuard`：基于 parking_lot 的条件变量协调工具。
-- `StdMonitor`、`ArcStdMonitor`、`StdMonitorGuard`：基于标准库的条件变量协调工具。
-- `TokioMonitor`、`ArcTokioMonitor`：由可选 `async-monitor` 特性启用的
-  Tokio 异步 monitor 协调工具。
-- 所有 monitor 都支持注入 Timer，使集成测试直接运行生产等待算法。
-- 直接支持借用和 `Arc` 持有的锁，无需额外包装类型。
+条件协调还会带来另一个问题：锁本身不能表达“等待某个 predicate 成立”。正确的
+条件变量代码必须让状态更新、predicate 检查、waiter 注册和 notification 遵循同一个
+协议。如果超时测试依赖真实 sleep，它还会变慢且不稳定。
 
-## 安装
-
-```toml
-[dependencies]
-qubit-lock = "0.11"
-```
-
-默认特性集启用 `monitor` 和 `parking-lot`，保留完整同步 API。只需要基础锁
-trait 的用户可以关闭全部默认特性，从依赖图中移除这两个可选依赖：
-
-```toml
-[dependencies]
-qubit-lock = { version = "0.11", default-features = false }
-```
-
-只需要异步锁、但不需要 Tokio monitor deadline 时显式启用：
-
-```toml
-[dependencies]
-qubit-lock = { version = "0.11", features = ["async-lock"] }
-```
-
-需要 Tokio monitor 协调和计时等待时显式启用：
-
-```toml
-[dependencies]
-qubit-lock = { version = "0.11", features = ["async-monitor"] }
-```
-
-如果应用需要创建 Tokio runtime，
-请在应用自己的 `Cargo.toml` 中启用合适的 Tokio runtime 特性，例如 `rt` 或
-`rt-multi-thread`。
-`AsyncLock` 和 `AsyncReadWriteLock` 返回 `Send` future。Tokio mutex 在
-`T: Send` 时实现前者；Tokio 读写锁在 `T: Send + Sync` 时实现后者。
-
-## Monitor 语义
-
-monitor notification 使用无记忆的条件变量语义。`notify_one` 最多选择一个已经注册的
-waiter；没有已注册 waiter 时发出的 notification 对未来没有影响。唤醒只会触发下一次
-受保护的 predicate 检查，既不会让 predicate 自动变为 true，也不保证公平性。
-
-当 predicate 读取 monitor 外部的 predicate 状态时，所有可能使其就绪的更新都必须
-参与同一个 monitor-lock handshake。仅靠 atomic ordering 无法防止 notification
-落在 predicate 检查与 waiter 注册之间。正确顺序是获取 monitor lock、更新外部状态、
-释放 lock、再通知；`with_write_notify_all` 等组合 helper 会执行这一协议：
-
-```rust
-use std::{
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-    thread,
-};
-
-use qubit_lock::ArcStdMonitor;
-
-let ready = Arc::new(AtomicBool::new(false));
-let monitor = ArcStdMonitor::new(());
-let waiter_ready = Arc::clone(&ready);
-let waiter_monitor = monitor.clone();
-let waiter = thread::spawn(move || {
-    waiter_monitor.wait_until(
-        |_| waiter_ready.load(Ordering::Acquire),
-        |_| (),
-    );
-});
-
-monitor.with_write_notify_all(|_| ready.store(true, Ordering::Release));
-waiter.join().expect("waiter should finish");
-```
-
-异步协议完全相同；应使用对应的组合 helper，确保外部状态更新与 notification 不会
-跨过 waiter 注册窗口：
-
-```rust
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
-
-use qubit_lock::{ArcTokioMonitor, AsyncConditionWaiter};
-
-#[tokio::main]
-async fn main() {
-    let ready = Arc::new(AtomicBool::new(false));
-    let monitor = ArcTokioMonitor::current(());
-    let waiter_ready = Arc::clone(&ready);
-    let waiter_monitor = monitor.clone();
-    let waiter = tokio::spawn(async move {
-        waiter_monitor
-            .wait_until_async(
-                |_| waiter_ready.load(Ordering::Acquire),
-                |_| (),
-            )
-            .await;
-    });
-
-    monitor
-        .with_write_notify_all_async(|_| {
-            ready.store(true, Ordering::Release);
-        })
-        .await;
-    waiter.await.expect("waiter should finish");
-}
-```
-
-相对 timeout 是条件等待预算。初始状态锁竞争和初始 predicate 检查不计入预算。初始
-检查确认必须等待后，monitor 会在首次条件等待挂起前立即建立同一个固定 deadline，并
-在后续唤醒中复用。零 timeout 仍会检查 predicate；Timer 正常完成 timeout 时，
-最后一次持锁 predicate 检查优先。Timer 注册或完成错误优先于任何等待后的 predicate
-结果，此时不会执行 action。初始 predicate 已就绪时不会启动 Timer。
-
-异步 monitor trait 返回 `impl Future`；返回的 future 是惰性的，所以构造 future 和首次
-poll 之前的时间不消耗 timeout 预算。`TokioMonitor::current` 和
-`ArcTokioMonitor::current` 会为默认 timer 捕获当前 runtime Handle；对应的
-`try_current` 可以在缺少当前 runtime 时返回错误而不 panic。计时等待 future 可以在
-其他 runtime context 中 poll，但目标 runtime 必须保持存活、启用 time driver，并持续
-运行到 deadline 完成。`with_timer` 仍是显式注入入口，并继承传入 timer 的生命周期与
-驱动要求。drop 一个 pending future 会注销其活跃 waiter，不会执行 action，
-也不会回滚受保护状态的变化。如果 `notify_one` 已选择该 waiter，取消会丢弃该次选择，
-不会转交给其他或未来 waiter。
-
-基于 Arc 的 monitor 包装器保留了供泛型代码使用的显式 trait 实现；普通 monitor 方法
-调用通过 `Deref` 解析。`from_arc`、`as_arc` 和 `into_arc` 明确表达共享所有权边界。
-
-### 选择 monitor 能力
-
-普通应用代码应优先选择具体实现：阻塞式协调使用 `ParkingLotMonitor` 或
-`StdMonitor`，异步协调使用 `TokioMonitor`；需要克隆或长期持有共享所有权时，
-选择对应的 `Arc*Monitor` 句柄。
-
-在泛型 API 边界，使用能够表达操作的最小能力：仅发送通知时使用 `Notifier`，
-阻塞式 predicate wait 使用 `ConditionWaiter` 或 `TimeoutConditionWaiter`，异步
-wait 使用对应的 `AsyncConditionWaiter` 或 `AsyncTimeoutConditionWaiter`。
-`Monitor` 和 `AsyncMonitor` 聚合状态访问、通知以及无时限 predicate wait；它们
-默认提供的 `with_write_notify_one` 和 `with_write_notify_all` helper 实现状态更新后
-通知的握手。`TimedMonitor` 和 `AsyncTimedMonitor` 额外提供带时限的 wait。泛型
-API 还要持有可克隆的无时限 monitor 句柄时，使用 `SharedMonitor` 或
-`SharedAsyncMonitor`。这些 waiter 和聚合 trait 用于静态泛型约束，不用于 `dyn`
-trait object 接口。
-
-所有公开类型都直接从 crate root 导入。
-
-### 确定性的 monitor 时间
-
-每个具体 monitor 都提供 `with_timer`。集成测试把 `ManualTimer` 注入生产所用的
-`ParkingLotMonitor`、`StdMonitor` 或 `TokioMonitor`，不再维护另一套 mock 等待算法。
-构造手动 clock 的代码需要直接依赖 `qubit-clock = "0.10"`：
-
-```rust
-use std::{sync::Arc, thread, time::Duration};
-
-use qubit_clock::{ManualMonotonicClock, MonotonicClock};
-use qubit_lock::{ParkingLotMonitor, WaitTimeoutResult};
-
-let clock = ManualMonotonicClock::new_shared();
-let monitor = Arc::new(ParkingLotMonitor::with_timer(false, clock.new_timer()));
-let waiter_monitor = Arc::clone(&monitor);
-let waiter = thread::spawn(move || {
-    waiter_monitor.wait_until_for(
-        Duration::from_secs(16),
-        |ready| *ready,
-        |_| (),
-    )
-});
-
-let _ = clock.advance_to_next_deadline_after_waiters(
-    1,
-    Duration::from_secs(1),
-);
-assert_eq!(waiter.join().unwrap(), Ok(WaitTimeoutResult::TimedOut));
-```
-
-`ManualMonotonicClock` 是测试控制面。测试通过 waiter/deadline 观察接口协调推进，
-无需用真实 sleep 猜测注册时机。Monitor 和 Timer 注册都支持安全取消；多个组件也可
-共享同一个手动时间域。
-
-带超时的 predicate API 返回 `Result<WaitTimeoutResult<_>, TimeError>`，Timer 注册或
-完成错误不会伪装成超时，也不会被等待后的就绪状态掩盖。Guard 使用原地更新的
-`wait`、`wait_for` 和 `wait_until`；Timer 出错时 guard 仍然持有且可继续使用，包括
-在 guard 释放并重新获取后才报告的完成错误。
+`qubit-lock` 提供后端无关的锁能力、基于闭包的数据访问、同步与异步 monitor，以及
+支持确定性测试的可注入 Timer。
 
 ## 快速开始
 
-### 绑定数据的锁
+`DataLock` 为受支持的 mutex 和读写锁提供相同的闭包式读写接口：
 
 ```rust
 use qubit_lock::DataLock;
@@ -224,79 +33,81 @@ fn main() {
 }
 ```
 
-### 与数据无关的锁
+## 完整用户手册
 
-当受保护状态位于锁外部（例如 atomic）时使用 `Lock`。guard 离开作用域时自动解锁。
-`Lock` 表示一种获取模式，本身不承诺互斥；`ExclusiveLock` 标记能够排除所有竞争
-guard 的获取模式。泛型代码要求独占进入时应增加这一约束。
+[中文用户手册](doc/user_guide.zh_CN.md)详细介绍生产者—消费者引导示例、所有公开
+组件、Feature 选择、monitor 语义、计时等待、确定性测试和常见错误。
 
-```rust
-use std::sync::atomic::{AtomicUsize, Ordering};
+[英文用户手册](doc/user_guide.md)提供相同内容的英文版本。
 
-use qubit_lock::Lock;
+## 特性
 
-fn main() {
-    let gate = std::sync::Mutex::new(());
-    let counter = AtomicUsize::new(0);
+- `Lock`、`ExclusiveLock`、`ReadWriteLock` 和 `DataLock<T>` 为
+  `std::sync::Mutex<T>`、`std::sync::RwLock<T>`、
+  `parking_lot::Mutex<T>` 和 `parking_lot::RwLock<T>` 提供统一同步能力。
+- `AsyncLock`、`AsyncReadWriteLock` 和 `AsyncDataLock<T>` 由
+  `async-lock` 启用，并提供对应的 Tokio 能力。
+- `ParkingLotMonitor`、`StdMonitor` 和对应的 `Arc*` 句柄提供阻塞式 predicate
+  协调。
+- `TokioMonitor` 和 `ArcTokioMonitor` 由 `async-monitor` 启用，并提供异步协调。
+- 每个具体 monitor 都支持注入 Timer，以便进行确定性测试。
 
-    {
-        let _guard = Lock::lock(&gate);
-        counter.fetch_add(1, Ordering::Relaxed);
-    }
+所有公开类型都直接从 crate root 导入。
 
-    assert_eq!(counter.load(Ordering::Relaxed), 1);
-}
+## 安装
+
+默认特性集启用 `monitor` 和 `parking-lot`：
+
+```toml
+[dependencies]
+qubit-lock = "0.11"
 ```
 
-`std::sync::Mutex<T>`、`std::sync::RwLock<T>`、`parking_lot::Mutex<T>` 和
-`parking_lot::RwLock<T>` 都实现 `DataLock<T>`。读写锁实现 `ReadWriteLock`；
-可用 `read_lock()` 或 `write_lock()` 将其中一侧适配为 `Lock`。`ReadLock`
-只实现 `Lock`，允许多个 reader 并发；`WriteLock` 还实现 `ExclusiveLock`。
+只使用同步锁 trait 和标准库实现：
 
-### ParkingLotMonitor
-
-当状态变化可能让 waiter 继续执行时，默认使用组合 write-and-notify helper。仅在代码
-已经持有显式 guard，或需要条件通知时使用 raw notification。
-
-```rust
-use qubit_lock::ArcParkingLotMonitor;
-
-fn main() {
-    let monitor = ArcParkingLotMonitor::new(Vec::<i32>::new());
-    let worker_monitor = monitor.clone();
-
-    let worker = std::thread::spawn(move || {
-        worker_monitor.wait_until(
-            |items| !items.is_empty(),
-            |items| items.pop().expect("item should be ready"),
-        )
-    });
-
-    monitor.with_write_notify_one(|items| items.push(7));
-
-    assert_eq!(worker.join().expect("worker should finish"), 7);
-}
+```toml
+[dependencies]
+qubit-lock = { version = "0.11", default-features = false }
 ```
+
+启用 Tokio 锁但不启用 Tokio monitor：
+
+```toml
+[dependencies]
+qubit-lock = { version = "0.11", features = ["async-lock"] }
+```
+
+启用 Tokio monitor 和计时等待：
+
+```toml
+[dependencies]
+qubit-lock = { version = "0.11", features = ["async-monitor"] }
+```
+
+如果应用创建 Tokio runtime，应在应用自己的 `Cargo.toml` 中启用所需的 runtime
+Feature。
 
 ## 项目结构
 
-- `src/lock`：锁 trait 与原生锁适配器。
-- `src/monitor`：monitor traits，以及 parking_lot、标准库和 Tokio monitor 实现。
-- `tests/lock`：锁相关行为测试。
-- `tests/monitor`：monitor 相关行为测试。
-- `tests/docs`：README 与文档文本一致性测试。
+- `src/lock`：锁 trait 与原生锁 adapter。
+- `src/monitor`：monitor trait，以及 parking_lot、标准库和 Tokio 实现。
+- `doc`：中英文用户手册。
+- `tests/lock`：锁行为测试。
+- `tests/monitor`：monitor 行为测试。
+- `tests/docs`：公开文档一致性测试。
 
 ## 相关项目
 
-Qubit 旗下的更多 Rust 库发布在 GitHub 组织 [qubit-ltd](https://github.com/qubit-ltd)。
+Qubit 旗下的更多 Rust 库发布在 GitHub 组织
+[qubit-ltd](https://github.com/qubit-ltd)。
 
 ## 测试
 
 ```bash
-# 使用默认 feature 集运行测试
+# 使用默认 Feature 集运行测试
 cargo test
 
-# 使用项目声明的全部 feature 运行测试
+# 使用项目声明的全部 Feature 运行测试
 cargo test --all-features
 
 # 运行项目 CI 检查
@@ -315,8 +126,8 @@ Copyright (c) 2025 - 2026. Haixing Hu. All rights reserved.
 
 ## 贡献
 
-欢迎贡献。请遵循 Rust API 指南，及时更新公共 API 文档与测试，并在提交
-Pull Request 前运行 `./align-ci.sh`格式化代码，运行`./ci-check.sh`对齐CI要求。
+欢迎贡献。请遵循 Rust API 指南，及时更新公共 API 文档与测试，并在提交 Pull
+Request 前运行 `./align-ci.sh` 格式化代码，运行 `./ci-check.sh` 对齐 CI 要求。
 
 ## 作者
 
