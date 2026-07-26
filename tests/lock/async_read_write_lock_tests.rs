@@ -32,7 +32,8 @@ async fn test_async_read_write_lock_accepts_borrowed_forwarding() {
         *AsyncReadWriteLock::try_read(&borrowed).expect("read should succeed"),
         2,
     );
-    *AsyncReadWriteLock::try_write(&borrowed).expect("write should succeed") = 3;
+    *AsyncReadWriteLock::try_write(&borrowed).expect("write should succeed") =
+        3;
 }
 
 #[tokio::test]

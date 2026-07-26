@@ -10,10 +10,16 @@
 use std::time::Duration;
 
 use qubit_clock::TimeError;
-use qubit_lock::{AsyncTimeoutConditionWaiter, TokioMonitor, WaitTimeoutResult};
+use qubit_lock::{
+    AsyncTimeoutConditionWaiter,
+    TokioMonitor,
+    WaitTimeoutResult,
+};
 
 /// Runs a zero-budget async wait through a generic timeout bound.
-async fn wait_through_trait<W>(waiter: &W) -> Result<WaitTimeoutResult<i32>, TimeError>
+async fn wait_through_trait<W>(
+    waiter: &W,
+) -> Result<WaitTimeoutResult<i32>, TimeError>
 where
     W: AsyncTimeoutConditionWaiter<State = bool>,
 {

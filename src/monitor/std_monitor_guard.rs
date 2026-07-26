@@ -12,15 +12,25 @@
 //! standard-library mutex guard and keeps a reference to the monitor that
 //! created it, so waiting operations can use its waiter registry and Timer.
 
-use qubit_clock::{MonotonicInstant, TimeError, TimerFuture};
+use qubit_clock::{
+    MonotonicInstant,
+    TimeError,
+    TimerFuture,
+};
 use std::{
-    ops::{Deref, DerefMut},
+    ops::{
+        Deref,
+        DerefMut,
+    },
     sync::MutexGuard,
     task::Poll,
     time::Duration,
 };
 
-use super::{std_monitor::StdMonitor, wait_timeout_status::WaitTimeoutStatus};
+use super::{
+    std_monitor::StdMonitor,
+    wait_timeout_status::WaitTimeoutStatus,
+};
 
 /// Guard returned by [`StdMonitor::lock`](super::StdMonitor::lock).
 ///
@@ -84,7 +94,10 @@ impl<'a, T> StdMonitorGuard<'a, T> {
     ///
     /// A monitor guard that can access state and wait for monitor notification.
     #[inline]
-    pub(super) fn new(monitor: &'a StdMonitor<T>, inner: MutexGuard<'a, T>) -> Self {
+    pub(super) fn new(
+        monitor: &'a StdMonitor<T>,
+        inner: MutexGuard<'a, T>,
+    ) -> Self {
         Self {
             monitor,
             inner: Some(inner),
@@ -251,7 +264,10 @@ impl<'a, T> StdMonitorGuard<'a, T> {
     /// assert_eq!(status, WaitTimeoutStatus::TimedOut);
     /// ```
     #[inline]
-    pub fn wait_for(&mut self, timeout: Duration) -> Result<WaitTimeoutStatus, TimeError> {
+    pub fn wait_for(
+        &mut self,
+        timeout: Duration,
+    ) -> Result<WaitTimeoutStatus, TimeError> {
         let mut future = self.monitor.timer().after(timeout)?;
         self.wait_with_timer(&mut future)
     }
@@ -304,7 +320,9 @@ impl<'a, T> StdMonitorGuard<'a, T> {
         let registration = self.monitor.waiters.register();
         let waiter = std::sync::Arc::clone(registration.waiter());
         if let Poll::Ready(result) =
-            super::internal::BlockingConditionWaiter::poll_timer(&waiter, future)
+            super::internal::BlockingConditionWaiter::poll_timer(
+                &waiter, future,
+            )
         {
             return result.map(|()| WaitTimeoutStatus::TimedOut);
         }
@@ -321,7 +339,9 @@ impl<'a, T> StdMonitorGuard<'a, T> {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner),
         );
-        match super::internal::BlockingConditionWaiter::poll_timer(&waiter, future) {
+        match super::internal::BlockingConditionWaiter::poll_timer(
+            &waiter, future,
+        ) {
             Poll::Ready(result) => result.map(|()| WaitTimeoutStatus::TimedOut),
             Poll::Pending => Ok(WaitTimeoutStatus::Woken),
         }

@@ -10,12 +10,28 @@
 use std::{
     future::Future,
     pin::Pin,
-    task::{Context, Poll, Waker},
+    task::{
+        Context,
+        Poll,
+        Waker,
+    },
 };
 
-use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
-use qubit_clock::{ManualMonotonicClock, MonotonicClock};
-use qubit_lock::{ArcTokioMonitor, AsyncConditionWaiter};
+use criterion::{
+    BatchSize,
+    BenchmarkId,
+    Criterion,
+    criterion_group,
+    criterion_main,
+};
+use qubit_clock::{
+    ManualMonotonicClock,
+    MonotonicClock,
+};
+use qubit_lock::{
+    ArcTokioMonitor,
+    AsyncConditionWaiter,
+};
 
 /// Registry sizes used to reveal cancellation scaling.
 const WAITER_COUNTS: [usize; 4] = [32, 128, 512, 2_048];

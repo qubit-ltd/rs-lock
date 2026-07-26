@@ -8,18 +8,37 @@
 //! Tokio-based asynchronous monitor.
 
 use std::{
-    future::{Future, poll_fn},
-    sync::{Arc, Mutex as StdMutex},
+    future::{
+        Future,
+        poll_fn,
+    },
+    sync::{
+        Arc,
+        Mutex as StdMutex,
+    },
     task::Poll,
     time::Duration,
 };
 
-use qubit_clock::{TimeError, Timer, TimerFuture, TokioRuntimeError, TokioTimer};
+use qubit_clock::{
+    TimeError,
+    Timer,
+    TimerFuture,
+    TokioRuntimeError,
+    TokioTimer,
+};
 use tokio::sync::Mutex;
 
 use super::{
-    AsyncConditionWaiter, AsyncTimeoutConditionWaiter, Notifier, WaitTimeoutResult,
-    internal::{TokioConditionWaiter, TokioConditionWaiterRegistration, WaiterRegistry},
+    AsyncConditionWaiter,
+    AsyncTimeoutConditionWaiter,
+    Notifier,
+    WaitTimeoutResult,
+    internal::{
+        TokioConditionWaiter,
+        TokioConditionWaiterRegistration,
+        WaiterRegistry,
+    },
 };
 
 /// Asynchronous monitor built on Tokio synchronization primitives.
@@ -76,8 +95,9 @@ impl<T> TokioMonitor<T> {
     #[track_caller]
     #[inline]
     pub fn current(state: T) -> Self {
-        Self::try_current(state)
-            .unwrap_or_else(|error| panic!("cannot create Tokio monitor: {error}"))
+        Self::try_current(state).unwrap_or_else(|error| {
+            panic!("cannot create Tokio monitor: {error}")
+        })
     }
 
     /// Tries to create a monitor by capturing the current Tokio runtime.
@@ -100,7 +120,8 @@ impl<T> TokioMonitor<T> {
     /// Panics if all process-wide clock-domain identifiers are exhausted.
     #[inline]
     pub fn try_current(state: T) -> Result<Self, TokioRuntimeError> {
-        TokioTimer::try_current().map(|timer| Self::with_timer(state, Arc::new(timer)))
+        TokioTimer::try_current()
+            .map(|timer| Self::with_timer(state, Arc::new(timer)))
     }
 
     /// Creates a Tokio monitor using an injected Timer.
@@ -291,7 +312,9 @@ impl<T> TokioMonitor<T> {
     ///
     /// `true` when the deadline has completed.
     #[inline]
-    async fn deadline_reached(deadline: &mut TimerFuture) -> Result<bool, TimeError> {
+    async fn deadline_reached(
+        deadline: &mut TimerFuture,
+    ) -> Result<bool, TimeError> {
         poll_fn(|context| match deadline.as_mut().poll(context) {
             Poll::Pending => Poll::Ready(Ok(false)),
             Poll::Ready(result) => Poll::Ready(result.map(|()| true)),
@@ -414,7 +437,11 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
-        self.wait_while_for_async(timeout, move |state| !predicate(state), action)
+        self.wait_while_for_async(
+            timeout,
+            move |state| !predicate(state),
+            action,
+        )
     }
 
     /// Returns a future that rechecks the predicate while it remains true or

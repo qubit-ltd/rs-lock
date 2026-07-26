@@ -20,16 +20,27 @@
 //! [`StdMonitorGuard::wait_until`] for more complex state machines such as
 //! thread pools.
 
-use qubit_clock::{TimeError, Timer};
+use qubit_clock::{
+    TimeError,
+    Timer,
+};
 use std::{
-    sync::{Arc, Mutex},
+    sync::{
+        Arc,
+        Mutex,
+    },
     time::Duration,
 };
 
 use super::std_monitor_guard::StdMonitorGuard;
 use super::{
-    ConditionWaiter, Notifier, TimeoutConditionWaiter,
-    internal::{BlockingWaiterRegistry, default_timer},
+    ConditionWaiter,
+    Notifier,
+    TimeoutConditionWaiter,
+    internal::{
+        BlockingWaiterRegistry,
+        default_timer,
+    },
     wait_timeout_result::WaitTimeoutResult,
 };
 

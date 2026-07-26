@@ -11,7 +11,11 @@
 //! Tests for the DataLock trait and its implementations.
 
 use std::{
-    sync::{Arc, Barrier, mpsc},
+    sync::{
+        Arc,
+        Barrier,
+        mpsc,
+    },
     thread,
     time::Duration,
 };
@@ -22,7 +26,10 @@ use std::sync::RwLock;
 
 #[cfg(feature = "parking-lot")]
 use parking_lot::RwLock as ParkingLotRwLock;
-use qubit_lock::{DataLock, TryLockError};
+use qubit_lock::{
+    DataLock,
+    TryLockError,
+};
 
 fn read_i32(value: &i32) -> i32 {
     *value
@@ -569,7 +576,8 @@ mod rwlock_trait_tests {
             .recv_timeout(Duration::from_secs(1))
             .expect("read lock should be held within timeout");
 
-        let concurrent_sum = rw_lock.try_with_read(|data| data.iter().sum::<i32>());
+        let concurrent_sum =
+            rw_lock.try_with_read(|data| data.iter().sum::<i32>());
         assert_eq!(concurrent_sum, Ok(15));
 
         release_tx
@@ -641,7 +649,8 @@ mod rwlock_trait_tests {
     fn test_rwlock_read_lock_returns_closure_result() {
         let rw_lock = ParkingLotRwLock::new(vec![10, 20, 30]);
 
-        let result = rw_lock.with_read(|v| v.iter().map(|&x| x * 2).collect::<Vec<_>>());
+        let result =
+            rw_lock.with_read(|v| v.iter().map(|&x| x * 2).collect::<Vec<_>>());
 
         assert_eq!(result, vec![20, 40, 60]);
 
@@ -861,7 +870,8 @@ mod rwlock_trait_tests {
     }
 
     #[test]
-    fn test_std_rwlock_try_write_returns_would_block_when_read_locked_short_path() {
+    fn test_std_rwlock_try_write_returns_would_block_when_read_locked_short_path()
+     {
         let rwlock = Arc::new(RwLock::new(0));
         let (locked_tx, locked_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();

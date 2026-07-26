@@ -9,9 +9,15 @@
 //!
 //! Defines an asynchronous lock abstraction that supports acquiring
 //! locks without blocking threads.
-use std::{future::Future, sync::Arc};
+use std::{
+    future::Future,
+    sync::Arc,
+};
 
-use tokio::sync::{Mutex as AsyncMutex, RwLock as AsyncRwLock};
+use tokio::sync::{
+    Mutex as AsyncMutex,
+    RwLock as AsyncRwLock,
+};
 
 use super::try_lock_error::TryLockError;
 

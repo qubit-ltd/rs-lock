@@ -7,9 +7,17 @@
 // =============================================================================
 //! Tests for [`AsyncMonitor`](qubit_lock::AsyncMonitor).
 
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::Duration,
+};
 
-use qubit_lock::{ArcTokioMonitor, AsyncMonitor, TokioMonitor, WaitTimeoutResult};
+use qubit_lock::{
+    ArcTokioMonitor,
+    AsyncMonitor,
+    TokioMonitor,
+    WaitTimeoutResult,
+};
 
 /// Exercises timed waiting through the aggregate async capability.
 async fn wait_through_trait<M>(monitor: &M)
@@ -18,7 +26,11 @@ where
 {
     assert_time_result_eq!(
         monitor
-            .wait_until_for_async(Duration::from_millis(1), |ready| *ready, |_| 7,)
+            .wait_until_for_async(
+                Duration::from_millis(1),
+                |ready| *ready,
+                |_| 7,
+            )
             .await,
         Ok(WaitTimeoutResult::TimedOut),
     );

@@ -9,7 +9,10 @@
 
 use std::sync::Arc;
 
-use super::{BlockingConditionWaiter, BlockingWaiterRegistry};
+use super::{
+    BlockingConditionWaiter,
+    BlockingWaiterRegistry,
+};
 
 /// RAII ownership of one active blocking waiter registration.
 #[must_use = "retain the registration while the waiter remains eligible for notification"]
@@ -44,7 +47,9 @@ impl<'a> BlockingWaiterRegistration<'a> {
     /// A shared reference to this registration's waiter allocation.
     #[must_use]
     #[inline(always)]
-    pub(in crate::monitor) const fn waiter(&self) -> &Arc<BlockingConditionWaiter> {
+    pub(in crate::monitor) const fn waiter(
+        &self,
+    ) -> &Arc<BlockingConditionWaiter> {
         &self.waiter
     }
 }

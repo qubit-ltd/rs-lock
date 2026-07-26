@@ -7,7 +7,10 @@
 // =============================================================================
 //! Asynchronous condition-wait capability.
 
-use std::{future::Future, sync::Arc};
+use std::{
+    future::Future,
+    sync::Arc,
+};
 
 /// Waits asynchronously for predicates over protected monitor state.
 ///

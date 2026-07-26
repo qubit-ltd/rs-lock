@@ -8,14 +8,24 @@
 //! Tests for [`ArcParkingLotMonitor`](qubit_lock::ArcParkingLotMonitor).
 
 use std::{
-    sync::{Arc, mpsc},
+    sync::{
+        Arc,
+        mpsc,
+    },
     thread,
     time::Duration,
 };
 
-use qubit_clock::{ManualMonotonicClock, MonotonicClock};
+use qubit_clock::{
+    ManualMonotonicClock,
+    MonotonicClock,
+};
 use qubit_lock::{
-    ArcParkingLotMonitor, ConditionWaiter, Notifier, ParkingLotMonitor, TimeoutConditionWaiter,
+    ArcParkingLotMonitor,
+    ConditionWaiter,
+    Notifier,
+    ParkingLotMonitor,
+    TimeoutConditionWaiter,
     WaitTimeoutResult,
 };
 
@@ -314,7 +324,8 @@ fn test_arc_parking_lot_monitor_wait_while_delegates_to_monitor() {
 }
 
 #[test]
-fn test_arc_parking_lot_monitor_wait_while_for_returns_ready_when_predicate_clears() {
+fn test_arc_parking_lot_monitor_wait_while_for_returns_ready_when_predicate_clears()
+ {
     let monitor = ArcParkingLotMonitor::new(Vec::<i32>::new());
     let (started_tx, started_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
