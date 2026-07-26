@@ -5,13 +5,6 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-//! # Qubit Lock Integration Tests
-//!
-//! Organized by source module: `lock` and `monitor`.
+//! Tests corresponding to Loom test utilities.
 
-mod docs;
-mod lock;
-#[cfg(feature = "monitor")]
-mod monitor;
-#[cfg(all(loom, feature = "loom-model"))]
-mod test_util;
+mod loom_waiter_registry_tests;
