@@ -16,15 +16,9 @@
 //! let _guard = Lock::lock(&lock);
 //! ```
 
-use std::{
-    future::Future,
-    sync::Arc,
-};
+use std::{future::Future, sync::Arc};
 
-use tokio::sync::{
-    Mutex,
-    MutexGuard,
-};
+use tokio::sync::{Mutex, MutexGuard};
 
 use crate::lock::TryLockError;
 

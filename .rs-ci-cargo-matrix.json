@@ -70,6 +70,16 @@
       ]
     },
     {
+      "name": "loom-model",
+      "defaultFeatures": false,
+      "features": [
+        "loom-model"
+      ],
+      "commands": [
+        "test"
+      ]
+    },
+    {
       "name": "all-features",
       "defaultFeatures": true,
       "features": [

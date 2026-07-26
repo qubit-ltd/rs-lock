@@ -111,47 +111,20 @@ mod lock;
 #[cfg(feature = "monitor")]
 mod monitor;
 #[cfg(feature = "async-lock")]
-pub use lock::{
-    AsyncDataLock,
-    AsyncLock,
-    AsyncReadLock,
-    AsyncReadWriteLock,
-    AsyncWriteLock,
-};
-pub use lock::{
-    DataLock,
-    ExclusiveLock,
-    Lock,
-    ReadLock,
-    ReadWriteLock,
-    TryLockError,
-    WriteLock,
-};
+pub use lock::{AsyncDataLock, AsyncLock, AsyncReadLock, AsyncReadWriteLock, AsyncWriteLock};
+pub use lock::{DataLock, ExclusiveLock, Lock, ReadLock, ReadWriteLock, TryLockError, WriteLock};
+#[cfg(feature = "test-util")]
+#[cfg_attr(docsrs, doc(cfg(feature = "test-util")))]
+pub mod test_util;
 #[cfg(all(feature = "monitor", feature = "parking-lot"))]
-pub use monitor::{
-    ArcParkingLotMonitor,
-    ParkingLotMonitor,
-    ParkingLotMonitorGuard,
-};
+pub use monitor::{ArcParkingLotMonitor, ParkingLotMonitor, ParkingLotMonitorGuard};
 #[cfg(feature = "monitor")]
 pub use monitor::{
-    ArcStdMonitor,
-    ConditionWaiter,
-    Monitor,
-    Notifier,
-    SharedMonitor,
-    StdMonitor,
-    StdMonitorGuard,
-    TimeoutConditionWaiter,
-    WaitTimeoutResult,
-    WaitTimeoutStatus,
+    ArcStdMonitor, ConditionWaiter, Monitor, Notifier, SharedMonitor, StdMonitor, StdMonitorGuard,
+    TimeoutConditionWaiter, WaitTimeoutResult, WaitTimeoutStatus,
 };
 #[cfg(feature = "async-monitor")]
 pub use monitor::{
-    ArcTokioMonitor,
-    AsyncConditionWaiter,
-    AsyncMonitor,
-    AsyncTimeoutConditionWaiter,
-    SharedAsyncMonitor,
-    TokioMonitor,
+    ArcTokioMonitor, AsyncConditionWaiter, AsyncMonitor, AsyncTimeoutConditionWaiter,
+    SharedAsyncMonitor, TokioMonitor,
 };

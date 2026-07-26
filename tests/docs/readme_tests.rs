@@ -7,34 +7,26 @@
 // =============================================================================
 //! README and lock documentation consistency tests.
 
-use semver::{
-    Version,
-    VersionReq,
-};
+use semver::{Version, VersionReq};
 
 const CARGO_TOML: &str = include_str!("../../Cargo.toml");
 const README_EN: &str = include_str!("../../README.md");
 const README_ZH: &str = include_str!("../../README.zh_CN.md");
 const LIB_RS: &str = include_str!("../../src/lib.rs");
-const READ_WRITE_LOCK_SRC: &str =
-    include_str!("../../src/lock/read_write_lock.rs");
-const CONDITION_WAITER_SRC: &str =
-    include_str!("../../src/monitor/condition_waiter.rs");
+const READ_WRITE_LOCK_SRC: &str = include_str!("../../src/lock/read_write_lock.rs");
+const CONDITION_WAITER_SRC: &str = include_str!("../../src/monitor/condition_waiter.rs");
 const ASYNC_CONDITION_WAITER_SRC: &str =
     include_str!("../../src/monitor/async_condition_waiter.rs");
-const ASYNC_READ_WRITE_LOCK_SRC: &str =
-    include_str!("../../src/lock/async_read_write_lock.rs");
+const ASYNC_READ_WRITE_LOCK_SRC: &str = include_str!("../../src/lock/async_read_write_lock.rs");
 const TIMEOUT_CONDITION_WAITER_SRC: &str =
     include_str!("../../src/monitor/timeout_condition_waiter.rs");
 const ASYNC_TIMEOUT_CONDITION_WAITER_SRC: &str =
     include_str!("../../src/monitor/async_timeout_condition_waiter.rs");
-const PARKING_LOT_MONITOR_SRC: &str =
-    include_str!("../../src/monitor/parking_lot_monitor.rs");
+const PARKING_LOT_MONITOR_SRC: &str = include_str!("../../src/monitor/parking_lot_monitor.rs");
 const PARKING_LOT_MONITOR_GUARD_SRC: &str =
     include_str!("../../src/monitor/parking_lot_monitor_guard.rs");
 const STD_MONITOR_SRC: &str = include_str!("../../src/monitor/std_monitor.rs");
-const STD_MONITOR_GUARD_SRC: &str =
-    include_str!("../../src/monitor/std_monitor_guard.rs");
+const STD_MONITOR_GUARD_SRC: &str = include_str!("../../src/monitor/std_monitor_guard.rs");
 
 /// Collapses Markdown whitespace so prose assertions do not depend on line
 /// wrapping.
@@ -152,10 +144,7 @@ fn test_readme_documents_monitor_wait_semantics() {
     assert!(readme_zh.contains("同一个固定 deadline"));
     assert!(readme_zh.contains("零 timeout 仍会检查 predicate"));
     assert!(readme_zh.contains("最后一次持锁 predicate 检查优先"));
-    assert!(
-        readme_zh
-            .contains("Timer 注册或完成错误优先于任何等待后的 predicate 结果")
-    );
+    assert!(readme_zh.contains("Timer 注册或完成错误优先于任何等待后的 predicate 结果"));
     assert!(readme_zh.contains("不会执行 action"));
 }
 
@@ -179,9 +168,7 @@ fn test_monitor_docs_cover_external_predicate_state_handshake() {
         assert!(source.contains("same monitor lock"));
     }
     assert!(ASYNC_CONDITION_WAITER_SRC.contains("let waiter = tokio::spawn"));
-    assert!(
-        ASYNC_CONDITION_WAITER_SRC.contains(".with_write_notify_all_async")
-    );
+    assert!(ASYNC_CONDITION_WAITER_SRC.contains(".with_write_notify_all_async"));
     assert!(readme_en.contains("with_write_notify_all_async"));
     assert!(readme_zh.contains("with_write_notify_all_async"));
 }
@@ -246,9 +233,7 @@ fn test_readme_documents_timer_ioc_testing() {
     let readme_en = normalize_readme_text(README_EN);
     let readme_zh = normalize_readme_text(README_ZH);
     assert!(readme_en.contains("there is no separate mock wait algorithm"));
-    assert!(
-        readme_en.contains("`ManualMonotonicClock` is the test control plane")
-    );
+    assert!(readme_en.contains("`ManualMonotonicClock` is the test control plane"));
     assert!(readme_zh.contains("不再维护另一套 mock 等待算法"));
     assert!(readme_zh.contains("`ManualMonotonicClock` 是测试控制面"));
 }
@@ -278,9 +263,7 @@ fn test_readme_documents_feature_tiers() {
 fn test_readme_documents_root_only_public_api() {
     assert!(!README_EN.contains("from `qubit_lock::monitor`"));
     assert!(!README_ZH.contains("\u{6216} crate root"));
-    assert!(
-        README_EN.contains("Import public types directly from the crate root.")
-    );
+    assert!(README_EN.contains("Import public types directly from the crate root."));
     assert!(README_ZH.contains("crate root"));
     assert!(LIB_RS.contains("mod lock;"));
     assert!(LIB_RS.contains("mod monitor;"));
@@ -299,10 +282,9 @@ fn test_rw_lock_docs_use_current_trait_names() {
 /// Ensures all README `qubit-lock` version requirements accept the crate
 /// version in Cargo.toml.
 fn test_readme_dependency_versions_match_cargo_toml() {
-    let cargo_version = extract_package_version(CARGO_TOML)
-        .expect("Failed to extract version from Cargo.toml");
-    let package_ver = Version::parse(cargo_version)
-        .expect("Invalid package version in Cargo.toml");
+    let cargo_version =
+        extract_package_version(CARGO_TOML).expect("Failed to extract version from Cargo.toml");
+    let package_ver = Version::parse(cargo_version).expect("Invalid package version in Cargo.toml");
 
     let readme_en_reqs = extract_readme_dependency_versions(README_EN);
     let readme_zh_reqs = extract_readme_dependency_versions(README_ZH);
@@ -328,12 +310,7 @@ fn test_readme_dependency_versions_match_cargo_toml() {
         "README.zh_CN.md has qubit-lock dependency lines that were not parsed"
     );
 
-    assert_readme_versions_match(
-        "README.md",
-        &readme_en_reqs,
-        &package_ver,
-        cargo_version,
-    );
+    assert_readme_versions_match("README.md", &readme_en_reqs, &package_ver, cargo_version);
     assert_readme_versions_match(
         "README.zh_CN.md",
         &readme_zh_reqs,
@@ -346,18 +323,12 @@ fn test_readme_dependency_versions_match_cargo_toml() {
 /// Ensures both README files use the same `qubit-clock` requirement as
 /// Cargo.toml.
 fn test_readme_qubit_clock_dependency_version_matches_cargo_toml() {
-    let cargo_requirement =
-        extract_cargo_dependency_version(CARGO_TOML, "qubit-clock")
-            .expect("Cargo.toml does not declare qubit-clock");
+    let cargo_requirement = extract_cargo_dependency_version(CARGO_TOML, "qubit-clock")
+        .expect("Cargo.toml does not declare qubit-clock");
 
-    for (filename, content) in
-        [("README.md", README_EN), ("README.zh_CN.md", README_ZH)]
-    {
-        let readme_requirement =
-            extract_inline_dependency_version(content, "qubit-clock")
-                .unwrap_or_else(|| {
-                    panic!("{filename} does not mention qubit-clock")
-                });
+    for (filename, content) in [("README.md", README_EN), ("README.zh_CN.md", README_ZH)] {
+        let readme_requirement = extract_inline_dependency_version(content, "qubit-clock")
+            .unwrap_or_else(|| panic!("{filename} does not mention qubit-clock"));
         assert_eq!(
             readme_requirement, cargo_requirement,
             "{filename} qubit-clock version differs from Cargo.toml",
@@ -385,10 +356,7 @@ fn extract_package_version(content: &str) -> Option<&str> {
 /// # Returns
 ///
 /// The first matching dependency version requirement, if present.
-fn extract_cargo_dependency_version<'a>(
-    content: &'a str,
-    dependency: &str,
-) -> Option<&'a str> {
+fn extract_cargo_dependency_version<'a>(content: &'a str, dependency: &str) -> Option<&'a str> {
     content.lines().find_map(|line| {
         let value = line.trim().strip_prefix(dependency)?.trim();
         let value = value.strip_prefix('=')?.trim();
@@ -410,10 +378,7 @@ fn extract_cargo_dependency_version<'a>(
 /// # Returns
 ///
 /// The first quoted version following `dependency =`, if present.
-fn extract_inline_dependency_version<'a>(
-    content: &'a str,
-    dependency: &str,
-) -> Option<&'a str> {
+fn extract_inline_dependency_version<'a>(content: &'a str, dependency: &str) -> Option<&'a str> {
     let marker = format!("{dependency} = \"");
     let (_, value) = content.split_once(&marker)?;
     value.split_once('"').map(|(requirement, _)| requirement)
@@ -427,9 +392,8 @@ fn assert_readme_versions_match(
     cargo_version: &str,
 ) {
     for (index, readme_req) in readme_reqs.iter().enumerate() {
-        let req = VersionReq::parse(readme_req).unwrap_or_else(|_| {
-            panic!("Invalid version req in {filename}: {readme_req}")
-        });
+        let req = VersionReq::parse(readme_req)
+            .unwrap_or_else(|_| panic!("Invalid version req in {filename}: {readme_req}"));
         assert!(
             req.matches(package_ver),
             "{filename} qubit-lock dependency #{index} = \"{readme_req}\" does not accept package version {cargo_version}"

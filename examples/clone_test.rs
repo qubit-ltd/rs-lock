@@ -8,11 +8,7 @@
 use std::sync::RwLock;
 use std::time::Duration;
 
-use qubit_lock::{
-    ArcParkingLotMonitor,
-    DataLock,
-    WaitTimeoutResult,
-};
+use qubit_lock::{ArcParkingLotMonitor, DataLock, WaitTimeoutResult};
 
 fn main() {
     println!("Demonstrating rs-lock wrapper boundaries...");

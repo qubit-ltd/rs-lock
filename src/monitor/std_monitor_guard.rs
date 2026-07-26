@@ -12,25 +12,15 @@
 //! standard-library mutex guard and keeps a reference to the monitor that
 //! created it, so waiting operations can use its waiter registry and Timer.
 
-use qubit_clock::{
-    MonotonicInstant,
-    TimeError,
-    TimerFuture,
-};
+use qubit_clock::{MonotonicInstant, TimeError, TimerFuture};
 use std::{
-    ops::{
-        Deref,
-        DerefMut,
-    },
+    ops::{Deref, DerefMut},
     sync::MutexGuard,
     task::Poll,
     time::Duration,
 };
 
-use super::{
-    std_monitor::StdMonitor,
-    wait_timeout_status::WaitTimeoutStatus,
-};
+use super::{std_monitor::StdMonitor, wait_timeout_status::WaitTimeoutStatus};
 
 /// Guard returned by [`StdMonitor::lock`](super::StdMonitor::lock).
 ///
@@ -94,14 +84,53 @@ impl<'a, T> StdMonitorGuard<'a, T> {
     ///
     /// A monitor guard that can access state and wait for monitor notification.
     #[inline]
-    pub(super) fn new(
-        monitor: &'a StdMonitor<T>,
-        inner: MutexGuard<'a, T>,
-    ) -> Self {
+    pub(super) fn new(monitor: &'a StdMonitor<T>, inner: MutexGuard<'a, T>) -> Self {
         Self {
             monitor,
             inner: Some(inner),
         }
+    }
+
+    /// Releases the monitor lock and signals at most one registered waiter.
+    ///
+    /// Consuming the guard makes the state update and notification handshake
+    /// explicit. The state lock is released before the notification is sent,
+    /// so a selected waiter can immediately attempt to reacquire it. A
+    /// notification does not carry state; waiting callers must still recheck
+    /// their predicate after waking.
+    ///
+    /// # Panics
+    ///
+    /// Panics only if the guard's internal ownership invariant is violated.
+    #[inline]
+    pub fn notify_one(mut self) {
+        drop(
+            self.inner
+                .take()
+                .expect("standard monitor guard slot must be occupied"),
+        );
+        self.monitor.notify_one();
+    }
+
+    /// Releases the monitor lock and signals every registered waiter.
+    ///
+    /// Consuming the guard makes the state update and notification handshake
+    /// explicit. The state lock is released before notifications are sent, so
+    /// selected waiters can immediately attempt to reacquire it. Notifications
+    /// do not carry state; waiting callers must still recheck their predicate
+    /// after waking.
+    ///
+    /// # Panics
+    ///
+    /// Panics only if the guard's internal ownership invariant is violated.
+    #[inline]
+    pub fn notify_all(mut self) {
+        drop(
+            self.inner
+                .take()
+                .expect("standard monitor guard slot must be occupied"),
+        );
+        self.monitor.notify_all();
     }
 
     /// Waits for a notification while temporarily releasing the monitor lock.
@@ -222,10 +251,7 @@ impl<'a, T> StdMonitorGuard<'a, T> {
     /// assert_eq!(status, WaitTimeoutStatus::TimedOut);
     /// ```
     #[inline]
-    pub fn wait_for(
-        &mut self,
-        timeout: Duration,
-    ) -> Result<WaitTimeoutStatus, TimeError> {
+    pub fn wait_for(&mut self, timeout: Duration) -> Result<WaitTimeoutStatus, TimeError> {
         let mut future = self.monitor.timer().after(timeout)?;
         self.wait_with_timer(&mut future)
     }
@@ -278,9 +304,7 @@ impl<'a, T> StdMonitorGuard<'a, T> {
         let registration = self.monitor.waiters.register();
         let waiter = std::sync::Arc::clone(registration.waiter());
         if let Poll::Ready(result) =
-            super::internal::BlockingConditionWaiter::poll_timer(
-                &waiter, future,
-            )
+            super::internal::BlockingConditionWaiter::poll_timer(&waiter, future)
         {
             return result.map(|()| WaitTimeoutStatus::TimedOut);
         }
@@ -297,9 +321,7 @@ impl<'a, T> StdMonitorGuard<'a, T> {
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner),
         );
-        match super::internal::BlockingConditionWaiter::poll_timer(
-            &waiter, future,
-        ) {
+        match super::internal::BlockingConditionWaiter::poll_timer(&waiter, future) {
             Poll::Ready(result) => result.map(|()| WaitTimeoutStatus::TimedOut),
             Poll::Pending => Ok(WaitTimeoutStatus::Woken),
         }

@@ -15,7 +15,6 @@ categories = ["concurrency", "asynchronous"]
 include = [
     "/Cargo.toml",
     "/LICENSE",
-    "/CHANGELOG.md",
     "/README.md",
     "/README.zh_CN.md",
     "/benches/**",
@@ -27,6 +26,9 @@ include = [
 [package.metadata.docs.rs]
 all-features = true
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(loom)"] }
+
 [lib]
 name = "qubit_lock"
 doctest = true
@@ -36,13 +38,17 @@ default = ["monitor", "parking-lot"]
 async = ["async-monitor"]
 async-lock = ["dep:tokio", "tokio/sync"]
 async-monitor = ["async-lock", "monitor", "tokio/time", "qubit-clock/tokio"]
-monitor = ["dep:qubit-clock"]
+loom-model = ["monitor", "test-util", "dep:loom"]
+monitor = ["dep:qubit-clock", "dep:qubit-collections"]
 parking-lot = ["dep:parking_lot"]
+test-util = []
 
 [dependencies]
 parking_lot = { version = "0.12", optional = true }
+loom = { version = "0.7", optional = true }
 tokio = { version = "1.52", default-features = false, optional = true }
 qubit-clock = { version = "0.10", path = "../rs-clock", optional = true }
+qubit-collections = { version = "0.1", path = "../rs-collections", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.8.2", default-features = false }

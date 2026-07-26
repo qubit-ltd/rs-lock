@@ -8,12 +8,8 @@
 //! Shared fault-injecting Timer factories and assertions.
 
 use qubit_clock::{
-    TimeError,
-    TimerUnavailableError,
-    test_util::{
-        FaultInjectingTimer,
-        TimerFailurePoint,
-    },
+    TimeError, TimerUnavailableError,
+    test_util::{FaultInjectingTimer, TimerFailurePoint},
 };
 
 /// Creates a Timer that rejects every future-deadline registration.
