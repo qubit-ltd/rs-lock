@@ -52,9 +52,8 @@ fn test_loom_waiter_registry_notify_one_races_with_selected_cancellation() {
         let notifier_registry = Arc::clone(&registry);
         let notifier = thread::spawn(move || notifier_registry.take_one());
         let cancellation_registry = Arc::clone(&registry);
-        let cancellation = thread::spawn(move || {
-            cancellation_registry.unregister(waiter_id)
-        });
+        let cancellation =
+            thread::spawn(move || cancellation_registry.unregister(waiter_id));
 
         let selected = notifier.join().expect("model notifier should finish");
         let cancelled = cancellation
