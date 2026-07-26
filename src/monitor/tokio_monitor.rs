@@ -253,7 +253,8 @@ impl<T> TokioMonitor<T> {
         result
     }
 
-    /// Selects the longest-waiting registered async waiter.
+    /// Selects at most one registered async waiter without a fairness or FIFO
+    /// guarantee.
     ///
     /// This does not guarantee scheduling or mutex reacquisition order.
     #[inline]
@@ -325,7 +326,8 @@ impl<T> TokioMonitor<T> {
 }
 
 impl<T> Notifier for TokioMonitor<T> {
-    /// Selects the longest-waiting registered async waiter.
+    /// Selects at most one registered async waiter without a fairness or FIFO
+    /// guarantee.
     ///
     /// This does not guarantee scheduling or mutex reacquisition order.
     #[inline(always)]

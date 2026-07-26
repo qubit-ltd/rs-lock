@@ -525,9 +525,10 @@ impl<T> StdMonitor<T> {
     ///
     /// This method is the timeout-aware form of [`Self::wait_while`]. It keeps
     /// rechecking `waiting` under the monitor lock and waits only for the
-    /// remaining portion of `timeout`. If `waiting` becomes false before the
-    /// timeout expires, `f` runs while the lock is still held. If the timeout
-    /// expires first, the closure is not called.
+    /// remaining portion of `timeout`. If `waiting` becomes false on the
+    /// deciding locked predicate check, `f` runs while the lock is still held.
+    /// If the Timer completes while `waiting` remains true on that check, the
+    /// closure is not called.
     ///
     /// The timeout budget starts after the monitor lock is acquired and the
     /// initial predicate check still requires waiting, immediately before the
@@ -556,8 +557,9 @@ impl<T> StdMonitor<T> {
     /// # Returns
     ///
     /// [`WaitTimeoutResult::Ready`] with the value returned by `f` when the
-    /// predicate stops blocking before the timeout. Returns
-    /// [`WaitTimeoutResult::TimedOut`] when the timeout expires first.
+    /// predicate stops blocking on the deciding locked check. Returns
+    /// [`WaitTimeoutResult::TimedOut`] when the Timer completes and the
+    /// predicate still blocks on that check.
     ///
     /// # Errors
     ///
@@ -613,9 +615,10 @@ impl<T> StdMonitor<T> {
     /// Waits until a predicate becomes true, with an overall time limit.
     ///
     /// This is the positive-predicate counterpart of
-    /// [`Self::wait_while_for`]. If `ready` becomes true before the timeout
-    /// expires, `f` runs while the monitor lock is still held. If the timeout
-    /// expires first, the closure is not called.
+    /// [`Self::wait_while_for`]. If `ready` becomes true on the deciding
+    /// locked predicate check, `f` runs while the monitor lock is still held.
+    /// If the Timer completes while `ready` remains false on that check, the
+    /// closure is not called.
     ///
     /// The timeout budget starts after the monitor lock is acquired and the
     /// initial predicate check still requires waiting, immediately before the
@@ -642,8 +645,9 @@ impl<T> StdMonitor<T> {
     /// # Returns
     ///
     /// [`WaitTimeoutResult::Ready`] with the value returned by `f` when the
-    /// predicate becomes true before the timeout. Returns
-    /// [`WaitTimeoutResult::TimedOut`] when the timeout expires first.
+    /// predicate becomes true on the deciding locked check. Returns
+    /// [`WaitTimeoutResult::TimedOut`] when the Timer completes and the
+    /// predicate remains false on that check.
     ///
     /// # Errors
     ///

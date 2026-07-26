@@ -22,7 +22,8 @@
 //!
 //! Public API items are re-exported from the crate root; the internal `lock`
 //! and `monitor` modules are implementation details. Start with [`Lock`] for
-//! exclusive synchronous access:
+//! synchronous lock acquisition. Use [`ExclusiveLock`] when generic code
+//! needs mutual exclusion:
 //!
 //! ```rust
 //! use qubit_lock::Lock;
