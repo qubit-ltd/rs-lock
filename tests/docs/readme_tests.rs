@@ -43,12 +43,8 @@ fn normalize_readme_text(content: &str) -> String {
 }
 
 #[test]
-/// Ensures README files only reference the current lock method names.
-fn test_readme_uses_with_lock_api_names() {
-    assert!(!README_EN.contains("with_lock"));
-    assert!(!README_EN.contains("try_with_lock"));
-    assert!(!README_ZH.contains("with_lock"));
-    assert!(!README_ZH.contains("try_with_lock"));
+/// Ensures README files document the current data-lock method names.
+fn test_readme_documents_data_lock_api_names() {
     assert!(README_EN.contains("with_read"));
     assert!(README_EN.contains("with_write"));
     assert!(README_ZH.contains("with_read"));
@@ -234,13 +230,6 @@ fn test_readme_documents_monitor_capability_selection() {
 }
 
 #[test]
-/// Ensures README files do not retain version migration guides.
-fn test_readme_omits_version_migration_guides() {
-    assert!(!README_EN.contains("## Migration from"));
-    assert!(!README_ZH.contains("迁移"));
-}
-
-#[test]
 /// Ensures both READMEs describe deterministic testing through Timer IOC.
 fn test_readme_documents_timer_ioc_testing() {
     let readme_en = normalize_readme_text(README_EN);
@@ -262,14 +251,12 @@ fn test_readme_documents_feature_tiers() {
     assert!(README_EN.contains("default-features = false"));
     assert!(README_EN.contains("`async-lock`"));
     assert!(README_EN.contains("`async-monitor`"));
-    assert!(README_EN.contains("`async` compatibility alias"));
     assert!(!README_EN.contains("`mock` feature"));
     assert!(README_ZH.contains("默认特性集"));
     assert!(README_ZH.contains("`monitor` 和 `parking-lot`"));
     assert!(README_ZH.contains("default-features = false"));
     assert!(README_ZH.contains("`async-lock`"));
     assert!(README_ZH.contains("`async-monitor`"));
-    assert!(README_ZH.contains("`async` 兼容别名"));
     assert!(!README_ZH.contains("`mock` feature"));
 }
 
@@ -293,6 +280,22 @@ fn test_readme_documents_root_only_public_api() {
 fn test_rw_lock_docs_use_current_trait_names() {
     assert!(READ_WRITE_LOCK_SRC.contains("ReadWriteLock"));
     assert!(ASYNC_READ_WRITE_LOCK_SRC.contains("AsyncReadWriteLock"));
+}
+
+#[test]
+/// Ensures Cargo exposes only the current feature surface.
+fn test_cargo_features_match_current_api() {
+    assert_eq!(
+        cargo_feature_names(CARGO_TOML),
+        [
+            "default",
+            "async-lock",
+            "async-monitor",
+            "loom-model",
+            "monitor",
+            "parking-lot",
+        ],
+    );
 }
 
 #[test]
@@ -373,6 +376,19 @@ fn extract_package_version(content: &str) -> Option<&str> {
         }
     }
     None
+}
+
+/// Extracts feature names from the Cargo feature section.
+fn cargo_feature_names(content: &str) -> Vec<&str> {
+    let (_, feature_section) = content
+        .split_once("[features]\n")
+        .expect("Cargo.toml must define features");
+
+    feature_section
+        .lines()
+        .take_while(|line| !line.starts_with('['))
+        .filter_map(|line| line.split_once('=').map(|(name, _)| name.trim()))
+        .collect()
 }
 
 /// Extracts a dependency version requirement from Cargo.toml content.

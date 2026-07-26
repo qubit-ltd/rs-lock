@@ -56,7 +56,7 @@ qubit-lock = { version = "0.11", features = ["async-lock"] }
 qubit-lock = { version = "0.11", features = ["async-monitor"] }
 ```
 
-历史 `async` 兼容别名会启用 `async-monitor`。如果应用需要创建 Tokio runtime，
+如果应用需要创建 Tokio runtime，
 请在应用自己的 `Cargo.toml` 中启用合适的 Tokio runtime 特性，例如 `rt` 或
 `rt-multi-thread`。
 `AsyncLock` 和 `AsyncReadWriteLock` 返回 `Send` future。Tokio mutex 在

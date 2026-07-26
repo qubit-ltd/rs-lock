@@ -60,16 +60,6 @@
       ]
     },
     {
-      "name": "async-compatibility",
-      "defaultFeatures": false,
-      "features": [
-        "async"
-      ],
-      "commands": [
-        "check"
-      ]
-    },
-    {
       "name": "loom-model",
       "defaultFeatures": false,
       "features": [
@@ -87,7 +77,7 @@
       "name": "all-features",
       "defaultFeatures": true,
       "features": [
-        "async"
+        "async-monitor"
       ],
       "commands": [
         "test",
