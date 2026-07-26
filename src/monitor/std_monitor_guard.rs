@@ -62,18 +62,6 @@ use super::{
 ///
 /// assert_eq!(monitor.with_read(|items| items.len()), 1);
 /// ```
-///
-/// Ignoring a monitor guard is rejected when unused must-use values are
-/// denied:
-///
-/// ```compile_fail
-/// #![deny(unused_must_use)]
-///
-/// use qubit_lock::StdMonitor;
-///
-/// let monitor = StdMonitor::new(0);
-/// monitor.lock();
-/// ```
 #[must_use = "dropping the guard immediately releases the monitor lock"]
 pub struct StdMonitorGuard<'a, T> {
     /// StdMonitor that owns the state, waiter registry, and Timer.

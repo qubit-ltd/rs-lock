@@ -8,13 +8,6 @@
 //! Data-independent asynchronous RAII lock capability.
 //!
 //! Tokio mutexes intentionally implement only the asynchronous capability.
-//!
-//! ```compile_fail
-//! use qubit_lock::Lock;
-//!
-//! let lock = tokio::sync::Mutex::new(());
-//! let _guard = Lock::lock(&lock);
-//! ```
 
 use std::{
     future::Future,

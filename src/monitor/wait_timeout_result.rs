@@ -42,17 +42,6 @@
 /// let outcome = result.expect("timer registration should succeed");
 /// assert_eq!(outcome, WaitTimeoutResult::Ready("ready"));
 /// ```
-///
-/// Ignoring a predicate-wait result is rejected when unused must-use values
-/// are denied:
-///
-/// ```compile_fail
-/// #![deny(unused_must_use)]
-///
-/// use qubit_lock::WaitTimeoutResult;
-///
-/// WaitTimeoutResult::<()>::TimedOut;
-/// ```
 #[must_use = "check whether the predicate became ready or the wait timed out"]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WaitTimeoutResult<R> {

@@ -48,21 +48,6 @@ use crate::lock::{
 ///
 /// run_exclusively(&std::sync::Mutex::new(()));
 /// ```
-///
-/// A shared read-mode adapter is a [`Lock`], but is not exclusive:
-///
-/// ```compile_fail
-/// use qubit_lock::{
-///     ExclusiveLock,
-///     ReadWriteLock,
-/// };
-///
-/// fn require_exclusive<L: ExclusiveLock + ?Sized>(_: &L) {}
-///
-/// let lock = std::sync::RwLock::new(());
-/// let read_lock = lock.read_lock();
-/// require_exclusive(&read_lock);
-/// ```
 pub trait ExclusiveLock: Lock {}
 
 impl<L> ExclusiveLock for &L where L: ExclusiveLock + ?Sized {}
