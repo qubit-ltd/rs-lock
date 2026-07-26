@@ -180,11 +180,14 @@ At generic API boundaries, use the narrowest capability that expresses the
 operation: `Notifier` for signaling, `ConditionWaiter` or
 `TimeoutConditionWaiter` for blocking predicate waits, and their
 `AsyncConditionWaiter` or `AsyncTimeoutConditionWaiter` counterparts for
-asynchronous waits. Use `Monitor` or `AsyncMonitor` only when the full
-notification-and-wait contract is required; use `SharedMonitor` or
-`SharedAsyncMonitor` when the generic API also retains a cloneable handle.
-These waiter and aggregate traits are intended for static generic bounds, not
-`dyn` trait-object interfaces.
+asynchronous waits. `Monitor` and `AsyncMonitor` combine state access,
+notification, and untimed predicate waits; their default
+`with_write_notify_one` and `with_write_notify_all` helpers implement the
+state-update-and-notify handshake. `TimedMonitor` and `AsyncTimedMonitor` add
+timeout-based waits. Use `SharedMonitor` or `SharedAsyncMonitor` when the
+generic API also retains a cloneable untimed monitor handle. These waiter and
+aggregate traits are intended for static generic bounds, not `dyn`
+trait-object interfaces.
 
 Import public types directly from the crate root.
 

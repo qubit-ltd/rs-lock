@@ -161,10 +161,13 @@ poll 之前的时间不消耗 timeout 预算。`TokioMonitor::current` 和
 
 在泛型 API 边界，使用能够表达操作的最小能力：仅发送通知时使用 `Notifier`，
 阻塞式 predicate wait 使用 `ConditionWaiter` 或 `TimeoutConditionWaiter`，异步
-wait 使用对应的 `AsyncConditionWaiter` 或 `AsyncTimeoutConditionWaiter`。只有在
-确实需要完整的通知与等待契约时才使用 `Monitor` 或 `AsyncMonitor`；泛型 API
-还要持有可克隆句柄时，使用 `SharedMonitor` 或 `SharedAsyncMonitor`。这些 waiter
-和聚合 trait 用于静态泛型约束，不用于 `dyn` trait object 接口。
+wait 使用对应的 `AsyncConditionWaiter` 或 `AsyncTimeoutConditionWaiter`。
+`Monitor` 和 `AsyncMonitor` 聚合状态访问、通知以及无时限 predicate wait；它们
+默认提供的 `with_write_notify_one` 和 `with_write_notify_all` helper 实现状态更新后
+通知的握手。`TimedMonitor` 和 `AsyncTimedMonitor` 额外提供带时限的 wait。泛型
+API 还要持有可克隆的无时限 monitor 句柄时，使用 `SharedMonitor` 或
+`SharedAsyncMonitor`。这些 waiter 和聚合 trait 用于静态泛型约束，不用于 `dyn`
+trait object 接口。
 
 所有公开类型都直接从 crate root 导入。
 
