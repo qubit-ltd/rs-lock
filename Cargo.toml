@@ -38,10 +38,9 @@ default = ["monitor", "parking-lot"]
 async = ["async-monitor"]
 async-lock = ["dep:tokio", "tokio/sync"]
 async-monitor = ["async-lock", "monitor", "tokio/time", "qubit-clock/tokio"]
-loom-model = ["monitor", "test-util", "dep:loom"]
+loom-model = ["monitor", "dep:loom"]
 monitor = ["dep:qubit-clock", "dep:qubit-collections"]
 parking-lot = ["dep:parking_lot"]
-test-util = []
 
 [dependencies]
 parking_lot = { version = "0.12", optional = true }
