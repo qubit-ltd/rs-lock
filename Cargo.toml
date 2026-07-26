@@ -35,7 +35,6 @@ doctest = true
 
 [features]
 default = ["monitor", "parking-lot"]
-async = ["async-monitor"]
 async-lock = ["dep:tokio", "tokio/sync"]
 async-monitor = ["async-lock", "monitor", "tokio/time", "qubit-clock/tokio"]
 loom-model = ["monitor", "dep:loom"]

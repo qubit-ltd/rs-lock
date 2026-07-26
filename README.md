@@ -59,8 +59,7 @@ Enable Tokio monitor coordination, including timed waits, when needed:
 qubit-lock = { version = "0.11", features = ["async-monitor"] }
 ```
 
-The legacy `async` compatibility alias enables `async-monitor`. If your
-application creates a Tokio runtime, enable the appropriate Tokio runtime
+If your application creates a Tokio runtime, enable the appropriate Tokio runtime
 features in your own `Cargo.toml`, such as `rt` or `rt-multi-thread`.
 `AsyncLock` and `AsyncReadWriteLock` return `Send` futures. Tokio mutexes
 implement the former when `T: Send`; Tokio read-write locks implement the
