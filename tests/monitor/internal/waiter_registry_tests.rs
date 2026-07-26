@@ -42,6 +42,32 @@ fn test_loom_waiter_registry_notify_one_races_with_cancellation() {
     });
 }
 
+/// Models notification selection racing with cancellation of the same waiter.
+#[test]
+fn test_loom_waiter_registry_notify_one_races_with_selected_cancellation() {
+    loom::model(|| {
+        let registry = Arc::new(LoomWaiterRegistry::new());
+        let waiter_id = registry.register(10);
+
+        let notifier_registry = Arc::clone(&registry);
+        let notifier = thread::spawn(move || notifier_registry.take_one());
+        let cancellation_registry = Arc::clone(&registry);
+        let cancellation = thread::spawn(move || {
+            cancellation_registry.unregister(waiter_id)
+        });
+
+        let selected = notifier.join().expect("model notifier should finish");
+        let cancelled = cancellation
+            .join()
+            .expect("model cancellation should finish");
+        assert!(
+            (selected == Some(10)) != (cancelled == Some(10)),
+            "notification and cancellation must remove the waiter exactly once",
+        );
+        assert_eq!(registry.take_one(), None);
+    });
+}
+
 /// Models notification of all waiters racing with cancellation of one waiter.
 #[test]
 fn test_loom_waiter_registry_notify_all_races_with_cancellation() {
