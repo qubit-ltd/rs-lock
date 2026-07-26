@@ -24,6 +24,8 @@ mod async_condition_waiter;
 #[cfg(feature = "async-monitor")]
 mod async_monitor;
 #[cfg(feature = "async-monitor")]
+mod async_timed_monitor;
+#[cfg(feature = "async-monitor")]
 mod async_timeout_condition_waiter;
 mod condition_waiter;
 pub(crate) mod internal;
@@ -38,6 +40,7 @@ mod shared_async_monitor;
 mod shared_monitor;
 mod std_monitor;
 mod std_monitor_guard;
+mod timed_monitor;
 mod timeout_condition_waiter;
 #[cfg(feature = "async-monitor")]
 mod tokio_monitor;
@@ -54,6 +57,8 @@ pub use async_condition_waiter::AsyncConditionWaiter;
 #[cfg(feature = "async-monitor")]
 pub use async_monitor::AsyncMonitor;
 #[cfg(feature = "async-monitor")]
+pub use async_timed_monitor::AsyncTimedMonitor;
+#[cfg(feature = "async-monitor")]
 pub use async_timeout_condition_waiter::AsyncTimeoutConditionWaiter;
 pub use condition_waiter::ConditionWaiter;
 pub use monitor::Monitor;
@@ -67,6 +72,7 @@ pub use shared_async_monitor::SharedAsyncMonitor;
 pub use shared_monitor::SharedMonitor;
 pub use std_monitor::StdMonitor;
 pub use std_monitor_guard::StdMonitorGuard;
+pub use timed_monitor::TimedMonitor;
 pub use timeout_condition_waiter::TimeoutConditionWaiter;
 #[cfg(feature = "async-monitor")]
 pub use tokio_monitor::TokioMonitor;

@@ -9,7 +9,7 @@
 
 use crate::monitor::Monitor;
 
-/// Aggregate trait for cloneable, shared blocking monitor handles.
+/// Aggregate trait for cloneable, shared untimed blocking monitor handles.
 ///
 /// This is a static generic bound for APIs that retain or clone a monitor
 /// handle. The inherited generic methods make it unsuitable as a `dyn`

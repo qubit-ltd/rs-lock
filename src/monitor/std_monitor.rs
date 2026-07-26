@@ -35,6 +35,7 @@ use std::{
 use super::std_monitor_guard::StdMonitorGuard;
 use super::{
     ConditionWaiter,
+    Monitor,
     Notifier,
     TimeoutConditionWaiter,
     internal::{
@@ -800,6 +801,26 @@ impl<T> ConditionWaiter for StdMonitor<T> {
         F: FnOnce(&mut Self::State) -> R,
     {
         Self::wait_while(self, predicate, action)
+    }
+}
+
+impl<T> Monitor for StdMonitor<T> {
+    /// Reads protected state while holding the monitor lock.
+    #[inline(always)]
+    fn with_read<R, F>(&self, f: F) -> R
+    where
+        F: FnOnce(&Self::State) -> R,
+    {
+        Self::with_read(self, f)
+    }
+
+    /// Mutates protected state while holding the monitor lock.
+    #[inline(always)]
+    fn with_write<R, F>(&self, f: F) -> R
+    where
+        F: FnOnce(&mut Self::State) -> R,
+    {
+        Self::with_write(self, f)
     }
 }
 

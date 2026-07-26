@@ -22,6 +22,8 @@ mod async_condition_waiter_tests;
 #[cfg(feature = "async-monitor")]
 mod async_monitor_tests;
 #[cfg(feature = "async-monitor")]
+mod async_timed_monitor_tests;
+#[cfg(feature = "async-monitor")]
 mod async_timeout_condition_waiter_tests;
 mod condition_waiter_tests;
 mod failing_timer_tests;
@@ -38,6 +40,7 @@ mod shared_async_monitor_tests;
 mod shared_monitor_tests;
 mod std_monitor_guard_tests;
 mod std_monitor_tests;
+mod timed_monitor_tests;
 mod timeout_condition_waiter_tests;
 #[cfg(feature = "async-monitor")]
 mod tokio_monitor_tests;

@@ -26,9 +26,8 @@ use std::{
 /// update must participate in the same monitor lock handshake before notifying
 /// the monitor. Atomic ordering alone cannot close the scheduling window
 /// between the waiter's predicate check and waiter registration. Use the
-/// concrete monitor's asynchronous combined helper, such as
-/// `with_write_notify_all_async`, to update that external state while holding
-/// the monitor lock and then notify waiters.
+/// [`crate::monitor::AsyncMonitor::with_write_notify_all_async`] to update that
+/// external state while holding the monitor lock and then notify waiters.
 ///
 /// ```
 /// use std::sync::{

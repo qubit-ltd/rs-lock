@@ -31,6 +31,7 @@ use tokio::sync::Mutex;
 
 use super::{
     AsyncConditionWaiter,
+    AsyncMonitor,
     AsyncTimeoutConditionWaiter,
     Notifier,
     WaitTimeoutResult,
@@ -397,6 +398,34 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
             }
             action(&mut *guard)
         }
+    }
+}
+
+impl<T: Send> AsyncMonitor for TokioMonitor<T> {
+    /// Acquires the monitor and reads the protected state.
+    #[inline(always)]
+    fn with_read_async<'a, R, F>(
+        &'a self,
+        f: F,
+    ) -> impl Future<Output = R> + Send + 'a
+    where
+        R: Send + 'a,
+        F: FnOnce(&Self::State) -> R + Send + 'a,
+    {
+        TokioMonitor::with_read_async(self, f)
+    }
+
+    /// Acquires the monitor and mutates the protected state.
+    #[inline(always)]
+    fn with_write_async<'a, R, F>(
+        &'a self,
+        f: F,
+    ) -> impl Future<Output = R> + Send + 'a
+    where
+        R: Send + 'a,
+        F: FnOnce(&mut Self::State) -> R + Send + 'a,
+    {
+        TokioMonitor::with_write_async(self, f)
     }
 }
 
