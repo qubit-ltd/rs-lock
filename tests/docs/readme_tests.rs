@@ -23,6 +23,8 @@ const READ_WRITE_LOCK_SRC: &str =
     include_str!("../../src/lock/read_write_lock.rs");
 const WAIT_TIMEOUT_RESULT_SRC: &str =
     include_str!("../../src/monitor/wait_timeout_result.rs");
+const WAIT_TIMEOUT_STATUS_SRC: &str =
+    include_str!("../../src/monitor/wait_timeout_status.rs");
 const CONDITION_WAITER_SRC: &str =
     include_str!("../../src/monitor/condition_waiter.rs");
 const ASYNC_CONDITION_WAITER_SRC: &str =
@@ -375,8 +377,16 @@ fn test_rustdoc_contracts_match_lock_and_monitor_semantics() {
     assert!(
         WAIT_TIMEOUT_RESULT_SRC.contains("deciding locked predicate check")
     );
+    assert!(
+        WAIT_TIMEOUT_RESULT_SRC.contains("blocking and asynchronous monitor")
+    );
+    assert!(WAIT_TIMEOUT_RESULT_SRC.contains("ParkingLotMonitor"));
+    assert!(WAIT_TIMEOUT_RESULT_SRC.contains("TokioMonitor"));
+    assert!(WAIT_TIMEOUT_STATUS_SRC.contains("blocking monitor guards"));
+    assert!(WAIT_TIMEOUT_STATUS_SRC.contains("ParkingLotMonitorGuard"));
 
     for source in [PARKING_LOT_MONITOR_SRC, STD_MONITOR_SRC] {
+        assert!(!source.contains("condition variable"));
         assert!(
             source.contains(
                 "predicate stops blocking on the deciding locked check"
