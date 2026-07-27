@@ -696,6 +696,13 @@ async fn test_tokio_monitor_condition_wait_futures_are_send() {
         )
         .await,
     );
+    assert_send(
+        <TokioMonitor<bool> as AsyncConditionWaiter>::wait_until_ready_async(
+            &monitor,
+            |ready| *ready,
+        ),
+    )
+    .await;
     assert!(
         assert_send(
             <TokioMonitor<bool> as AsyncConditionWaiter>::wait_while_async(
@@ -717,6 +724,17 @@ async fn test_tokio_monitor_condition_wait_futures_are_send() {
         )
         .await,
         Ok(WaitTimeoutResult::Ready(true)),
+    );
+    assert_time_result_eq!(
+        assert_send(
+            <TokioMonitor<bool> as AsyncTimeoutConditionWaiter>::wait_until_ready_for_async(
+                &monitor,
+                Duration::ZERO,
+                |ready| *ready,
+            ),
+        )
+        .await,
+        Ok(WaitTimeoutResult::Ready(())),
     );
     assert_time_result_eq!(
         assert_send(

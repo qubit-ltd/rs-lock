@@ -356,6 +356,16 @@ fn test_monitor_docs_cover_std_monitor_poisoning_policy() {
 }
 
 #[test]
+/// Ensures both user guides document the action-free asynchronous wait
+/// conveniences.
+fn test_monitor_docs_cover_async_ready_wait_helpers() {
+    for guide in [USER_GUIDE_EN, USER_GUIDE_ZH] {
+        assert!(guide.contains("`wait_until_ready_async`"));
+        assert!(guide.contains("`wait_until_ready_for_async`"));
+    }
+}
+
+#[test]
 /// Ensures the Chinese README contribution section matches the project
 /// template.
 fn test_readme_zh_uses_contribution_template() {

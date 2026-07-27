@@ -114,6 +114,36 @@ pub trait AsyncConditionWaiter {
         self.wait_while_async(move |state| !predicate(state), action)
     }
 
+    /// Returns a future that waits until the predicate becomes true.
+    ///
+    /// The predicate runs while the monitor state is locked. This convenience
+    /// method does not run an action after the predicate becomes true. The
+    /// trait-level laziness and cancellation contract applies to the returned
+    /// future.
+    ///
+    /// # Parameters
+    ///
+    /// * `predicate` - Predicate that returns `true` when the state is ready.
+    ///
+    /// # Returns
+    ///
+    /// A lazy future that resolves to `()` when the predicate becomes true.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `predicate` when it is
+    /// polled.
+    #[inline(always)]
+    fn wait_until_ready_async<'a, P>(
+        &'a self,
+        predicate: P,
+    ) -> impl Future<Output = ()> + Send + 'a
+    where
+        P: FnMut(&Self::State) -> bool + Send + 'a,
+    {
+        self.wait_until_async(predicate, |_| ())
+    }
+
     /// Returns a future that waits while the predicate remains true.
     ///
     /// The predicate and action run while the monitor state is locked. The

@@ -273,8 +273,8 @@ monitor 持有受保护状态，并使用 notification 协调 predicate wait。�
 | `Monitor` | 状态访问、notification 和无时限同步等待 |
 | `TimedMonitor` | `Monitor` 加同步计时等待 |
 | `SharedMonitor` | 可克隆的同步共享 monitor 句柄 |
-| `AsyncConditionWaiter` | 异步无时限 predicate wait |
-| `AsyncTimeoutConditionWaiter` | 异步计时 predicate wait |
+| `AsyncConditionWaiter` | 异步 `wait_until_async`、无 action 的 `wait_until_ready_async` 和 `wait_while_async` |
+| `AsyncTimeoutConditionWaiter` | 异步 `wait_until_for_async`、无 action 的 `wait_until_ready_for_async` 和 `wait_while_for_async` |
 | `AsyncMonitor` | 异步状态访问、notification 和无时限等待 |
 | `AsyncTimedMonitor` | `AsyncMonitor` 加计时等待 |
 | `SharedAsyncMonitor` | 可克隆的异步共享 monitor 句柄 |
@@ -380,7 +380,8 @@ fn main() {
 - `with_timer` 注入显式 Timer。
 - `with_read_async`、`with_write_async` 和组合式
   `with_write_notify_*_async` 方法访问状态。
-- `wait_until_async` / `wait_while_async` 及对应的 `_for_async` 版本等待 predicate。
+- `wait_until_async` / `wait_while_async` 及对应的 `_for_async` 版本等待 predicate；
+  `wait_until_ready_async` 和 `wait_until_ready_for_async` 提供无 action 的形式。
 
 ```rust
 use qubit_lock::{ArcTokioMonitor, AsyncConditionWaiter};
@@ -481,10 +482,9 @@ async fn main() {
 
     let waiter = tokio::spawn(async move {
         waiter_monitor
-            .wait_until_async(
-                |_| waiter_ready.load(Ordering::Acquire),
-                |_| (),
-            )
+            .wait_until_ready_async(|_| {
+                waiter_ready.load(Ordering::Acquire)
+            })
             .await;
     });
 
