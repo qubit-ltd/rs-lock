@@ -11,6 +11,8 @@ use std::{
     hint::black_box,
     sync::{
         Arc,
+        Condvar as StdCondvar,
+        Mutex as StdMutex,
         mpsc::{
             self,
             Receiver,
@@ -315,6 +317,20 @@ fn benchmark_zero_timeout(criterion: &mut Criterion) {
         bencher.iter(|| {
             let mut guard = state.lock();
             black_box(changed.wait_for(&mut guard, Duration::ZERO).timed_out())
+        });
+    });
+
+    let std_state = StdMutex::new(());
+    let std_changed = StdCondvar::new();
+    group.bench_function("std_condvar", |bencher| {
+        bencher.iter(|| {
+            let guard =
+                std_state.lock().expect("benchmark mutex should not poison");
+            let (guard, result) = std_changed
+                .wait_timeout(guard, Duration::ZERO)
+                .expect("benchmark mutex should not poison");
+            black_box(result.timed_out());
+            drop(guard);
         });
     });
     group.finish();
