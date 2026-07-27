@@ -11,6 +11,7 @@ use std::{
     collections::{
         BTreeMap,
         HashMap,
+        btree_map::IntoValues,
     },
     hint::black_box,
 };
@@ -91,8 +92,19 @@ impl BTreeWaiters {
     ///
     /// # Returns
     ///
+    /// An owning iterator over values active when the operation began.
+    fn take_all(&mut self) -> IntoValues<u64, usize> {
+        // Match production by moving the tree directly into iteration so the
+        // benchmark measures the removal of the intermediate Vec allocation.
+        std::mem::take(&mut self.waiters).into_values()
+    }
+
+    /// Removes every waiter through the former intermediate-Vec strategy.
+    ///
+    /// # Returns
+    ///
     /// Values active when the operation began.
-    fn take_all(&mut self) -> Vec<usize> {
+    fn take_all_via_vec(&mut self) -> Vec<usize> {
         std::mem::take(&mut self.waiters).into_values().collect()
     }
 
@@ -476,12 +488,36 @@ fn benchmark_waiter_registry(criterion: &mut Criterion) {
             },
         );
         group.bench_with_input(
+            BenchmarkId::new("btree_vec/notify_all", waiter_count),
+            &waiter_count,
+            |bencher, &waiter_count| {
+                bencher.iter_batched_ref(
+                    || prepare_btree_waiters(waiter_count),
+                    |waiters| {
+                        // Consume every value just like the iterator case so
+                        // only the intermediate Vec allocation differs.
+                        for waiter in waiters.take_all_via_vec() {
+                            black_box(waiter);
+                        }
+                    },
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+        group.bench_with_input(
             BenchmarkId::new("btree/notify_all", waiter_count),
             &waiter_count,
             |bencher, &waiter_count| {
                 bencher.iter_batched_ref(
                     || prepare_btree_waiters(waiter_count),
-                    |waiters| black_box(waiters.take_all()),
+                    |waiters| {
+                        // Consume the owning iterator inside the timed routine
+                        // so moving iteration out of take_all cannot fake a
+                        // win.
+                        for waiter in waiters.take_all() {
+                            black_box(waiter);
+                        }
+                    },
                     BatchSize::SmallInput,
                 );
             },

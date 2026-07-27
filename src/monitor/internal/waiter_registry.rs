@@ -7,7 +7,10 @@
 // =============================================================================
 //! Maintains FIFO selection for active Monitor waiters.
 
-use std::collections::BTreeMap;
+use std::collections::{
+    BTreeMap,
+    btree_map::IntoValues,
+};
 
 /// Mutable registry of waiters eligible for one memoryless notification.
 ///
@@ -80,10 +83,12 @@ impl<W> WaiterRegistry<W> {
     ///
     /// # Returns
     ///
-    /// All waiters active when this method was called.
+    /// An owning iterator over all waiters active when this method was called.
     #[inline]
-    pub(crate) fn take_all(&mut self) -> Vec<W> {
-        std::mem::take(&mut self.waiters).into_values().collect()
+    pub(crate) fn take_all(&mut self) -> IntoValues<u64, W> {
+        // Moving the tree into its owning iterator lets notification release
+        // the registry lock without allocating or copying a second collection.
+        std::mem::take(&mut self.waiters).into_values()
     }
 
     /// Removes the waiter registered with `waiter_id`.
