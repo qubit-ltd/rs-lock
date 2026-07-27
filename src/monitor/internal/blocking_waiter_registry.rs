@@ -7,16 +7,17 @@
 // =============================================================================
 //! Stores active blocking Monitor waiters with memoryless notification.
 
-use std::sync::{
-    Arc,
-    Mutex,
-};
+use std::sync::Arc;
 use std::task::Wake;
 
 use super::{
     BlockingConditionWaiter,
     BlockingWaiterRegistration,
     WaiterRegistry,
+    sync::{
+        Mutex,
+        recover,
+    },
 };
 
 /// Registry of blocking waiters eligible for current notifications.
@@ -52,21 +53,14 @@ impl BlockingWaiterRegistry {
         &self,
     ) -> BlockingWaiterRegistration<'_> {
         let waiter = Arc::new(BlockingConditionWaiter::new());
-        let waiter_id = self
-            .waiters
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .register(Arc::clone(&waiter));
+        let waiter_id =
+            recover(self.waiters.lock()).register(Arc::clone(&waiter));
         BlockingWaiterRegistration::new(self, waiter_id, waiter)
     }
 
     /// Selects and signals at most one currently registered waiter.
     pub(in crate::monitor) fn notify_one(&self) {
-        let waiter = self
-            .waiters
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .take_one();
+        let waiter = recover(self.waiters.lock()).take_one();
         if let Some(waiter) = waiter {
             Wake::wake(waiter);
         }
@@ -75,10 +69,7 @@ impl BlockingWaiterRegistry {
     /// Selects and signals every currently registered waiter.
     pub(in crate::monitor) fn notify_all(&self) {
         let waiters = {
-            let mut registry = self
-                .waiters
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let mut registry = recover(self.waiters.lock());
             registry.take_all()
         };
         for waiter in waiters {
@@ -92,11 +83,7 @@ impl BlockingWaiterRegistry {
     ///
     /// * `waiter_id` - Stable registration identifier to remove.
     pub(super) fn unregister(&self, waiter_id: u64) {
-        let waiter = self
-            .waiters
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .unregister(waiter_id);
+        let waiter = recover(self.waiters.lock()).unregister(waiter_id);
         drop(waiter);
     }
 }

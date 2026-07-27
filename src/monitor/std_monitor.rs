@@ -25,10 +25,7 @@ use qubit_clock::{
     Timer,
 };
 use std::{
-    sync::{
-        Arc,
-        Mutex,
-    },
+    sync::Arc,
     time::Duration,
 };
 
@@ -41,6 +38,10 @@ use super::{
     internal::{
         BlockingWaiterRegistry,
         default_timer,
+        sync::{
+            Mutex,
+            recover,
+        },
     },
     wait_timeout_result::WaitTimeoutResult,
 };
@@ -217,12 +218,7 @@ impl<T> StdMonitor<T> {
     /// ```
     #[inline]
     pub fn lock(&self) -> StdMonitorGuard<'_, T> {
-        StdMonitorGuard::new(
-            self,
-            self.state
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner),
-        )
+        StdMonitorGuard::new(self, recover(self.state.lock()))
     }
 
     /// Acquires the monitor and reads the protected state.

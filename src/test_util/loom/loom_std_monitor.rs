@@ -5,10 +5,7 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-//! Loom-facing adapters over production monitor state machines.
+//! Exposes the production synchronous monitor to Loom models.
 
-mod loom_std_monitor;
-mod loom_waiter_registry;
-
-pub use loom_std_monitor::LoomStdMonitor;
-pub use loom_waiter_registry::LoomWaiterRegistry;
+/// Production synchronous monitor configured with Loom synchronization.
+pub type LoomStdMonitor<T> = crate::monitor::StdMonitor<T>;

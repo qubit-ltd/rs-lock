@@ -7,11 +7,7 @@
 // =============================================================================
 //! Defines one latched blocking condition waiter and Timer waker.
 
-use std::sync::{
-    Arc,
-    Condvar,
-    Mutex,
-};
+use std::sync::Arc;
 use std::task::{
     Context,
     Poll,
@@ -24,7 +20,14 @@ use qubit_clock::{
     TimerFuture,
 };
 
-use super::blocking_condition_waiter_state::BlockingConditionWaiterState;
+use super::{
+    blocking_condition_waiter_state::BlockingConditionWaiterState,
+    sync::{
+        Condvar,
+        Mutex,
+        recover,
+    },
+};
 
 /// Private signal shared by monitor notification and a TimerFuture Waker.
 pub(in crate::monitor) struct BlockingConditionWaiter {
@@ -42,7 +45,7 @@ impl BlockingConditionWaiter {
     /// A waiter ready for registry insertion and Timer polling.
     #[must_use]
     #[inline]
-    pub(in crate::monitor) const fn new() -> Self {
+    pub(in crate::monitor) fn new() -> Self {
         Self {
             state: Mutex::new(BlockingConditionWaiterState {
                 signalled: false,
@@ -78,25 +81,16 @@ impl BlockingConditionWaiter {
     /// Blocks until monitor notification or the Timer Waker signals this
     /// waiter.
     pub(in crate::monitor) fn wait(&self) {
-        let mut state = self
-            .state
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut state = recover(self.state.lock());
         while !state.signalled {
-            state = self
-                .changed
-                .wait(state)
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            state = recover(self.changed.wait(state));
         }
     }
 
     /// Latches one signal and unparks the blocking thread.
     #[inline]
     fn signal(&self) {
-        let mut state = self
-            .state
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut state = recover(self.state.lock());
         state.signalled = true;
         self.changed.notify_one();
     }
