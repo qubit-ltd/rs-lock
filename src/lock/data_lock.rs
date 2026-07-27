@@ -223,6 +223,11 @@ pub trait DataLock<T: ?Sized>: Send + Sync {
     /// immediately. Returns [`TryLockError::Poisoned`] for standard-library
     /// locks that were poisoned by a panic.
     ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f` when the lock is acquired. On
+    /// standard-library implementations, that panic may poison the lock.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -262,6 +267,11 @@ pub trait DataLock<T: ?Sized>: Send + Sync {
     /// Returns [`TryLockError::WouldBlock`] when the lock cannot be acquired
     /// immediately. Returns [`TryLockError::Poisoned`] for standard-library
     /// locks that were poisoned by a panic.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f` when the lock is acquired. On
+    /// standard-library implementations, that panic may poison the lock.
     ///
     /// # Examples
     ///
@@ -388,7 +398,8 @@ impl<T: ?Sized + Send> DataLock<T> for Mutex<T> {
     ///
     /// # Panics
     ///
-    /// Panics if the mutex is poisoned.
+    /// Panics if the mutex is poisoned or `f` panics. A panic from `f` may
+    /// poison the mutex.
     #[inline]
     fn with_read<R, F>(&self, f: F) -> R
     where
@@ -410,7 +421,8 @@ impl<T: ?Sized + Send> DataLock<T> for Mutex<T> {
     ///
     /// # Panics
     ///
-    /// Panics if the mutex is poisoned.
+    /// Panics if the mutex is poisoned or `f` panics. A panic from `f` may
+    /// poison the mutex.
     #[inline]
     fn with_write<R, F>(&self, f: F) -> R
     where
@@ -434,6 +446,11 @@ impl<T: ?Sized + Send> DataLock<T> for Mutex<T> {
     ///
     /// Returns [`TryLockError::WouldBlock`] when the mutex is held by another
     /// thread, or [`TryLockError::Poisoned`] when the mutex is poisoned.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f` when the mutex is acquired. That panic may
+    /// poison the mutex.
     #[inline]
     fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -464,6 +481,11 @@ impl<T: ?Sized + Send> DataLock<T> for Mutex<T> {
     ///
     /// Returns [`TryLockError::WouldBlock`] when the mutex is held by another
     /// thread, or [`TryLockError::Poisoned`] when the mutex is poisoned.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f` when the mutex is acquired. That panic may
+    /// poison the mutex.
     #[inline]
     fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -504,7 +526,7 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for RwLock<T> {
     ///
     /// # Panics
     ///
-    /// Panics if the read-write lock is poisoned.
+    /// Panics if the read-write lock is poisoned or `f` panics.
     #[inline]
     fn with_read<R, F>(&self, f: F) -> R
     where
@@ -526,7 +548,8 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for RwLock<T> {
     ///
     /// # Panics
     ///
-    /// Panics if the read-write lock is poisoned.
+    /// Panics if the read-write lock is poisoned or `f` panics. A panic from
+    /// `f` may poison the lock.
     #[inline]
     fn with_write<R, F>(&self, f: F) -> R
     where
@@ -550,6 +573,10 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for RwLock<T> {
     ///
     /// Returns [`TryLockError::WouldBlock`] when the lock is unavailable, or
     /// [`TryLockError::Poisoned`] when the lock is poisoned.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f` when the read lock is acquired.
     #[inline]
     fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -580,6 +607,11 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for RwLock<T> {
     ///
     /// Returns [`TryLockError::WouldBlock`] when the lock is unavailable, or
     /// [`TryLockError::Poisoned`] when the lock is poisoned.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f` when the write lock is acquired. That panic
+    /// may poison the read-write lock.
     #[inline]
     fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -597,24 +629,15 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for RwLock<T> {
     }
 }
 
-/// High-performance synchronous mutex implementation of the DataLock trait
+/// parking_lot-backed synchronous mutex implementation of the DataLock trait
 ///
 /// This implementation uses the `parking_lot` crate's `Mutex` type to provide
-/// a high-performance synchronous lock. Both read and write operations acquire
-/// the same exclusive lock, ensuring thread safety with better performance
-/// than the standard library's Mutex.
+/// a synchronous non-poisoning lock. Both read and write operations acquire
+/// the same exclusive lock.
 ///
 /// # Type Parameters
 ///
 /// * `T` - The type of data protected by the lock
-///
-/// # Performance Characteristics
-///
-/// The parking_lot Mutex is generally faster than std::sync::Mutex due to:
-/// - More efficient lock acquisition and release
-/// - Better handling of contended locks
-/// - Reduced memory overhead
-/// - No risk of lock poisoning (panics don't poison the lock)
 #[cfg(feature = "parking-lot")]
 impl<T: ?Sized + Send> DataLock<T> for ParkingLotMutex<T> {
     /// Acquires the parking_lot mutex and executes a read-only closure.
@@ -626,6 +649,10 @@ impl<T: ?Sized + Send> DataLock<T> for ParkingLotMutex<T> {
     /// # Returns
     ///
     /// The value returned by `f`.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f`. parking_lot mutexes are not poisoned.
     #[inline]
     fn with_read<R, F>(&self, f: F) -> R
     where
@@ -644,6 +671,10 @@ impl<T: ?Sized + Send> DataLock<T> for ParkingLotMutex<T> {
     /// # Returns
     ///
     /// The value returned by `f`.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f`. parking_lot mutexes are not poisoned.
     #[inline]
     fn with_write<R, F>(&self, f: F) -> R
     where
@@ -667,6 +698,11 @@ impl<T: ?Sized + Send> DataLock<T> for ParkingLotMutex<T> {
     ///
     /// Returns [`TryLockError::WouldBlock`] when the mutex is held by another
     /// thread. parking_lot mutexes are not poisoned.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f` when the mutex is acquired. parking_lot
+    /// mutexes are not poisoned.
     #[inline]
     fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -691,6 +727,11 @@ impl<T: ?Sized + Send> DataLock<T> for ParkingLotMutex<T> {
     ///
     /// Returns [`TryLockError::WouldBlock`] when the mutex is held by another
     /// thread. parking_lot mutexes are not poisoned.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f` when the mutex is acquired. parking_lot
+    /// mutexes are not poisoned.
     #[inline]
     fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -702,8 +743,8 @@ impl<T: ?Sized + Send> DataLock<T> for ParkingLotMutex<T> {
     }
 }
 
-/// High-performance synchronous read-write lock implementation of the DataLock
-/// trait.
+/// parking_lot-backed synchronous read-write lock implementation of the
+/// DataLock trait.
 ///
 /// This implementation uses the `parking_lot` crate's `RwLock` type to provide
 /// a non-poisoning read-write lock. Read operations use shared locks allowing
@@ -723,6 +764,11 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for ParkingLotRwLock<T> {
     /// # Returns
     ///
     /// The value returned by `f`.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f`. parking_lot read-write locks are not
+    /// poisoned.
     #[inline]
     fn with_read<R, F>(&self, f: F) -> R
     where
@@ -741,6 +787,11 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for ParkingLotRwLock<T> {
     /// # Returns
     ///
     /// The value returned by `f`.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f`. parking_lot read-write locks are not
+    /// poisoned.
     #[inline]
     fn with_write<R, F>(&self, f: F) -> R
     where
@@ -764,6 +815,11 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for ParkingLotRwLock<T> {
     ///
     /// Returns [`TryLockError::WouldBlock`] when the lock is unavailable.
     /// parking_lot read-write locks are not poisoned.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f` when the read lock is acquired. parking_lot
+    /// read-write locks are not poisoned.
     #[inline]
     fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -788,6 +844,11 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for ParkingLotRwLock<T> {
     ///
     /// Returns [`TryLockError::WouldBlock`] when the lock is unavailable.
     /// parking_lot read-write locks are not poisoned.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f` when the write lock is acquired. parking_lot
+    /// read-write locks are not poisoned.
     #[inline]
     fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where

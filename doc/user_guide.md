@@ -143,6 +143,8 @@ fn main() {
 Keep the closure short. The lock remains held until the closure returns.
 Standard-library implementations panic on blocking acquisition if the lock is
 poisoned; the `try_*` methods report `TryLockError::Poisoned`.
+Any callback panic propagates. With standard-library locks, it may also poison
+the lock; parking_lot locks are not poisoned.
 
 ### `Lock` and `ExclusiveLock`
 
@@ -249,6 +251,7 @@ async fn main() {
 
 Do not perform blocking I/O or await another future inside the closure. The
 closure itself is synchronous and the lock stays held until it returns.
+Any callback panic propagates; Tokio locks are not poisoned.
 
 ### `AsyncLock`, `AsyncReadWriteLock`, `AsyncReadLock`, and `AsyncWriteLock`
 
@@ -434,6 +437,10 @@ runtime context; the timer still belongs to the captured or injected runtime.
 sent when no waiter is registered has no future effect. `notify_all` affects
 the currently registered waiters. Neither operation makes a predicate true or
 guarantees fairness.
+
+Predicates and callbacks execute while the monitor state lock is held. Their
+panics propagate. If a callback passed to `with_write_notify_*` panics, the
+monitor sends no notification.
 
 A wakeup, including a spurious wakeup, only causes another locked predicate
 check. Always store readiness in state and let the predicate inspect it.

@@ -35,6 +35,10 @@ pub trait Monitor: Notifier + ConditionWaiter {
     /// # Returns
     ///
     /// The value returned by `f`.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f` after the monitor lock is released.
     fn with_read<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&Self::State) -> R;
@@ -50,6 +54,10 @@ pub trait Monitor: Notifier + ConditionWaiter {
     /// # Returns
     ///
     /// The value returned by `f`.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f` after the monitor lock is released.
     fn with_write<R, F>(&self, f: F) -> R
     where
         F: FnOnce(&mut Self::State) -> R;
