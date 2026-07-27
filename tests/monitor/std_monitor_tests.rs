@@ -477,10 +477,8 @@ fn test_std_monitor_timed_predicate_wait_propagates_timer_error() {
 
 #[test]
 fn test_std_monitor_ready_predicate_skips_timer_registration() {
-    let monitor = StdMonitor::with_timer(
-        true,
-        Arc::new(registration_failing_timer()),
-    );
+    let monitor =
+        StdMonitor::with_timer(true, Arc::new(registration_failing_timer()));
 
     let result = monitor.wait_until_for(Duration::MAX, |ready| *ready, |_| 7);
 
