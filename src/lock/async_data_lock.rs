@@ -130,6 +130,11 @@ pub trait AsyncDataLock<T: ?Sized>: Send + Sync {
     ///
     /// Returns a future that resolves to the result produced by the closure
     ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `f` after it acquires the
+    /// lock. Tokio locks are not poisoned.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -189,6 +194,11 @@ pub trait AsyncDataLock<T: ?Sized>: Send + Sync {
     ///
     /// Returns a future that resolves to the result produced by the closure
     ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `f` after it acquires the
+    /// lock. Tokio locks are not poisoned.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -241,6 +251,11 @@ pub trait AsyncDataLock<T: ?Sized>: Send + Sync {
     /// acquired immediately. Tokio locks are not poisoned, so this method does
     /// not return [`TryLockError::Poisoned`].
     ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f` when the lock is acquired. Tokio locks are
+    /// not poisoned.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -280,6 +295,11 @@ pub trait AsyncDataLock<T: ?Sized>: Send + Sync {
     /// Returns [`TryLockError::WouldBlock`] when the async lock cannot be
     /// acquired immediately. Tokio locks are not poisoned, so this method does
     /// not return [`TryLockError::Poisoned`].
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f` when the lock is acquired. Tokio locks are
+    /// not poisoned.
     ///
     /// # Examples
     ///
@@ -408,6 +428,11 @@ impl<T: ?Sized + Send> AsyncDataLock<T> for AsyncMutex<T> {
     /// # Returns
     ///
     /// A future resolving to the value returned by `f`.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `f`. Tokio mutexes are not
+    /// poisoned.
     #[inline]
     async fn with_read<R, F>(&self, f: F) -> R
     where
@@ -427,6 +452,11 @@ impl<T: ?Sized + Send> AsyncDataLock<T> for AsyncMutex<T> {
     /// # Returns
     ///
     /// A future resolving to the value returned by `f`.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `f`. Tokio mutexes are not
+    /// poisoned.
     #[inline]
     async fn with_write<R, F>(&self, f: F) -> R
     where
@@ -447,6 +477,11 @@ impl<T: ?Sized + Send> AsyncDataLock<T> for AsyncMutex<T> {
     ///
     /// `Ok(result)` if the mutex is acquired, or
     /// [`TryLockError::WouldBlock`] if it is busy.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f` when the mutex is acquired. Tokio mutexes
+    /// are not poisoned.
     #[inline]
     fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -467,6 +502,11 @@ impl<T: ?Sized + Send> AsyncDataLock<T> for AsyncMutex<T> {
     ///
     /// `Ok(result)` if the mutex is acquired, or
     /// [`TryLockError::WouldBlock`] if it is busy.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f` when the mutex is acquired. Tokio mutexes
+    /// are not poisoned.
     #[inline]
     fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -499,6 +539,11 @@ impl<T: ?Sized + Send + Sync> AsyncDataLock<T> for AsyncRwLock<T> {
     /// # Returns
     ///
     /// A future resolving to the value returned by `f`.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `f`. Tokio read-write locks
+    /// are not poisoned.
     #[inline]
     async fn with_read<R, F>(&self, f: F) -> R
     where
@@ -518,6 +563,11 @@ impl<T: ?Sized + Send + Sync> AsyncDataLock<T> for AsyncRwLock<T> {
     /// # Returns
     ///
     /// A future resolving to the value returned by `f`.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `f`. Tokio read-write locks
+    /// are not poisoned.
     #[inline]
     async fn with_write<R, F>(&self, f: F) -> R
     where
@@ -539,6 +589,11 @@ impl<T: ?Sized + Send + Sync> AsyncDataLock<T> for AsyncRwLock<T> {
     ///
     /// `Ok(result)` if a read lock is acquired, or
     /// [`TryLockError::WouldBlock`] if it is busy.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f` when the read lock is acquired. Tokio
+    /// read-write locks are not poisoned.
     #[inline]
     fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -560,6 +615,11 @@ impl<T: ?Sized + Send + Sync> AsyncDataLock<T> for AsyncRwLock<T> {
     ///
     /// `Ok(result)` if a write lock is acquired, or
     /// [`TryLockError::WouldBlock`] if it is busy.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f` when the write lock is acquired. Tokio
+    /// read-write locks are not poisoned.
     #[inline]
     fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where

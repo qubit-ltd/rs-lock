@@ -130,6 +130,7 @@ fn main() {
 
 闭包应保持简短；锁会一直持有到闭包返回。标准库实现遇到 poisoned lock 时会在阻塞式
 获取中 panic；`try_*` 方法则返回 `TryLockError::Poisoned`。
+所有回调 panic 都会向上传播。对于标准库锁，它还可能使锁中毒；parking_lot 锁不会中毒。
 
 ### `Lock` 与 `ExclusiveLock`
 
@@ -231,6 +232,7 @@ async fn main() {
 
 不要在闭包中执行阻塞 I/O，也不能在闭包中 await 另一个 future。闭包本身是同步的，
 锁会一直持有到闭包返回。
+所有回调 panic 都会向上传播；Tokio 锁不会中毒。
 
 ### `AsyncLock`、`AsyncReadWriteLock`、`AsyncReadLock` 与 `AsyncWriteLock`
 
@@ -408,6 +410,9 @@ runtime。
 `notify_one` 最多选择一个已经注册的 waiter。没有 waiter 注册时发送的 notification
 对未来没有影响。`notify_all` 影响当前已经注册的 waiter。两者都不会使 predicate
 自动变为 true，也不保证公平性。
+
+predicate 和回调都在持有 monitor 状态锁时执行；它们的 panic 会向上传播。
+传给 `with_write_notify_*` 的回调如果 panic，monitor 不会发送 notification。
 
 包括虚假唤醒在内的 wakeup 只会触发下一次持锁 predicate 检查。应把就绪状态存入
 受保护数据，并让 predicate 检查它。

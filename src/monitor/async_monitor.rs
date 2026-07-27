@@ -28,6 +28,19 @@ use crate::monitor::{
 /// complete contract is unnecessary.
 pub trait AsyncMonitor: Notifier + AsyncConditionWaiter + Sync {
     /// Acquires the monitor and reads the protected state.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure receiving immutable access to the protected state.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to the value returned by `f`.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `f` after the state lock is
+    /// released.
     fn with_read_async<'a, R, F>(
         &'a self,
         f: F,
@@ -39,6 +52,19 @@ pub trait AsyncMonitor: Notifier + AsyncConditionWaiter + Sync {
     /// Acquires the monitor and mutates the protected state.
     ///
     /// This method does not notify waiters automatically.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure receiving mutable access to the protected state.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to the value returned by `f`.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `f` after the state lock is
+    /// released.
     fn with_write_async<'a, R, F>(
         &'a self,
         f: F,
@@ -50,6 +76,19 @@ pub trait AsyncMonitor: Notifier + AsyncConditionWaiter + Sync {
     /// Mutates the protected state and wakes one waiter.
     ///
     /// The state lock is released before notification. If `f` panics, no
+    /// notification is sent.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure receiving mutable access to the protected state.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to the value returned by `f`.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `f`. In that case no
     /// notification is sent.
     #[inline]
     fn with_write_notify_one_async<'a, R, F>(
@@ -70,6 +109,19 @@ pub trait AsyncMonitor: Notifier + AsyncConditionWaiter + Sync {
     /// Mutates the protected state and wakes all waiters.
     ///
     /// The state lock is released before notification. If `f` panics, no
+    /// notification is sent.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure receiving mutable access to the protected state.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to the value returned by `f`.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `f`. In that case no
     /// notification is sent.
     #[inline]
     fn with_write_notify_all_async<'a, R, F>(

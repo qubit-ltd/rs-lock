@@ -192,6 +192,10 @@ impl<T> TokioMonitor<T> {
     /// # Returns
     ///
     /// The value returned by the closure.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f`.
     #[inline]
     pub async fn with_write_async<R, F>(&self, f: F) -> R
     where
