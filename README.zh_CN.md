@@ -87,6 +87,14 @@ qubit-lock = { version = "0.11", default-features = false, features = ["async-mo
 如果应用创建 Tokio runtime，应在应用自己的 `Cargo.toml` 中启用所需的 runtime
 Feature。
 
+## 条件等待语义
+
+计时 monitor 等待与 `std::sync::Condvar::wait_timeout_while` 对齐。timeout 是条件
+等待预算：取得状态锁后、首次 predicate 检查前，monitor 会采样一个固定 deadline。
+初始获取锁不计入预算，predicate 检查会消耗预算，并且重新获取状态锁时可能在 timeout
+后返回。零时长、错误、取消和整个调用 deadline 的语义请参阅
+[英文用户手册](doc/user_guide.md) 或 [中文用户手册](doc/user_guide.zh_CN.md)。
+
 ## 项目结构
 
 - `src/lock`：锁 trait 与原生锁 adapter。

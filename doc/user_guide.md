@@ -534,21 +534,31 @@ async fn main() {
 
 ### Timeout budget
 
-A relative timeout is the condition-wait budget. Initial state-lock contention
-and the initial predicate check are excluded. If the predicate is not ready,
-the monitor establishes one fixed deadline immediately before the first wait
-and reuses it across wakeups.
+A relative timeout is a condition-wait budget, aligned with
+`std::sync::Condvar::wait_timeout_while`. It is not a hard deadline for the
+whole method call: initial state-lock contention is excluded, and the action
+after readiness is excluded.
+
+After acquiring the state lock and before the first predicate check, the
+monitor samples the start time and derives one fixed absolute deadline. The
+first predicate check, every later predicate check, waiter registration, and
+all waiting consume this budget. Notifications and spurious wakeups never
+restart it. A timed wait may return after the timeout while reacquiring the
+state lock, exactly as a condition variable does.
 
 A zero timeout still performs the initial predicate check. At the deadline, a
 final predicate check under the lock wins over a successful timer completion.
 Timer registration or completion errors take precedence over post-wait
-readiness, and the action is not run.
+readiness, and the action is not run. If an application needs a whole-call
+deadline, it must sample its own absolute deadline at the business-operation
+entry point and pass the remaining budget to each wait.
 
 Async wait futures are lazy: time before the first poll does not consume the
-budget. Dropping a pending future unregisters its waiter and does not run the
-action. Cancellation does not roll back protected-state changes made by other
-tasks. If `notify_one` already selected that waiter, cancellation discards the
-selection; it is not transferred to another or future waiter.
+budget, and initial async state-lock contention is excluded. Dropping a
+pending future unregisters its waiter and does not run the action. Cancellation
+does not roll back protected-state changes made by other tasks. If `notify_one`
+already selected that waiter, cancellation discards the selection; it is not
+transferred to another or future waiter.
 
 ## 8. Wait results and errors
 

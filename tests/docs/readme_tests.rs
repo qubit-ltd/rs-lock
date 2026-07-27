@@ -157,10 +157,18 @@ fn test_readme_documents_monitor_capability_split() {
 fn test_readme_documents_monitor_wait_semantics() {
     let guide_en = normalize_readme_text(USER_GUIDE_EN);
     let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
+    let readme_en = normalize_readme_text(README_EN);
+    let readme_zh = normalize_readme_text(README_ZH);
     assert!(guide_en.contains("Notifications are memoryless"));
     assert!(guide_en.contains("already registered waiter"));
     assert!(guide_en.contains("condition-wait budget"));
-    assert!(guide_en.contains("one fixed deadline"));
+    assert!(guide_en.contains(
+        "After acquiring the state lock and before the first predicate check,"
+    ));
+    assert!(guide_en.contains(
+        "may return after the timeout while reacquiring the state lock"
+    ));
+    assert!(guide_en.contains("one fixed absolute deadline"));
     assert!(guide_en.contains("A zero timeout still performs"));
     assert!(guide_en.contains("final predicate check under the lock wins"));
     assert!(
@@ -172,11 +180,17 @@ fn test_readme_documents_monitor_wait_semantics() {
     assert!(guide_zh.contains("Notification 是无记忆的"));
     assert!(guide_zh.contains("已经注册的 waiter"));
     assert!(guide_zh.contains("条件等待预算"));
-    assert!(guide_zh.contains("固定 deadline"));
+    assert!(guide_zh.contains("取得状态锁后、首次 predicate 检查前"));
+    assert!(guide_zh.contains("和条件变量一样，重新获取"));
+    assert!(guide_zh.contains("状态锁时可能在 timeout 后返回"));
+    assert!(guide_zh.contains("固定的 绝对 deadline"));
     assert!(guide_zh.contains("零时长 timeout 仍会执行初始 predicate 检查"));
     assert!(guide_zh.contains("最后一次持锁 predicate 检查优先"));
     assert!(guide_zh.contains("Timer 注册或完成错误优先"));
     assert!(guide_zh.contains("不会执行 action"));
+    for readme in [readme_en, readme_zh] {
+        assert!(readme.contains("std::sync::Condvar::wait_timeout_while"));
+    }
 }
 
 #[test]
@@ -321,9 +335,7 @@ fn test_monitor_docs_cover_callback_and_constructor_panics() {
         ARC_STD_MONITOR_SRC,
     ] {
         assert!(
-            source.contains(
-                "Panics if all process-wide clock-domain identifiers are exhausted."
-            ),
+            source.contains("Panics if all process-wide clock-domain identifiers are exhausted."),
             "default Timer constructors must describe clock-domain exhaustion",
         );
     }
