@@ -96,6 +96,17 @@ qubit-lock = { version = "0.11", default-features = false, features = ["async-mo
 If the application creates a Tokio runtime, enable its required runtime
 features in the application's own `Cargo.toml`.
 
+## Condition-wait semantics
+
+Timed monitor waits align with `std::sync::Condvar::wait_timeout_while`.
+Their timeout is a condition-wait budget: after acquiring the state lock and
+before the first predicate check, the monitor samples one fixed deadline. The
+initial lock acquisition is excluded, predicate checks consume the budget, and
+the method may return after the timeout while reacquiring the state lock. See
+the [English user guide](doc/user_guide.md) or
+[中文用户手册](doc/user_guide.zh_CN.md) for zero-timeout, error, cancellation,
+and whole-call-deadline semantics.
+
 ## Project layout
 
 - `src/lock`: lock traits and native lock adapters.

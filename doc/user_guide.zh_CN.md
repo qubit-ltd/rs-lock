@@ -500,18 +500,24 @@ async fn main() {
 
 ### Timeout 预算
 
-相对 timeout 是条件等待预算。初始状态锁竞争和第一次 predicate 检查不计入预算。
-如果 predicate 尚未就绪，monitor 会在第一次等待前立即建立固定 deadline，并在后续
-唤醒中复用。
+相对 timeout 是条件等待预算，与 `std::sync::Condvar::wait_timeout_while`
+对齐。它不是整个方法调用的硬性 deadline：初始状态锁竞争不计入预算，predicate
+就绪之后执行的 action 也不计入预算。
+
+取得状态锁后、首次 predicate 检查前，monitor 会采样起始时间并推导出一个固定的
+绝对 deadline。第一次和之后的每次 predicate 检查、waiter 注册以及全部等待时间都会
+消耗这份预算；notification 与虚假唤醒都不会重新开始计时。和条件变量一样，重新获取
+状态锁时可能在 timeout 后返回。
 
 零时长 timeout 仍会执行初始 predicate 检查。到达 deadline 后，最后一次持锁
 predicate 检查优先于成功的 Timer 完成。Timer 注册或完成错误优先于等待后的就绪结果，
-并且不会执行 action。
+并且不会执行 action。如果应用需要整个调用的 deadline，必须在业务操作入口自行采样
+绝对 deadline，并将每次等待的剩余预算传入。
 
-异步等待 future 是惰性的：首次 poll 前的时间不消耗预算。drop pending future 会注销
-其 waiter，也不会执行 action。取消不会回滚受保护状态的变化，包括其他任务已经完成的
-修改。如果 `notify_one` 已经选择该 waiter，取消会丢弃这次选择，不会转交给其他或
-未来 waiter。
+异步等待 future 是惰性的：首次 poll 前的时间不消耗预算，初始异步状态锁竞争也不
+计入预算。drop pending future 会注销其 waiter，也不会执行 action。取消不会回滚受保护状态的变化，
+包括其他任务已经完成的修改。如果 `notify_one` 已经选择该 waiter，
+取消会丢弃这次选择，不会转交给其他或未来 waiter。
 
 ## 8. 等待结果与错误
 
