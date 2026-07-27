@@ -293,8 +293,8 @@ Use the capability traits at generic API boundaries:
 | `Monitor` | State access, notification, and untimed synchronous waits |
 | `TimedMonitor` | `Monitor` plus timed synchronous waits |
 | `SharedMonitor` | A cloneable shared synchronous monitor handle |
-| `AsyncConditionWaiter` | Asynchronous untimed predicate waits |
-| `AsyncTimeoutConditionWaiter` | Asynchronous timed predicate waits |
+| `AsyncConditionWaiter` | Asynchronous `wait_until_async`, action-free `wait_until_ready_async`, and `wait_while_async` |
+| `AsyncTimeoutConditionWaiter` | Asynchronous `wait_until_for_async`, action-free `wait_until_ready_for_async`, and `wait_while_for_async` |
 | `AsyncMonitor` | Async state access, notification, and untimed waits |
 | `AsyncTimedMonitor` | `AsyncMonitor` plus timed waits |
 | `SharedAsyncMonitor` | A cloneable shared asynchronous monitor handle |
@@ -410,7 +410,8 @@ ownership and `ArcTokioMonitor<T>` for cloneable shared ownership.
 - `with_read_async`, `with_write_async`, and the combined
   `with_write_notify_*_async` methods access state.
 - `wait_until_async` / `wait_while_async` and their `_for_async` variants wait
-  on predicates.
+  on predicates; `wait_until_ready_async` and
+  `wait_until_ready_for_async` provide action-free forms.
 
 ```rust
 use qubit_lock::{ArcTokioMonitor, AsyncConditionWaiter};
@@ -515,10 +516,9 @@ async fn main() {
 
     let waiter = tokio::spawn(async move {
         waiter_monitor
-            .wait_until_async(
-                |_| waiter_ready.load(Ordering::Acquire),
-                |_| (),
-            )
+            .wait_until_ready_async(|_| {
+                waiter_ready.load(Ordering::Acquire)
+            })
             .await;
     });
 

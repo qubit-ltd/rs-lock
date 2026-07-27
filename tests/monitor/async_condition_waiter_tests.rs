@@ -20,8 +20,18 @@ where
     waiter.wait_until_async(|ready| *ready, |_| 7).await
 }
 
+/// Runs an immediately ready action-free async wait through a generic
+/// capability bound.
+async fn wait_until_ready_through_trait<W>(waiter: &W)
+where
+    W: AsyncConditionWaiter<State = bool>,
+{
+    waiter.wait_until_ready_async(|ready| *ready).await;
+}
+
 #[tokio::test]
 /// Verifies a Tokio monitor satisfies [`AsyncConditionWaiter`].
 async fn test_async_condition_waiter_trait_accepts_tokio_monitor() {
     assert_eq!(wait_through_trait(&TokioMonitor::current(true)).await, 7);
+    wait_until_ready_through_trait(&TokioMonitor::current(true)).await;
 }

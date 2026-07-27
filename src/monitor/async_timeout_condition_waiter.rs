@@ -93,6 +93,47 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
         )
     }
 
+    /// Returns a future that waits until the predicate becomes true or times
+    /// out.
+    ///
+    /// This convenience method does not run an action after the predicate
+    /// becomes true. Its timeout budget, laziness, cancellation, and
+    /// deadline-boundary semantics are identical to
+    /// [`Self::wait_until_for_async`].
+    ///
+    /// # Parameters
+    ///
+    /// * `timeout` - Relative condition-wait budget.
+    /// * `predicate` - Predicate that returns `true` when the state is ready.
+    ///
+    /// # Returns
+    ///
+    /// A lazy future that resolves to [`WaitTimeoutResult::Ready`] with `()`
+    /// when the predicate becomes true, or [`WaitTimeoutResult::TimedOut`] when
+    /// the condition-wait budget expires.
+    ///
+    /// # Errors
+    ///
+    /// The future resolves to Timer registration or completion errors rather
+    /// than reporting them as timeouts. After waiting begins, such an error
+    /// takes precedence over a post-wait ready predicate.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `predicate` when it is
+    /// polled.
+    #[inline(always)]
+    fn wait_until_ready_for_async<'a, P>(
+        &'a self,
+        timeout: Duration,
+        predicate: P,
+    ) -> impl Future<Output = Result<WaitTimeoutResult<()>, TimeError>> + Send + 'a
+    where
+        P: FnMut(&Self::State) -> bool + Send + 'a,
+    {
+        self.wait_until_for_async(timeout, predicate, |_| ())
+    }
+
     /// Returns a future that waits while the predicate remains true or times
     /// out.
     ///
