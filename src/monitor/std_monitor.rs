@@ -40,6 +40,8 @@ use super::{
         default_timer,
         sync::{
             Mutex,
+            clear_poison,
+            is_poisoned,
             recover,
         },
     },
@@ -201,7 +203,7 @@ impl<T> StdMonitor<T> {
     #[must_use]
     #[inline(always)]
     pub fn is_poisoned(&self) -> bool {
-        self.state.is_poisoned()
+        is_poisoned(&self.state)
     }
 
     /// Clears the poison marker after protected state has been validated or
@@ -238,7 +240,7 @@ impl<T> StdMonitor<T> {
     /// ```
     #[inline(always)]
     pub fn clear_poison(&self) {
-        self.state.clear_poison();
+        clear_poison(&self.state);
     }
 
     /// Acquires the monitor and returns a guard for explicit state-machine

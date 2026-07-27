@@ -42,3 +42,36 @@ pub(in crate::monitor) use std::sync::{
 pub(in crate::monitor) fn recover<T>(result: LockResult<T>) -> T {
     result.unwrap_or_else(PoisonError::into_inner)
 }
+
+/// Reports whether the selected mutex backend records poisoning.
+///
+/// Loom's mutex intentionally does not model standard-library poisoning, so a
+/// Loom model build reports `false`. Normal builds delegate to
+/// [`std::sync::Mutex::is_poisoned`].
+#[cfg(all(loom, feature = "loom-model"))]
+#[inline(always)]
+pub(in crate::monitor) const fn is_poisoned<T>(_mutex: &Mutex<T>) -> bool {
+    false
+}
+
+/// Reports whether the selected mutex backend records poisoning.
+#[cfg(not(all(loom, feature = "loom-model")))]
+#[inline(always)]
+pub(in crate::monitor) fn is_poisoned<T>(mutex: &Mutex<T>) -> bool {
+    mutex.is_poisoned()
+}
+
+/// Clears poisoning when the selected mutex backend supports it.
+///
+/// Loom's mutex intentionally does not model standard-library poisoning, so
+/// this is a no-op in Loom model builds.
+#[cfg(all(loom, feature = "loom-model"))]
+#[inline(always)]
+pub(in crate::monitor) const fn clear_poison<T>(_mutex: &Mutex<T>) {}
+
+/// Clears poisoning when the selected mutex backend supports it.
+#[cfg(not(all(loom, feature = "loom-model")))]
+#[inline(always)]
+pub(in crate::monitor) fn clear_poison<T>(mutex: &Mutex<T>) {
+    mutex.clear_poison();
+}

@@ -19,6 +19,19 @@ use loom::{
 };
 use qubit_lock::test_util::loom::LoomStdMonitor;
 
+/// Verifies the public poison API remains available when Loom substitutes its
+/// non-poisoning mutex.
+#[test]
+fn test_loom_std_monitor_exposes_non_poisoning_status() {
+    loom::model(|| {
+        let monitor = LoomStdMonitor::new(());
+
+        assert!(!monitor.is_poisoned());
+        monitor.clear_poison();
+        assert!(!monitor.is_poisoned());
+    });
+}
+
 /// Models one registered waiter receiving a state-changing notification.
 #[test]
 fn test_loom_std_monitor_notify_one_releases_registered_waiter() {
