@@ -268,8 +268,8 @@ monitor 持有受保护状态，并使用 notification 协调 predicate wait。�
 | 组件 | 能力 |
 | --- | --- |
 | `Notifier` | 只提供 `notify_one` 和 `notify_all` |
-| `ConditionWaiter` | 同步 `wait_until` 和 `wait_while` |
-| `TimeoutConditionWaiter` | 同步 `wait_until_for` 和 `wait_while_for` |
+| `ConditionWaiter` | 同步 `wait_until`、`wait_until_ready` 和 `wait_while` |
+| `TimeoutConditionWaiter` | 同步 `wait_until_for`、`wait_until_ready_for` 和 `wait_while_for` |
 | `Monitor` | 状态访问、notification 和无时限同步等待 |
 | `TimedMonitor` | `Monitor` 加同步计时等待 |
 | `SharedMonitor` | 可克隆的同步共享 monitor 句柄 |
@@ -309,7 +309,7 @@ where
 - `new` 和 `with_timer`：构造 monitor。
 - `with_read` 和 `with_write`：访问状态。
 - `with_write_notify_one` 和 `with_write_notify_all`：执行常规的状态更新与通知协议。
-- `wait_until` / `wait_while` 及对应的 `_for` 计时版本。
+- `wait_until` / `wait_while`、无 action 的 `wait_until_ready` 及对应的 `_for` 计时版本。
 - `lock`：需要显式控制 guard 时使用。
 
 `Arc*` 包装器通过 `Deref` 访问内部 monitor。`from_arc`、`as_arc` 和 `into_arc`
@@ -441,10 +441,9 @@ fn main() {
     let waiter_monitor = monitor.clone();
 
     let waiter = thread::spawn(move || {
-        waiter_monitor.wait_until(
-            |_| waiter_ready.load(Ordering::Acquire),
-            |_| (),
-        );
+        waiter_monitor.wait_until_ready(|_| {
+            waiter_ready.load(Ordering::Acquire)
+        });
     });
 
     monitor.with_write_notify_all(|_| {
@@ -555,10 +554,9 @@ fn main() {
     let waiter_monitor = Arc::clone(&monitor);
 
     let waiter = thread::spawn(move || {
-        waiter_monitor.wait_until_for(
+        waiter_monitor.wait_until_ready_for(
             Duration::from_secs(16),
             |ready| *ready,
-            |_| (),
         )
     });
 

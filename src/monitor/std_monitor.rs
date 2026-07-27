@@ -531,6 +531,27 @@ impl<T> StdMonitor<T> {
         self.wait_while(|state| !ready(state), f)
     }
 
+    /// Waits until a predicate becomes true without changing the ready state.
+    ///
+    /// The predicate runs while the monitor lock is held. This convenience
+    /// method is equivalent to [`Self::wait_until`] with a no-op action.
+    ///
+    /// # Parameters
+    ///
+    /// * `ready` - Predicate that returns `true` when the caller may continue.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `ready`. Panics if the registry exhausts
+    /// registration identifiers.
+    #[inline(always)]
+    pub fn wait_until_ready<P>(&self, ready: P)
+    where
+        P: FnMut(&T) -> bool,
+    {
+        self.wait_until(ready, |_| ());
+    }
+
     /// Waits while a predicate remains true, with an overall time limit.
     ///
     /// This method is the timeout-aware form of [`Self::wait_while`]. It keeps
@@ -720,6 +741,46 @@ impl<T> StdMonitor<T> {
         F: FnOnce(&mut T) -> R,
     {
         self.wait_while_for(timeout, |state| !ready(state), f)
+    }
+
+    /// Waits until a predicate becomes true or a timeout expires without
+    /// changing the ready state.
+    ///
+    /// This convenience method is equivalent to [`Self::wait_until_for`] with
+    /// a no-op action. Its timeout budget and deadline-boundary semantics are
+    /// unchanged.
+    ///
+    /// # Parameters
+    ///
+    /// * `timeout` - Maximum total duration to wait.
+    /// * `ready` - Predicate that returns `true` when the caller may continue.
+    ///
+    /// # Returns
+    ///
+    /// [`WaitTimeoutResult::Ready`] with `()` when the predicate becomes true,
+    /// or [`WaitTimeoutResult::TimedOut`] when the Timer completes while the
+    /// predicate remains false on the deciding locked check.
+    ///
+    /// # Errors
+    ///
+    /// Returns Timer registration or completion errors rather than reporting
+    /// them as timeouts. After waiting begins, such an error takes precedence
+    /// over post-wait readiness.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `ready`. Panics if the registry exhausts
+    /// registration identifiers.
+    #[inline(always)]
+    pub fn wait_until_ready_for<P>(
+        &self,
+        timeout: Duration,
+        ready: P,
+    ) -> Result<WaitTimeoutResult<()>, TimeError>
+    where
+        P: FnMut(&T) -> bool,
+    {
+        self.wait_until_for(timeout, ready, |_| ())
     }
 
     /// Wakes one registered condition waiter.

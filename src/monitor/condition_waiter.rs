@@ -93,6 +93,26 @@ pub trait ConditionWaiter {
         self.wait_while(move |state| !predicate(state), action)
     }
 
+    /// Blocks until the predicate becomes true.
+    ///
+    /// The predicate runs while the monitor state is locked. This convenience
+    /// method does not run an action after the predicate becomes true.
+    ///
+    /// # Parameters
+    ///
+    /// * `predicate` - Predicate that returns `true` when the state is ready.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `predicate`.
+    #[inline(always)]
+    fn wait_until_ready<P>(&self, predicate: P)
+    where
+        P: FnMut(&Self::State) -> bool,
+    {
+        self.wait_until(predicate, |_| ());
+    }
+
     /// Blocks while the predicate remains true, then runs an action.
     ///
     /// The predicate and action run while the monitor state is locked.
