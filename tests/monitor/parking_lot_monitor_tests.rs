@@ -29,6 +29,11 @@ use qubit_lock::{
     WaitTimeoutStatus,
 };
 
+blocking_monitor_contract_tests!(
+    parking_lot_monitor_contract,
+    ParkingLotMonitor
+);
+
 use super::failing_timer_tests::{
     assert_backend_unavailable,
     completion_failing_timer,
