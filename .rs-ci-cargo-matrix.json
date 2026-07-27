@@ -60,20 +60,6 @@
       ]
     },
     {
-      "name": "loom-model",
-      "defaultFeatures": false,
-      "features": [
-        "loom-model"
-      ],
-      "rustflags": [
-        "--cfg",
-        "loom"
-      ],
-      "commands": [
-        "test"
-      ]
-    },
-    {
       "name": "all-features",
       "defaultFeatures": true,
       "features": [
