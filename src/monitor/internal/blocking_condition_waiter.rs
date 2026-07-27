@@ -54,6 +54,26 @@ impl BlockingConditionWaiter {
         }
     }
 
+    /// Polls a Timer before a blocking waiter has been registered.
+    ///
+    /// This fast path detects an already-complete Timer without allocating or
+    /// registering a waiter. A pending result must be followed by a poll with
+    /// the registered waiter's waker before releasing the monitor lock.
+    ///
+    /// # Parameters
+    ///
+    /// * `future` - Timer future associated with the current wait attempt.
+    ///
+    /// # Returns
+    ///
+    /// The current Timer completion state.
+    pub(in crate::monitor) fn poll_timer_without_waiter(
+        future: &mut TimerFuture,
+    ) -> Poll<Result<(), TimeError>> {
+        let mut context = Context::from_waker(Waker::noop());
+        future.as_mut().poll(&mut context)
+    }
+
     /// Polls a TimerFuture using this waiter as its task Waker.
     ///
     /// # Parameters

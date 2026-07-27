@@ -208,7 +208,10 @@ impl<'a, T> StdMonitorGuard<'a, T> {
     ///
     /// The guard stays in place while this method registers a private waiter,
     /// releases the state lock, and races notification against the injected
-    /// Timer. It reacquires the state lock before returning.
+    /// Timer. The relative timeout starts before waiter registration and uses
+    /// one fixed deadline; this method may return after that deadline while
+    /// reacquiring the state lock. It reacquires the state lock before
+    /// returning.
     ///
     /// A [`WaitTimeoutStatus::Woken`] result does not prove that another thread
     /// changed the state. A
@@ -313,6 +316,13 @@ impl<'a, T> StdMonitorGuard<'a, T> {
         &mut self,
         future: &mut TimerFuture,
     ) -> Result<WaitTimeoutStatus, TimeError> {
+        if let Poll::Ready(result) =
+            super::internal::BlockingConditionWaiter::poll_timer_without_waiter(
+                future,
+            )
+        {
+            return result.map(|()| WaitTimeoutStatus::TimedOut);
+        }
         let registration = self.monitor.waiters.register();
         let waiter = std::sync::Arc::clone(registration.waiter());
         if let Poll::Ready(result) =
