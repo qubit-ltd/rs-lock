@@ -63,7 +63,7 @@ impl LoomWaiterRegistry {
     /// All waiters active when selection began.
     #[inline]
     pub fn take_all(&self) -> Vec<usize> {
-        self.inner.lock().unwrap().take_all()
+        self.inner.lock().unwrap().take_all().collect()
     }
 
     /// Cancels the registration identified by `waiter_id`.
