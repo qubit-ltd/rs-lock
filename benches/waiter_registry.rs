@@ -1,0 +1,360 @@
+// =============================================================================
+//    Copyright (c) 2025 - 2026 Haixing Hu.
+//
+//    SPDX-License-Identifier: Apache-2.0
+//
+//    Licensed under the Apache License, Version 2.0.
+// =============================================================================
+//! Compares the monitor waiter index with the former BTreeMap and HashMap
+//! implementation strategy.
+
+use std::{
+    collections::{
+        BTreeMap,
+        HashMap,
+    },
+    hint::black_box,
+};
+
+use criterion::{
+    BatchSize,
+    BenchmarkId,
+    Criterion,
+    criterion_group,
+    criterion_main,
+};
+use qubit_collections::map::OrderedIndexMap;
+
+/// Registry sizes used to expose order-index maintenance costs.
+const WAITER_COUNTS: [usize; 4] = [32, 128, 512, 2_048];
+
+/// FIFO waiter index matching the production OrderedIndexMap strategy.
+struct OrderedIndexWaiters {
+    /// Next nonzero registration identifier.
+    next_waiter_id: u64,
+    /// Values indexed by registration identifier and attachment order.
+    waiters: OrderedIndexMap<u64, (), usize>,
+}
+
+impl OrderedIndexWaiters {
+    /// Creates an empty FIFO waiter index.
+    ///
+    /// # Returns
+    ///
+    /// An index ready to register benchmark waiter values.
+    fn new() -> Self {
+        Self {
+            next_waiter_id: 1,
+            waiters: OrderedIndexMap::new(),
+        }
+    }
+
+    /// Registers `waiter` and returns its cancellation identifier.
+    ///
+    /// # Parameters
+    ///
+    /// * `waiter` - Benchmark value made eligible for notification.
+    ///
+    /// # Returns
+    ///
+    /// The identifier required to cancel `waiter`.
+    fn register(&mut self, waiter: usize) -> u64 {
+        let waiter_id = self.next_waiter_id;
+        self.next_waiter_id = waiter_id
+            .checked_add(1)
+            .expect("benchmark waiter identifiers should not exhaust");
+        let _ = self
+            .waiters
+            .try_insert(waiter_id, (), waiter)
+            .expect("benchmark waiter identifier should be unique");
+        waiter_id
+    }
+
+    /// Removes and returns the longest-waiting registered value.
+    ///
+    /// # Returns
+    ///
+    /// The selected value, or `None` when no waiter remains.
+    fn take_one(&mut self) -> Option<usize> {
+        self.waiters.pop_first().map(|entry| entry.into_value())
+    }
+
+    /// Removes every waiter in FIFO order.
+    ///
+    /// # Returns
+    ///
+    /// Values active when the operation began.
+    fn take_all(&mut self) -> Vec<usize> {
+        let mut waiters = Vec::with_capacity(self.waiters.len());
+        while let Some(waiter) = self.take_one() {
+            waiters.push(waiter);
+        }
+        waiters
+    }
+
+    /// Cancels the waiter associated with `waiter_id`.
+    ///
+    /// # Parameters
+    ///
+    /// * `waiter_id` - Registration identifier returned by [`Self::register`].
+    ///
+    /// # Returns
+    ///
+    /// The cancelled value, or `None` when it was already selected.
+    fn unregister(&mut self, waiter_id: u64) -> Option<usize> {
+        self.waiters
+            .remove(&waiter_id)
+            .map(|entry| entry.into_value())
+    }
+}
+
+/// FIFO waiter index using separate order and identifier maps.
+struct BTreeHashWaiters {
+    /// Next nonzero registration identifier.
+    next_waiter_id: u64,
+    /// Values indexed by cancellation identifier.
+    values: HashMap<u64, usize>,
+    /// FIFO order keyed by monotonically increasing registration identifier.
+    order: BTreeMap<u64, ()>,
+}
+
+impl BTreeHashWaiters {
+    /// Creates an empty dual-map FIFO waiter index.
+    ///
+    /// # Returns
+    ///
+    /// An index ready to register benchmark waiter values.
+    fn new() -> Self {
+        Self {
+            next_waiter_id: 1,
+            values: HashMap::new(),
+            order: BTreeMap::new(),
+        }
+    }
+
+    /// Registers `waiter` and returns its cancellation identifier.
+    ///
+    /// # Parameters
+    ///
+    /// * `waiter` - Benchmark value made eligible for notification.
+    ///
+    /// # Returns
+    ///
+    /// The identifier required to cancel `waiter`.
+    fn register(&mut self, waiter: usize) -> u64 {
+        let waiter_id = self.next_waiter_id;
+        self.next_waiter_id = waiter_id
+            .checked_add(1)
+            .expect("benchmark waiter identifiers should not exhaust");
+        assert!(
+            self.values.insert(waiter_id, waiter).is_none(),
+            "benchmark waiter identifier should be unique",
+        );
+        assert!(
+            self.order.insert(waiter_id, ()).is_none(),
+            "benchmark waiter order should be unique",
+        );
+        waiter_id
+    }
+
+    /// Removes and returns the longest-waiting registered value.
+    ///
+    /// # Returns
+    ///
+    /// The selected value, or `None` when no waiter remains.
+    fn take_one(&mut self) -> Option<usize> {
+        self.order
+            .pop_first()
+            .and_then(|(waiter_id, _)| self.values.remove(&waiter_id))
+    }
+
+    /// Removes every waiter in FIFO order.
+    ///
+    /// # Returns
+    ///
+    /// Values active when the operation began.
+    fn take_all(&mut self) -> Vec<usize> {
+        let mut waiters = Vec::with_capacity(self.values.len());
+        while let Some(waiter) = self.take_one() {
+            waiters.push(waiter);
+        }
+        waiters
+    }
+
+    /// Cancels the waiter associated with `waiter_id`.
+    ///
+    /// # Parameters
+    ///
+    /// * `waiter_id` - Registration identifier returned by [`Self::register`].
+    ///
+    /// # Returns
+    ///
+    /// The cancelled value, or `None` when it was already selected.
+    fn unregister(&mut self, waiter_id: u64) -> Option<usize> {
+        let waiter = self.values.remove(&waiter_id);
+        if waiter.is_some() {
+            assert!(
+                self.order.remove(&waiter_id).is_some(),
+                "active benchmark waiter should remain in the FIFO index",
+            );
+        }
+        waiter
+    }
+}
+
+/// Builds an OrderedIndexMap fixture outside the measured operation.
+///
+/// # Parameters
+///
+/// * `waiter_count` - Number of registered values in the fixture.
+///
+/// # Returns
+///
+/// A populated waiter index with identifiers from one through `waiter_count`.
+fn prepare_ordered_index_waiters(waiter_count: usize) -> OrderedIndexWaiters {
+    let mut waiters = OrderedIndexWaiters::new();
+    for waiter in 0..waiter_count {
+        waiters.register(waiter);
+    }
+    waiters
+}
+
+/// Builds a BTreeMap and HashMap fixture outside the measured operation.
+///
+/// # Parameters
+///
+/// * `waiter_count` - Number of registered values in the fixture.
+///
+/// # Returns
+///
+/// A populated waiter index with identifiers from one through `waiter_count`.
+fn prepare_btree_hash_waiters(waiter_count: usize) -> BTreeHashWaiters {
+    let mut waiters = BTreeHashWaiters::new();
+    for waiter in 0..waiter_count {
+        waiters.register(waiter);
+    }
+    waiters
+}
+
+/// Benchmarks registration, cancellation, and notification selection paths.
+///
+/// # Parameters
+///
+/// * `criterion` - Criterion runner receiving each registry workload.
+fn benchmark_waiter_registry(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("waiter_registry");
+    for waiter_count in WAITER_COUNTS {
+        group.bench_with_input(
+            BenchmarkId::new("ordered_index/register", waiter_count),
+            &waiter_count,
+            |bencher, &waiter_count| {
+                bencher.iter_batched(
+                    OrderedIndexWaiters::new,
+                    |mut waiters| {
+                        for waiter in 0..waiter_count {
+                            black_box(waiters.register(waiter));
+                        }
+                        black_box(waiters);
+                    },
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("btree_hash/register", waiter_count),
+            &waiter_count,
+            |bencher, &waiter_count| {
+                bencher.iter_batched(
+                    BTreeHashWaiters::new,
+                    |mut waiters| {
+                        for waiter in 0..waiter_count {
+                            black_box(waiters.register(waiter));
+                        }
+                        black_box(waiters);
+                    },
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("ordered_index/cancel_reverse", waiter_count),
+            &waiter_count,
+            |bencher, &waiter_count| {
+                bencher.iter_batched(
+                    || prepare_ordered_index_waiters(waiter_count),
+                    |mut waiters| {
+                        for waiter_id in (1..=waiter_count as u64).rev() {
+                            black_box(waiters.unregister(waiter_id));
+                        }
+                        black_box(waiters);
+                    },
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("btree_hash/cancel_reverse", waiter_count),
+            &waiter_count,
+            |bencher, &waiter_count| {
+                bencher.iter_batched(
+                    || prepare_btree_hash_waiters(waiter_count),
+                    |mut waiters| {
+                        for waiter_id in (1..=waiter_count as u64).rev() {
+                            black_box(waiters.unregister(waiter_id));
+                        }
+                        black_box(waiters);
+                    },
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("ordered_index/notify_one", waiter_count),
+            &waiter_count,
+            |bencher, &waiter_count| {
+                bencher.iter_batched(
+                    || prepare_ordered_index_waiters(waiter_count),
+                    |mut waiters| black_box(waiters.take_one()),
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("btree_hash/notify_one", waiter_count),
+            &waiter_count,
+            |bencher, &waiter_count| {
+                bencher.iter_batched(
+                    || prepare_btree_hash_waiters(waiter_count),
+                    |mut waiters| black_box(waiters.take_one()),
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("ordered_index/notify_all", waiter_count),
+            &waiter_count,
+            |bencher, &waiter_count| {
+                bencher.iter_batched(
+                    || prepare_ordered_index_waiters(waiter_count),
+                    |mut waiters| black_box(waiters.take_all()),
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("btree_hash/notify_all", waiter_count),
+            &waiter_count,
+            |bencher, &waiter_count| {
+                bencher.iter_batched(
+                    || prepare_btree_hash_waiters(waiter_count),
+                    |mut waiters| black_box(waiters.take_all()),
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+    }
+    group.finish();
+}
+
+criterion_group!(benches, benchmark_waiter_registry);
+criterion_main!(benches);

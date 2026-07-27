@@ -73,3 +73,8 @@ required-features = ["monitor", "parking-lot"]
 name = "blocking_wait_registration"
 harness = false
 required-features = ["monitor", "parking-lot"]
+
+[[bench]]
+name = "waiter_registry"
+harness = false
+required-features = ["monitor"]
