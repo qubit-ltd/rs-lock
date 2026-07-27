@@ -12,6 +12,7 @@ mod blocking_condition_waiter_state;
 mod blocking_waiter_registration;
 mod blocking_waiter_registry;
 mod default_timer;
+pub(in crate::monitor) mod sync;
 #[cfg(feature = "async-monitor")]
 mod tokio_condition_waiter;
 #[cfg(feature = "async-monitor")]

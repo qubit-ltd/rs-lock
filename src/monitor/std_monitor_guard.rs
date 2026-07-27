@@ -22,12 +22,15 @@ use std::{
         Deref,
         DerefMut,
     },
-    sync::MutexGuard,
     task::Poll,
     time::Duration,
 };
 
 use super::{
+    internal::sync::{
+        MutexGuard,
+        recover,
+    },
     std_monitor::StdMonitor,
     wait_timeout_status::WaitTimeoutStatus,
 };
@@ -197,12 +200,7 @@ impl<'a, T> StdMonitorGuard<'a, T> {
         drop(inner);
         registration.waiter().wait();
         drop(registration);
-        self.inner = Some(
-            self.monitor
-                .state
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner),
-        );
+        self.inner = Some(recover(self.monitor.state.lock()));
     }
 
     /// Waits for a notification or timeout while temporarily releasing the
@@ -331,12 +329,7 @@ impl<'a, T> StdMonitorGuard<'a, T> {
         drop(inner);
         waiter.wait();
         drop(registration);
-        self.inner = Some(
-            self.monitor
-                .state
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner),
-        );
+        self.inner = Some(recover(self.monitor.state.lock()));
         match super::internal::BlockingConditionWaiter::poll_timer(
             &waiter, future,
         ) {
