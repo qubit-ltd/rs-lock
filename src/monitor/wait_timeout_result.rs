@@ -11,9 +11,10 @@
 
 /// Result of waiting for a predicate with an overall timeout.
 ///
-/// This type is returned by
-/// [`StdMonitor::wait_while_for`](super::StdMonitor::wait_while_for) and
-/// [`StdMonitor::wait_until_for`](super::StdMonitor::wait_until_for). It is
+/// This type is returned by blocking and asynchronous monitor predicate waits.
+/// Blocking APIs include [`StdMonitor::wait_while_for`](super::StdMonitor::wait_while_for),
+/// `ParkingLotMonitor::wait_while_for`, and their `wait_until_for`
+/// counterparts. `TokioMonitor` provides the asynchronous counterparts. It is
 /// more explicit than `Option<R>`: a ready predicate produces [`Self::Ready`],
 /// while a completed timeout with a still-blocking predicate produces
 /// [`Self::TimedOut`].

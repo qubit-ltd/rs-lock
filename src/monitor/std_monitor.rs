@@ -310,8 +310,8 @@ impl<T> StdMonitor<T> {
     /// Acquires the monitor, mutates the protected state, and wakes one waiter.
     ///
     /// The closure runs while the mutex is held. After the closure returns, the
-    /// mutex guard is dropped and one thread waiting on this monitor's
-    /// condition variable is notified. This is a convenience method for the
+    /// mutex guard is dropped and one registered condition waiter is notified.
+    /// This is a convenience method for the
     /// common "update state, then notify one waiter" pattern.
     ///
     /// If the mutex is poisoned, this method recovers the inner state before
@@ -358,8 +358,8 @@ impl<T> StdMonitor<T> {
     /// waiters.
     ///
     /// The closure runs while the mutex is held. After the closure returns, the
-    /// mutex guard is dropped and all threads waiting on this monitor's
-    /// condition variable are notified. This is a convenience method for
+    /// mutex guard is dropped and all registered condition waiters are
+    /// notified. This is a convenience method for
     /// state changes that may allow multiple waiters to make progress.
     ///
     /// If the mutex is poisoned, this method recovers the inner state before
@@ -474,7 +474,7 @@ impl<T> StdMonitor<T> {
     ///
     /// This is the positive-predicate counterpart of [`Self::wait_while`]. The
     /// predicate is evaluated while holding the mutex. If it returns `false`,
-    /// the current thread waits on the condition variable and atomically
+    /// the current thread registers as a condition waiter and atomically
     /// releases the mutex. After a notification or spurious wakeup, the mutex
     /// is reacquired and the predicate is evaluated again. When the predicate
     /// returns `true`, `f` runs while the mutex is still held.
@@ -726,7 +726,7 @@ impl<T> StdMonitor<T> {
         self.wait_while_for(timeout, |state| !ready(state), f)
     }
 
-    /// Wakes one thread waiting on this monitor's condition variable.
+    /// Wakes one registered condition waiter.
     ///
     /// Notifications do not carry state by themselves. A waiting thread only
     /// proceeds safely after rechecking the protected state. Prefer
@@ -764,7 +764,7 @@ impl<T> StdMonitor<T> {
         self.waiters.notify_one();
     }
 
-    /// Wakes all threads waiting on this monitor's condition variable.
+    /// Wakes all registered condition waiters.
     ///
     /// Notifications do not carry state by themselves. Every awakened thread
     /// must recheck the protected state before continuing. Prefer

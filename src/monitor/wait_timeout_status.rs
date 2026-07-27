@@ -11,10 +11,11 @@
 
 /// Result of a timed wait operation.
 ///
-/// This status is returned by
-/// [`StdMonitorGuard::wait_for`](super::StdMonitorGuard::wait_for). It
-/// describes why a timed wait returned, but callers must still re-check the
-/// protected state because notification does not imply predicate truth.
+/// This status is returned by blocking monitor guards, including
+/// [`StdMonitorGuard::wait_for`](super::StdMonitorGuard::wait_for) and
+/// `ParkingLotMonitorGuard::wait_for`. It describes why a timed wait returned,
+/// but callers must still re-check the protected state because notification
+/// does not imply predicate truth.
 ///
 /// # Examples
 ///
@@ -35,12 +36,9 @@
 pub enum WaitTimeoutStatus {
     /// The wait returned before the timeout elapsed.
     ///
-    /// This usually means another thread called
-    /// [`StdMonitor::notify_one`](super::StdMonitor::notify_one)
-    /// or
-    /// [`StdMonitor::notify_all`](super::StdMonitor::notify_all),
-    /// but it may also be a spurious wakeup. Always re-check the guarded
-    /// state before acting on this status.
+    /// This usually means a monitor notification selected the waiting thread,
+    /// but it may also be a spurious wakeup. Always re-check the guarded state
+    /// before acting on this status.
     Woken,
     /// The wait reached the timeout boundary.
     ///
