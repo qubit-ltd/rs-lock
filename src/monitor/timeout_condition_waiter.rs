@@ -20,14 +20,16 @@ use crate::monitor::{
 
 /// Waits for predicates over protected state with relative timeouts.
 ///
-/// A timeout is a condition-wait budget. Initial state-lock contention and the
-/// initial locked predicate check are excluded. If waiting is required, one
-/// fixed deadline is established immediately before the first condition-wait
-/// suspension and reused across wakeups. A zero timeout still checks the
-/// predicate. After waiting begins, Timer registration or completion errors
-/// take precedence over every post-wait predicate result, and the action is not
-/// run. When the Timer completes successfully, a final locked predicate check
-/// still wins over timeout.
+/// A timeout is a condition-wait budget, aligned with
+/// [`std::sync::Condvar::wait_timeout_while`]. Initial state-lock contention
+/// is excluded. The budget starts after acquiring the state lock and before
+/// the first predicate check, so predicate work consumes it. If waiting is
+/// required, one fixed deadline is reused across wakeups. A timed wait may
+/// return after the timeout while reacquiring the state lock. A zero timeout
+/// still checks the predicate. After waiting begins, Timer registration or
+/// completion errors take precedence over every post-wait predicate result,
+/// and the action is not run. When the Timer completes successfully, a final
+/// locked predicate check still wins over timeout.
 ///
 /// The external predicate state handshake documented by
 /// [`ConditionWaiter`] also applies to timed waits.
