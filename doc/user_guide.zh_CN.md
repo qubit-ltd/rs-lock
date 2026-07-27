@@ -79,14 +79,14 @@ qubit-lock = { version = "0.11", default-features = false }
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", features = ["async-lock"] }
+qubit-lock = { version = "0.11", default-features = false, features = ["async-lock"] }
 ```
 
 启用 Tokio monitor 协调和计时等待：
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", features = ["async-monitor"] }
+qubit-lock = { version = "0.11", default-features = false, features = ["async-monitor"] }
 ```
 
 如果应用创建 Tokio runtime，应在应用自己的 `Cargo.toml` 中启用所需的 runtime

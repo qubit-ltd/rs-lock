@@ -95,6 +95,11 @@ pub trait AsyncConditionWaiter {
     /// # Returns
     ///
     /// A lazy future that resolves to the value returned by `action`.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `predicate` or `action` when
+    /// it is polled.
     #[inline(always)]
     fn wait_until_async<'a, R, P, F>(
         &'a self,
@@ -124,6 +129,11 @@ pub trait AsyncConditionWaiter {
     /// # Returns
     ///
     /// A lazy future that resolves to the value returned by `action`.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `predicate` or `action` when
+    /// it is polled.
     fn wait_while_async<'a, R, P, F>(
         &'a self,
         predicate: P,
@@ -152,6 +162,11 @@ where
     /// # Returns
     ///
     /// The future returned by the wrapped monitor.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from the wrapped monitor,
+    /// including from `predicate` or `action`, when it is polled.
     #[inline(always)]
     fn wait_while_async<'a, R, P, F>(
         &'a self,

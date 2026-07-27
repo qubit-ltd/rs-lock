@@ -80,6 +80,10 @@ pub trait ConditionWaiter {
     /// # Returns
     ///
     /// The value returned by `action`.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `predicate` or `action`.
     #[inline(always)]
     fn wait_until<R, P, F>(&self, mut predicate: P, action: F) -> R
     where
@@ -102,6 +106,10 @@ pub trait ConditionWaiter {
     /// # Returns
     ///
     /// The value returned by `action`.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `predicate` or `action`.
     fn wait_while<R, P, F>(&self, predicate: P, action: F) -> R
     where
         P: FnMut(&Self::State) -> bool,
@@ -124,6 +132,11 @@ where
     /// # Returns
     ///
     /// The value returned by `action`.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from the wrapped monitor, including from `predicate`
+    /// or `action`.
     #[inline(always)]
     fn wait_while<R, P, F>(&self, predicate: P, action: F) -> R
     where

@@ -185,7 +185,8 @@ impl<'a, T> StdMonitorGuard<'a, T> {
     ///
     /// # Panics
     ///
-    /// Panics only if the guard's internal ownership invariant is violated.
+    /// Panics if the guard's internal ownership invariant is violated.
+    /// Panics if the registry exhausts registration identifiers.
     #[inline]
     pub fn wait(&mut self) {
         let registration = self.monitor.waiters.register();
@@ -251,6 +252,10 @@ impl<'a, T> StdMonitorGuard<'a, T> {
     /// assert_eq!(*guard, 0);
     /// assert_eq!(status, WaitTimeoutStatus::TimedOut);
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if the registry exhausts registration identifiers.
     #[inline]
     pub fn wait_for(
         &mut self,
@@ -275,6 +280,10 @@ impl<'a, T> StdMonitorGuard<'a, T> {
     /// Returns Timer registration or completion errors. This guard remains
     /// held and usable in either case; a completion error may be reported after
     /// the guard was released and reacquired.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the registry exhausts registration identifiers.
     #[inline(always)]
     pub fn wait_until(
         &mut self,
@@ -300,7 +309,8 @@ impl<'a, T> StdMonitorGuard<'a, T> {
     ///
     /// # Panics
     ///
-    /// Panics only if the guard's internal ownership invariant is violated.
+    /// Panics if the guard's internal ownership invariant is violated.
+    /// Panics if the registry exhausts registration identifiers.
     pub(super) fn wait_with_timer(
         &mut self,
         future: &mut TimerFuture,

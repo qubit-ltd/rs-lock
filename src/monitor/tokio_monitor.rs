@@ -353,6 +353,12 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
     /// future while it is pending cancels and unregisters the wait without
     /// running `action` or rolling back protected-state changes. A notification
     /// that already selected this waiter is discarded rather than transferred.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `predicate` or `action` when
+    /// it is polled. It also panics if the registry exhausts registration
+    /// identifiers.
     #[inline(always)]
     fn wait_until_async<'a, R, P, F>(
         &'a self,
@@ -375,6 +381,12 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
     /// future while it is pending cancels and unregisters the wait without
     /// running `action` or rolling back protected-state changes. A notification
     /// that already selected this waiter is discarded rather than transferred.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `predicate` or `action` when
+    /// it is polled. It also panics if the registry exhausts registration
+    /// identifiers.
     #[allow(
         clippy::manual_async_fn,
         reason = "the explicit Send bound is part of the trait contract"
@@ -456,6 +468,12 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// waiter registration. When the signal and deadline are both ready, the
     /// deadline is selected first. A zero timeout still checks the predicate
     /// once.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `predicate` or `action` when
+    /// it is polled. It also panics if the registry exhausts registration
+    /// identifiers.
     #[inline(always)]
     fn wait_until_for_async<'a, R, P, F>(
         &'a self,
@@ -499,6 +517,12 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// waiter registration. When the signal and deadline are both ready, the
     /// deadline is selected first. A zero timeout still checks the predicate
     /// once.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `predicate` or `action` when
+    /// it is polled. It also panics if the registry exhausts registration
+    /// identifiers.
     #[allow(
         clippy::manual_async_fn,
         reason = "the explicit Send bound is part of the trait contract"

@@ -149,6 +149,10 @@ impl<T> ParkingLotMonitor<T> {
     /// let monitor = ParkingLotMonitor::new(0_u32);
     /// assert_eq!(monitor.with_read(|n| *n), 0);
     /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if all process-wide clock-domain identifiers are exhausted.
     #[inline]
     pub fn new(state: T) -> Self {
         Self::with_timer(state, default_timer())
@@ -405,6 +409,11 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// The value returned by `f`.
     ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `waiting` or `f`. Panics if the registry
+    /// exhausts registration identifiers.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -461,6 +470,11 @@ impl<T> ParkingLotMonitor<T> {
     /// # Returns
     ///
     /// The value returned by `f` after the predicate has become true.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `ready` or `f`. Panics if the registry exhausts
+    /// registration identifiers.
     ///
     /// # Examples
     ///
@@ -539,6 +553,11 @@ impl<T> ParkingLotMonitor<T> {
     /// Returns Timer registration or completion errors rather than reporting
     /// them as timeouts. After waiting begins, such an error takes precedence
     /// over post-wait readiness.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `waiting` or `f`. Panics if the registry
+    /// exhausts registration identifiers.
     ///
     /// # Examples
     ///
@@ -623,6 +642,11 @@ impl<T> ParkingLotMonitor<T> {
     /// Returns Timer registration or completion errors rather than reporting
     /// them as timeouts. After waiting begins, such an error takes precedence
     /// over post-wait readiness.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `ready` or `f`. Panics if the registry exhausts
+    /// registration identifiers.
     ///
     /// # Examples
     ///
@@ -824,6 +848,10 @@ impl<T> From<T> for ParkingLotMonitor<T> {
     /// # Returns
     ///
     /// A monitor initialized with `value`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if all process-wide clock-domain identifiers are exhausted.
     #[inline(always)]
     fn from(value: T) -> Self {
         Self::new(value)
@@ -836,6 +864,11 @@ impl<T: Default> Default for ParkingLotMonitor<T> {
     /// # Returns
     ///
     /// A monitor protecting the default value for `T`.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `T::default()`. Panics if all process-wide
+    /// clock-domain identifiers are exhausted.
     ///
     /// # Examples
     ///

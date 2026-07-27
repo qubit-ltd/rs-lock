@@ -42,6 +42,10 @@ const STD_MONITOR_GUARD_SRC: &str =
     include_str!("../../src/monitor/std_monitor_guard.rs");
 const TOKIO_MONITOR_SRC: &str =
     include_str!("../../src/monitor/tokio_monitor.rs");
+const ARC_PARKING_LOT_MONITOR_SRC: &str =
+    include_str!("../../src/monitor/arc_parking_lot_monitor.rs");
+const ARC_STD_MONITOR_SRC: &str =
+    include_str!("../../src/monitor/arc_std_monitor.rs");
 
 /// Collapses Markdown whitespace so prose assertions do not depend on line
 /// wrapping.
@@ -262,18 +266,83 @@ fn test_readme_documents_timer_ioc_testing() {
 /// Ensures README files document the default, async-lock, and async-monitor
 /// feature tiers.
 fn test_readme_documents_feature_tiers() {
+    const ASYNC_LOCK_DEPENDENCY: &str = "qubit-lock = { version = \"0.11\", default-features = false, features = [\"async-lock\"] }";
+    const ASYNC_MONITOR_DEPENDENCY: &str = "qubit-lock = { version = \"0.11\", default-features = false, features = [\"async-monitor\"] }";
+
     assert!(README_EN.contains("default feature set"));
     assert!(README_EN.contains("`monitor` and `parking-lot`"));
-    assert!(README_EN.contains("default-features = false"));
-    assert!(README_EN.contains("`async-lock`"));
-    assert!(README_EN.contains("`async-monitor`"));
+    for document in [README_EN, README_ZH, USER_GUIDE_EN, USER_GUIDE_ZH] {
+        assert!(
+            document.contains(ASYNC_LOCK_DEPENDENCY),
+            "async-lock example must disable default features",
+        );
+        assert!(
+            document.contains(ASYNC_MONITOR_DEPENDENCY),
+            "async-monitor example must disable default features",
+        );
+    }
     assert!(!README_EN.contains("`mock` feature"));
     assert!(README_ZH.contains("默认特性集"));
     assert!(README_ZH.contains("`monitor` 和 `parking-lot`"));
-    assert!(README_ZH.contains("default-features = false"));
-    assert!(README_ZH.contains("`async-lock`"));
-    assert!(README_ZH.contains("`async-monitor`"));
     assert!(!README_ZH.contains("`mock` feature"));
+}
+
+#[test]
+/// Ensures monitor Rustdoc records callback and default-Timer panic paths.
+fn test_monitor_docs_cover_callback_and_constructor_panics() {
+    for source in [
+        CONDITION_WAITER_SRC,
+        TIMEOUT_CONDITION_WAITER_SRC,
+        ASYNC_CONDITION_WAITER_SRC,
+        ASYNC_TIMEOUT_CONDITION_WAITER_SRC,
+        TOKIO_MONITOR_SRC,
+    ] {
+        assert!(
+            source.contains("# Panics")
+                && source.contains("`predicate` or `action`"),
+            "waiter documentation must describe callback panics",
+        );
+    }
+
+    for source in [PARKING_LOT_MONITOR_SRC, STD_MONITOR_SRC] {
+        assert!(
+            source.contains("Panics if the registry")
+                && source.contains("registration identifiers."),
+            "blocking monitor documentation must describe waiter registration panics",
+        );
+    }
+
+    for source in [
+        PARKING_LOT_MONITOR_SRC,
+        STD_MONITOR_SRC,
+        ARC_PARKING_LOT_MONITOR_SRC,
+        ARC_STD_MONITOR_SRC,
+    ] {
+        assert!(
+            source.contains(
+                "Panics if all process-wide clock-domain identifiers are exhausted."
+            ),
+            "default Timer constructors must describe clock-domain exhaustion",
+        );
+    }
+
+    for source in [PARKING_LOT_MONITOR_GUARD_SRC, STD_MONITOR_GUARD_SRC] {
+        assert!(
+            source.contains(
+                "Panics if the registry exhausts registration identifiers."
+            ),
+            "guard waits must describe waiter registration panics",
+        );
+    }
+}
+
+#[test]
+/// Ensures the Chinese README contribution section matches the project
+/// template.
+fn test_readme_zh_uses_contribution_template() {
+    assert!(README_ZH.contains(
+        "欢迎贡献。请遵循 Rust API 指南，及时更新公共 API 文档与测试，并在提交\nPull Request 前运行 `./align-ci.sh`格式化代码，运行`./ci-check.sh`对齐CI要求。"
+    ));
 }
 
 #[test]
@@ -309,16 +378,13 @@ fn test_rustdoc_contracts_match_lock_and_monitor_semantics() {
 
     for source in [PARKING_LOT_MONITOR_SRC, STD_MONITOR_SRC] {
         assert!(
-            source.contains("predicate stops blocking on the deciding locked check")
+            source.contains(
+                "predicate stops blocking on the deciding locked check"
+            )
         );
     }
 
-    assert!(
-        TOKIO_MONITOR_SRC
-            .matches("fairness or FIFO")
-            .count()
-            >= 3
-    );
+    assert!(TOKIO_MONITOR_SRC.matches("fairness or FIFO").count() >= 3);
 }
 
 #[test]

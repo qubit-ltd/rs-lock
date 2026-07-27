@@ -83,14 +83,14 @@ Enable Tokio locks without Tokio monitors:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", features = ["async-lock"] }
+qubit-lock = { version = "0.11", default-features = false, features = ["async-lock"] }
 ```
 
 Enable Tokio monitors and timed waits:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", features = ["async-monitor"] }
+qubit-lock = { version = "0.11", default-features = false, features = ["async-monitor"] }
 ```
 
 If the application creates a Tokio runtime, enable its required runtime

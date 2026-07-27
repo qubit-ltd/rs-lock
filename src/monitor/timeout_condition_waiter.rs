@@ -56,6 +56,10 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// Returns Timer registration or completion errors rather than reporting
     /// them as timeouts. After waiting begins, such an error takes precedence
     /// over a post-wait ready predicate and prevents `action` from running.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `predicate` or `action`.
     #[inline(always)]
     fn wait_until_for<R, P, F>(
         &self,
@@ -91,6 +95,10 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// Returns Timer registration or completion errors rather than reporting
     /// them as timeouts. After waiting begins, such an error takes precedence
     /// over a post-wait ready predicate and prevents `action` from running.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `predicate` or `action`.
     fn wait_while_for<R, P, F>(
         &self,
         timeout: Duration,
@@ -121,6 +129,11 @@ where
     /// # Errors
     ///
     /// Returns an error when the wrapped monitor's Timer fails.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from the wrapped monitor, including from `predicate`
+    /// or `action`.
     #[inline(always)]
     fn wait_while_for<R, P, F>(
         &self,
