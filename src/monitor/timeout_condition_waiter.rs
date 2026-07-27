@@ -74,6 +74,44 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
         self.wait_while_for(timeout, move |state| !predicate(state), action)
     }
 
+    /// Blocks until the predicate becomes true or the timeout expires.
+    ///
+    /// This convenience method does not run an action after the predicate
+    /// becomes true. Its timeout budget and deadline-boundary semantics are
+    /// identical to [`Self::wait_until_for`].
+    ///
+    /// # Parameters
+    ///
+    /// * `timeout` - Maximum relative duration to wait.
+    /// * `predicate` - Predicate that returns `true` when the state is ready.
+    ///
+    /// # Returns
+    ///
+    /// [`WaitTimeoutResult::Ready`] with `()` when the predicate becomes true,
+    /// or [`WaitTimeoutResult::TimedOut`] when the condition-wait budget
+    /// expires.
+    ///
+    /// # Errors
+    ///
+    /// Returns Timer registration or completion errors rather than reporting
+    /// them as timeouts. After waiting begins, such an error takes precedence
+    /// over a post-wait ready predicate.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `predicate`.
+    #[inline(always)]
+    fn wait_until_ready_for<P>(
+        &self,
+        timeout: Duration,
+        predicate: P,
+    ) -> Result<WaitTimeoutResult<()>, TimeError>
+    where
+        P: FnMut(&Self::State) -> bool,
+    {
+        self.wait_until_for(timeout, predicate, |_| ())
+    }
+
     /// Blocks while the predicate remains true or until the timeout expires.
     ///
     /// # Parameters

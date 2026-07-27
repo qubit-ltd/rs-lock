@@ -137,6 +137,45 @@ macro_rules! blocking_monitor_contract_tests {
             }
 
             #[test]
+            fn test_wait_until_ready_blocks_until_notify_one() {
+                let monitor = Arc::new($monitor::new(false));
+                let waiter_monitor = Arc::clone(&monitor);
+                let waiter = thread::spawn(move || {
+                    waiter_monitor.wait_until_ready(|ready| *ready);
+                });
+
+                monitor.with_write_notify_one(|ready| *ready = true);
+
+                waiter.join().expect("contract waiter should not panic");
+            }
+
+            #[test]
+            fn test_wait_until_ready_returns_when_predicate_is_ready() {
+                let monitor = $monitor::new(true);
+
+                monitor.wait_until_ready(|ready| *ready);
+            }
+
+            #[test]
+            fn test_wait_until_ready_for_preserves_ready_and_timeout_outcomes() {
+                let timed_out = $monitor::new(false);
+                let ready = $monitor::new(true);
+
+                assert_eq!(
+                    timed_out
+                        .wait_until_ready_for(Duration::ZERO, |ready| *ready)
+                        .expect("zero timeout should not register a Timer"),
+                    WaitTimeoutResult::TimedOut,
+                );
+                assert_eq!(
+                    ready
+                        .wait_until_ready_for(Duration::ZERO, |ready| *ready)
+                        .expect("ready predicate should not register a Timer"),
+                    WaitTimeoutResult::Ready(()),
+                );
+            }
+
+            #[test]
             fn test_timed_wait_uses_injected_timer_domain() {
                 let clock = ManualMonotonicClock::new_shared();
                 let monitor = $monitor::with_timer(false, clock.new_timer());

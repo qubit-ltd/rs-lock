@@ -288,8 +288,8 @@ Use the capability traits at generic API boundaries:
 | Component | Capability |
 | --- | --- |
 | `Notifier` | `notify_one` and `notify_all` only |
-| `ConditionWaiter` | Synchronous `wait_until` and `wait_while` |
-| `TimeoutConditionWaiter` | Synchronous `wait_until_for` and `wait_while_for` |
+| `ConditionWaiter` | Synchronous `wait_until`, `wait_until_ready`, and `wait_while` |
+| `TimeoutConditionWaiter` | Synchronous `wait_until_for`, `wait_until_ready_for`, and `wait_while_for` |
 | `Monitor` | State access, notification, and untimed synchronous waits |
 | `TimedMonitor` | `Monitor` plus timed synchronous waits |
 | `SharedMonitor` | A cloneable shared synchronous monitor handle |
@@ -331,7 +331,8 @@ Important methods are:
 - `with_read` and `with_write` for state access.
 - `with_write_notify_one` and `with_write_notify_all` for the normal
   state-update-and-notify protocol.
-- `wait_until` / `wait_while` and their `_for` timed variants.
+- `wait_until` / `wait_while`, action-free `wait_until_ready`, and their
+  `_for` timed variants.
 - `lock` when explicit guard-level control is necessary.
 
 The `Arc*` wrapper dereferences to its inner monitor. `from_arc`, `as_arc`, and
@@ -470,10 +471,9 @@ fn main() {
     let waiter_monitor = monitor.clone();
 
     let waiter = thread::spawn(move || {
-        waiter_monitor.wait_until(
-            |_| waiter_ready.load(Ordering::Acquire),
-            |_| (),
-        );
+        waiter_monitor.wait_until_ready(|_| {
+            waiter_ready.load(Ordering::Acquire)
+        });
     });
 
     monitor.with_write_notify_all(|_| {
@@ -592,10 +592,9 @@ fn main() {
     let waiter_monitor = Arc::clone(&monitor);
 
     let waiter = thread::spawn(move || {
-        waiter_monitor.wait_until_for(
+        waiter_monitor.wait_until_ready_for(
             Duration::from_secs(16),
             |ready| *ready,
-            |_| (),
         )
     });
 

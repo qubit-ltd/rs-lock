@@ -20,8 +20,23 @@ where
     waiter.wait_until(|ready| *ready, |_| 7)
 }
 
+/// Runs an immediately ready action-free condition wait through a generic
+/// bound.
+fn wait_until_ready_through_trait<W>(waiter: &W)
+where
+    W: ConditionWaiter<State = bool>,
+{
+    waiter.wait_until_ready(|ready| *ready);
+}
+
 #[test]
 /// Verifies that a concrete blocking monitor satisfies [`ConditionWaiter`].
 fn test_condition_waiter_trait_accepts_std_monitor() {
     assert_eq!(wait_through_trait(&StdMonitor::new(true)), 7);
+}
+
+#[test]
+/// Verifies the trait exposes an action-free wait for a ready condition.
+fn test_condition_waiter_wait_until_ready_returns_when_predicate_is_ready() {
+    wait_until_ready_through_trait(&StdMonitor::new(true));
 }
