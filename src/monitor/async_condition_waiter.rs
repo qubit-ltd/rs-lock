@@ -7,10 +7,7 @@
 // =============================================================================
 //! Asynchronous condition-wait capability.
 
-use std::{
-    future::Future,
-    sync::Arc,
-};
+use std::{future::Future, sync::Arc};
 
 /// Waits asynchronously for predicates over protected monitor state.
 ///
@@ -134,10 +131,7 @@ pub trait AsyncConditionWaiter {
     /// The returned future propagates a panic from `predicate` when it is
     /// polled.
     #[inline(always)]
-    fn wait_until_ready_async<'a, P>(
-        &'a self,
-        predicate: P,
-    ) -> impl Future<Output = ()> + Send + 'a
+    fn wait_until_ready_async<'a, P>(&'a self, predicate: P) -> impl Future<Output = ()> + Send + 'a
     where
         P: FnMut(&Self::State) -> bool + Send + 'a,
     {

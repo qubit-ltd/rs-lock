@@ -9,11 +9,7 @@
 
 use std::sync::Arc;
 
-use qubit_lock::{
-    ArcTokioMonitor,
-    AsyncMonitor,
-    TokioMonitor,
-};
+use qubit_lock::{ArcTokioMonitor, AsyncMonitor, TokioMonitor};
 
 /// Exercises state access and untimed waiting through the aggregate capability.
 async fn use_async_monitor<M>(monitor: &M)

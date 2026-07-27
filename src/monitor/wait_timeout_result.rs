@@ -9,7 +9,7 @@
 //!
 //! Provides the result returned by predicate-based timed monitor waits.
 
-/// Result of waiting for a predicate with an overall timeout.
+/// Result of a timed predicate wait.
 ///
 /// This type is returned by blocking and asynchronous monitor predicate waits.
 /// Blocking APIs include

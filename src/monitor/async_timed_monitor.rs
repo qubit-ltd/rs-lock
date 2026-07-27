@@ -7,21 +7,12 @@
 // =============================================================================
 //! Aggregate asynchronous monitor capability with timeout-based waits.
 
-use crate::monitor::{
-    AsyncMonitor,
-    AsyncTimeoutConditionWaiter,
-};
+use crate::monitor::{AsyncMonitor, AsyncTimeoutConditionWaiter};
 
 /// An asynchronous [`AsyncMonitor`] that also supports timeout-based waits.
 ///
 /// This trait is implemented automatically for every type that provides both
 /// capabilities.
-pub trait AsyncTimedMonitor:
-    AsyncMonitor + AsyncTimeoutConditionWaiter
-{
-}
+pub trait AsyncTimedMonitor: AsyncMonitor + AsyncTimeoutConditionWaiter {}
 
-impl<M> AsyncTimedMonitor for M where
-    M: AsyncMonitor + AsyncTimeoutConditionWaiter + ?Sized
-{
-}
+impl<M> AsyncTimedMonitor for M where M: AsyncMonitor + AsyncTimeoutConditionWaiter + ?Sized {}

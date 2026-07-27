@@ -7,25 +7,15 @@
 // =============================================================================
 //! Synchronous RAII read-write lock capability.
 
-use std::sync::{
-    Arc,
-    RwLock,
-    RwLockReadGuard,
-    RwLockWriteGuard,
-};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 #[cfg(feature = "parking-lot")]
 use parking_lot::{
-    RwLock as ParkingLotRwLock,
-    RwLockReadGuard as ParkingLotRwLockReadGuard,
+    RwLock as ParkingLotRwLock, RwLockReadGuard as ParkingLotRwLockReadGuard,
     RwLockWriteGuard as ParkingLotRwLockWriteGuard,
 };
 
-use crate::lock::{
-    ReadLock,
-    TryLockError,
-    WriteLock,
-};
+use crate::lock::{ReadLock, TryLockError, WriteLock};
 
 /// Represents a synchronous lock with explicit shared and exclusive modes.
 pub trait ReadWriteLock: Send + Sync {
@@ -220,12 +210,8 @@ where
     fn try_read(&self) -> Result<Self::ReadGuard<'_>, TryLockError> {
         match RwLock::try_read(self) {
             Ok(guard) => Ok(guard),
-            Err(std::sync::TryLockError::WouldBlock) => {
-                Err(TryLockError::WouldBlock)
-            }
-            Err(std::sync::TryLockError::Poisoned(_)) => {
-                Err(TryLockError::Poisoned)
-            }
+            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
+            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
         }
     }
 
@@ -234,12 +220,8 @@ where
     fn try_write(&self) -> Result<Self::WriteGuard<'_>, TryLockError> {
         match RwLock::try_write(self) {
             Ok(guard) => Ok(guard),
-            Err(std::sync::TryLockError::WouldBlock) => {
-                Err(TryLockError::WouldBlock)
-            }
-            Err(std::sync::TryLockError::Poisoned(_)) => {
-                Err(TryLockError::Poisoned)
-            }
+            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
+            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
         }
     }
 }

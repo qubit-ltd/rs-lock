@@ -7,15 +7,9 @@
 // =============================================================================
 //! Aggregate asynchronous monitor capability.
 
-use std::{
-    future::Future,
-    sync::Arc,
-};
+use std::{future::Future, sync::Arc};
 
-use crate::monitor::{
-    AsyncConditionWaiter,
-    Notifier,
-};
+use crate::monitor::{AsyncConditionWaiter, Notifier};
 
 /// Aggregate trait for asynchronous monitor-style synchronization.
 ///
@@ -41,10 +35,7 @@ pub trait AsyncMonitor: Notifier + AsyncConditionWaiter + Sync {
     ///
     /// The returned future propagates a panic from `f` after the state lock is
     /// released.
-    fn with_read_async<'a, R, F>(
-        &'a self,
-        f: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn with_read_async<'a, R, F>(&'a self, f: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         F: FnOnce(&Self::State) -> R + Send + 'a;
@@ -65,10 +56,7 @@ pub trait AsyncMonitor: Notifier + AsyncConditionWaiter + Sync {
     ///
     /// The returned future propagates a panic from `f` after the state lock is
     /// released.
-    fn with_write_async<'a, R, F>(
-        &'a self,
-        f: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn with_write_async<'a, R, F>(&'a self, f: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a;
@@ -91,10 +79,7 @@ pub trait AsyncMonitor: Notifier + AsyncConditionWaiter + Sync {
     /// The returned future propagates a panic from `f`. In that case no
     /// notification is sent.
     #[inline]
-    fn with_write_notify_one_async<'a, R, F>(
-        &'a self,
-        f: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn with_write_notify_one_async<'a, R, F>(&'a self, f: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
@@ -124,10 +109,7 @@ pub trait AsyncMonitor: Notifier + AsyncConditionWaiter + Sync {
     /// The returned future propagates a panic from `f`. In that case no
     /// notification is sent.
     #[inline]
-    fn with_write_notify_all_async<'a, R, F>(
-        &'a self,
-        f: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn with_write_notify_all_async<'a, R, F>(&'a self, f: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
@@ -146,10 +128,7 @@ where
 {
     /// Forwards protected-state reads to the wrapped monitor.
     #[inline(always)]
-    fn with_read_async<'a, R, F>(
-        &'a self,
-        f: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn with_read_async<'a, R, F>(&'a self, f: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         F: FnOnce(&Self::State) -> R + Send + 'a,
@@ -159,10 +138,7 @@ where
 
     /// Forwards protected-state writes to the wrapped monitor.
     #[inline(always)]
-    fn with_write_async<'a, R, F>(
-        &'a self,
-        f: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn with_write_async<'a, R, F>(&'a self, f: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,

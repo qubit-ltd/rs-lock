@@ -198,25 +198,15 @@ macro_rules! arc_blocking_monitor_contract_tests {
         mod $module {
             use std::sync::Arc;
 
-            use qubit_clock::{
-                ManualMonotonicClock,
-                MonotonicClock,
-            };
-            use qubit_lock::{
-                $arc_monitor,
-                $monitor,
-            };
+            use qubit_clock::{ManualMonotonicClock, MonotonicClock};
+            use qubit_lock::{$arc_monitor, $monitor};
 
             #[test]
             fn test_with_timer_preserves_timer_domain() {
                 let clock = ManualMonotonicClock::new_shared();
-                let monitor =
-                    $arc_monitor::with_timer(1usize, clock.new_timer());
+                let monitor = $arc_monitor::with_timer(1usize, clock.new_timer());
 
-                assert_eq!(
-                    clock.now().domain(),
-                    monitor.timer().clock().now().domain()
-                );
+                assert_eq!(clock.now().domain(), monitor.timer().clock().now().domain());
             }
 
             #[test]
@@ -235,10 +225,7 @@ macro_rules! arc_blocking_monitor_contract_tests {
 
                 cloned.with_write_notify_one(|items| items.push(4));
 
-                assert_eq!(
-                    monitor.with_read(|items| items.clone()),
-                    vec![1, 2, 3, 4]
-                );
+                assert_eq!(monitor.with_read(|items| items.clone()), vec![1, 2, 3, 4]);
             }
 
             #[test]

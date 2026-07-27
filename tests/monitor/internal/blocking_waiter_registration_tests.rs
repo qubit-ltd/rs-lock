@@ -9,10 +9,7 @@
 
 use std::time::Duration;
 
-use qubit_lock::{
-    StdMonitor,
-    WaitTimeoutResult,
-};
+use qubit_lock::{StdMonitor, WaitTimeoutResult};
 
 /// Verifies a timed-out blocking registration is removed cleanly.
 #[test]

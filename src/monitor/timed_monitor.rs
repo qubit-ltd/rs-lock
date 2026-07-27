@@ -7,10 +7,7 @@
 // =============================================================================
 //! Aggregate timed blocking monitor capability.
 
-use crate::monitor::{
-    Monitor,
-    TimeoutConditionWaiter,
-};
+use crate::monitor::{Monitor, TimeoutConditionWaiter};
 
 /// Aggregate trait for blocking monitors with timeout-aware condition waits.
 ///

@@ -7,15 +7,9 @@
 // =============================================================================
 //! Provides the process-shared standard Timer for blocking monitors.
 
-use std::sync::{
-    Arc,
-    OnceLock,
-};
+use std::sync::{Arc, OnceLock};
 
-use qubit_clock::{
-    StdTimer,
-    Timer,
-};
+use qubit_clock::{StdTimer, Timer};
 
 /// Returns the process-shared standard Timer used by default constructors.
 ///

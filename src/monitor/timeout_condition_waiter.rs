@@ -7,16 +7,10 @@
 // =============================================================================
 //! Blocking timeout condition-wait capability.
 
-use qubit_clock::TimeError;
-use std::{
-    sync::Arc,
-    time::Duration,
-};
+use qubit_clock::{MonotonicInstant, TimeError};
+use std::{sync::Arc, time::Duration};
 
-use crate::monitor::{
-    ConditionWaiter,
-    WaitTimeoutResult,
-};
+use crate::monitor::{ConditionWaiter, WaitTimeoutResult};
 
 /// Waits for predicates over protected state with relative timeouts.
 ///
@@ -38,6 +32,109 @@ use crate::monitor::{
 /// predicate waits. Its generic methods make it unsuitable as a `dyn`
 /// trait-object interface.
 pub trait TimeoutConditionWaiter: ConditionWaiter {
+    /// Blocks until the predicate becomes true or an absolute deadline passes.
+    ///
+    /// The supplied deadline keeps advancing while acquiring the state lock,
+    /// evaluating the predicate, waiting, and reacquiring the lock. A ready
+    /// predicate wins even when the deadline has already passed.
+    ///
+    /// # Parameters
+    ///
+    /// * deadline - Absolute monotonic deadline for the condition wait.
+    /// * predicate - Predicate that returns true when the state is ready.
+    /// * action - Action to run after the predicate becomes true.
+    ///
+    /// # Returns
+    ///
+    /// Returns Ready with the action result, or TimedOut when the deadline
+    /// passes while the predicate remains false.
+    ///
+    /// # Errors
+    ///
+    /// Returns Timer domain, registration, or completion errors when waiting
+    /// is required. After waiting begins, such an error prevents action.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from predicate or action.
+    #[inline(always)]
+    fn wait_until_with_deadline<R, P, F>(
+        &self,
+        deadline: MonotonicInstant,
+        mut predicate: P,
+        action: F,
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
+    where
+        P: FnMut(&Self::State) -> bool,
+        F: FnOnce(&mut Self::State) -> R,
+    {
+        self.wait_while_with_deadline(deadline, move |state| !predicate(state), action)
+    }
+
+    /// Blocks until the predicate becomes true or an absolute deadline passes.
+    ///
+    /// This convenience method does not run an action and otherwise has the
+    /// same deadline and error semantics as wait_until_with_deadline.
+    ///
+    /// # Parameters
+    ///
+    /// * deadline - Absolute monotonic deadline for the condition wait.
+    /// * predicate - Predicate that returns true when the state is ready.
+    ///
+    /// # Returns
+    ///
+    /// Returns Ready with unit, or TimedOut when the deadline passes.
+    ///
+    /// # Errors
+    ///
+    /// Returns Timer errors when waiting is required.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from predicate.
+    #[inline(always)]
+    fn wait_until_ready_with_deadline<P>(
+        &self,
+        deadline: MonotonicInstant,
+        predicate: P,
+    ) -> Result<WaitTimeoutResult<()>, TimeError>
+    where
+        P: FnMut(&Self::State) -> bool,
+    {
+        self.wait_until_with_deadline(deadline, predicate, |_| ())
+    }
+
+    /// Blocks while the predicate remains true or until an absolute deadline.
+    ///
+    /// # Parameters
+    ///
+    /// * deadline - Absolute monotonic deadline for the condition wait.
+    /// * predicate - Predicate that returns true while waiting continues.
+    /// * action - Action to run after the predicate becomes false.
+    ///
+    /// # Returns
+    ///
+    /// Returns Ready with the action result, or TimedOut when the deadline
+    /// passes while the predicate remains true.
+    ///
+    /// # Errors
+    ///
+    /// Returns Timer domain, registration, or completion errors when waiting
+    /// is required.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from predicate or action.
+    fn wait_while_with_deadline<R, P, F>(
+        &self,
+        deadline: MonotonicInstant,
+        predicate: P,
+        action: F,
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
+    where
+        P: FnMut(&Self::State) -> bool,
+        F: FnOnce(&mut Self::State) -> R;
+
     /// Blocks until the predicate becomes true or the timeout expires.
     ///
     /// # Parameters
@@ -154,6 +251,29 @@ impl<M: ?Sized> TimeoutConditionWaiter for Arc<M>
 where
     M: TimeoutConditionWaiter,
 {
+    /// Delegates an absolute-deadline condition wait to the shared monitor.
+    ///
+    /// The deadline, result, errors, and panic behavior are forwarded
+    /// unchanged to the wrapped monitor.
+    #[inline(always)]
+    fn wait_while_with_deadline<R, P, F>(
+        &self,
+        deadline: MonotonicInstant,
+        predicate: P,
+        action: F,
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
+    where
+        P: FnMut(&Self::State) -> bool,
+        F: FnOnce(&mut Self::State) -> R,
+    {
+        <M as TimeoutConditionWaiter>::wait_while_with_deadline(
+            self.as_ref(),
+            deadline,
+            predicate,
+            action,
+        )
+    }
+
     /// Delegates a timed blocking condition wait to the shared monitor.
     ///
     /// # Parameters
@@ -185,11 +305,6 @@ where
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,
     {
-        <M as TimeoutConditionWaiter>::wait_while_for(
-            self.as_ref(),
-            timeout,
-            predicate,
-            action,
-        )
+        <M as TimeoutConditionWaiter>::wait_while_for(self.as_ref(), timeout, predicate, action)
     }
 }

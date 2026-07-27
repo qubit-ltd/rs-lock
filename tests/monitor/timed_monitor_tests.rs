@@ -7,17 +7,9 @@
 // =============================================================================
 //! Tests for [`TimedMonitor`](qubit_lock::TimedMonitor).
 
-use std::{
-    sync::Arc,
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 
-use qubit_lock::{
-    ArcStdMonitor,
-    StdMonitor,
-    TimedMonitor,
-    WaitTimeoutResult,
-};
+use qubit_lock::{ArcStdMonitor, StdMonitor, TimedMonitor, WaitTimeoutResult};
 
 /// Exercises timed waiting through the aggregate timed capability.
 fn wait_through_trait<M>(monitor: &M)

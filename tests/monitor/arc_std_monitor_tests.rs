@@ -8,32 +8,17 @@
 //! Tests for [`ArcStdMonitor`](qubit_lock::ArcStdMonitor).
 
 use std::{
-    sync::{
-        Arc,
-        mpsc,
-    },
+    sync::{Arc, mpsc},
     thread,
     time::Duration,
 };
 
-use qubit_clock::{
-    ManualMonotonicClock,
-    MonotonicClock,
-};
+use qubit_clock::{ManualMonotonicClock, MonotonicClock};
 use qubit_lock::{
-    ArcStdMonitor,
-    ConditionWaiter,
-    Notifier,
-    StdMonitor,
-    TimeoutConditionWaiter,
-    WaitTimeoutResult,
+    ArcStdMonitor, ConditionWaiter, Notifier, StdMonitor, TimeoutConditionWaiter, WaitTimeoutResult,
 };
 
-arc_blocking_monitor_contract_tests!(
-    arc_std_monitor_contract,
-    ArcStdMonitor,
-    StdMonitor
-);
+arc_blocking_monitor_contract_tests!(arc_std_monitor_contract, ArcStdMonitor, StdMonitor);
 
 #[test]
 fn test_arc_std_monitor_with_timer_preserves_timer_domain() {

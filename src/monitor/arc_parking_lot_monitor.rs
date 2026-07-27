@@ -10,22 +10,11 @@
 //! Provides an Arc-wrapped synchronous monitor for condition-based state
 //! coordination across threads.
 
-use qubit_clock::{
-    TimeError,
-    Timer,
-};
-use std::{
-    ops::Deref,
-    sync::Arc,
-    time::Duration,
-};
+use qubit_clock::{MonotonicInstant, TimeError, Timer};
+use std::{ops::Deref, sync::Arc, time::Duration};
 
 use super::{
-    ConditionWaiter,
-    Monitor,
-    Notifier,
-    ParkingLotMonitor,
-    TimeoutConditionWaiter,
+    ConditionWaiter, Monitor, Notifier, ParkingLotMonitor, TimeoutConditionWaiter,
     WaitTimeoutResult,
 };
 
@@ -216,6 +205,26 @@ impl<T> Monitor for ArcParkingLotMonitor<T> {
 }
 
 impl<T> TimeoutConditionWaiter for ArcParkingLotMonitor<T> {
+    /// Blocks while the predicate remains true or until an absolute deadline.
+    #[inline(always)]
+    fn wait_while_with_deadline<R, P, F>(
+        &self,
+        deadline: MonotonicInstant,
+        predicate: P,
+        action: F,
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
+    where
+        P: FnMut(&Self::State) -> bool,
+        F: FnOnce(&mut Self::State) -> R,
+    {
+        <ParkingLotMonitor<T> as TimeoutConditionWaiter>::wait_while_with_deadline(
+            self.inner.as_ref(),
+            deadline,
+            predicate,
+            action,
+        )
+    }
+
     /// Blocks while the predicate remains true or until the timeout expires.
     ///
     /// # Panics

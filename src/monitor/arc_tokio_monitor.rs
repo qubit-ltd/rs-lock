@@ -7,24 +7,11 @@
 // =============================================================================
 //! Arc-wrapped Tokio monitor.
 
-use qubit_clock::{
-    TimeError,
-    Timer,
-    TokioRuntimeError,
-};
-use std::{
-    future::Future,
-    ops::Deref,
-    sync::Arc,
-    time::Duration,
-};
+use qubit_clock::{MonotonicInstant, TimeError, Timer, TokioRuntimeError};
+use std::{future::Future, ops::Deref, sync::Arc, time::Duration};
 
 use super::{
-    AsyncConditionWaiter,
-    AsyncMonitor,
-    AsyncTimeoutConditionWaiter,
-    Notifier,
-    TokioMonitor,
+    AsyncConditionWaiter, AsyncMonitor, AsyncTimeoutConditionWaiter, Notifier, TokioMonitor,
     WaitTimeoutResult,
 };
 
@@ -53,9 +40,8 @@ impl<T> ArcTokioMonitor<T> {
     #[track_caller]
     #[inline]
     pub fn current(state: T) -> Self {
-        Self::try_current(state).unwrap_or_else(|error| {
-            panic!("cannot create Arc-wrapped Tokio monitor: {error}")
-        })
+        Self::try_current(state)
+            .unwrap_or_else(|error| panic!("cannot create Arc-wrapped Tokio monitor: {error}"))
     }
 
     /// Tries to create an Arc-wrapped monitor by capturing the current runtime.
@@ -180,10 +166,7 @@ impl<T: Send> AsyncConditionWaiter for ArcTokioMonitor<T> {
 impl<T: Send> AsyncMonitor for ArcTokioMonitor<T> {
     /// Acquires the wrapped monitor and reads its protected state.
     #[inline(always)]
-    fn with_read_async<'a, R, F>(
-        &'a self,
-        f: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn with_read_async<'a, R, F>(&'a self, f: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         F: FnOnce(&Self::State) -> R + Send + 'a,
@@ -193,10 +176,7 @@ impl<T: Send> AsyncMonitor for ArcTokioMonitor<T> {
 
     /// Acquires the wrapped monitor and mutates its protected state.
     #[inline(always)]
-    fn with_write_async<'a, R, F>(
-        &'a self,
-        f: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn with_write_async<'a, R, F>(&'a self, f: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
@@ -206,6 +186,24 @@ impl<T: Send> AsyncMonitor for ArcTokioMonitor<T> {
 }
 
 impl<T: Send> AsyncTimeoutConditionWaiter for ArcTokioMonitor<T> {
+    /// Returns a future that waits while the predicate remains true or until
+    /// an absolute deadline passes.
+    #[inline(always)]
+    fn wait_while_with_deadline_async<'a, R, P, F>(
+        &'a self,
+        deadline: MonotonicInstant,
+        predicate: P,
+        action: F,
+    ) -> impl Future<Output = Result<WaitTimeoutResult<R>, TimeError>> + Send + 'a
+    where
+        R: Send + 'a,
+        P: FnMut(&Self::State) -> bool + Send + 'a,
+        F: FnOnce(&mut Self::State) -> R + Send + 'a,
+    {
+        self.inner
+            .wait_while_with_deadline_async(deadline, predicate, action)
+    }
+
     /// Returns a future that waits while the predicate remains true or times
     /// out.
     ///

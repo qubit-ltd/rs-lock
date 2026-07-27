@@ -7,11 +7,7 @@
 // =============================================================================
 //! Tests for the lock module's crate-root exports.
 
-use qubit_lock::{
-    ExclusiveLock,
-    Lock,
-    ReadWriteLock,
-};
+use qubit_lock::{ExclusiveLock, Lock, ReadWriteLock};
 
 /// Verifies that synchronous lock traits remain available without optional
 /// features.
