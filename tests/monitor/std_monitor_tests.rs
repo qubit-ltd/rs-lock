@@ -802,6 +802,36 @@ fn test_std_monitor_remains_usable_after_panic_while_locked() {
     assert_eq!(monitor.with_read(|value| *value), 8);
 }
 
+/// Verifies poisoning stays observable until repaired state is explicitly
+/// accepted.
+#[test]
+fn test_std_monitor_reports_and_clears_poisoning() {
+    let monitor = Arc::new(StdMonitor::new(0usize));
+    assert!(!monitor.is_poisoned());
+    let poison_monitor = Arc::clone(&monitor);
+
+    let poisoner = thread::spawn(move || {
+        poison_monitor.with_write(|value| {
+            *value = 7;
+            panic!("intentional panic after partial state mutation");
+        });
+    });
+
+    assert!(poisoner.join().is_err());
+    assert!(monitor.is_poisoned());
+    assert_eq!(monitor.with_read(|value| *value), 7);
+    assert!(
+        monitor.is_poisoned(),
+        "recovering access must not silently clear the poison marker",
+    );
+
+    monitor.with_write(|value| *value = 11);
+    monitor.clear_poison();
+
+    assert!(!monitor.is_poisoned());
+    assert_eq!(monitor.with_read(|value| *value), 11);
+}
+
 #[test]
 fn test_std_monitor_wait_until_continues_after_panic_while_locked() {
     let monitor = Arc::new(StdMonitor::new(false));

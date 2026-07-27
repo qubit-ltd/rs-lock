@@ -187,6 +187,60 @@ impl<T> StdMonitor<T> {
         self.timer.as_ref()
     }
 
+    /// Reports whether a panic poisoned the standard-library state mutex.
+    ///
+    /// A poisoned result means a thread panicked while holding the monitor
+    /// state lock, so the protected value may contain partial mutations.
+    /// Monitor access methods recover and expose that inner value, but recovery
+    /// does not clear the poison marker. The result is an instantaneous
+    /// observation and may become stale if another thread subsequently panics.
+    ///
+    /// # Returns
+    ///
+    /// `true` while the state mutex remains poisoned, otherwise `false`.
+    #[must_use]
+    #[inline(always)]
+    pub fn is_poisoned(&self) -> bool {
+        self.state.is_poisoned()
+    }
+
+    /// Clears the poison marker after protected state has been validated or
+    /// repaired.
+    ///
+    /// This method only clears the marker. It does not inspect, roll back, or
+    /// repair mutations made before the panic. Callers should first recover the
+    /// state through [`Self::lock`] or [`Self::with_write`], restore the
+    /// application invariant, and only then accept that state by clearing the
+    /// marker.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use std::panic::{
+    ///     AssertUnwindSafe,
+    ///     catch_unwind,
+    /// };
+    ///
+    /// use qubit_lock::StdMonitor;
+    ///
+    /// let monitor = StdMonitor::new(1);
+    /// let _ = catch_unwind(AssertUnwindSafe(|| {
+    ///     monitor.with_write(|value| {
+    ///         *value = 0;
+    ///         panic!("partial update");
+    ///     });
+    /// }));
+    ///
+    /// assert!(monitor.is_poisoned());
+    /// monitor.with_write(|value| *value = 1);
+    /// monitor.clear_poison();
+    /// assert!(!monitor.is_poisoned());
+    /// ```
+    #[inline(always)]
+    pub fn clear_poison(&self) {
+        self.state.clear_poison();
+    }
+
     /// Acquires the monitor and returns a guard for explicit state-machine
     /// code.
     ///

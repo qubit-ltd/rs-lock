@@ -345,6 +345,17 @@ primitives. Choose it when avoiding the parking_lot dependency matters more
 than using that backend. `ArcStdMonitor<T>` is its cloneable shared handle and
 also provides `from_arc`, `as_arc`, and `into_arc`.
 
+Unlike the standard-library `Lock` and `DataLock` adapters, `StdMonitor`
+recovers the inner state instead of rejecting access after poisoning. A panic
+while the state lock is held can leave that state partially modified.
+`is_poisoned` reports whether this has happened; ordinary `lock`, `with_read`,
+`with_write`, and wait operations remain available but do not clear the marker.
+After inspecting and, when necessary, repairing the protected invariant, call
+`clear_poison` to explicitly accept the recovered state. `clear_poison` only
+clears the marker: it neither validates nor rolls back state, and a later panic
+while holding the monitor can poison it again. `ArcStdMonitor` exposes both
+methods through its inner monitor.
+
 ```rust
 use qubit_lock::ArcStdMonitor;
 
