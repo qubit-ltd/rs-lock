@@ -39,7 +39,7 @@ default = ["monitor", "parking-lot"]
 async-lock = ["dep:tokio", "tokio/sync"]
 async-monitor = ["async-lock", "monitor", "tokio/time", "qubit-clock/tokio"]
 loom-model = ["monitor", "dep:loom"]
-monitor = ["dep:qubit-clock", "dep:qubit-collections"]
+monitor = ["dep:qubit-clock"]
 parking-lot = ["dep:parking_lot"]
 
 [dependencies]
@@ -47,11 +47,11 @@ parking_lot = { version = "0.12", optional = true }
 loom = { version = "0.7", optional = true }
 tokio = { version = "1.52", default-features = false, optional = true }
 qubit-clock = { version = "0.10", optional = true }
-qubit-collections = { version = "0.1", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.8.2", default-features = false }
 qubit-clock = { version = "0.10", features = ["test-util"] }
+qubit-collections = { version = "0.1" }
 semver = { version = "1.0", default-features = false }
 tokio = { version = "1.52", default-features = false, features = ["macros", "rt-multi-thread", "test-util", "time"] }
 

@@ -23,3 +23,20 @@ fn test_loom_waiter_registry_selects_and_cancels_waiters() {
         assert_eq!(registry.take_one(), None);
     });
 }
+
+/// Verifies cancellation gaps do not change FIFO selection of remaining
+/// waiters.
+#[test]
+fn test_loom_waiter_registry_preserves_fifo_after_middle_cancellation() {
+    loom::model(|| {
+        let registry = LoomWaiterRegistry::new();
+        let _ = registry.register(10);
+        let cancelled_waiter_id = registry.register(20);
+        let _ = registry.register(30);
+
+        assert_eq!(registry.unregister(cancelled_waiter_id), Some(20));
+
+        let _ = registry.register(40);
+        assert_eq!(registry.take_all(), vec![10, 30, 40]);
+    });
+}

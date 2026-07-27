@@ -5,8 +5,7 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-//! Compares the monitor waiter index with the former BTreeMap and HashMap
-//! implementation strategy.
+//! Compares the production BTreeMap waiter index with former index strategies.
 
 use std::{
     collections::{
@@ -28,12 +27,87 @@ use qubit_collections::map::OrderedIndexMap;
 /// Registry sizes used to expose order-index maintenance costs.
 const WAITER_COUNTS: [usize; 4] = [32, 128, 512, 2_048];
 
-/// FIFO waiter index matching the production OrderedIndexMap strategy.
+/// FIFO waiter index matching the former production OrderedIndexMap strategy.
 struct OrderedIndexWaiters {
     /// Next nonzero registration identifier.
     next_waiter_id: u64,
     /// Values indexed by registration identifier and attachment order.
     waiters: OrderedIndexMap<u64, (), usize>,
+}
+
+/// FIFO waiter index matching the production single-BTreeMap strategy.
+struct BTreeWaiters {
+    /// Next nonzero registration identifier.
+    next_waiter_id: u64,
+    /// Values indexed by monotonically increasing FIFO registration
+    /// identifier.
+    waiters: BTreeMap<u64, usize>,
+}
+
+impl BTreeWaiters {
+    /// Creates an empty FIFO waiter index.
+    ///
+    /// # Returns
+    ///
+    /// An index ready to register benchmark waiter values.
+    fn new() -> Self {
+        Self {
+            next_waiter_id: 1,
+            waiters: BTreeMap::new(),
+        }
+    }
+
+    /// Registers `waiter` and returns its cancellation identifier.
+    ///
+    /// # Parameters
+    ///
+    /// * `waiter` - Benchmark value made eligible for notification.
+    ///
+    /// # Returns
+    ///
+    /// The identifier required to cancel `waiter`.
+    fn register(&mut self, waiter: usize) -> u64 {
+        let waiter_id = self.next_waiter_id;
+        self.next_waiter_id = waiter_id
+            .checked_add(1)
+            .expect("benchmark waiter identifiers should not exhaust");
+        assert!(
+            self.waiters.insert(waiter_id, waiter).is_none(),
+            "benchmark waiter identifier should be unique",
+        );
+        waiter_id
+    }
+
+    /// Removes and returns the longest-waiting registered value.
+    ///
+    /// # Returns
+    ///
+    /// The selected value, or `None` when no waiter remains.
+    fn take_one(&mut self) -> Option<usize> {
+        self.waiters.pop_first().map(|(_, waiter)| waiter)
+    }
+
+    /// Removes every waiter in FIFO order.
+    ///
+    /// # Returns
+    ///
+    /// Values active when the operation began.
+    fn take_all(&mut self) -> Vec<usize> {
+        std::mem::take(&mut self.waiters).into_values().collect()
+    }
+
+    /// Cancels the waiter associated with `waiter_id`.
+    ///
+    /// # Parameters
+    ///
+    /// * `waiter_id` - Registration identifier returned by [`Self::register`].
+    ///
+    /// # Returns
+    ///
+    /// The cancelled value, or `None` when it was already selected.
+    fn unregister(&mut self, waiter_id: u64) -> Option<usize> {
+        self.waiters.remove(&waiter_id)
+    }
 }
 
 impl OrderedIndexWaiters {
@@ -219,6 +293,23 @@ fn prepare_ordered_index_waiters(waiter_count: usize) -> OrderedIndexWaiters {
     waiters
 }
 
+/// Builds a single-BTreeMap fixture outside the measured operation.
+///
+/// # Parameters
+///
+/// * `waiter_count` - Number of registered values in the fixture.
+///
+/// # Returns
+///
+/// A populated waiter index with identifiers from one through `waiter_count`.
+fn prepare_btree_waiters(waiter_count: usize) -> BTreeWaiters {
+    let mut waiters = BTreeWaiters::new();
+    for waiter in 0..waiter_count {
+        waiters.register(waiter);
+    }
+    waiters
+}
+
 /// Builds a BTreeMap and HashMap fixture outside the measured operation.
 ///
 /// # Parameters
@@ -248,9 +339,25 @@ fn benchmark_waiter_registry(criterion: &mut Criterion) {
             BenchmarkId::new("ordered_index/register", waiter_count),
             &waiter_count,
             |bencher, &waiter_count| {
-                bencher.iter_batched(
+                bencher.iter_batched_ref(
                     OrderedIndexWaiters::new,
-                    |mut waiters| {
+                    |waiters| {
+                        for waiter in 0..waiter_count {
+                            black_box(waiters.register(waiter));
+                        }
+                        black_box(waiters);
+                    },
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("btree/register", waiter_count),
+            &waiter_count,
+            |bencher, &waiter_count| {
+                bencher.iter_batched_ref(
+                    BTreeWaiters::new,
+                    |waiters| {
                         for waiter in 0..waiter_count {
                             black_box(waiters.register(waiter));
                         }
@@ -264,9 +371,9 @@ fn benchmark_waiter_registry(criterion: &mut Criterion) {
             BenchmarkId::new("btree_hash/register", waiter_count),
             &waiter_count,
             |bencher, &waiter_count| {
-                bencher.iter_batched(
+                bencher.iter_batched_ref(
                     BTreeHashWaiters::new,
-                    |mut waiters| {
+                    |waiters| {
                         for waiter in 0..waiter_count {
                             black_box(waiters.register(waiter));
                         }
@@ -280,9 +387,25 @@ fn benchmark_waiter_registry(criterion: &mut Criterion) {
             BenchmarkId::new("ordered_index/cancel_reverse", waiter_count),
             &waiter_count,
             |bencher, &waiter_count| {
-                bencher.iter_batched(
+                bencher.iter_batched_ref(
                     || prepare_ordered_index_waiters(waiter_count),
-                    |mut waiters| {
+                    |waiters| {
+                        for waiter_id in (1..=waiter_count as u64).rev() {
+                            black_box(waiters.unregister(waiter_id));
+                        }
+                        black_box(waiters);
+                    },
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("btree/cancel_reverse", waiter_count),
+            &waiter_count,
+            |bencher, &waiter_count| {
+                bencher.iter_batched_ref(
+                    || prepare_btree_waiters(waiter_count),
+                    |waiters| {
                         for waiter_id in (1..=waiter_count as u64).rev() {
                             black_box(waiters.unregister(waiter_id));
                         }
@@ -296,9 +419,9 @@ fn benchmark_waiter_registry(criterion: &mut Criterion) {
             BenchmarkId::new("btree_hash/cancel_reverse", waiter_count),
             &waiter_count,
             |bencher, &waiter_count| {
-                bencher.iter_batched(
+                bencher.iter_batched_ref(
                     || prepare_btree_hash_waiters(waiter_count),
-                    |mut waiters| {
+                    |waiters| {
                         for waiter_id in (1..=waiter_count as u64).rev() {
                             black_box(waiters.unregister(waiter_id));
                         }
@@ -312,9 +435,20 @@ fn benchmark_waiter_registry(criterion: &mut Criterion) {
             BenchmarkId::new("ordered_index/notify_one", waiter_count),
             &waiter_count,
             |bencher, &waiter_count| {
-                bencher.iter_batched(
+                bencher.iter_batched_ref(
                     || prepare_ordered_index_waiters(waiter_count),
-                    |mut waiters| black_box(waiters.take_one()),
+                    |waiters| black_box(waiters.take_one()),
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("btree/notify_one", waiter_count),
+            &waiter_count,
+            |bencher, &waiter_count| {
+                bencher.iter_batched_ref(
+                    || prepare_btree_waiters(waiter_count),
+                    |waiters| black_box(waiters.take_one()),
                     BatchSize::SmallInput,
                 );
             },
@@ -323,9 +457,9 @@ fn benchmark_waiter_registry(criterion: &mut Criterion) {
             BenchmarkId::new("btree_hash/notify_one", waiter_count),
             &waiter_count,
             |bencher, &waiter_count| {
-                bencher.iter_batched(
+                bencher.iter_batched_ref(
                     || prepare_btree_hash_waiters(waiter_count),
-                    |mut waiters| black_box(waiters.take_one()),
+                    |waiters| black_box(waiters.take_one()),
                     BatchSize::SmallInput,
                 );
             },
@@ -334,9 +468,20 @@ fn benchmark_waiter_registry(criterion: &mut Criterion) {
             BenchmarkId::new("ordered_index/notify_all", waiter_count),
             &waiter_count,
             |bencher, &waiter_count| {
-                bencher.iter_batched(
+                bencher.iter_batched_ref(
                     || prepare_ordered_index_waiters(waiter_count),
-                    |mut waiters| black_box(waiters.take_all()),
+                    |waiters| black_box(waiters.take_all()),
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+        group.bench_with_input(
+            BenchmarkId::new("btree/notify_all", waiter_count),
+            &waiter_count,
+            |bencher, &waiter_count| {
+                bencher.iter_batched_ref(
+                    || prepare_btree_waiters(waiter_count),
+                    |waiters| black_box(waiters.take_all()),
                     BatchSize::SmallInput,
                 );
             },
@@ -345,9 +490,9 @@ fn benchmark_waiter_registry(criterion: &mut Criterion) {
             BenchmarkId::new("btree_hash/notify_all", waiter_count),
             &waiter_count,
             |bencher, &waiter_count| {
-                bencher.iter_batched(
+                bencher.iter_batched_ref(
                     || prepare_btree_hash_waiters(waiter_count),
-                    |mut waiters| black_box(waiters.take_all()),
+                    |waiters| black_box(waiters.take_all()),
                     BatchSize::SmallInput,
                 );
             },
