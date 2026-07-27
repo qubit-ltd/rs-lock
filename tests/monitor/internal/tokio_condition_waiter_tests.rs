@@ -8,17 +8,11 @@
 //! Public behavior tests backed by the internal Tokio condition waiter.
 
 use std::{
-    future::{
-        Future,
-        poll_fn,
-    },
+    future::{Future, poll_fn},
     task::Poll,
 };
 
-use qubit_lock::{
-    AsyncConditionWaiter,
-    TokioMonitor,
-};
+use qubit_lock::{AsyncConditionWaiter, TokioMonitor};
 
 /// Verifies a Tokio waiter resumes and rechecks state after notification.
 #[tokio::test]

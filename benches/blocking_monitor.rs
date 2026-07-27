@@ -10,37 +10,16 @@
 use std::{
     hint::black_box,
     sync::{
-        Arc,
-        Condvar as StdCondvar,
-        Mutex as StdMutex,
-        mpsc::{
-            self,
-            Receiver,
-        },
+        Arc, Condvar as StdCondvar, Mutex as StdMutex,
+        mpsc::{self, Receiver},
     },
-    thread::{
-        self,
-        JoinHandle,
-    },
+    thread::{self, JoinHandle},
     time::Duration,
 };
 
-use criterion::{
-    BatchSize,
-    BenchmarkId,
-    Criterion,
-    criterion_group,
-    criterion_main,
-};
-use parking_lot::{
-    Condvar,
-    Mutex,
-};
-use qubit_lock::{
-    ParkingLotMonitor,
-    StdMonitor,
-    WaitTimeoutStatus,
-};
+use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
+use parking_lot::{Condvar, Mutex};
+use qubit_lock::{ParkingLotMonitor, StdMonitor, WaitTimeoutStatus};
 
 /// Generous safety deadline that detects stalled notify-one benchmarks without
 /// allowing ordinary setup delays to select the timeout path.
@@ -68,8 +47,7 @@ type TimedMonitorWaiter = (
 );
 
 /// Resources for one timed parking_lot Condvar notify-one measurement.
-type TimedCondvarWaiter =
-    (Arc<(Mutex<bool>, Condvar)>, JoinHandle<()>, Receiver<bool>);
+type TimedCondvarWaiter = (Arc<(Mutex<bool>, Condvar)>, JoinHandle<()>, Receiver<bool>);
 
 /// Prepares registered ParkingLotMonitor waiters outside the measured routine.
 ///
@@ -93,12 +71,10 @@ fn prepare_monitor_waiters(waiter_count: usize) -> MonitorWaiters {
                 let mut registered_tx = Some(registered_tx);
                 monitor.wait_until(
                     move |ready| {
-                        if !*ready
-                            && let Some(registered_tx) = registered_tx.take()
-                        {
-                            registered_tx.send(()).expect(
-                                "benchmark should observe registration",
-                            );
+                        if !*ready && let Some(registered_tx) = registered_tx.take() {
+                            registered_tx
+                                .send(())
+                                .expect("benchmark should observe registration");
                         }
                         *ready
                     },
@@ -267,11 +243,7 @@ fn validate_notify_one_workloads() {
 /// * `waiter_count` - Number of completion messages to receive.
 /// * `done_rx` - Receiver carrying waiter completion messages.
 /// * `waiters` - Threads to join after completion.
-fn finish_waiters(
-    waiter_count: usize,
-    done_rx: Receiver<()>,
-    waiters: Vec<JoinHandle<()>>,
-) {
+fn finish_waiters(waiter_count: usize, done_rx: Receiver<()>, waiters: Vec<JoinHandle<()>>) {
     for _ in 0..waiter_count {
         done_rx.recv().expect("benchmark waiter should complete");
     }
@@ -324,8 +296,7 @@ fn benchmark_zero_timeout(criterion: &mut Criterion) {
     let std_changed = StdCondvar::new();
     group.bench_function("std_condvar", |bencher| {
         bencher.iter(|| {
-            let guard =
-                std_state.lock().expect("benchmark mutex should not poison");
+            let guard = std_state.lock().expect("benchmark mutex should not poison");
             let (guard, result) = std_changed
                 .wait_timeout(guard, Duration::ZERO)
                 .expect("benchmark mutex should not poison");

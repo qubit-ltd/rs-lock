@@ -10,23 +10,11 @@
 //! Provides an Arc-wrapped synchronous monitor for condition-based state
 //! coordination across threads.
 
-use qubit_clock::{
-    TimeError,
-    Timer,
-};
-use std::{
-    ops::Deref,
-    sync::Arc,
-    time::Duration,
-};
+use qubit_clock::{MonotonicInstant, TimeError, Timer};
+use std::{ops::Deref, sync::Arc, time::Duration};
 
 use super::{
-    ConditionWaiter,
-    Monitor,
-    Notifier,
-    StdMonitor,
-    TimeoutConditionWaiter,
-    WaitTimeoutResult,
+    ConditionWaiter, Monitor, Notifier, StdMonitor, TimeoutConditionWaiter, WaitTimeoutResult,
 };
 
 /// Arc-wrapped monitor for shared condition-based state coordination.
@@ -186,11 +174,7 @@ impl<T> ConditionWaiter for ArcStdMonitor<T> {
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,
     {
-        <StdMonitor<T> as ConditionWaiter>::wait_while(
-            self.inner.as_ref(),
-            predicate,
-            action,
-        )
+        <StdMonitor<T> as ConditionWaiter>::wait_while(self.inner.as_ref(), predicate, action)
     }
 }
 
@@ -215,6 +199,26 @@ impl<T> Monitor for ArcStdMonitor<T> {
 }
 
 impl<T> TimeoutConditionWaiter for ArcStdMonitor<T> {
+    /// Blocks while the predicate remains true or until an absolute deadline.
+    #[inline(always)]
+    fn wait_while_with_deadline<R, P, F>(
+        &self,
+        deadline: MonotonicInstant,
+        predicate: P,
+        action: F,
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
+    where
+        P: FnMut(&Self::State) -> bool,
+        F: FnOnce(&mut Self::State) -> R,
+    {
+        <StdMonitor<T> as TimeoutConditionWaiter>::wait_while_with_deadline(
+            self.inner.as_ref(),
+            deadline,
+            predicate,
+            action,
+        )
+    }
+
     /// Blocks while the predicate remains true or until the timeout expires.
     ///
     /// # Panics

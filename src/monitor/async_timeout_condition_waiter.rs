@@ -7,17 +7,10 @@
 // =============================================================================
 //! Asynchronous timeout condition-wait capability.
 
-use qubit_clock::TimeError;
-use std::{
-    future::Future,
-    sync::Arc,
-    time::Duration,
-};
+use qubit_clock::{MonotonicInstant, TimeError};
+use std::{future::Future, sync::Arc, time::Duration};
 
-use crate::monitor::{
-    AsyncConditionWaiter,
-    WaitTimeoutResult,
-};
+use crate::monitor::{AsyncConditionWaiter, WaitTimeoutResult};
 
 /// Waits asynchronously for predicates over protected state with timeouts.
 ///
@@ -46,6 +39,106 @@ use crate::monitor::{
 /// predicate waits. Its return-position `impl Future` methods make it
 /// unsuitable as a `dyn` trait-object interface.
 pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
+    /// Returns a future that waits until the predicate becomes true or an
+    /// absolute deadline passes.
+    ///
+    /// The future is lazy, but the supplied deadline is not reset when it is
+    /// first polled. A ready predicate wins even when the deadline has passed.
+    ///
+    /// # Parameters
+    ///
+    /// * deadline - Absolute monotonic deadline for the condition wait.
+    /// * predicate - Predicate that returns true when the state is ready.
+    /// * action - Action to run after the predicate becomes true.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to Ready with the action result or TimedOut.
+    ///
+    /// # Errors
+    ///
+    /// The future resolves to Timer errors when waiting is required.
+    ///
+    /// # Panics
+    ///
+    /// The future propagates a panic from predicate or action when polled.
+    #[inline(always)]
+    fn wait_until_with_deadline_async<'a, R, P, F>(
+        &'a self,
+        deadline: MonotonicInstant,
+        mut predicate: P,
+        action: F,
+    ) -> impl Future<Output = Result<WaitTimeoutResult<R>, TimeError>> + Send + 'a
+    where
+        R: Send + 'a,
+        P: FnMut(&Self::State) -> bool + Send + 'a,
+        F: FnOnce(&mut Self::State) -> R + Send + 'a,
+    {
+        self.wait_while_with_deadline_async(deadline, move |state| !predicate(state), action)
+    }
+
+    /// Returns a future that waits until the predicate becomes true or an
+    /// absolute deadline passes without running an action.
+    ///
+    /// # Parameters
+    ///
+    /// * deadline - Absolute monotonic deadline for the condition wait.
+    /// * predicate - Predicate that returns true when the state is ready.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to Ready with unit or TimedOut.
+    ///
+    /// # Errors
+    ///
+    /// The future resolves to Timer errors when waiting is required.
+    ///
+    /// # Panics
+    ///
+    /// The future propagates a panic from predicate when polled.
+    #[inline(always)]
+    fn wait_until_ready_with_deadline_async<'a, P>(
+        &'a self,
+        deadline: MonotonicInstant,
+        predicate: P,
+    ) -> impl Future<Output = Result<WaitTimeoutResult<()>, TimeError>> + Send + 'a
+    where
+        P: FnMut(&Self::State) -> bool + Send + 'a,
+    {
+        self.wait_until_with_deadline_async(deadline, predicate, |_| ())
+    }
+
+    /// Returns a future that waits while the predicate remains true or until
+    /// an absolute deadline passes.
+    ///
+    /// # Parameters
+    ///
+    /// * deadline - Absolute monotonic deadline for the condition wait.
+    /// * predicate - Predicate that returns true while waiting continues.
+    /// * action - Action to run after the predicate becomes false.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to Ready with the action result or TimedOut.
+    ///
+    /// # Errors
+    ///
+    /// The future resolves to Timer errors when waiting is required.
+    ///
+    /// # Panics
+    ///
+    /// The future propagates a panic from predicate or action when polled.
+    fn wait_while_with_deadline_async<'a, R, P, F>(
+        &'a self,
+        deadline: MonotonicInstant,
+        predicate: P,
+        action: F,
+    ) -> impl Future<Output = Result<WaitTimeoutResult<R>, TimeError>> + Send + 'a
+    where
+        R: Send + 'a,
+        P: FnMut(&Self::State) -> bool + Send + 'a,
+        F: FnOnce(&mut Self::State) -> R + Send + 'a;
+
     /// Returns a future that waits until the predicate becomes true or times
     /// out.
     ///
@@ -87,11 +180,7 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
-        self.wait_while_for_async(
-            timeout,
-            move |state| !predicate(state),
-            action,
-        )
+        self.wait_while_for_async(timeout, move |state| !predicate(state), action)
     }
 
     /// Returns a future that waits until the predicate becomes true or times
@@ -181,6 +270,23 @@ impl<M> AsyncTimeoutConditionWaiter for Arc<M>
 where
     M: AsyncTimeoutConditionWaiter + ?Sized,
 {
+    /// Forwards an absolute-deadline async condition wait to the wrapped monitor.
+    #[inline(always)]
+    fn wait_while_with_deadline_async<'a, R, P, F>(
+        &'a self,
+        deadline: MonotonicInstant,
+        predicate: P,
+        action: F,
+    ) -> impl Future<Output = Result<WaitTimeoutResult<R>, TimeError>> + Send + 'a
+    where
+        R: Send + 'a,
+        P: FnMut(&Self::State) -> bool + Send + 'a,
+        F: FnOnce(&mut Self::State) -> R + Send + 'a,
+    {
+        self.as_ref()
+            .wait_while_with_deadline_async(deadline, predicate, action)
+    }
+
     /// Forwards the timed asynchronous wait to the wrapped monitor.
     ///
     /// # Parameters

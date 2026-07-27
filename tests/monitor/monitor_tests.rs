@@ -10,15 +10,8 @@
 use std::sync::Arc;
 
 #[cfg(feature = "parking-lot")]
-use qubit_lock::{
-    ArcParkingLotMonitor,
-    ParkingLotMonitor,
-};
-use qubit_lock::{
-    ArcStdMonitor,
-    Monitor,
-    StdMonitor,
-};
+use qubit_lock::{ArcParkingLotMonitor, ParkingLotMonitor};
+use qubit_lock::{ArcStdMonitor, Monitor, StdMonitor};
 
 /// Exercises state access, notification, and untimed waiting through the
 /// aggregate blocking capability.

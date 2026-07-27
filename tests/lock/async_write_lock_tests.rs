@@ -7,11 +7,7 @@
 // =============================================================================
 //! Tests for the asynchronous write-mode lock adapter.
 
-use qubit_lock::{
-    AsyncLock,
-    AsyncReadWriteLock,
-    TryLockError,
-};
+use qubit_lock::{AsyncLock, AsyncReadWriteLock, TryLockError};
 use tokio::sync::RwLock;
 
 /// Verifies the asynchronous write adapter is exclusive.

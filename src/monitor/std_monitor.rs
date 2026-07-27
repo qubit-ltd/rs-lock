@@ -20,30 +20,15 @@
 //! [`StdMonitorGuard::wait_until`] for more complex state machines such as
 //! thread pools.
 
-use qubit_clock::{
-    TimeError,
-    Timer,
-};
-use std::{
-    sync::Arc,
-    time::Duration,
-};
+use qubit_clock::{MonotonicInstant, TimeError, Timer, TimerFuture};
+use std::{sync::Arc, task::Poll, time::Duration};
 
 use super::std_monitor_guard::StdMonitorGuard;
 use super::{
-    ConditionWaiter,
-    Monitor,
-    Notifier,
-    TimeoutConditionWaiter,
+    ConditionWaiter, Monitor, Notifier, TimeoutConditionWaiter,
     internal::{
-        BlockingWaiterRegistry,
-        default_timer,
-        sync::{
-            Mutex,
-            clear_poison,
-            is_poisoned,
-            recover,
-        },
+        BlockingConditionWaiter, BlockingWaiterRegistry, default_timer,
+        sync::{Mutex, clear_poison, is_poisoned, recover},
     },
     wait_timeout_result::WaitTimeoutResult,
 };
@@ -608,7 +593,30 @@ impl<T> StdMonitor<T> {
         self.wait_until(ready, |_| ());
     }
 
-    /// Waits while a predicate remains true, with an overall time limit.
+    /// Continues a timed wait after its first locked predicate check.
+    fn wait_while_with_timer_locked<R, P, F>(
+        &self,
+        mut guard: StdMonitorGuard<'_, T>,
+        mut future: TimerFuture,
+        mut waiting: P,
+        f: F,
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
+    where
+        P: FnMut(&T) -> bool,
+        F: FnOnce(&mut T) -> R,
+    {
+        loop {
+            let status = guard.wait_with_timer(&mut future)?;
+            if !waiting(&*guard) {
+                return Ok(WaitTimeoutResult::Ready(f(&mut *guard)));
+            }
+            if status.is_timed_out() {
+                return Ok(WaitTimeoutResult::TimedOut);
+            }
+        }
+    }
+
+    /// Waits while a predicate remains true with a relative condition-wait budget.
     ///
     /// This method is the timeout-aware form of [`Self::wait_while`]. It keeps
     /// rechecking `waiting` under the monitor lock and waits only for the
@@ -637,7 +645,7 @@ impl<T> StdMonitor<T> {
     ///
     /// # Parameters
     ///
-    /// * `timeout` - Maximum total duration to wait.
+    /// * `timeout` - Relative condition-wait budget after acquiring the lock.
     /// * `waiting` - Predicate that returns `true` while the caller should
     ///   continue waiting.
     /// * `f` - Closure that receives mutable access when waiting is no longer
@@ -696,19 +704,48 @@ impl<T> StdMonitor<T> {
             return Ok(WaitTimeoutResult::TimedOut);
         }
         let deadline = started_at.checked_add(timeout)?;
-        let mut future = self.timer.at(deadline)?;
-        loop {
-            let status = guard.wait_with_timer(&mut future)?;
-            if !waiting(&*guard) {
-                return Ok(WaitTimeoutResult::Ready(f(&mut *guard)));
-            }
-            if status.is_timed_out() {
-                return Ok(WaitTimeoutResult::TimedOut);
-            }
-        }
+        let future = self.timer.at(deadline)?;
+        self.wait_while_with_timer_locked(guard, future, waiting, f)
     }
 
-    /// Waits until a predicate becomes true, with an overall time limit.
+    /// Waits while a predicate remains true or until an absolute deadline.
+    ///
+    /// The deadline includes initial lock contention and predicate evaluation.
+    /// A ready predicate wins even when the deadline has passed. The action
+    /// runs while the monitor lock is held and is not limited by the deadline.
+    ///
+    /// # Errors
+    ///
+    /// Returns Timer domain, registration, or completion errors when waiting
+    /// is required.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from waiting or f.
+    pub fn wait_while_with_deadline<R, P, F>(
+        &self,
+        deadline: MonotonicInstant,
+        mut waiting: P,
+        f: F,
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
+    where
+        P: FnMut(&T) -> bool,
+        F: FnOnce(&mut T) -> R,
+    {
+        let mut guard = self.lock();
+        if !waiting(&*guard) {
+            return Ok(WaitTimeoutResult::Ready(f(&mut *guard)));
+        }
+        let mut future = self.timer.at(deadline)?;
+        if let Poll::Ready(result) = BlockingConditionWaiter::poll_timer_without_waiter(&mut future)
+        {
+            result?;
+            return Ok(WaitTimeoutResult::TimedOut);
+        }
+        self.wait_while_with_timer_locked(guard, future, waiting, f)
+    }
+
+    /// Waits until a predicate becomes true with a relative condition-wait budget.
     ///
     /// This is the positive-predicate counterpart of
     /// [`Self::wait_while_for`]. If `ready` becomes true on the deciding
@@ -736,7 +773,7 @@ impl<T> StdMonitor<T> {
     ///
     /// # Parameters
     ///
-    /// * `timeout` - Maximum total duration to wait.
+    /// * `timeout` - Relative condition-wait budget after acquiring the lock.
     /// * `ready` - Predicate that returns `true` when the caller may continue.
     /// * `f` - Closure that receives mutable access to the ready state.
     ///
@@ -805,6 +842,30 @@ impl<T> StdMonitor<T> {
         self.wait_while_for(timeout, |state| !ready(state), f)
     }
 
+    /// Waits until a predicate becomes true or an absolute deadline passes.
+    ///
+    /// # Errors
+    ///
+    /// Returns Timer errors from wait_while_with_deadline when waiting is
+    /// required.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from ready or f.
+    #[inline(always)]
+    pub fn wait_until_with_deadline<R, P, F>(
+        &self,
+        deadline: MonotonicInstant,
+        mut ready: P,
+        f: F,
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
+    where
+        P: FnMut(&T) -> bool,
+        F: FnOnce(&mut T) -> R,
+    {
+        self.wait_while_with_deadline(deadline, |state| !ready(state), f)
+    }
+
     /// Waits until a predicate becomes true or a timeout expires without
     /// changing the ready state.
     ///
@@ -814,7 +875,7 @@ impl<T> StdMonitor<T> {
     ///
     /// # Parameters
     ///
-    /// * `timeout` - Maximum total duration to wait.
+    /// * `timeout` - Relative condition-wait budget after acquiring the lock.
     /// * `ready` - Predicate that returns `true` when the caller may continue.
     ///
     /// # Returns
@@ -843,6 +904,28 @@ impl<T> StdMonitor<T> {
         P: FnMut(&T) -> bool,
     {
         self.wait_until_for(timeout, ready, |_| ())
+    }
+
+    /// Waits until a predicate becomes true or an absolute deadline passes.
+    ///
+    /// # Errors
+    ///
+    /// Returns Timer errors from wait_until_with_deadline when waiting is
+    /// required.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from ready.
+    #[inline(always)]
+    pub fn wait_until_ready_with_deadline<P>(
+        &self,
+        deadline: MonotonicInstant,
+        ready: P,
+    ) -> Result<WaitTimeoutResult<()>, TimeError>
+    where
+        P: FnMut(&T) -> bool,
+    {
+        self.wait_until_with_deadline(deadline, ready, |_| ())
     }
 
     /// Wakes one registered condition waiter.
@@ -972,6 +1055,21 @@ impl<T> Monitor for StdMonitor<T> {
 }
 
 impl<T> TimeoutConditionWaiter for StdMonitor<T> {
+    /// Blocks while the predicate remains true or until an absolute deadline.
+    #[inline(always)]
+    fn wait_while_with_deadline<R, P, F>(
+        &self,
+        deadline: MonotonicInstant,
+        predicate: P,
+        action: F,
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
+    where
+        P: FnMut(&Self::State) -> bool,
+        F: FnOnce(&mut Self::State) -> R,
+    {
+        Self::wait_while_with_deadline(self, deadline, predicate, action)
+    }
+
     /// Blocks while the predicate remains true or until the timeout expires.
     #[inline(always)]
     fn wait_while_for<R, P, F>(

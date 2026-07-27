@@ -7,10 +7,7 @@
 // =============================================================================
 //! Tests for [`SharedMonitor`](qubit_lock::SharedMonitor).
 
-use qubit_lock::{
-    ArcStdMonitor,
-    SharedMonitor,
-};
+use qubit_lock::{ArcStdMonitor, SharedMonitor};
 
 /// Clones a monitor through the aggregate shared capability.
 fn clone_through_trait<M>(monitor: M) -> M

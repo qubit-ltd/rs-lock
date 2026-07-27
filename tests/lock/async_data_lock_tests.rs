@@ -10,15 +10,9 @@
 //!
 //! Tests for the AsyncDataLock trait and its Tokio implementations.
 
-use tokio::sync::{
-    Mutex as AsyncMutex,
-    RwLock as AsyncRwLock,
-};
+use tokio::sync::{Mutex as AsyncMutex, RwLock as AsyncRwLock};
 
-use qubit_lock::{
-    AsyncDataLock,
-    TryLockError,
-};
+use qubit_lock::{AsyncDataLock, TryLockError};
 
 fn read_i32(value: &i32) -> i32 {
     *value
@@ -41,10 +35,7 @@ mod async_data_lock_trait_tests {
         let borrowed = &mutex;
 
         assert_eq!(AsyncDataLock::with_read(&borrowed, read_i32).await, 0,);
-        assert_eq!(
-            AsyncDataLock::with_write(&borrowed, increment_i32).await,
-            1,
-        );
+        assert_eq!(AsyncDataLock::with_write(&borrowed, increment_i32).await, 1,);
         assert_eq!(AsyncDataLock::try_with_read(&borrowed, read_i32), Ok(1),);
         assert_eq!(
             AsyncDataLock::try_with_write(&borrowed, increment_i32),
@@ -110,10 +101,7 @@ mod async_data_lock_trait_tests {
     #[tokio::test]
     async fn test_async_mutex_try_read_returns_would_block_when_locked() {
         use std::{
-            sync::{
-                Arc,
-                mpsc,
-            },
+            sync::{Arc, mpsc},
             time::Duration,
         };
 
@@ -127,14 +115,11 @@ mod async_data_lock_trait_tests {
         // Hold the lock in another thread (note: using thread instead of tokio
         // task)
         let handle = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new()
-                .expect("failed to create Tokio runtime");
+            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
             rt.block_on(async {
                 async_mutex_clone
                     .with_write(move |_| {
-                        locked_tx
-                            .send(())
-                            .expect("test should observe held mutex");
+                        locked_tx.send(()).expect("test should observe held mutex");
                         release_rx
                             .recv_timeout(Duration::from_secs(1))
                             .expect("test should release held mutex");
@@ -262,10 +247,7 @@ mod async_data_lock_trait_tests {
     #[tokio::test]
     async fn test_async_mutex_serializes_contended_writes() {
         use std::{
-            sync::{
-                Arc,
-                mpsc,
-            },
+            sync::{Arc, mpsc},
             time::Duration,
         };
 
@@ -276,15 +258,12 @@ mod async_data_lock_trait_tests {
         let async_mutex_clone = async_mutex.clone();
 
         let holder = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new()
-                .expect("failed to create Tokio runtime");
+            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
             rt.block_on(async {
                 async_mutex_clone
                     .with_write(move |value| {
                         *value += 1;
-                        locked_tx
-                            .send(())
-                            .expect("test should observe held mutex");
+                        locked_tx.send(()).expect("test should observe held mutex");
                         release_rx
                             .recv_timeout(Duration::from_secs(1))
                             .expect("test should release held mutex");
@@ -405,8 +384,7 @@ mod async_data_lock_trait_tests {
     }
 
     #[tokio::test]
-    async fn test_tokio_async_mutex_try_write_returns_would_block_when_guard_held()
-     {
+    async fn test_tokio_async_mutex_try_write_returns_would_block_when_guard_held() {
         let mutex = AsyncMutex::new(0);
         let _guard = mutex
             .try_lock()
@@ -417,8 +395,7 @@ mod async_data_lock_trait_tests {
     }
 
     #[tokio::test]
-    async fn test_tokio_async_mutex_try_methods_cover_shared_function_pointer_paths()
-     {
+    async fn test_tokio_async_mutex_try_methods_cover_shared_function_pointer_paths() {
         let mutex = AsyncMutex::new(0);
 
         assert_eq!(AsyncDataLock::try_with_read(&mutex, read_i32), Ok(0));
@@ -701,8 +678,7 @@ mod async_rwlock_data_trait_tests {
     }
 
     #[tokio::test]
-    async fn test_tokio_async_rwlock_try_read_succeeds_after_write_guard_released()
-     {
+    async fn test_tokio_async_rwlock_try_read_succeeds_after_write_guard_released() {
         let rwlock = AsyncRwLock::new(0);
 
         // First acquire write lock to ensure it's locked
@@ -716,8 +692,7 @@ mod async_rwlock_data_trait_tests {
     }
 
     #[tokio::test]
-    async fn test_tokio_async_rwlock_try_write_succeeds_after_read_guard_released()
-     {
+    async fn test_tokio_async_rwlock_try_write_succeeds_after_read_guard_released() {
         let rwlock = AsyncRwLock::new(0);
 
         // First acquire read lock to ensure it's locked
@@ -731,8 +706,7 @@ mod async_rwlock_data_trait_tests {
     }
 
     #[tokio::test]
-    async fn test_tokio_async_rwlock_try_read_returns_would_block_when_write_guard_held()
-     {
+    async fn test_tokio_async_rwlock_try_read_returns_would_block_when_write_guard_held() {
         let rwlock = AsyncRwLock::new(0);
         let _guard = rwlock
             .try_write()
@@ -743,8 +717,7 @@ mod async_rwlock_data_trait_tests {
     }
 
     #[tokio::test]
-    async fn test_tokio_async_rwlock_try_write_returns_would_block_when_read_guard_held()
-     {
+    async fn test_tokio_async_rwlock_try_write_returns_would_block_when_read_guard_held() {
         let rwlock = AsyncRwLock::new(0);
         let _guard = rwlock
             .try_read()
@@ -755,15 +728,11 @@ mod async_rwlock_data_trait_tests {
     }
 
     #[tokio::test]
-    async fn test_tokio_async_rwlock_try_methods_cover_shared_function_pointer_paths()
-     {
+    async fn test_tokio_async_rwlock_try_methods_cover_shared_function_pointer_paths() {
         let rwlock = AsyncRwLock::new(0);
 
         assert_eq!(AsyncDataLock::try_with_read(&rwlock, read_i32), Ok(0));
-        assert_eq!(
-            AsyncDataLock::try_with_write(&rwlock, increment_i32),
-            Ok(1)
-        );
+        assert_eq!(AsyncDataLock::try_with_write(&rwlock, increment_i32), Ok(1));
 
         let write_guard = rwlock
             .try_write()

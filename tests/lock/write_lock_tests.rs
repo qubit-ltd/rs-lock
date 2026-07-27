@@ -7,11 +7,7 @@
 // =============================================================================
 //! Tests for the synchronous write-mode lock adapter.
 
-use qubit_lock::{
-    Lock,
-    ReadWriteLock,
-    TryLockError,
-};
+use qubit_lock::{Lock, ReadWriteLock, TryLockError};
 use std::sync::RwLock;
 
 /// Verifies the write adapter provides exclusive acquisition.

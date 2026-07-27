@@ -11,17 +11,10 @@
 //! locks and executing operations within the locked context. This trait allows
 //! locks to be used in a generic way through closures, avoiding the complexity
 //! of explicitly managing lock guards and their lifetimes.
-use std::sync::{
-    Arc,
-    Mutex,
-    RwLock,
-};
+use std::sync::{Arc, Mutex, RwLock};
 
 #[cfg(feature = "parking-lot")]
-use parking_lot::{
-    Mutex as ParkingLotMutex,
-    RwLock as ParkingLotRwLock,
-};
+use parking_lot::{Mutex as ParkingLotMutex, RwLock as ParkingLotRwLock};
 
 use super::try_lock_error::TryLockError;
 
@@ -458,12 +451,8 @@ impl<T: ?Sized + Send> DataLock<T> for Mutex<T> {
     {
         match self.try_lock() {
             Ok(guard) => Ok(f(&*guard)),
-            Err(std::sync::TryLockError::WouldBlock) => {
-                Err(TryLockError::WouldBlock)
-            }
-            Err(std::sync::TryLockError::Poisoned(_)) => {
-                Err(TryLockError::Poisoned)
-            }
+            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
+            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
         }
     }
 
@@ -493,12 +482,8 @@ impl<T: ?Sized + Send> DataLock<T> for Mutex<T> {
     {
         match self.try_lock() {
             Ok(mut guard) => Ok(f(&mut *guard)),
-            Err(std::sync::TryLockError::WouldBlock) => {
-                Err(TryLockError::WouldBlock)
-            }
-            Err(std::sync::TryLockError::Poisoned(_)) => {
-                Err(TryLockError::Poisoned)
-            }
+            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
+            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
         }
     }
 }
@@ -584,12 +569,8 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for RwLock<T> {
     {
         match self.try_read() {
             Ok(guard) => Ok(f(&*guard)),
-            Err(std::sync::TryLockError::WouldBlock) => {
-                Err(TryLockError::WouldBlock)
-            }
-            Err(std::sync::TryLockError::Poisoned(_)) => {
-                Err(TryLockError::Poisoned)
-            }
+            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
+            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
         }
     }
 
@@ -619,12 +600,8 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for RwLock<T> {
     {
         match self.try_write() {
             Ok(mut guard) => Ok(f(&mut *guard)),
-            Err(std::sync::TryLockError::WouldBlock) => {
-                Err(TryLockError::WouldBlock)
-            }
-            Err(std::sync::TryLockError::Poisoned(_)) => {
-                Err(TryLockError::Poisoned)
-            }
+            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
+            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
         }
     }
 }

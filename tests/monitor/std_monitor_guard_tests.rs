@@ -8,27 +8,14 @@
 //! Tests for [`StdMonitorGuard`](qubit_lock::StdMonitorGuard).
 
 use std::{
-    sync::{
-        Arc,
-        mpsc,
-    },
+    sync::{Arc, mpsc},
     thread,
     time::Duration,
 };
 
-use super::failing_timer_tests::{
-    assert_backend_unavailable,
-    registration_failing_timer,
-};
-use qubit_clock::{
-    ManualMonotonicClock,
-    MonotonicClock,
-    TimeError,
-};
-use qubit_lock::{
-    StdMonitor,
-    WaitTimeoutStatus,
-};
+use super::failing_timer_tests::{assert_backend_unavailable, registration_failing_timer};
+use qubit_clock::{ManualMonotonicClock, MonotonicClock, TimeError};
+use qubit_lock::{StdMonitor, WaitTimeoutStatus};
 
 #[test]
 fn test_std_monitor_guard_updates_state() {
@@ -54,16 +41,16 @@ fn test_std_monitor_guard_notify_one_releases_lock_and_wakes_waiter() {
         waiter_monitor.wait_until(
             |ready| {
                 if !*ready {
-                    checked_tx.send(()).expect(
-                        "test coordinator should receive predicate check",
-                    );
+                    checked_tx
+                        .send(())
+                        .expect("test coordinator should receive predicate check");
                 }
                 *ready
             },
             |_ready| {
-                done_tx.send(()).expect(
-                    "test coordinator should receive waiter completion",
-                );
+                done_tx
+                    .send(())
+                    .expect("test coordinator should receive waiter completion");
             },
         );
     });
@@ -165,8 +152,7 @@ fn test_std_monitor_guard_wait_until_accepts_reached_local_deadline() {
 
 #[test]
 fn test_std_monitor_guard_keeps_lock_after_timer_registration_error() {
-    let monitor =
-        StdMonitor::with_timer(1, Arc::new(registration_failing_timer()));
+    let monitor = StdMonitor::with_timer(1, Arc::new(registration_failing_timer()));
     let mut guard = monitor.lock();
 
     let error = guard

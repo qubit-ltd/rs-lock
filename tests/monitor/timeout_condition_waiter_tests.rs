@@ -9,17 +9,12 @@
 
 use std::time::Duration;
 
-use qubit_clock::TimeError;
 use qubit_lock::{
-    StdMonitor,
-    TimeoutConditionWaiter,
-    WaitTimeoutResult,
+    MonotonicInstant, StdMonitor, TimeError, TimeoutConditionWaiter, WaitTimeoutResult,
 };
 
 /// Runs a zero-budget condition wait through a generic timeout bound.
-fn wait_through_trait<W>(
-    waiter: &W,
-) -> Result<WaitTimeoutResult<i32>, TimeError>
+fn wait_through_trait<W>(waiter: &W) -> Result<WaitTimeoutResult<i32>, TimeError>
 where
     W: TimeoutConditionWaiter<State = bool>,
 {
@@ -27,13 +22,22 @@ where
 }
 
 /// Runs an action-free timed condition wait through a generic timeout bound.
-fn wait_until_ready_for_through_trait<W>(
-    waiter: &W,
-) -> Result<WaitTimeoutResult<()>, TimeError>
+fn wait_until_ready_for_through_trait<W>(waiter: &W) -> Result<WaitTimeoutResult<()>, TimeError>
 where
     W: TimeoutConditionWaiter<State = bool>,
 {
     waiter.wait_until_ready_for(Duration::ZERO, |ready| *ready)
+}
+
+/// Runs an action-free deadline wait through a generic timeout bound.
+fn wait_until_ready_with_deadline_through_trait<W>(
+    waiter: &W,
+    deadline: MonotonicInstant,
+) -> Result<WaitTimeoutResult<()>, TimeError>
+where
+    W: TimeoutConditionWaiter<State = bool>,
+{
+    waiter.wait_until_ready_with_deadline(deadline, |ready| *ready)
 }
 
 #[test]
@@ -54,6 +58,24 @@ fn test_timeout_condition_waiter_wait_until_ready_for_preserves_outcome() {
     );
     assert_time_result_eq!(
         wait_until_ready_for_through_trait(&StdMonitor::new(true)),
+        Ok(WaitTimeoutResult::Ready(())),
+    );
+}
+
+#[test]
+/// Verifies the deadline helper preserves ready and timeout outcomes.
+fn test_timeout_condition_waiter_wait_until_ready_with_deadline_preserves_outcome() {
+    let timed_out = StdMonitor::new(false);
+    let ready = StdMonitor::new(true);
+    let timed_out_deadline = timed_out.timer().now();
+    let ready_deadline = ready.timer().now();
+
+    assert_time_result_eq!(
+        wait_until_ready_with_deadline_through_trait(&timed_out, timed_out_deadline),
+        Ok(WaitTimeoutResult::TimedOut),
+    );
+    assert_time_result_eq!(
+        wait_until_ready_with_deadline_through_trait(&ready, ready_deadline),
         Ok(WaitTimeoutResult::Ready(())),
     );
 }

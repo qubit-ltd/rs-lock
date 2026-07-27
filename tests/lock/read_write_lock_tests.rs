@@ -8,19 +8,13 @@
 //! Tests for synchronous read-write lock capabilities.
 
 use std::{
-    sync::{
-        Arc,
-        RwLock,
-    },
+    sync::{Arc, RwLock},
     thread,
 };
 
 #[cfg(feature = "parking-lot")]
 use parking_lot::RwLock as ParkingLotRwLock;
-use qubit_lock::{
-    ReadWriteLock,
-    TryLockError,
-};
+use qubit_lock::{ReadWriteLock, TryLockError};
 
 #[test]
 fn test_read_write_lock_std_modes_return_native_guards() {
