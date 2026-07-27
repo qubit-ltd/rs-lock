@@ -83,6 +83,10 @@ impl<T> ArcStdMonitor<T> {
     /// # Returns
     ///
     /// A cloneable monitor handle initialized with the supplied state.
+    ///
+    /// # Panics
+    ///
+    /// Panics if all process-wide clock-domain identifiers are exhausted.
     #[inline]
     pub fn new(state: T) -> Self {
         Self {
@@ -172,6 +176,10 @@ impl<T> ConditionWaiter for ArcStdMonitor<T> {
     type State = T;
 
     /// Blocks while the predicate remains true, then runs the action.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `predicate`, `action`, or the wrapped monitor.
     #[inline(always)]
     fn wait_while<R, P, F>(&self, predicate: P, action: F) -> R
     where
@@ -208,6 +216,10 @@ impl<T> Monitor for ArcStdMonitor<T> {
 
 impl<T> TimeoutConditionWaiter for ArcStdMonitor<T> {
     /// Blocks while the predicate remains true or until the timeout expires.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `predicate`, `action`, or the wrapped monitor.
     #[inline(always)]
     fn wait_while_for<R, P, F>(
         &self,
@@ -251,6 +263,10 @@ impl<T> From<T> for ArcStdMonitor<T> {
     /// # Returns
     ///
     /// A cloneable standard monitor handle protecting `value`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if all process-wide clock-domain identifiers are exhausted.
     #[inline(always)]
     fn from(value: T) -> Self {
         Self::new(value)
@@ -263,6 +279,11 @@ impl<T: Default> Default for ArcStdMonitor<T> {
     /// # Returns
     ///
     /// A cloneable monitor handle protecting the default value for `T`.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `T::default()`. Panics if all process-wide
+    /// clock-domain identifiers are exhausted.
     #[inline(always)]
     fn default() -> Self {
         Self::new(T::default())

@@ -74,14 +74,14 @@ qubit-lock = { version = "0.11", default-features = false }
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", features = ["async-lock"] }
+qubit-lock = { version = "0.11", default-features = false, features = ["async-lock"] }
 ```
 
 启用 Tokio monitor 和计时等待：
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", features = ["async-monitor"] }
+qubit-lock = { version = "0.11", default-features = false, features = ["async-monitor"] }
 ```
 
 如果应用创建 Tokio runtime，应在应用自己的 `Cargo.toml` 中启用所需的 runtime
@@ -126,8 +126,8 @@ Copyright (c) 2025 - 2026. Haixing Hu. All rights reserved.
 
 ## 贡献
 
-欢迎贡献。请遵循 Rust API 指南，及时更新公共 API 文档与测试，并在提交 Pull
-Request 前运行 `./align-ci.sh` 格式化代码，运行 `./ci-check.sh` 对齐 CI 要求。
+欢迎贡献。请遵循 Rust API 指南，及时更新公共 API 文档与测试，并在提交
+Pull Request 前运行 `./align-ci.sh`格式化代码，运行`./ci-check.sh`对齐CI要求。
 
 ## 作者
 

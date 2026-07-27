@@ -69,6 +69,11 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     /// than reporting them as timeouts. After waiting begins, such an error
     /// takes precedence over a post-wait ready predicate and prevents `action`
     /// from running.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `predicate` or `action` when
+    /// it is polled.
     #[inline(always)]
     fn wait_until_for_async<'a, R, P, F>(
         &'a self,
@@ -113,6 +118,11 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     /// than reporting them as timeouts. After waiting begins, such an error
     /// takes precedence over a post-wait ready predicate and prevents `action`
     /// from running.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `predicate` or `action` when
+    /// it is polled.
     fn wait_while_for_async<'a, R, P, F>(
         &'a self,
         timeout: Duration,
@@ -146,6 +156,11 @@ where
     ///
     /// The future resolves to Timer registration or completion errors from the
     /// wrapped monitor rather than reporting them as timeouts.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from the wrapped monitor,
+    /// including from `predicate` or `action`, when it is polled.
     #[inline(always)]
     fn wait_while_for_async<'a, R, P, F>(
         &'a self,

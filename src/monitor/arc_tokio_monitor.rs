@@ -158,6 +158,10 @@ impl<T: Send> AsyncConditionWaiter for ArcTokioMonitor<T> {
     type State = T;
 
     /// Returns a future that waits while the predicate remains true.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates panics from the wrapped monitor.
     #[inline(always)]
     fn wait_while_async<'a, R, P, F>(
         &'a self,
@@ -204,6 +208,10 @@ impl<T: Send> AsyncMonitor for ArcTokioMonitor<T> {
 impl<T: Send> AsyncTimeoutConditionWaiter for ArcTokioMonitor<T> {
     /// Returns a future that waits while the predicate remains true or times
     /// out.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates panics from the wrapped monitor.
     #[inline(always)]
     fn wait_while_for_async<'a, R, P, F>(
         &'a self,
