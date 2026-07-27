@@ -54,20 +54,22 @@ use super::{
 /// state guard, and unregisters its Tokio notification waiter without running
 /// the action or rolling back protected-state changes. If `notify_one` has
 /// already selected that waiter, cancellation discards that selection instead
-/// of transferring it to another or future waiter. After an initial predicate
-/// check requires waiting with a nonzero budget, a timed wait creates one timer
-/// before registering its first waiter and reuses that fixed deadline across
-/// wakeups. Registration and state-reacquisition time consume the
-/// condition-wait budget; a signal cannot restart or extend it. When a signal
-/// and the deadline are both ready, the deadline is selected first, followed
-/// by one final locked predicate check. The default Tokio timer captures a
+/// of transferring it to another or future waiter. Timed waits align with
+/// [`std::sync::Condvar::wait_timeout_while`]: after acquiring the state lock
+/// and before the first predicate check, they sample one fixed deadline. The
+/// initial mutex contention is excluded, but predicate work, registration, and
+/// waiting consume the condition-wait budget; a signal cannot restart or
+/// extend it. A timed wait may return after the timeout while reacquiring the
+/// state lock. When a signal and the deadline are both ready, the deadline is
+/// selected first, followed by one final locked predicate check. The default
+/// Tokio timer captures a
 /// runtime handle during monitor construction. Its target runtime must remain
 /// alive with time enabled and be driven while a timed wait is pending, though
 /// the wait future may be polled from another runtime context. Injected timers
-/// retain their own progress requirements. Initial mutex contention, an
-/// immediately ready predicate, and a zero budget do not create a timer future.
-/// Closures and predicates execute while the state mutex is held and must not
-/// re-enter the same monitor; doing so can deadlock.
+/// retain their own progress requirements. An immediately ready predicate and
+/// a zero budget do not create a timer future. Closures and predicates execute
+/// while the state mutex is held and must not re-enter the same monitor; doing
+/// so can deadlock.
 pub struct TokioMonitor<T> {
     /// Protected monitor state.
     state: Mutex<T>,
@@ -456,22 +458,22 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// future while it is pending cancels and unregisters the wait without
     /// running `action` or rolling back protected-state changes. A notification
     /// that already selected this waiter is discarded rather than transferred.
-    /// After an initial blocking predicate with a nonzero budget, the method
-    /// creates one Timer future before waiter registration. The default Tokio
-    /// timer uses its retained runtime handle; that runtime must stay alive,
-    /// have time enabled, and be driven while the wait is pending. Injected
-    /// timers retain their own progress requirements. Registration time
-    /// consumes the budget. Initial mutex contention, an immediately ready
-    /// predicate, and a zero budget do not create a Timer future. The fixed
-    /// deadline is reused across wakeups and followed by one final locked
-    /// predicate check. Predicate readiness wins over a successful timeout. A
-    /// Timer registration or completion error is settled before every
-    /// post-wait predicate result and prevents `action` from running. If a
-    /// signal wins before the timer is ready but reacquiring the state exhausts
-    /// the fixed deadline, a still-blocking predicate times out without another
-    /// waiter registration. When the signal and deadline are both ready, the
-    /// deadline is selected first. A zero timeout still checks the predicate
-    /// once.
+    /// The timeout is aligned with [`std::sync::Condvar::wait_timeout_while`]:
+    /// after acquiring the state lock and before the first predicate check, the
+    /// method samples one fixed deadline. Initial mutex contention is excluded,
+    /// but predicate work, registration, and waiting consume the budget. The
+    /// method may return after the timeout while reacquiring the state lock.
+    /// An immediately ready predicate and a zero budget do not create a Timer
+    /// future. The default Tokio timer uses its retained runtime handle; that
+    /// runtime must stay alive, have time enabled, and be driven while the wait
+    /// is pending. Injected timers retain their own progress requirements.
+    /// Predicate readiness wins over a successful timeout, while a Timer
+    /// registration or completion error takes precedence over every post-wait
+    /// predicate result and prevents `action` from running. If a signal wins
+    /// before the timer is ready but reacquiring the state exhausts the fixed
+    /// deadline, a still-blocking predicate times out without another waiter
+    /// registration. When the signal and deadline are both ready, the deadline
+    /// is selected first. A zero timeout still checks the predicate once.
     ///
     /// # Panics
     ///
@@ -544,6 +546,7 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     {
         async move {
             let mut guard = self.state.lock().await;
+            let started_at = self.timer.now();
             if !predicate(&*guard) {
                 return Ok(WaitTimeoutResult::Ready(action(&mut *guard)));
             }
@@ -551,7 +554,8 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
                 return Ok(WaitTimeoutResult::TimedOut);
             }
 
-            let mut deadline = self.timer.after(timeout)?;
+            let deadline_at = started_at.checked_add(timeout)?;
+            let mut deadline = self.timer.at(deadline_at)?;
             loop {
                 let registration = self.register_waiter();
                 drop(guard);

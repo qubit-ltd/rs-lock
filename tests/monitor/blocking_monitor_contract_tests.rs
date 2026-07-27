@@ -12,23 +12,13 @@ macro_rules! blocking_monitor_contract_tests {
     ($module:ident, $monitor:ident) => {
         mod $module {
             use std::{
-                sync::{
-                    Arc,
-                    mpsc,
-                },
+                sync::{Arc, mpsc},
                 thread,
                 time::Duration,
             };
 
-            use qubit_clock::{
-                ManualMonotonicClock,
-                MonotonicClock,
-            };
-            use qubit_lock::{
-                WaitTimeoutResult,
-                WaitTimeoutStatus,
-                $monitor,
-            };
+            use qubit_clock::{ManualMonotonicClock, MonotonicClock};
+            use qubit_lock::{WaitTimeoutResult, WaitTimeoutStatus, $monitor};
 
             #[test]
             fn test_new_read_write_updates_state() {
@@ -68,9 +58,7 @@ macro_rules! blocking_monitor_contract_tests {
                             *ready
                         },
                         |_| {
-                            done_tx
-                                .send(())
-                                .expect("contract waiter should complete");
+                            done_tx.send(()).expect("contract waiter should complete");
                         },
                     );
                 });
@@ -102,17 +90,15 @@ macro_rules! blocking_monitor_contract_tests {
                                 move |ready| {
                                     if !*ready {
                                         if let Some(checked_tx) = checked_tx.take() {
-                                            checked_tx.send(()).expect(
-                                                "contract should observe predicate check",
-                                            );
+                                            checked_tx
+                                                .send(())
+                                                .expect("contract should observe predicate check");
                                         }
                                     }
                                     *ready
                                 },
                                 |_| {
-                                    done_tx.send(()).expect(
-                                        "contract waiter should complete",
-                                    );
+                                    done_tx.send(()).expect("contract waiter should complete");
                                 },
                             );
                         })

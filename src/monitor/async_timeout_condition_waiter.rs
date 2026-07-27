@@ -21,16 +21,17 @@ use crate::monitor::{
 
 /// Waits asynchronously for predicates over protected state with timeouts.
 ///
-/// The timeout is a condition-wait budget. The returned future is lazy, so
+/// The timeout is a condition-wait budget, aligned with
+/// [`std::sync::Condvar::wait_timeout_while`]. The returned future is lazy, so
 /// construction and time before its first poll consume no budget. Initial
-/// state-lock contention and the initial locked predicate check are also
-/// excluded. If waiting is required, one fixed deadline is established
-/// immediately before the first condition-wait suspension and reused across
-/// wakeups. A zero timeout still checks the predicate. After waiting begins,
-/// Timer registration or completion errors take precedence over every
-/// post-wait predicate result, and the action is not run. When the Timer
-/// completes successfully, a final locked predicate check still wins over
-/// timeout.
+/// state-lock contention is excluded. The budget starts after acquiring the
+/// state lock and before the first predicate check, so predicate work consumes
+/// it. If waiting is required, one fixed deadline is reused across wakeups. A
+/// timed wait may return after the timeout while reacquiring the state lock. A
+/// zero timeout still checks the predicate. After waiting begins, Timer
+/// registration or completion errors take precedence over every post-wait
+/// predicate result, and the action is not run. When the Timer completes
+/// successfully, a final locked predicate check still wins over timeout.
 ///
 /// The external predicate state handshake documented by
 /// [`AsyncConditionWaiter`] also applies to timed asynchronous waits.

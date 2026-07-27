@@ -301,6 +301,18 @@ async fn test_tokio_monitor_propagates_timer_registration_error() {
     assert!(!monitor.with_read_async(|ready| *ready).await);
 }
 
+#[tokio::test]
+async fn test_tokio_monitor_ready_predicate_skips_timer_registration() {
+    let monitor =
+        TokioMonitor::with_timer(true, Arc::new(registration_failing_timer()));
+
+    let result = monitor
+        .wait_until_for_async(Duration::MAX, |ready| *ready, |_| 7)
+        .await;
+
+    assert_time_result_eq!(result, Ok(WaitTimeoutResult::Ready(7)));
+}
+
 /// Counts wakeups delivered to one manually polled future.
 #[derive(Default)]
 struct WakeCounter {
@@ -869,6 +881,44 @@ async fn test_tokio_monitor_async_wait_while_for_uses_condition_wait_budget() {
     );
     tokio::time::advance(Duration::from_millis(1)).await;
     assert_time_result_eq!(wait.await, Ok(WaitTimeoutResult::TimedOut));
+}
+
+/// Verifies that the first predicate check consumes the timeout budget.
+#[tokio::test]
+async fn test_tokio_monitor_async_wait_while_for_includes_initial_predicate_time_in_deadline()
+ {
+    const WAIT_TIMEOUT: Duration = Duration::from_millis(20);
+    const PREDICATE_TIME: Duration = Duration::from_millis(5);
+
+    let clock = ManualMonotonicClock::new_shared();
+    let monitor = TokioMonitor::with_timer(false, clock.new_timer());
+    let predicate_clock = Arc::clone(&clock);
+    let predicate_checks = Arc::new(AtomicUsize::new(0));
+    let predicate_check_counter = Arc::clone(&predicate_checks);
+    let mut waiter = Box::pin(monitor.wait_while_for_async(
+        WAIT_TIMEOUT,
+        move |_| {
+            if predicate_check_counter.fetch_add(1, Ordering::SeqCst) == 0 {
+                predicate_clock.advance(PREDICATE_TIME).expect(
+                    "manual clock should advance during predicate evaluation",
+                );
+            }
+            true
+        },
+        |_| (),
+    ));
+    let wake_counter = Arc::new(WakeCounter::default());
+
+    assert!(poll_once(waiter.as_mut(), &wake_counter).is_pending());
+    let deadline = clock
+        .next_deadline()
+        .expect("condition-wait deadline should be registered");
+    assert_eq!(deadline.elapsed_since_origin(), WAIT_TIMEOUT);
+    let _ = clock
+        .advance_to_next_deadline()
+        .expect("registered deadline should advance");
+
+    assert_time_result_eq!(waiter.await, Ok(WaitTimeoutResult::TimedOut));
 }
 
 /// Verifies that initial mutex contention does not consume timeout budget.

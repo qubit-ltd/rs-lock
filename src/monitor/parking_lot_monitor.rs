@@ -542,14 +542,16 @@ impl<T> ParkingLotMonitor<T> {
     /// If the Timer completes while `waiting` remains true on that check, the
     /// closure is not called.
     ///
-    /// The timeout budget starts after the monitor lock is acquired and the
-    /// initial predicate check still requires waiting, immediately before the
-    /// first condition-wait suspension. Initial lock contention and that
-    /// predicate check do not consume the budget. One fixed deadline is reused
-    /// across wakeups. After a successful Timer completion, readiness wins one
-    /// final locked predicate check. A Timer registration or completion error
-    /// takes precedence over every post-wait predicate result and prevents
-    /// `f` from running. A zero timeout still checks the predicate once.
+    /// The timeout budget is aligned with
+    /// [`std::sync::Condvar::wait_timeout_while`]: it starts after acquiring
+    /// the monitor lock and before the first predicate check. Initial lock
+    /// contention is excluded, but predicate work consumes the budget. One
+    /// fixed deadline is reused across wakeups, and the method may return after
+    /// the timeout while reacquiring the monitor lock. After a successful Timer
+    /// completion, readiness wins one final locked predicate check. A Timer
+    /// registration or completion error takes precedence over every post-wait
+    /// predicate result and prevents `f` from running. A zero timeout still
+    /// checks the predicate once.
     ///
     /// Timeout status alone is not used as proof that the predicate is still
     /// true; the predicate is always rechecked under the lock.
@@ -607,13 +609,15 @@ impl<T> ParkingLotMonitor<T> {
         F: FnOnce(&mut T) -> R,
     {
         let mut guard = self.lock();
+        let started_at = self.timer.now();
         if !waiting(&*guard) {
             return Ok(WaitTimeoutResult::Ready(f(&mut *guard)));
         }
         if timeout.is_zero() {
             return Ok(WaitTimeoutResult::TimedOut);
         }
-        let mut future = self.timer.after(timeout)?;
+        let deadline = started_at.checked_add(timeout)?;
+        let mut future = self.timer.at(deadline)?;
         loop {
             let status = guard.wait_with_timer(&mut future)?;
             if !waiting(&*guard) {
@@ -633,14 +637,16 @@ impl<T> ParkingLotMonitor<T> {
     /// If the Timer completes while `ready` remains false on that check, the
     /// closure is not called.
     ///
-    /// The timeout budget starts after the monitor lock is acquired and the
-    /// initial predicate check still requires waiting, immediately before the
-    /// first condition-wait suspension. Initial lock contention and that
-    /// predicate check do not consume the budget. One fixed deadline is reused
-    /// across wakeups. After a successful Timer completion, readiness wins one
-    /// final locked predicate check. A Timer registration or completion error
-    /// takes precedence over every post-wait predicate result and prevents
-    /// `f` from running. A zero timeout still checks the predicate once.
+    /// The timeout budget is aligned with
+    /// [`std::sync::Condvar::wait_timeout_while`]: it starts after acquiring
+    /// the monitor lock and before the first predicate check. Initial lock
+    /// contention is excluded, but predicate work consumes the budget. One
+    /// fixed deadline is reused across wakeups, and the method may return after
+    /// the timeout while reacquiring the monitor lock. After a successful Timer
+    /// completion, readiness wins one final locked predicate check. A Timer
+    /// registration or completion error takes precedence over every post-wait
+    /// predicate result and prevents `f` from running. A zero timeout still
+    /// checks the predicate once.
     ///
     /// Timeout status alone is not used as proof that the predicate is still
     /// false; the predicate is always rechecked under the lock.
