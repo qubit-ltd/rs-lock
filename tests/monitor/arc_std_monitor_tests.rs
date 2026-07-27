@@ -29,6 +29,12 @@ use qubit_lock::{
     WaitTimeoutResult,
 };
 
+arc_blocking_monitor_contract_tests!(
+    arc_std_monitor_contract,
+    ArcStdMonitor,
+    StdMonitor
+);
+
 #[test]
 fn test_arc_std_monitor_with_timer_preserves_timer_domain() {
     let clock = ManualMonotonicClock::new_shared();

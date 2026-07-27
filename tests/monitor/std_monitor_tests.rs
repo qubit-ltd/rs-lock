@@ -29,6 +29,8 @@ use qubit_lock::{
     WaitTimeoutStatus,
 };
 
+blocking_monitor_contract_tests!(std_monitor_contract, StdMonitor);
+
 use super::failing_timer_tests::{
     assert_backend_unavailable,
     completion_failing_timer,
