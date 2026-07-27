@@ -339,6 +339,23 @@ fn test_monitor_docs_cover_callback_and_constructor_panics() {
 }
 
 #[test]
+/// Ensures standard-monitor documentation explains poison observation,
+/// recovery, repair, and explicit acceptance.
+fn test_monitor_docs_cover_std_monitor_poisoning_policy() {
+    assert!(STD_MONITOR_SRC.contains("pub fn is_poisoned"));
+    assert!(STD_MONITOR_SRC.contains("pub fn clear_poison"));
+    assert!(STD_MONITOR_SRC.contains("partial mutations"));
+    assert!(STD_MONITOR_SRC.contains("does not clear the poison marker"));
+
+    assert!(USER_GUIDE_EN.contains("`is_poisoned`"));
+    assert!(USER_GUIDE_EN.contains("`clear_poison`"));
+    assert!(USER_GUIDE_EN.contains("partially modified"));
+    assert!(USER_GUIDE_ZH.contains("`is_poisoned`"));
+    assert!(USER_GUIDE_ZH.contains("`clear_poison`"));
+    assert!(USER_GUIDE_ZH.contains("部分修改"));
+}
+
+#[test]
 /// Ensures the Chinese README contribution section matches the project
 /// template.
 fn test_readme_zh_uses_contribution_template() {

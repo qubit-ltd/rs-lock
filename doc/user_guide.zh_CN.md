@@ -321,6 +321,14 @@ where
 使用该后端更重要时选择它。`ArcStdMonitor<T>` 是其可克隆的共享句柄，同样提供
 `from_arc`、`as_arc` 和 `into_arc`。
 
+与标准库的 `Lock` 和 `DataLock` 适配器不同，`StdMonitor` 在 poisoning 后会恢复
+并继续提供内部状态，而不是拒绝访问。线程持有状态锁时发生 panic，可能使状态只完成
+部分修改。`is_poisoned` 用于检查是否发生过这种情况；普通的 `lock`、`with_read`、
+`with_write` 和等待操作仍可使用，但不会自动清除 poisoning 标记。调用者应先检查状态，
+必要时修复受保护的不变量，再调用 `clear_poison` 明确接受恢复后的状态。
+`clear_poison` 只清除标记，不会验证或回滚状态；以后再次在持锁期间 panic，monitor
+仍会重新进入 poisoned 状态。`ArcStdMonitor` 通过内部 monitor 同样公开这两个方法。
+
 ```rust
 use qubit_lock::ArcStdMonitor;
 
