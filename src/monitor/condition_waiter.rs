@@ -41,10 +41,10 @@ use std::sync::Arc;
 ///     thread,
 /// };
 ///
-/// use qubit_lock::ArcStdMonitor;
+/// use qubit_lock::StdMonitor;
 ///
 /// let ready = Arc::new(AtomicBool::new(false));
-/// let monitor = ArcStdMonitor::new(());
+/// let monitor = Arc::new(StdMonitor::new(()));
 /// let waiter_ready = Arc::clone(&ready);
 /// let waiter_monitor = monitor.clone();
 ///

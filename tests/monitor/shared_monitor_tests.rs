@@ -7,7 +7,12 @@
 // =============================================================================
 //! Tests for [`SharedMonitor`](qubit_lock::SharedMonitor).
 
-use qubit_lock::{ArcStdMonitor, SharedMonitor};
+use std::sync::Arc;
+
+use qubit_lock::{
+    SharedMonitor,
+    StdMonitor,
+};
 
 /// Clones a monitor through the aggregate shared capability.
 fn clone_through_trait<M>(monitor: M) -> M
@@ -20,6 +25,6 @@ where
 #[test]
 /// Verifies the parking-lot handle satisfies [`SharedMonitor`].
 fn test_shared_monitor_trait_accepts_std_monitor_handle() {
-    let monitor = clone_through_trait(ArcStdMonitor::new(false));
+    let monitor = clone_through_trait(Arc::new(StdMonitor::new(false)));
     assert!(!monitor.with_read(|ready| *ready));
 }

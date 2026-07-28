@@ -12,6 +12,8 @@ mod blocking_condition_waiter_state_tests;
 #[cfg(not(loom))]
 mod blocking_condition_waiter_tests;
 #[cfg(not(loom))]
+mod blocking_timed_wait_tests;
+#[cfg(not(loom))]
 mod blocking_waiter_registration_tests;
 #[cfg(all(not(loom), feature = "parking-lot"))]
 mod blocking_waiter_registry_tests;

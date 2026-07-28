@@ -7,9 +7,16 @@
 // =============================================================================
 //! Tests for [`TimedMonitor`](qubit_lock::TimedMonitor).
 
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::Duration,
+};
 
-use qubit_lock::{ArcStdMonitor, StdMonitor, TimedMonitor, WaitTimeoutResult};
+use qubit_lock::{
+    StdMonitor,
+    TimedMonitor,
+    WaitTimeoutResult,
+};
 
 /// Exercises timed waiting through the aggregate timed capability.
 fn wait_through_trait<M>(monitor: &M)
@@ -25,7 +32,7 @@ where
 #[test]
 /// Verifies a named shared monitor handle satisfies [`TimedMonitor`].
 fn test_timed_monitor_trait_accepts_std_monitor() {
-    wait_through_trait(&ArcStdMonitor::new(false));
+    wait_through_trait(&Arc::new(StdMonitor::new(false)));
 }
 
 #[test]

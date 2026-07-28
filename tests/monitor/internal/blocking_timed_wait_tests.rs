@@ -5,7 +5,7 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-//! Public behavior tests for the monitor's internal default timer selection.
+//! Public behavior tests backed by the shared blocking timed-wait loop.
 
 use std::time::Duration;
 
@@ -14,14 +14,14 @@ use qubit_lock::{
     WaitTimeoutResult,
 };
 
-/// Verifies a default blocking timer reports an elapsed wait as timed out.
+/// Verifies a timed blocking wait performs its deciding predicate check.
 #[test]
-fn test_default_timer_drives_blocking_monitor_timeout() {
-    let monitor = StdMonitor::new(false);
+fn test_blocking_timed_wait_runs_action_when_predicate_is_already_ready() {
+    let monitor = StdMonitor::new(true);
 
     let result = monitor
-        .wait_while_for(Duration::from_millis(1), |ready| !*ready, |_| ())
+        .wait_until_for(Duration::ZERO, |ready| *ready, |_| 7)
         .expect("default timer should register");
 
-    assert_eq!(result, WaitTimeoutResult::TimedOut);
+    assert_eq!(result, WaitTimeoutResult::Ready(7));
 }

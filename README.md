@@ -57,7 +57,7 @@ Chinese.
   Tokio capabilities behind `async-lock`.
 - `ParkingLotMonitor`, `StdMonitor`, and their `Arc*` handles provide blocking
   predicate coordination.
-- `TokioMonitor` and `ArcTokioMonitor` provide asynchronous coordination behind
+- `TokioMonitor` provides asynchronous coordination behind
   `async-monitor`.
 - Every concrete monitor supports Timer injection for deterministic tests.
 
@@ -65,7 +65,7 @@ Import public types directly from the crate root.
 
 ## Installation
 
-The default feature set enables `monitor` and `parking-lot`:
+The default feature set is empty. Enable monitor backends explicitly:
 
 ```toml
 [dependencies]

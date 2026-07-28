@@ -9,6 +9,7 @@
 
 mod blocking_condition_waiter;
 mod blocking_condition_waiter_state;
+mod blocking_timed_wait;
 mod blocking_waiter_registration;
 mod blocking_waiter_registry;
 mod default_timer;
@@ -20,6 +21,7 @@ mod tokio_condition_waiter_registration;
 mod waiter_registry;
 
 pub(in crate::monitor) use blocking_condition_waiter::BlockingConditionWaiter;
+pub(in crate::monitor) use blocking_timed_wait::wait_while_with_timer_locked;
 pub(in crate::monitor) use blocking_waiter_registration::BlockingWaiterRegistration;
 pub(in crate::monitor) use blocking_waiter_registry::BlockingWaiterRegistry;
 pub(in crate::monitor) use default_timer::default_timer;

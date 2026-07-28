@@ -25,10 +25,12 @@ Rust 已经提供了优秀的锁实现，但应用和库代码仍会反复遇到
 必须更新队列并通知已注册 waiter，同时不能留下丢失通知的窗口：
 
 ```rust
-use qubit_lock::ArcParkingLotMonitor;
+use std::sync::Arc;
+
+use qubit_lock::ParkingLotMonitor;
 
 fn main() {
-    let queue = ArcParkingLotMonitor::new(Vec::<i32>::new());
+    let queue = Arc::new(ParkingLotMonitor::new(Vec::<i32>::new()));
     let worker_queue = queue.clone();
 
     let worker = std::thread::spawn(move || {
@@ -50,11 +52,11 @@ notification 只是再次检查状态的提示。
 
 ## 2. 安装与 Feature 选择
 
-默认配置提供完整的同步 API：
+默认特性集为空；请显式启用程序使用的组件：
 
 ```toml
 [dependencies]
-qubit-lock = "0.11"
+qubit-lock = { version = "0.11", features = ["parking-lot", "monitor"] }
 ```
 
 根据所需组件选择 Feature：
@@ -298,11 +300,11 @@ where
 
 ## 6. 具体 Monitor 组件
 
-### `ParkingLotMonitor<T>` 与 `ArcParkingLotMonitor<T>`
+### `ParkingLotMonitor<T>`
 
 启用 `parking-lot` 和 `monitor` Feature 后，需要高效阻塞式协调时使用
 `ParkingLotMonitor<T>`。需要在线程间克隆或长期持有句柄时，使用
-`ArcParkingLotMonitor<T>`。
+`Arc<ParkingLotMonitor<T>>`。
 
 重要方法包括：
 
@@ -312,14 +314,12 @@ where
 - `wait_until` / `wait_while`、无 action 的 `wait_until_ready` 及对应的 `_for` 计时版本。
 - `lock`：需要显式控制 guard 时使用。
 
-`Arc*` 包装器通过 `Deref` 访问内部 monitor。`from_arc`、`as_arc` 和 `into_arc`
-显式表达所有权边界，不会再分配一层。
+直接使用标准库的 `Arc`；它的 deref coercion 保留 monitor API，无需 crate 专用包装器。
 
-### `StdMonitor<T>` 与 `ArcStdMonitor<T>`
+### `StdMonitor<T>`
 
 `StdMonitor<T>` 使用标准库原语，并提供相同的高层 API。当避免 parking_lot 依赖比
-使用该后端更重要时选择它。`ArcStdMonitor<T>` 是其可克隆的共享句柄，同样提供
-`from_arc`、`as_arc` 和 `into_arc`。
+使用该后端更重要时选择它。需要共享时使用 `Arc<StdMonitor<T>>`。
 
 与标准库的 `Lock` 和 `DataLock` 适配器不同，`StdMonitor` 在 poisoning 后会恢复
 并继续提供内部状态，而不是拒绝访问。线程持有状态锁时发生 panic，可能使状态只完成
@@ -327,13 +327,15 @@ where
 `with_write` 和等待操作仍可使用，但不会自动清除 poisoning 标记。调用者应先检查状态，
 必要时修复受保护的不变量，再调用 `clear_poison` 明确接受恢复后的状态。
 `clear_poison` 只清除标记，不会验证或回滚状态；以后再次在持锁期间 panic，monitor
-仍会重新进入 poisoned 状态。`ArcStdMonitor` 通过内部 monitor 同样公开这两个方法。
+仍会重新进入 poisoned 状态。`Arc<StdMonitor<T>>` 通过 deref coercion 同样公开这两个方法。
 
 ```rust
-use qubit_lock::ArcStdMonitor;
+use std::sync::Arc;
+
+use qubit_lock::StdMonitor;
 
 fn main() {
-    let monitor = ArcStdMonitor::new(false);
+    let monitor = Arc::new(StdMonitor::new(false));
     let waiter_monitor = monitor.clone();
 
     let waiter = std::thread::spawn(move || {
@@ -370,10 +372,10 @@ fn main() {
 }
 ```
 
-### `TokioMonitor<T>` 与 `ArcTokioMonitor<T>`
+### `TokioMonitor<T>`
 
-这些类型需要 `async-monitor`。任务局部持有时使用 `TokioMonitor<T>`；需要可克隆
-共享所有权时使用 `ArcTokioMonitor<T>`。
+该类型需要 `async-monitor`。任务局部持有时使用 `TokioMonitor<T>`；需要可克隆
+共享所有权时使用 `Arc<TokioMonitor<T>>`。
 
 - `current` 为默认 Timer 捕获当前 Tokio runtime Handle。
 - `try_current` 在缺少当前 runtime 时返回错误，而不是 panic。
@@ -384,11 +386,13 @@ fn main() {
   `wait_until_ready_async` 和 `wait_until_ready_for_async` 提供无 action 的形式。
 
 ```rust
-use qubit_lock::{ArcTokioMonitor, AsyncConditionWaiter};
+use std::sync::Arc;
+
+use qubit_lock::{AsyncConditionWaiter, TokioMonitor};
 
 #[tokio::main]
 async fn main() {
-    let monitor = ArcTokioMonitor::current(Vec::<i32>::new());
+    let monitor = Arc::new(TokioMonitor::current(Vec::<i32>::new()));
     let worker_monitor = monitor.clone();
 
     let worker = tokio::spawn(async move {
@@ -441,11 +445,11 @@ use std::{
     thread,
 };
 
-use qubit_lock::ArcStdMonitor;
+use qubit_lock::StdMonitor;
 
 fn main() {
     let ready = Arc::new(AtomicBool::new(false));
-    let monitor = ArcStdMonitor::new(());
+    let monitor = Arc::new(StdMonitor::new(()));
     let waiter_ready = Arc::clone(&ready);
     let waiter_monitor = monitor.clone();
 
@@ -471,12 +475,12 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
-use qubit_lock::{ArcTokioMonitor, AsyncConditionWaiter};
+use qubit_lock::{AsyncConditionWaiter, TokioMonitor};
 
 #[tokio::main]
 async fn main() {
     let ready = Arc::new(AtomicBool::new(false));
-    let monitor = ArcTokioMonitor::current(());
+    let monitor = Arc::new(TokioMonitor::current(()));
     let waiter_ready = Arc::clone(&ready);
     let waiter_monitor = monitor.clone();
 
@@ -550,7 +554,7 @@ Timer 注册或完成失败，不是真实超时。发生该错误后，guard �
 
 ```toml
 [dev-dependencies]
-qubit-clock = { version = "0.10", features = ["test-util"] }
+qubit-clock = { version = "0.10.1", features = ["test-util"] }
 ```
 
 ```rust

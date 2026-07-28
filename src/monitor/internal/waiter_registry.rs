@@ -7,7 +7,10 @@
 // =============================================================================
 //! Maintains FIFO selection for active Monitor waiters.
 
-use std::collections::{BTreeMap, btree_map::IntoValues};
+use std::collections::{
+    BTreeMap,
+    btree_map::IntoValues,
+};
 
 /// Mutable registry of waiters eligible for one memoryless notification.
 ///

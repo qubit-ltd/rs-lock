@@ -49,14 +49,14 @@ fn main() {
   `async-lock` 启用，并提供对应的 Tokio 能力。
 - `ParkingLotMonitor`、`StdMonitor` 和对应的 `Arc*` 句柄提供阻塞式 predicate
   协调。
-- `TokioMonitor` 和 `ArcTokioMonitor` 由 `async-monitor` 启用，并提供异步协调。
+- `TokioMonitor` 由 `async-monitor` 启用，并提供异步协调。
 - 每个具体 monitor 都支持注入 Timer，以便进行确定性测试。
 
 所有公开类型都直接从 crate root 导入。
 
 ## 安装
 
-默认特性集启用 `monitor` 和 `parking-lot`：
+默认特性集为空；请显式启用所需的 monitor 后端：
 
 ```toml
 [dependencies]

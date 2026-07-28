@@ -70,22 +70,49 @@ mod lock;
 #[cfg(feature = "monitor")]
 mod monitor;
 #[cfg(feature = "async-lock")]
-pub use lock::{AsyncDataLock, AsyncLock, AsyncReadLock, AsyncReadWriteLock, AsyncWriteLock};
-pub use lock::{DataLock, ExclusiveLock, Lock, ReadLock, ReadWriteLock, TryLockError, WriteLock};
+pub use lock::{
+    AsyncDataLock,
+    AsyncLock,
+    AsyncReadLock,
+    AsyncReadWriteLock,
+    AsyncWriteLock,
+};
+pub use lock::{
+    DataLock,
+    ExclusiveLock,
+    Lock,
+    ReadLock,
+    ReadWriteLock,
+    TryLockError,
+    WriteLock,
+};
 #[cfg(all(feature = "loom-model", loom))]
 #[doc(hidden)]
 pub mod test_util;
-#[cfg(all(feature = "monitor", feature = "parking-lot"))]
-pub use monitor::{ArcParkingLotMonitor, ParkingLotMonitor, ParkingLotMonitorGuard};
-#[cfg(feature = "monitor")]
-pub use monitor::{
-    ArcStdMonitor, ConditionWaiter, Monitor, Notifier, SharedMonitor, StdMonitor, StdMonitorGuard,
-    TimedMonitor, TimeoutConditionWaiter, WaitTimeoutResult, WaitTimeoutStatus,
-};
 #[cfg(feature = "async-monitor")]
 pub use monitor::{
-    ArcTokioMonitor, AsyncConditionWaiter, AsyncMonitor, AsyncTimedMonitor,
-    AsyncTimeoutConditionWaiter, SharedAsyncMonitor, TokioMonitor,
+    AsyncConditionWaiter,
+    AsyncMonitor,
+    AsyncTimedMonitor,
+    AsyncTimeoutConditionWaiter,
+    SharedAsyncMonitor,
+    TokioMonitor,
 };
 #[cfg(feature = "monitor")]
-pub use qubit_clock::{MonotonicInstant, TimeError};
+pub use monitor::{
+    ConditionWaiter,
+    Monitor,
+    Notifier,
+    SharedMonitor,
+    StdMonitor,
+    StdMonitorGuard,
+    TimedMonitor,
+    TimeoutConditionWaiter,
+    WaitTimeoutResult,
+    WaitTimeoutStatus,
+};
+#[cfg(all(feature = "monitor", feature = "parking-lot"))]
+pub use monitor::{
+    ParkingLotMonitor,
+    ParkingLotMonitorGuard,
+};

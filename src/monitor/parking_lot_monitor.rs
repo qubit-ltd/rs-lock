@@ -22,15 +22,32 @@
 //! [`ParkingLotMonitorGuard::wait_until`] for more complex state machines such
 //! as thread pools.
 
-use qubit_clock::{MonotonicInstant, TimeError, Timer, TimerFuture};
-use std::{sync::Arc, task::Poll, time::Duration};
+use qubit_clock::{
+    MonotonicInstant,
+    TimeError,
+    Timer,
+    TimerFuture,
+};
+use std::{
+    sync::Arc,
+    task::Poll,
+    time::Duration,
+};
 
 use parking_lot::Mutex;
 
 use super::parking_lot_monitor_guard::ParkingLotMonitorGuard;
 use super::{
-    ConditionWaiter, Monitor, Notifier, TimeoutConditionWaiter,
-    internal::{BlockingConditionWaiter, BlockingWaiterRegistry, default_timer},
+    ConditionWaiter,
+    Monitor,
+    Notifier,
+    TimeoutConditionWaiter,
+    internal::{
+        BlockingConditionWaiter,
+        BlockingWaiterRegistry,
+        default_timer,
+        wait_while_with_timer_locked,
+    },
     wait_timeout_result::WaitTimeoutResult,
 };
 
@@ -86,11 +103,11 @@ use super::{
 /// # Examples
 ///
 /// ```rust
-/// use std::thread;
+/// use std::{sync::Arc, thread};
 ///
-/// use qubit_lock::ArcParkingLotMonitor;
+/// use qubit_lock::ParkingLotMonitor;
 ///
-/// let monitor = ArcParkingLotMonitor::new(false);
+/// let monitor = Arc::new(ParkingLotMonitor::new(false));
 /// let waiter_monitor = monitor.clone();
 ///
 /// let waiter = thread::spawn(move || {
@@ -524,27 +541,26 @@ impl<T> ParkingLotMonitor<T> {
     /// Continues a timed wait after its first locked predicate check.
     fn wait_while_with_timer_locked<R, P, F>(
         &self,
-        mut guard: ParkingLotMonitorGuard<'_, T>,
-        mut future: TimerFuture,
-        mut waiting: P,
+        guard: ParkingLotMonitorGuard<'_, T>,
+        future: TimerFuture,
+        waiting: P,
         f: F,
     ) -> Result<WaitTimeoutResult<R>, TimeError>
     where
         P: FnMut(&T) -> bool,
         F: FnOnce(&mut T) -> R,
     {
-        loop {
-            let status = guard.wait_with_timer(&mut future)?;
-            if !waiting(&*guard) {
-                return Ok(WaitTimeoutResult::Ready(f(&mut *guard)));
-            }
-            if status.is_timed_out() {
-                return Ok(WaitTimeoutResult::TimedOut);
-            }
-        }
+        wait_while_with_timer_locked(
+            guard,
+            future,
+            waiting,
+            f,
+            |guard, future| guard.wait_with_timer(future),
+        )
     }
 
-    /// Waits while a predicate remains true with a relative condition-wait budget.
+    /// Waits while a predicate remains true with a relative condition-wait
+    /// budget.
     ///
     /// This method is the timeout-aware form of [`Self::wait_while`]. It keeps
     /// rechecking `waiting` under the monitor lock and waits only for the
@@ -660,7 +676,8 @@ impl<T> ParkingLotMonitor<T> {
             return Ok(WaitTimeoutResult::Ready(f(&mut *guard)));
         }
         let mut future = self.timer.at(deadline)?;
-        if let Poll::Ready(result) = BlockingConditionWaiter::poll_timer_without_waiter(&mut future)
+        if let Poll::Ready(result) =
+            BlockingConditionWaiter::poll_timer_without_waiter(&mut future)
         {
             result?;
             return Ok(WaitTimeoutResult::TimedOut);
@@ -668,7 +685,8 @@ impl<T> ParkingLotMonitor<T> {
         self.wait_while_with_timer_locked(guard, future, waiting, f)
     }
 
-    /// Waits until a predicate becomes true with a relative condition-wait budget.
+    /// Waits until a predicate becomes true with a relative condition-wait
+    /// budget.
     ///
     /// This is the positive-predicate counterpart of
     /// [`Self::wait_while_for`]. If `ready` becomes true on the deciding
@@ -859,11 +877,11 @@ impl<T> ParkingLotMonitor<T> {
     /// # Examples
     ///
     /// ```rust
-    /// use std::thread;
+    /// use std::{sync::Arc, thread};
     ///
-    /// use qubit_lock::ArcParkingLotMonitor;
+    /// use qubit_lock::ParkingLotMonitor;
     ///
-    /// let monitor = ArcParkingLotMonitor::new(0_u32);
+    /// let monitor = Arc::new(ParkingLotMonitor::new(0_u32));
     /// let waiter = {
     ///     let m = monitor.clone();
     ///     thread::spawn(move || {
@@ -897,11 +915,11 @@ impl<T> ParkingLotMonitor<T> {
     /// # Examples
     ///
     /// ```rust
-    /// use std::thread;
+    /// use std::{sync::Arc, thread};
     ///
-    /// use qubit_lock::ArcParkingLotMonitor;
+    /// use qubit_lock::ParkingLotMonitor;
     ///
-    /// let monitor = ArcParkingLotMonitor::new(false);
+    /// let monitor = Arc::new(ParkingLotMonitor::new(false));
     /// let mut handles = Vec::new();
     /// for _ in 0..2 {
     ///     let m = monitor.clone();

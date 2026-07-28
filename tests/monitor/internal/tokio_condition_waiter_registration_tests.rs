@@ -9,13 +9,17 @@
 
 use std::time::Duration;
 
-use qubit_lock::{AsyncConditionWaiter, TokioMonitor};
+use qubit_lock::{
+    AsyncConditionWaiter,
+    TokioMonitor,
+};
 
 /// Verifies cancelling a pending Tokio wait removes its registration.
 #[tokio::test]
 async fn test_tokio_waiter_registration_is_removed_after_cancellation() {
     let monitor = TokioMonitor::current(false);
-    let mut cancelled = Box::pin(monitor.wait_until_async(|ready| *ready, |_| unreachable!()));
+    let mut cancelled =
+        Box::pin(monitor.wait_until_async(|ready| *ready, |_| unreachable!()));
 
     assert!(
         tokio::time::timeout(Duration::from_millis(1), &mut cancelled)

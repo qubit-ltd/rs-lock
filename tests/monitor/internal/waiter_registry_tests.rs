@@ -7,7 +7,10 @@
 // =============================================================================
 //! Loom models for Monitor waiter registration, selection, and cancellation.
 
-use loom::{sync::Arc, thread};
+use loom::{
+    sync::Arc,
+    thread,
+};
 use qubit_lock::test_util::loom::LoomWaiterRegistry;
 
 /// Models notification selection racing with cancellation of another waiter.
@@ -21,8 +24,9 @@ fn test_loom_waiter_registry_notify_one_races_with_cancellation() {
         let notifier_registry = Arc::clone(&registry);
         let notifier = thread::spawn(move || notifier_registry.take_one());
         let cancellation_registry = Arc::clone(&registry);
-        let cancellation =
-            thread::spawn(move || cancellation_registry.unregister(cancelled_waiter_id));
+        let cancellation = thread::spawn(move || {
+            cancellation_registry.unregister(cancelled_waiter_id)
+        });
 
         assert_eq!(
             notifier.join().expect("model notifier should finish"),
@@ -48,7 +52,8 @@ fn test_loom_waiter_registry_notify_one_races_with_selected_cancellation() {
         let notifier_registry = Arc::clone(&registry);
         let notifier = thread::spawn(move || notifier_registry.take_one());
         let cancellation_registry = Arc::clone(&registry);
-        let cancellation = thread::spawn(move || cancellation_registry.unregister(waiter_id));
+        let cancellation =
+            thread::spawn(move || cancellation_registry.unregister(waiter_id));
 
         let selected = notifier.join().expect("model notifier should finish");
         let cancelled = cancellation
@@ -73,7 +78,9 @@ fn test_loom_waiter_registry_notify_all_races_with_cancellation() {
         let notifier_registry = Arc::clone(&registry);
         let notifier = thread::spawn(move || notifier_registry.take_all());
         let cancellation_registry = Arc::clone(&registry);
-        let cancellation = thread::spawn(move || cancellation_registry.unregister(first_waiter_id));
+        let cancellation = thread::spawn(move || {
+            cancellation_registry.unregister(first_waiter_id)
+        });
 
         let selected = notifier.join().expect("model notifier should finish");
         let cancelled = cancellation

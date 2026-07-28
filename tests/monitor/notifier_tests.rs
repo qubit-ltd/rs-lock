@@ -7,7 +7,10 @@
 // =============================================================================
 //! Tests for [`Notifier`](qubit_lock::Notifier).
 
-use qubit_lock::{Notifier, StdMonitor};
+use qubit_lock::{
+    Notifier,
+    StdMonitor,
+};
 
 /// Exercises both notification methods through a generic capability bound.
 fn notify_through_trait<N: Notifier>(notifier: &N) {

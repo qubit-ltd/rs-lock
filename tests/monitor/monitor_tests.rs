@@ -10,8 +10,11 @@
 use std::sync::Arc;
 
 #[cfg(feature = "parking-lot")]
-use qubit_lock::{ArcParkingLotMonitor, ParkingLotMonitor};
-use qubit_lock::{ArcStdMonitor, Monitor, StdMonitor};
+use qubit_lock::ParkingLotMonitor;
+use qubit_lock::{
+    Monitor,
+    StdMonitor,
+};
 
 /// Exercises state access, notification, and untimed waiting through the
 /// aggregate blocking capability.
@@ -39,7 +42,7 @@ where
 #[test]
 /// Verifies a named shared monitor handle satisfies [`Monitor`].
 fn test_monitor_trait_accepts_std_monitor() {
-    use_monitor(&ArcStdMonitor::new(false));
+    use_monitor(&Arc::new(StdMonitor::new(false)));
 }
 
 #[test]
@@ -52,7 +55,7 @@ fn test_monitor_trait_accepts_arc_wrapped_implementation() {
 #[test]
 /// Verifies a parking-lot handle satisfies [`Monitor`].
 fn test_monitor_trait_accepts_parking_lot_monitor() {
-    use_monitor(&ArcParkingLotMonitor::new(false));
+    use_monitor(&Arc::new(ParkingLotMonitor::new(false)));
 }
 
 #[cfg(feature = "parking-lot")]

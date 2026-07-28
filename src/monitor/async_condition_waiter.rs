@@ -7,7 +7,10 @@
 // =============================================================================
 //! Asynchronous condition-wait capability.
 
-use std::{future::Future, sync::Arc};
+use std::{
+    future::Future,
+    sync::Arc,
+};
 
 /// Waits asynchronously for predicates over protected monitor state.
 ///
@@ -36,14 +39,14 @@ use std::{future::Future, sync::Arc};
 /// };
 ///
 /// use qubit_lock::{
-///     ArcTokioMonitor,
 ///     AsyncConditionWaiter,
+///     TokioMonitor,
 /// };
 ///
 /// # #[tokio::main]
 /// # async fn main() {
 /// let ready = Arc::new(AtomicBool::new(false));
-/// let monitor = ArcTokioMonitor::current(());
+/// let monitor = Arc::new(TokioMonitor::current(()));
 /// let waiter_ready = Arc::clone(&ready);
 /// let waiter_monitor = monitor.clone();
 ///
@@ -131,7 +134,10 @@ pub trait AsyncConditionWaiter {
     /// The returned future propagates a panic from `predicate` when it is
     /// polled.
     #[inline(always)]
-    fn wait_until_ready_async<'a, P>(&'a self, predicate: P) -> impl Future<Output = ()> + Send + 'a
+    fn wait_until_ready_async<'a, P>(
+        &'a self,
+        predicate: P,
+    ) -> impl Future<Output = ()> + Send + 'a
     where
         P: FnMut(&Self::State) -> bool + Send + 'a,
     {
