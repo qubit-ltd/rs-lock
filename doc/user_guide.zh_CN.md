@@ -56,7 +56,7 @@ notification 只是再次检查状态的提示。
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", features = ["parking-lot", "monitor"] }
+qubit-lock = { version = "0.11", default-features = false, features = ["monitor", "parking-lot"] }
 ```
 
 根据所需组件选择 Feature：
@@ -68,7 +68,7 @@ qubit-lock = { version = "0.11", features = ["parking-lot", "monitor"] }
 | `monitor` | monitor trait、标准库 monitor、计时等待和 Timer 注入 |
 | `async-lock` | Tokio 锁 trait 和适配器 |
 | `async-monitor` | `async-lock`、monitor 支持和 Tokio monitor |
-| 默认配置 | `monitor` 和 `parking-lot` |
+| 默认配置 | 不启用可选 Feature |
 
 只使用锁的用户可以避免所有可选依赖：
 
@@ -607,7 +607,7 @@ Tokio monitor 使用相同的注入设计。
 | 使用 Tokio 锁 | 对应的 `Async*` 组件 |
 | 协调阻塞式 predicate wait | `ParkingLotMonitor` 或 `StdMonitor` |
 | 协调 Tokio predicate wait | `TokioMonitor` |
-| 克隆 monitor 句柄 | 对应的 `Arc*Monitor` |
+| 克隆 monitor 句柄 | `Arc<ParkingLotMonitor<T>>`、`Arc<StdMonitor<T>>` 或 `Arc<TokioMonitor<T>>` |
 | 不使用 sleep 测试 deadline | `with_timer` 和 `ManualMonotonicClock` |
 | 表达泛型 monitor 依赖 | 能满足操作的最小能力 trait |
 

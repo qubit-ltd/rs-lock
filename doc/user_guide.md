@@ -65,7 +65,7 @@ The default feature set is empty. Enable the components used by your program:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", features = ["parking-lot", "monitor"] }
+qubit-lock = { version = "0.11", default-features = false, features = ["monitor", "parking-lot"] }
 ```
 
 Choose features according to the components you use:
@@ -77,7 +77,7 @@ Choose features according to the components you use:
 | `monitor` | Monitor traits, std monitors, timed waits, and timer injection |
 | `async-lock` | Tokio lock traits and adapters |
 | `async-monitor` | `async-lock`, monitor support, and Tokio monitors |
-| default | `monitor` and `parking-lot` |
+| default | no optional features |
 
 Lock-only users can avoid all optional dependencies:
 
@@ -654,7 +654,7 @@ manual clock domain. Tokio monitors use the same injection design.
 | Use Tokio locks | The corresponding `Async*` component |
 | Coordinate blocking predicate waits | `ParkingLotMonitor` or `StdMonitor` |
 | Coordinate Tokio predicate waits | `TokioMonitor` |
-| Clone a monitor handle | The corresponding `Arc*Monitor` |
+| Clone a monitor handle | `Arc<ParkingLotMonitor<T>>`, `Arc<StdMonitor<T>>`, or `Arc<TokioMonitor<T>>` |
 | Test deadlines without sleeping | `with_timer` and `ManualMonotonicClock` |
 | Express a generic monitor dependency | The narrowest capability trait |
 

@@ -55,8 +55,9 @@ Chinese.
   `parking_lot::RwLock<T>`.
 - `AsyncLock`, `AsyncReadWriteLock`, and `AsyncDataLock<T>` provide matching
   Tokio capabilities behind `async-lock`.
-- `ParkingLotMonitor`, `StdMonitor`, and their `Arc*` handles provide blocking
-  predicate coordination.
+- `ParkingLotMonitor` and `StdMonitor`, including standard
+  `Arc<ParkingLotMonitor<T>>` and `Arc<StdMonitor<T>>` handles, provide
+  blocking predicate coordination.
 - `TokioMonitor` provides asynchronous coordination behind
   `async-monitor`.
 - Every concrete monitor supports Timer injection for deterministic tests.
@@ -65,11 +66,12 @@ Import public types directly from the crate root.
 
 ## Installation
 
-The default feature set is empty. Enable monitor backends explicitly:
+The default feature set is empty. Enable the blocking monitor backend
+explicitly:
 
 ```toml
 [dependencies]
-qubit-lock = "0.11"
+qubit-lock = { version = "0.11", default-features = false, features = ["monitor", "parking-lot"] }
 ```
 
 Use only the synchronous lock traits and standard-library implementations:

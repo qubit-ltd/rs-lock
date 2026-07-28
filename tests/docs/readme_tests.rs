@@ -278,11 +278,17 @@ fn test_readme_documents_timer_ioc_testing() {
 /// Ensures README files document the default, async-lock, and async-monitor
 /// feature tiers.
 fn test_readme_documents_feature_tiers() {
+    const BLOCKING_MONITOR_DEPENDENCY: &str = "qubit-lock = { version = \"0.11\", default-features = false, features = [\"monitor\", \"parking-lot\"] }";
     const ASYNC_LOCK_DEPENDENCY: &str = "qubit-lock = { version = \"0.11\", default-features = false, features = [\"async-lock\"] }";
     const ASYNC_MONITOR_DEPENDENCY: &str = "qubit-lock = { version = \"0.11\", default-features = false, features = [\"async-monitor\"] }";
 
+    assert!(CARGO_TOML.contains("default = []"));
     assert!(README_EN.contains("default feature set is empty"));
     for document in [README_EN, README_ZH, USER_GUIDE_EN, USER_GUIDE_ZH] {
+        assert!(
+            document.contains(BLOCKING_MONITOR_DEPENDENCY),
+            "blocking monitor example must select both required features",
+        );
         assert!(
             document.contains(ASYNC_LOCK_DEPENDENCY),
             "async-lock example must select its feature",
@@ -290,6 +296,14 @@ fn test_readme_documents_feature_tiers() {
         assert!(
             document.contains(ASYNC_MONITOR_DEPENDENCY),
             "async-monitor example must select its feature",
+        );
+    }
+    assert!(USER_GUIDE_EN.contains("| default | no optional features |"));
+    assert!(USER_GUIDE_ZH.contains("| 默认配置 | 不启用可选 Feature |"));
+    for document in [README_EN, README_ZH, USER_GUIDE_EN, USER_GUIDE_ZH] {
+        assert!(
+            !document.contains("Arc*"),
+            "documentation must name standard Arc-wrapped monitor types",
         );
     }
     assert!(!README_EN.contains("`mock` feature"));
