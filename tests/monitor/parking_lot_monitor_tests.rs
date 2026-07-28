@@ -10,6 +10,7 @@
 use std::{
     sync::{
         Arc,
+        atomic::Ordering,
         mpsc,
     },
     thread,
@@ -35,6 +36,7 @@ blocking_monitor_contract_tests!(
 );
 
 use super::failing_timer_tests::{
+    OncePendingTimer,
     assert_backend_unavailable,
     completion_failing_timer,
     registration_failing_timer,
@@ -503,6 +505,100 @@ fn test_parking_lot_monitor_wait_until_with_deadline_ready_wins_reached_deadline
 
     assert_time_result_eq!(result, Ok(WaitTimeoutResult::Ready(7)));
     assert_eq!(clock.pending_waiters(), 0);
+}
+
+#[test]
+/// Verifies deadline helpers register, wait, and preserve trait forwarding.
+fn test_parking_lot_monitor_deadline_helpers_wait_until_timeout() {
+    const WAIT_TIMEOUT: Duration = Duration::from_millis(20);
+
+    let clock = ManualMonotonicClock::new_shared();
+    let monitor =
+        Arc::new(ParkingLotMonitor::with_timer(false, clock.new_timer()));
+    let deadline = clock
+        .now()
+        .checked_add(WAIT_TIMEOUT)
+        .expect("manual clock deadline should be representable");
+    let waiter_monitor = Arc::clone(&monitor);
+    let waiter = thread::spawn(move || {
+        ParkingLotMonitor::wait_while_with_deadline(
+            &waiter_monitor,
+            deadline,
+            |_| true,
+            |_| (),
+        )
+    });
+
+    let _ = clock
+        .advance_to_next_deadline_after_waiters(1, Duration::from_secs(1))
+        .expect("deadline helper should register a condition waiter");
+
+    assert_time_result_eq!(
+        waiter.join().expect("deadline waiter should finish"),
+        Ok(WaitTimeoutResult::TimedOut),
+    );
+    assert_time_result_eq!(
+        <ParkingLotMonitor<bool> as TimeoutConditionWaiter>::wait_while_with_deadline(
+            &monitor,
+            clock.now(),
+            |_| false,
+            |_| 7,
+        ),
+        Ok(WaitTimeoutResult::Ready(7)),
+    );
+    assert_time_result_eq!(
+        ParkingLotMonitor::wait_until_ready_with_deadline(
+            &monitor,
+            clock.now(),
+            |ready| *ready,
+        ),
+        Ok(WaitTimeoutResult::TimedOut),
+    );
+}
+
+#[test]
+/// Verifies the inherent deadline helper enters the pending wait path.
+fn test_parking_lot_monitor_deadline_wait_propagates_completion_error() {
+    let (timer, poll_count) = OncePendingTimer::new(completion_failing_timer());
+    let monitor =
+        Arc::new(ParkingLotMonitor::with_timer(false, Arc::new(timer)));
+    let (checked_tx, checked_rx) = mpsc::channel();
+    let waiter_monitor = Arc::clone(&monitor);
+    let waiter = thread::spawn(move || {
+        let deadline = waiter_monitor
+            .timer()
+            .clock()
+            .now()
+            .checked_add(Duration::from_secs(1))
+            .expect("test deadline should be representable");
+        let mut checked_tx = Some(checked_tx);
+        ParkingLotMonitor::wait_while_with_deadline(
+            &waiter_monitor,
+            deadline,
+            move |_| {
+                if let Some(checked_tx) = checked_tx.take() {
+                    checked_tx
+                        .send(())
+                        .expect("test should observe the initial predicate");
+                }
+                true
+            },
+            |_| (),
+        )
+    });
+
+    checked_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("waiter should perform the initial predicate check");
+    drop(monitor.lock());
+    monitor.notify_one();
+
+    let error = waiter.join().expect("waiter should finish").expect_err(
+        "pending deadline wait should propagate timer completion error",
+    );
+
+    assert_backend_unavailable(error);
+    assert_eq!(poll_count.load(Ordering::SeqCst), 2);
 }
 
 #[test]

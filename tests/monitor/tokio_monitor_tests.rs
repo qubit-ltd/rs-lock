@@ -901,6 +901,70 @@ async fn test_tokio_monitor_async_wait_while_with_deadline_includes_pre_poll_tim
     assert_eq!(clock.pending_waiters(), 0);
 }
 
+#[tokio::test]
+/// Verifies concrete deadline helpers cover notification and timeout paths.
+async fn test_tokio_monitor_deadline_helpers_wait_and_complete() {
+    const WAIT_TIMEOUT: Duration = Duration::from_millis(20);
+
+    let clock = ManualMonotonicClock::new_shared();
+    let ready_monitor = TokioMonitor::with_timer(false, clock.new_timer());
+    let ready_deadline = clock
+        .now()
+        .checked_add(WAIT_TIMEOUT)
+        .expect("manual clock deadline should be representable");
+    let mut ready_wait =
+        Box::pin(ready_monitor.wait_until_with_deadline_async(
+            ready_deadline,
+            |ready| *ready,
+            |_| 7,
+        ));
+    let wake_counter = Arc::new(WakeCounter::default());
+
+    assert!(poll_once(ready_wait.as_mut(), &wake_counter).is_pending());
+    ready_monitor
+        .with_write_notify_one_async(|ready| *ready = true)
+        .await;
+    assert_time_result_eq!(ready_wait.await, Ok(WaitTimeoutResult::Ready(7)));
+
+    let timeout_monitor = TokioMonitor::with_timer(false, clock.new_timer());
+    let timeout_deadline = clock
+        .now()
+        .checked_add(WAIT_TIMEOUT)
+        .expect("manual clock deadline should be representable");
+    let mut timeout_wait = Box::pin(
+        timeout_monitor
+            .wait_until_ready_with_deadline_async(timeout_deadline, |ready| {
+                *ready
+            }),
+    );
+
+    assert!(poll_once(timeout_wait.as_mut(), &wake_counter).is_pending());
+    let _ = clock
+        .advance_to_next_deadline()
+        .expect("deadline helper should register a timer");
+    assert_time_result_eq!(timeout_wait.await, Ok(WaitTimeoutResult::TimedOut),);
+
+    let repeat_monitor = TokioMonitor::with_timer(false, clock.new_timer());
+    let repeat_deadline = clock
+        .now()
+        .checked_add(WAIT_TIMEOUT)
+        .expect("manual clock deadline should be representable");
+    let mut repeat_wait =
+        Box::pin(repeat_monitor.wait_while_with_deadline_async(
+            repeat_deadline,
+            |_| true,
+            |_| (),
+        ));
+
+    assert!(poll_once(repeat_wait.as_mut(), &wake_counter).is_pending());
+    repeat_monitor.notify_one();
+    assert!(poll_once(repeat_wait.as_mut(), &wake_counter).is_pending());
+    let _ = clock
+        .advance_to_next_deadline()
+        .expect("rechecked deadline wait should retain its original timer");
+    assert_time_result_eq!(repeat_wait.await, Ok(WaitTimeoutResult::TimedOut));
+}
+
 /// Verifies that the first predicate check consumes the timeout budget.
 #[tokio::test]
 async fn test_tokio_monitor_async_wait_while_for_includes_initial_predicate_time_in_deadline()

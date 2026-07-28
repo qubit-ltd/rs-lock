@@ -7,7 +7,10 @@
 // =============================================================================
 //! Tests for [`TimeoutConditionWaiter`](qubit_lock::TimeoutConditionWaiter).
 
-use std::time::Duration;
+use std::{
+    sync::Arc,
+    time::Duration,
+};
 
 use qubit_clock::{
     MonotonicInstant,
@@ -55,6 +58,17 @@ where
 fn test_timeout_condition_waiter_trait_accepts_std_monitor() {
     assert_time_result_eq!(
         wait_through_trait(&StdMonitor::new(false)),
+        Ok(WaitTimeoutResult::TimedOut),
+    );
+}
+
+#[test]
+/// Verifies an Arc-wrapped monitor preserves timeout trait forwarding.
+fn test_timeout_condition_waiter_trait_accepts_arc_std_monitor() {
+    let monitor = Arc::new(StdMonitor::new(false));
+
+    assert_time_result_eq!(
+        wait_through_trait(&monitor),
         Ok(WaitTimeoutResult::TimedOut),
     );
 }
