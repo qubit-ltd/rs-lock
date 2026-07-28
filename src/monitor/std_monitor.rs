@@ -127,6 +127,7 @@ use super::{
 /// waiter.join().expect("waiter should finish");
 /// assert!(!monitor.with_read(|ready| *ready));
 /// ```
+#[must_use = "retain and use the monitor to coordinate protected state"]
 pub struct StdMonitor<T> {
     /// Mutex protecting the monitor state.
     pub(super) state: Mutex<T>,
@@ -727,6 +728,55 @@ impl<T> StdMonitor<T> {
         self.wait_while_with_timer_locked(guard, future, waiting, f)
     }
 
+    /// Waits while a predicate remains true with one operation-wide timeout.
+    ///
+    /// The Timer fixes an absolute deadline before this method attempts to
+    /// acquire the monitor lock. Initial lock contention, predicate
+    /// evaluation, condition waiting, and lock reacquisition therefore consume
+    /// the same budget. When `waiting` becomes false on the deciding locked
+    /// check, `f` runs without a time limit while the state remains locked.
+    ///
+    /// Reaching the deadline does not interrupt mutex acquisition or
+    /// reacquisition, so this method may return after `timeout`. If the mutex
+    /// is poisoned, this method recovers its inner state and continues.
+    ///
+    /// # Parameters
+    ///
+    /// * `timeout` - Relative budget fixed before initial lock acquisition.
+    /// * `waiting` - Predicate that returns `true` while waiting continues.
+    /// * `f` - Closure receiving mutable state after waiting becomes false.
+    ///
+    /// # Returns
+    ///
+    /// [`WaitTimeoutResult::Ready`] with the value returned by `f`, or
+    /// [`WaitTimeoutResult::TimedOut`] when the fixed deadline has passed while
+    /// `waiting` remains true on the deciding locked check.
+    ///
+    /// # Errors
+    ///
+    /// Returns a deadline overflow before acquiring the monitor lock or
+    /// running `waiting`. Returns Timer domain, registration, or completion
+    /// errors when waiting is required.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `waiting` or `f`. Panics if the registry
+    /// exhausts registration identifiers.
+    #[inline]
+    pub fn wait_while_with_total_timeout<R, P, F>(
+        &self,
+        timeout: Duration,
+        waiting: P,
+        f: F,
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
+    where
+        P: FnMut(&T) -> bool,
+        F: FnOnce(&mut T) -> R,
+    {
+        let deadline = self.timer().deadline_after(timeout)?;
+        self.wait_while_with_deadline(deadline, waiting, f)
+    }
+
     /// Waits while a predicate remains true or until an absolute deadline.
     ///
     /// The deadline includes initial lock contention and predicate evaluation.
@@ -863,6 +913,50 @@ impl<T> StdMonitor<T> {
         self.wait_while_for(timeout, |state| !ready(state), f)
     }
 
+    /// Waits until a predicate becomes true with one operation-wide timeout.
+    ///
+    /// The Timer fixes an absolute deadline before initial lock acquisition.
+    /// Initial lock contention therefore consumes the timeout. A ready
+    /// predicate wins on the deciding locked check even when the deadline has
+    /// already passed. The closure then runs without a time limit while the
+    /// monitor lock remains held. Poisoned state is recovered before predicate
+    /// evaluation.
+    ///
+    /// # Parameters
+    ///
+    /// * `timeout` - Relative budget fixed before initial lock acquisition.
+    /// * `ready` - Predicate that returns `true` when the caller may continue.
+    /// * `f` - Closure receiving mutable access to the ready state.
+    ///
+    /// # Returns
+    ///
+    /// [`WaitTimeoutResult::Ready`] with the value returned by `f`, or
+    /// [`WaitTimeoutResult::TimedOut`] when the total budget expires while the
+    /// predicate remains false.
+    ///
+    /// # Errors
+    ///
+    /// Returns deadline construction or Timer errors from
+    /// [`Self::wait_while_with_total_timeout`].
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `ready` or `f`. Panics if the registry exhausts
+    /// registration identifiers.
+    #[inline(always)]
+    pub fn wait_until_with_total_timeout<R, P, F>(
+        &self,
+        timeout: Duration,
+        mut ready: P,
+        f: F,
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
+    where
+        P: FnMut(&T) -> bool,
+        F: FnOnce(&mut T) -> R,
+    {
+        self.wait_while_with_total_timeout(timeout, |state| !ready(state), f)
+    }
+
     /// Waits until a predicate becomes true or an absolute deadline passes.
     ///
     /// # Errors
@@ -925,6 +1019,44 @@ impl<T> StdMonitor<T> {
         P: FnMut(&T) -> bool,
     {
         self.wait_until_for(timeout, ready, |_| ())
+    }
+
+    /// Waits for readiness with one operation-wide timeout.
+    ///
+    /// This convenience method does not mutate ready state after the predicate
+    /// succeeds. Its initial-lock, deadline-boundary, Timer error, and poison
+    /// recovery semantics are identical to
+    /// [`Self::wait_until_with_total_timeout`].
+    ///
+    /// # Parameters
+    ///
+    /// * `timeout` - Relative budget fixed before initial lock acquisition.
+    /// * `ready` - Predicate that returns `true` when the caller may continue.
+    ///
+    /// # Returns
+    ///
+    /// [`WaitTimeoutResult::Ready`] with `()` when `ready` becomes true, or
+    /// [`WaitTimeoutResult::TimedOut`] when the total budget expires.
+    ///
+    /// # Errors
+    ///
+    /// Returns deadline construction or Timer errors from
+    /// [`Self::wait_until_with_total_timeout`].
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `ready`. Panics if the registry exhausts
+    /// registration identifiers.
+    #[inline(always)]
+    pub fn wait_until_ready_with_total_timeout<P>(
+        &self,
+        timeout: Duration,
+        ready: P,
+    ) -> Result<WaitTimeoutResult<()>, TimeError>
+    where
+        P: FnMut(&T) -> bool,
+    {
+        self.wait_until_with_total_timeout(timeout, ready, |_| ())
     }
 
     /// Waits until a predicate becomes true or an absolute deadline passes.
@@ -1089,6 +1221,21 @@ impl<T> TimeoutConditionWaiter for StdMonitor<T> {
         F: FnOnce(&mut Self::State) -> R,
     {
         Self::wait_while_with_deadline(self, deadline, predicate, action)
+    }
+
+    /// Blocks while the predicate remains true with one operation-wide budget.
+    #[inline(always)]
+    fn wait_while_with_total_timeout<R, P, F>(
+        &self,
+        timeout: Duration,
+        predicate: P,
+        action: F,
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
+    where
+        P: FnMut(&Self::State) -> bool,
+        F: FnOnce(&mut Self::State) -> R,
+    {
+        Self::wait_while_with_total_timeout(self, timeout, predicate, action)
     }
 
     /// Blocks while the predicate remains true or until the timeout expires.

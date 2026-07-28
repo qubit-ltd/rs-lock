@@ -16,6 +16,8 @@ use qubit_clock::{
     MonotonicInstant,
     TimeError,
 };
+#[cfg(feature = "parking-lot")]
+use qubit_lock::ParkingLotMonitor;
 use qubit_lock::{
     StdMonitor,
     TimeoutConditionWaiter,
@@ -51,6 +53,40 @@ where
     W: TimeoutConditionWaiter<State = bool>,
 {
     waiter.wait_until_ready_with_deadline(deadline, |ready| *ready)
+}
+
+/// Runs a total-timeout wait-while action through a generic timeout bound.
+fn wait_while_with_total_timeout_through_trait<W>(
+    waiter: &W,
+) -> Result<WaitTimeoutResult<i32>, TimeError>
+where
+    W: TimeoutConditionWaiter<State = bool>,
+{
+    waiter.wait_while_with_total_timeout(
+        Duration::ZERO,
+        |waiting| *waiting,
+        |_| 7,
+    )
+}
+
+/// Runs a total-timeout wait-until action through a generic timeout bound.
+fn wait_until_with_total_timeout_through_trait<W>(
+    waiter: &W,
+) -> Result<WaitTimeoutResult<i32>, TimeError>
+where
+    W: TimeoutConditionWaiter<State = bool>,
+{
+    waiter.wait_until_with_total_timeout(Duration::ZERO, |ready| *ready, |_| 7)
+}
+
+/// Runs an action-free total-timeout wait through a generic timeout bound.
+fn wait_until_ready_with_total_timeout_through_trait<W>(
+    waiter: &W,
+) -> Result<WaitTimeoutResult<()>, TimeError>
+where
+    W: TimeoutConditionWaiter<State = bool>,
+{
+    waiter.wait_until_ready_with_total_timeout(Duration::ZERO, |ready| *ready)
 }
 
 #[test]
@@ -104,6 +140,49 @@ fn test_timeout_condition_waiter_wait_until_ready_with_deadline_preserves_outcom
     );
     assert_time_result_eq!(
         wait_until_ready_with_deadline_through_trait(&ready, ready_deadline),
+        Ok(WaitTimeoutResult::Ready(())),
+    );
+}
+
+#[test]
+/// Verifies every total-timeout helper is available through the trait bound.
+fn test_timeout_condition_waiter_total_timeout_helpers_preserve_outcome() {
+    assert_time_result_eq!(
+        wait_while_with_total_timeout_through_trait(&StdMonitor::new(false)),
+        Ok(WaitTimeoutResult::Ready(7)),
+    );
+    assert_time_result_eq!(
+        wait_until_with_total_timeout_through_trait(&StdMonitor::new(true)),
+        Ok(WaitTimeoutResult::Ready(7)),
+    );
+    assert_time_result_eq!(
+        wait_until_ready_with_total_timeout_through_trait(&StdMonitor::new(
+            false
+        )),
+        Ok(WaitTimeoutResult::TimedOut),
+    );
+}
+
+#[cfg(feature = "parking-lot")]
+#[test]
+/// Verifies the parking_lot implementation dispatches the total-timeout
+/// primitive through the trait.
+fn test_timeout_condition_waiter_total_timeout_accepts_parking_lot_monitor() {
+    assert_time_result_eq!(
+        wait_while_with_total_timeout_through_trait(&ParkingLotMonitor::new(
+            false
+        )),
+        Ok(WaitTimeoutResult::Ready(7)),
+    );
+}
+
+#[test]
+/// Verifies Arc forwarding preserves the total-timeout trait contract.
+fn test_timeout_condition_waiter_arc_forwards_total_timeout() {
+    let monitor = Arc::new(StdMonitor::new(true));
+
+    assert_time_result_eq!(
+        wait_until_ready_with_total_timeout_through_trait(&monitor),
         Ok(WaitTimeoutResult::Ready(())),
     );
 }

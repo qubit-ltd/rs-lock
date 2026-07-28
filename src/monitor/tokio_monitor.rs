@@ -71,6 +71,7 @@ use super::{
 /// a zero budget do not create a timer future. Closures and predicates execute
 /// while the state mutex is held and must not re-enter the same monitor; doing
 /// so can deadlock.
+#[must_use = "retain and use the monitor to coordinate protected state"]
 pub struct TokioMonitor<T> {
     /// Protected monitor state.
     state: Mutex<T>,
@@ -95,7 +96,6 @@ impl<T> TokioMonitor<T> {
     ///
     /// Panics when no Tokio runtime is entered or all process-wide clock-domain
     /// identifiers are exhausted.
-    #[must_use]
     #[track_caller]
     #[inline]
     pub fn current(state: T) -> Self {

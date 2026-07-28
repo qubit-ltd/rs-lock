@@ -21,9 +21,9 @@ use crate::monitor::{
     WaitTimeoutResult,
 };
 
-/// Waits for predicates over protected state with relative timeouts.
+/// Waits for predicates over protected state with bounded time budgets.
 ///
-/// A timeout is a condition-wait budget, aligned with
+/// The `*_for` methods use a condition-wait budget aligned with
 /// [`std::sync::Condvar::wait_timeout_while`]. Initial state-lock contention
 /// is excluded. The budget starts after acquiring the state lock and before
 /// the first predicate check, so predicate work consumes it. If waiting is
@@ -33,6 +33,13 @@ use crate::monitor::{
 /// completion errors take precedence over every post-wait predicate result,
 /// and the action is not run. When the Timer completes successfully, a final
 /// locked predicate check still wins over timeout.
+///
+/// The `*_with_total_timeout` methods instead fix one absolute deadline before
+/// attempting to acquire the state lock. Initial lock contention therefore
+/// consumes that operation-wide budget. These methods do not provide a hard
+/// return-time guarantee: reaching the deadline cannot interrupt mutex
+/// acquisition or reacquisition, and a ready action runs after the deciding
+/// predicate check without a time limit.
 ///
 /// The external predicate state handshake documented by
 /// [`ConditionWaiter`] also applies to timed waits.
@@ -141,6 +148,134 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     fn wait_while_with_deadline<R, P, F>(
         &self,
         deadline: MonotonicInstant,
+        predicate: P,
+        action: F,
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
+    where
+        P: FnMut(&Self::State) -> bool,
+        F: FnOnce(&mut Self::State) -> R;
+
+    /// Blocks until the predicate becomes true or the total timeout expires.
+    ///
+    /// The implementation fixes an absolute deadline before attempting to
+    /// acquire the protected state lock. Initial lock contention, predicate
+    /// evaluation, condition waiting, and lock reacquisition therefore consume
+    /// the same operation-wide budget. A ready predicate wins on the deciding
+    /// locked check even when the deadline has already passed. The action runs
+    /// without a time limit after that ready decision.
+    ///
+    /// # Parameters
+    ///
+    /// * `timeout` - Relative budget fixed before initial lock acquisition.
+    /// * `predicate` - Predicate that returns `true` when the state is ready.
+    /// * `action` - Action to run after the predicate becomes true.
+    ///
+    /// # Returns
+    ///
+    /// [`WaitTimeoutResult::Ready`] with the action result, or
+    /// [`WaitTimeoutResult::TimedOut`] when the fixed deadline has passed while
+    /// the predicate remains false on the deciding locked check.
+    ///
+    /// # Errors
+    ///
+    /// Returns a deadline overflow before acquiring the state lock or running
+    /// the predicate. Returns Timer domain, registration, or completion errors
+    /// when waiting is required. After waiting begins, such an error prevents
+    /// `action` from running.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `predicate` or `action`.
+    #[inline(always)]
+    fn wait_until_with_total_timeout<R, P, F>(
+        &self,
+        timeout: Duration,
+        mut predicate: P,
+        action: F,
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
+    where
+        P: FnMut(&Self::State) -> bool,
+        F: FnOnce(&mut Self::State) -> R,
+    {
+        self.wait_while_with_total_timeout(
+            timeout,
+            move |state| !predicate(state),
+            action,
+        )
+    }
+
+    /// Blocks until the predicate becomes true or the total timeout expires.
+    ///
+    /// This convenience method does not run an action after readiness. Its
+    /// initial-lock, deadline-boundary, and Timer error semantics are identical
+    /// to [`Self::wait_until_with_total_timeout`].
+    ///
+    /// # Parameters
+    ///
+    /// * `timeout` - Relative budget fixed before initial lock acquisition.
+    /// * `predicate` - Predicate that returns `true` when the state is ready.
+    ///
+    /// # Returns
+    ///
+    /// [`WaitTimeoutResult::Ready`] with `()` when the predicate becomes true,
+    /// or [`WaitTimeoutResult::TimedOut`] when the total budget expires.
+    ///
+    /// # Errors
+    ///
+    /// Returns deadline construction or Timer errors from
+    /// [`Self::wait_until_with_total_timeout`].
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `predicate`.
+    #[inline(always)]
+    fn wait_until_ready_with_total_timeout<P>(
+        &self,
+        timeout: Duration,
+        predicate: P,
+    ) -> Result<WaitTimeoutResult<()>, TimeError>
+    where
+        P: FnMut(&Self::State) -> bool,
+    {
+        self.wait_until_with_total_timeout(timeout, predicate, |_| ())
+    }
+
+    /// Blocks while the predicate remains true or the total timeout expires.
+    ///
+    /// The implementation must fix an absolute deadline before attempting to
+    /// acquire the protected state lock. Initial lock contention, predicate
+    /// evaluation, condition waiting, and lock reacquisition consume that
+    /// operation-wide budget. When the predicate becomes false on the deciding
+    /// locked check, `action` runs without a time limit while the state remains
+    /// locked.
+    ///
+    /// Reaching the deadline does not interrupt mutex acquisition or
+    /// reacquisition, so this method may return after `timeout`.
+    ///
+    /// # Parameters
+    ///
+    /// * `timeout` - Relative budget fixed before initial lock acquisition.
+    /// * `predicate` - Predicate that returns `true` while waiting continues.
+    /// * `action` - Action to run after the predicate becomes false.
+    ///
+    /// # Returns
+    ///
+    /// [`WaitTimeoutResult::Ready`] with the action result, or
+    /// [`WaitTimeoutResult::TimedOut`] when the fixed deadline has passed while
+    /// the predicate remains true on the deciding locked check.
+    ///
+    /// # Errors
+    ///
+    /// Returns a deadline overflow before acquiring the state lock or running
+    /// the predicate. Returns Timer domain, registration, or completion errors
+    /// when waiting is required.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `predicate` or `action`.
+    fn wait_while_with_total_timeout<R, P, F>(
+        &self,
+        timeout: Duration,
         predicate: P,
         action: F,
     ) -> Result<WaitTimeoutResult<R>, TimeError>
@@ -282,6 +417,45 @@ where
         <M as TimeoutConditionWaiter>::wait_while_with_deadline(
             self.as_ref(),
             deadline,
+            predicate,
+            action,
+        )
+    }
+
+    /// Delegates an operation-wide timed condition wait to the shared monitor.
+    ///
+    /// # Parameters
+    ///
+    /// * `timeout` - Relative budget fixed before initial lock acquisition.
+    /// * `predicate` - Predicate that remains true while waiting continues.
+    /// * `action` - Action to run after the predicate becomes false.
+    ///
+    /// # Returns
+    ///
+    /// The total-timeout result returned by the wrapped monitor.
+    ///
+    /// # Errors
+    ///
+    /// Returns deadline construction or Timer errors from the wrapped monitor.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from the wrapped monitor, including from `predicate`
+    /// or `action`.
+    #[inline(always)]
+    fn wait_while_with_total_timeout<R, P, F>(
+        &self,
+        timeout: Duration,
+        predicate: P,
+        action: F,
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
+    where
+        P: FnMut(&Self::State) -> bool,
+        F: FnOnce(&mut Self::State) -> R,
+    {
+        <M as TimeoutConditionWaiter>::wait_while_with_total_timeout(
+            self.as_ref(),
+            timeout,
             predicate,
             action,
         )

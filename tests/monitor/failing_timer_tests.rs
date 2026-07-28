@@ -11,12 +11,15 @@ use std::{
     future::poll_fn,
     sync::{
         Arc,
+        Mutex,
         atomic::{
             AtomicUsize,
             Ordering,
         },
+        mpsc::Sender,
     },
     task::Poll,
+    time::Duration,
 };
 
 use qubit_clock::{
@@ -31,6 +34,68 @@ use qubit_clock::{
         TimerFailurePoint,
     },
 };
+
+/// Timer wrapper that reports when an operation samples its deadline clock.
+pub(super) struct DeadlineSignalingTimer<T> {
+    /// Wrapped timer providing clock access and deadline futures.
+    inner: T,
+    /// One-shot signal emitted by the first clock sample.
+    sampled_tx: Mutex<Option<Sender<()>>>,
+}
+
+impl<T> DeadlineSignalingTimer<T> {
+    /// Creates a wrapper that signals the supplied channel on its first clock
+    /// sample.
+    ///
+    /// # Parameters
+    ///
+    /// * `inner` - Timer providing the real deadline behavior.
+    /// * `sampled_tx` - Channel notified when the wrapper's clock is sampled.
+    ///
+    /// # Returns
+    ///
+    /// A Timer wrapper retaining the one-shot sampling signal.
+    pub(super) fn new(inner: T, sampled_tx: Sender<()>) -> Self {
+        Self {
+            inner,
+            sampled_tx: Mutex::new(Some(sampled_tx)),
+        }
+    }
+}
+
+impl<T> Timer for DeadlineSignalingTimer<T>
+where
+    T: Timer,
+{
+    /// Returns the wrapped timer's monotonic clock.
+    fn clock(&self) -> &dyn MonotonicClock {
+        self.inner.clock()
+    }
+
+    /// Reports the first completed deadline sample.
+    fn deadline_after(
+        &self,
+        duration: Duration,
+    ) -> Result<MonotonicInstant, TimeError> {
+        let deadline = self.inner.deadline_after(duration)?;
+        if let Some(sampled_tx) = self
+            .sampled_tx
+            .lock()
+            .expect("deadline signal lock should not be poisoned")
+            .take()
+        {
+            sampled_tx
+                .send(())
+                .expect("deadline sampling receiver should remain connected");
+        }
+        Ok(deadline)
+    }
+
+    /// Registers the deadline with the wrapped timer.
+    fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
+        self.inner.at(deadline)
+    }
+}
 
 /// Timer wrapper that remains pending once before forwarding completion.
 pub(super) struct OncePendingTimer<T> {

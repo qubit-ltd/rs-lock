@@ -16,7 +16,10 @@ use crate::monitor::{
 ///
 /// This trait extends the complete untimed [`Monitor`] contract with
 /// [`TimeoutConditionWaiter`]. Use it when a generic API needs both monitor
-/// state coordination and bounded waiting.
+/// state coordination and bounded waiting. Implementations support absolute
+/// deadlines, condition-wait budgets that begin after initial lock
+/// acquisition, and operation-wide timeouts that fix their deadline before
+/// initial lock acquisition.
 pub trait TimedMonitor: Monitor + TimeoutConditionWaiter {}
 
 impl<M: ?Sized> TimedMonitor for M where M: Monitor + TimeoutConditionWaiter {}

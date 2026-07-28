@@ -65,7 +65,7 @@ The default feature set is empty. Enable the components used by your program:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", default-features = false, features = ["monitor", "parking-lot"] }
+qubit-lock = { version = "0.12", default-features = false, features = ["monitor", "parking-lot"] }
 ```
 
 Choose features according to the components you use:
@@ -83,21 +83,21 @@ Lock-only users can avoid all optional dependencies:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", default-features = false }
+qubit-lock = { version = "0.12", default-features = false }
 ```
 
 Enable asynchronous locks without Tokio monitor deadlines:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", default-features = false, features = ["async-lock"] }
+qubit-lock = { version = "0.12", default-features = false, features = ["async-lock"] }
 ```
 
 Enable Tokio monitor coordination and timed waits:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", default-features = false, features = ["async-monitor"] }
+qubit-lock = { version = "0.12", default-features = false, features = ["async-monitor"] }
 ```
 
 If the application creates a Tokio runtime, enable the required runtime
@@ -291,7 +291,7 @@ Use the capability traits at generic API boundaries:
 | --- | --- |
 | `Notifier` | `notify_one` and `notify_all` only |
 | `ConditionWaiter` | Synchronous `wait_until`, `wait_until_ready`, and `wait_while` |
-| `TimeoutConditionWaiter` | Synchronous `wait_until_for`, `wait_until_ready_for`, and `wait_while_for` |
+| `TimeoutConditionWaiter` | Synchronous condition-budget `*_for`, absolute-deadline `*_with_deadline`, and operation-wide `*_with_total_timeout` waits |
 | `Monitor` | State access, notification, and untimed synchronous waits |
 | `TimedMonitor` | `Monitor` plus timed synchronous waits |
 | `SharedMonitor` | A cloneable shared synchronous monitor handle |
@@ -554,9 +554,16 @@ state lock, exactly as a condition variable does.
 A zero timeout still performs the initial predicate check. At the deadline, a
 final predicate check under the lock wins over a successful timer completion.
 Timer registration or completion errors take precedence over post-wait
-readiness, and the action is not run. If an application needs a whole-call
-deadline, it must sample its own absolute deadline at the business-operation
-entry point and pass the remaining budget to each wait.
+readiness, and the action is not run.
+
+For blocking code, `wait_while_with_total_timeout`,
+`wait_until_with_total_timeout`, and
+`wait_until_ready_with_total_timeout` fix their absolute deadline before
+initial state-lock acquisition. Lock contention therefore consumes the same
+operation-wide budget as predicate evaluation and waiting. These methods are
+still not hard return-time guarantees: reaching the deadline cannot interrupt
+mutex acquisition or reacquisition, and the ready action runs without a time
+limit.
 
 Async wait futures are lazy: time before the first poll does not consume the
 budget, and initial async state-lock contention is excluded. Dropping a
