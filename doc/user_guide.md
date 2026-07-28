@@ -600,7 +600,7 @@ Declare the test clock directly:
 
 ```toml
 [dev-dependencies]
-qubit-clock = { version = "0.10.1", features = ["test-util"] }
+qubit-clock = { version = "0.10", features = ["test-util"] }
 ```
 
 ```rust

@@ -554,7 +554,7 @@ Timer 注册或完成失败，不是真实超时。发生该错误后，guard �
 
 ```toml
 [dev-dependencies]
-qubit-clock = { version = "0.10.1", features = ["test-util"] }
+qubit-clock = { version = "0.10", features = ["test-util"] }
 ```
 
 ```rust
