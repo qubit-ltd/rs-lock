@@ -7,14 +7,75 @@
 // =============================================================================
 //! Shared fault-injecting Timer factories and assertions.
 
+use std::{
+    future::poll_fn,
+    sync::{
+        Arc,
+        atomic::{
+            AtomicUsize,
+            Ordering,
+        },
+    },
+    task::Poll,
+};
+
 use qubit_clock::{
+    MonotonicClock,
+    MonotonicInstant,
     TimeError,
+    Timer,
+    TimerFuture,
     TimerUnavailableError,
     test_util::{
         FaultInjectingTimer,
         TimerFailurePoint,
     },
 };
+
+/// Timer wrapper that remains pending once before forwarding completion.
+pub(super) struct OncePendingTimer<T> {
+    /// Wrapped timer providing the eventual result.
+    inner: T,
+    /// Number of polls observed across registered futures.
+    poll_count: Arc<AtomicUsize>,
+}
+
+impl<T> OncePendingTimer<T> {
+    /// Creates a wrapper and exposes its shared poll counter.
+    pub(super) fn new(inner: T) -> (Self, Arc<AtomicUsize>) {
+        let poll_count = Arc::new(AtomicUsize::new(0));
+        (
+            Self {
+                inner,
+                poll_count: Arc::clone(&poll_count),
+            },
+            poll_count,
+        )
+    }
+}
+
+impl<T> Timer for OncePendingTimer<T>
+where
+    T: Timer,
+{
+    /// Returns the wrapped timer's monotonic clock.
+    fn clock(&self) -> &dyn MonotonicClock {
+        self.inner.clock()
+    }
+
+    /// Defers the wrapped future's first completion poll.
+    fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
+        let mut future = self.inner.at(deadline)?;
+        let poll_count = Arc::clone(&self.poll_count);
+        Ok(Box::pin(poll_fn(move |context| {
+            if poll_count.fetch_add(1, Ordering::SeqCst) == 0 {
+                Poll::Pending
+            } else {
+                future.as_mut().poll(context)
+            }
+        })))
+    }
+}
 
 /// Creates a Timer that rejects every future-deadline registration.
 ///

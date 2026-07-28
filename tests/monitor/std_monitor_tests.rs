@@ -10,6 +10,7 @@
 use std::{
     sync::{
         Arc,
+        atomic::Ordering,
         mpsc,
     },
     thread,
@@ -32,6 +33,7 @@ use qubit_lock::{
 blocking_monitor_contract_tests!(std_monitor_contract, StdMonitor);
 
 use super::failing_timer_tests::{
+    OncePendingTimer,
     assert_backend_unavailable,
     completion_failing_timer,
     registration_failing_timer,
@@ -71,6 +73,43 @@ fn test_std_monitor_completion_error_wins_over_post_wait_readiness() {
     assert_backend_unavailable(error);
     assert_eq!(predicate_checks, 1);
     assert_eq!(action_calls, 0);
+}
+
+#[test]
+/// Verifies an error returned by a blocking timed wait is propagated.
+fn test_std_monitor_blocking_wait_propagates_post_wait_timer_error() {
+    let (timer, poll_count) = OncePendingTimer::new(completion_failing_timer());
+    let monitor = Arc::new(StdMonitor::with_timer(false, Arc::new(timer)));
+    let (checked_tx, checked_rx) = mpsc::channel();
+    let waiter_monitor = Arc::clone(&monitor);
+    let waiter = thread::spawn(move || {
+        let mut checked_tx = Some(checked_tx);
+        waiter_monitor.wait_until_for(
+            Duration::from_secs(1),
+            move |_| {
+                if let Some(checked_tx) = checked_tx.take() {
+                    checked_tx
+                        .send(())
+                        .expect("test should observe the initial predicate");
+                }
+                false
+            },
+            |_| (),
+        )
+    });
+
+    checked_rx
+        .recv_timeout(Duration::from_secs(1))
+        .expect("waiter should perform the initial predicate check");
+    drop(monitor.lock());
+    monitor.notify_one();
+
+    let error = waiter
+        .join()
+        .expect("waiter should finish")
+        .expect_err("post-wait timer completion should fail");
+    assert_backend_unavailable(error);
+    assert_eq!(poll_count.load(Ordering::SeqCst), 2);
 }
 
 #[test]
@@ -496,6 +535,101 @@ fn test_std_monitor_wait_until_with_deadline_ready_wins_reached_deadline() {
 
     assert_time_result_eq!(result, Ok(WaitTimeoutResult::Ready(7)));
     assert_eq!(clock.pending_waiters(), 0);
+}
+
+#[test]
+/// Verifies deadline helpers register, wait, and preserve concrete forwarding.
+fn test_std_monitor_deadline_helpers_wait_until_timeout() {
+    const WAIT_TIMEOUT: Duration = Duration::from_millis(20);
+
+    let clock = ManualMonotonicClock::new_shared();
+    let monitor = Arc::new(StdMonitor::with_timer(false, clock.new_timer()));
+    let deadline = clock
+        .now()
+        .checked_add(WAIT_TIMEOUT)
+        .expect("manual clock deadline should be representable");
+    let waiter_monitor = Arc::clone(&monitor);
+    let waiter = thread::spawn(move || {
+        StdMonitor::wait_until_ready_with_deadline(
+            &waiter_monitor,
+            deadline,
+            |ready| *ready,
+        )
+    });
+
+    let _ = clock
+        .advance_to_next_deadline_after_waiters(1, Duration::from_secs(1))
+        .expect("deadline helper should register a condition waiter");
+
+    assert_time_result_eq!(
+        waiter.join().expect("deadline waiter should finish"),
+        Ok(WaitTimeoutResult::TimedOut),
+    );
+    assert_time_result_eq!(
+        <StdMonitor<bool> as TimeoutConditionWaiter>::wait_while_with_deadline(
+            &monitor,
+            clock.now(),
+            |_| false,
+            |_| 7,
+        ),
+        Ok(WaitTimeoutResult::Ready(7)),
+    );
+}
+
+#[test]
+/// Verifies a deadline wait rechecks after a notification that leaves it
+/// blocked.
+fn test_std_monitor_deadline_wait_rechecks_after_notification() {
+    const WAIT_TIMEOUT: Duration = Duration::from_millis(20);
+
+    let clock = ManualMonotonicClock::new_shared();
+    let monitor = Arc::new(StdMonitor::with_timer(false, clock.new_timer()));
+    let (checked_tx, checked_rx) = mpsc::channel();
+    let deadline = clock
+        .now()
+        .checked_add(WAIT_TIMEOUT)
+        .expect("manual clock deadline should be representable");
+    let waiter_monitor = Arc::clone(&monitor);
+    let waiter = thread::spawn(move || {
+        let mut checks = 0;
+        waiter_monitor.wait_while_with_deadline(
+            deadline,
+            move |_| {
+                checks += 1;
+                checked_tx
+                    .send(checks)
+                    .expect("test should observe each predicate check");
+                true
+            },
+            |_| (),
+        )
+    });
+
+    assert_eq!(
+        checked_rx.recv_timeout(Duration::from_secs(1)).expect(
+            "deadline waiter should perform its initial predicate check"
+        ),
+        1,
+    );
+    let _ = clock
+        .wait_for_next_deadline(Duration::from_secs(1))
+        .expect("deadline wait should register before notification");
+    drop(monitor.lock());
+    monitor.notify_one();
+    assert_eq!(
+        checked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("deadline waiter should recheck after notification"),
+        2,
+    );
+    let _ = clock
+        .advance_to_next_deadline()
+        .expect("deadline wait should retain its original deadline");
+
+    assert_time_result_eq!(
+        waiter.join().expect("deadline waiter should finish"),
+        Ok(WaitTimeoutResult::TimedOut),
+    );
 }
 
 #[test]
