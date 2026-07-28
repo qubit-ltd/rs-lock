@@ -8,7 +8,13 @@
 use std::sync::RwLock;
 use std::time::Duration;
 
-use qubit_lock::{ArcParkingLotMonitor, DataLock, WaitTimeoutResult};
+use std::sync::Arc;
+
+use qubit_lock::{
+    DataLock,
+    ParkingLotMonitor,
+    WaitTimeoutResult,
+};
 
 fn main() {
     println!("Demonstrating rs-lock wrapper boundaries...");
@@ -23,7 +29,7 @@ fn main() {
         String::from("std semantics"),
     );
 
-    let monitor = ArcParkingLotMonitor::new(Vec::<i32>::new());
+    let monitor = Arc::new(ParkingLotMonitor::new(Vec::<i32>::new()));
     let result = monitor.wait_while_for(
         Duration::from_millis(1),
         |items| items.is_empty(),

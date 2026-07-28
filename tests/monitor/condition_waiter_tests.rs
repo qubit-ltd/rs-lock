@@ -7,7 +7,10 @@
 // =============================================================================
 //! Tests for [`ConditionWaiter`](qubit_lock::ConditionWaiter).
 
-use qubit_lock::{ConditionWaiter, StdMonitor};
+use qubit_lock::{
+    ConditionWaiter,
+    StdMonitor,
+};
 
 /// Runs an immediately ready condition wait through a generic bound.
 fn wait_through_trait<W>(waiter: &W) -> i32

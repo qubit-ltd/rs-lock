@@ -7,7 +7,10 @@
 // =============================================================================
 //! Public behavior tests backed by the blocking condition waiter's state.
 
-use std::{sync::Arc, thread};
+use std::{
+    sync::Arc,
+    thread,
+};
 
 use qubit_lock::StdMonitor;
 
@@ -17,7 +20,9 @@ use qubit_lock::StdMonitor;
 fn test_blocking_condition_waiter_state_latches_notification() {
     let monitor = Arc::new(StdMonitor::new(false));
     let waiter_monitor = Arc::clone(&monitor);
-    let waiter = thread::spawn(move || waiter_monitor.wait_until(|ready| *ready, |ready| *ready));
+    let waiter = thread::spawn(move || {
+        waiter_monitor.wait_until(|ready| *ready, |ready| *ready)
+    });
 
     monitor.with_write_notify_one(|ready| *ready = true);
 

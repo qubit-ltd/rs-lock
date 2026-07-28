@@ -16,12 +16,6 @@ mod assert_time_result_eq_tests;
 #[macro_use]
 mod blocking_monitor_contract_tests;
 
-#[cfg(all(not(loom), feature = "parking-lot"))]
-mod arc_parking_lot_monitor_tests;
-#[cfg(not(loom))]
-mod arc_std_monitor_tests;
-#[cfg(all(not(loom), feature = "async-monitor"))]
-mod arc_tokio_monitor_tests;
 #[cfg(all(not(loom), feature = "async-monitor"))]
 mod async_condition_waiter_tests;
 #[cfg(all(not(loom), feature = "async-monitor"))]

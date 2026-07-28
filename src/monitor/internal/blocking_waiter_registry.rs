@@ -11,8 +11,13 @@ use std::sync::Arc;
 use std::task::Wake;
 
 use super::{
-    BlockingConditionWaiter, BlockingWaiterRegistration, WaiterRegistry,
-    sync::{Mutex, recover},
+    BlockingConditionWaiter,
+    BlockingWaiterRegistration,
+    WaiterRegistry,
+    sync::{
+        Mutex,
+        recover,
+    },
 };
 
 /// Registry of blocking waiters eligible for current notifications.
@@ -44,9 +49,12 @@ impl BlockingWaiterRegistry {
     /// # Panics
     ///
     /// Panics if the registry exhausts registration identifiers.
-    pub(in crate::monitor) fn register(&self) -> BlockingWaiterRegistration<'_> {
+    pub(in crate::monitor) fn register(
+        &self,
+    ) -> BlockingWaiterRegistration<'_> {
         let waiter = Arc::new(BlockingConditionWaiter::new());
-        let waiter_id = recover(self.waiters.lock()).register(Arc::clone(&waiter));
+        let waiter_id =
+            recover(self.waiters.lock()).register(Arc::clone(&waiter));
         BlockingWaiterRegistration::new(self, waiter_id, waiter)
     }
 

@@ -8,13 +8,25 @@
 //! Defines one latched blocking condition waiter and Timer waker.
 
 use std::sync::Arc;
-use std::task::{Context, Poll, Wake, Waker};
+use std::task::{
+    Context,
+    Poll,
+    Wake,
+    Waker,
+};
 
-use qubit_clock::{TimeError, TimerFuture};
+use qubit_clock::{
+    TimeError,
+    TimerFuture,
+};
 
 use super::{
     blocking_condition_waiter_state::BlockingConditionWaiterState,
-    sync::{Condvar, Mutex, recover},
+    sync::{
+        Condvar,
+        Mutex,
+        recover,
+    },
 };
 
 /// Private signal shared by monitor notification and a TimerFuture Waker.
@@ -35,7 +47,9 @@ impl BlockingConditionWaiter {
     #[inline]
     pub(in crate::monitor) fn new() -> Self {
         Self {
-            state: Mutex::new(BlockingConditionWaiterState { signalled: false }),
+            state: Mutex::new(BlockingConditionWaiterState {
+                signalled: false,
+            }),
             changed: Condvar::new(),
         }
     }

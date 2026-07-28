@@ -7,10 +7,20 @@
 // =============================================================================
 //! Asynchronous timeout condition-wait capability.
 
-use qubit_clock::{MonotonicInstant, TimeError};
-use std::{future::Future, sync::Arc, time::Duration};
+use qubit_clock::{
+    MonotonicInstant,
+    TimeError,
+};
+use std::{
+    future::Future,
+    sync::Arc,
+    time::Duration,
+};
 
-use crate::monitor::{AsyncConditionWaiter, WaitTimeoutResult};
+use crate::monitor::{
+    AsyncConditionWaiter,
+    WaitTimeoutResult,
+};
 
 /// Waits asynchronously for predicates over protected state with timeouts.
 ///
@@ -74,7 +84,11 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
-        self.wait_while_with_deadline_async(deadline, move |state| !predicate(state), action)
+        self.wait_while_with_deadline_async(
+            deadline,
+            move |state| !predicate(state),
+            action,
+        )
     }
 
     /// Returns a future that waits until the predicate becomes true or an
@@ -180,7 +194,11 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
-        self.wait_while_for_async(timeout, move |state| !predicate(state), action)
+        self.wait_while_for_async(
+            timeout,
+            move |state| !predicate(state),
+            action,
+        )
     }
 
     /// Returns a future that waits until the predicate becomes true or times
@@ -270,7 +288,8 @@ impl<M> AsyncTimeoutConditionWaiter for Arc<M>
 where
     M: AsyncTimeoutConditionWaiter + ?Sized,
 {
-    /// Forwards an absolute-deadline async condition wait to the wrapped monitor.
+    /// Forwards an absolute-deadline async condition wait to the wrapped
+    /// monitor.
     #[inline(always)]
     fn wait_while_with_deadline_async<'a, R, P, F>(
         &'a self,

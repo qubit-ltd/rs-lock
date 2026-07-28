@@ -13,15 +13,25 @@
 //! it, so waiting operations can use its waiter registry and Timer.
 
 use std::{
-    ops::{Deref, DerefMut},
+    ops::{
+        Deref,
+        DerefMut,
+    },
     task::Poll,
     time::Duration,
 };
 
 use parking_lot::MutexGuard;
-use qubit_clock::{MonotonicInstant, TimeError, TimerFuture};
+use qubit_clock::{
+    MonotonicInstant,
+    TimeError,
+    TimerFuture,
+};
 
-use super::{parking_lot_monitor::ParkingLotMonitor, wait_timeout_status::WaitTimeoutStatus};
+use super::{
+    parking_lot_monitor::ParkingLotMonitor,
+    wait_timeout_status::WaitTimeoutStatus,
+};
 
 /// Guard returned by
 /// [`ParkingLotMonitor::lock`](super::ParkingLotMonitor::lock).
@@ -74,7 +84,10 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     ///
     /// A monitor guard that can access state and wait for monitor notification.
     #[inline]
-    pub(super) fn new(monitor: &'a ParkingLotMonitor<T>, inner: MutexGuard<'a, T>) -> Self {
+    pub(super) fn new(
+        monitor: &'a ParkingLotMonitor<T>,
+        inner: MutexGuard<'a, T>,
+    ) -> Self {
         Self {
             monitor,
             inner: Some(inner),
@@ -237,7 +250,10 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     ///
     /// Panics if the registry exhausts registration identifiers.
     #[inline]
-    pub fn wait_for(&mut self, timeout: Duration) -> Result<WaitTimeoutStatus, TimeError> {
+    pub fn wait_for(
+        &mut self,
+        timeout: Duration,
+    ) -> Result<WaitTimeoutStatus, TimeError> {
         let mut future = self.monitor.timer().after(timeout)?;
         self.wait_with_timer(&mut future)
     }
@@ -293,14 +309,18 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
         future: &mut TimerFuture,
     ) -> Result<WaitTimeoutStatus, TimeError> {
         if let Poll::Ready(result) =
-            super::internal::BlockingConditionWaiter::poll_timer_without_waiter(future)
+            super::internal::BlockingConditionWaiter::poll_timer_without_waiter(
+                future,
+            )
         {
             return result.map(|()| WaitTimeoutStatus::TimedOut);
         }
         let registration = self.monitor.waiters.register();
         let waiter = std::sync::Arc::clone(registration.waiter());
         if let Poll::Ready(result) =
-            super::internal::BlockingConditionWaiter::poll_timer(&waiter, future)
+            super::internal::BlockingConditionWaiter::poll_timer(
+                &waiter, future,
+            )
         {
             return result.map(|()| WaitTimeoutStatus::TimedOut);
         }
@@ -312,7 +332,9 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
         waiter.wait();
         drop(registration);
         self.inner = Some(self.monitor.state.lock());
-        match super::internal::BlockingConditionWaiter::poll_timer(&waiter, future) {
+        match super::internal::BlockingConditionWaiter::poll_timer(
+            &waiter, future,
+        ) {
             Poll::Ready(result) => result.map(|()| WaitTimeoutStatus::TimedOut),
             Poll::Pending => Ok(WaitTimeoutStatus::Woken),
         }

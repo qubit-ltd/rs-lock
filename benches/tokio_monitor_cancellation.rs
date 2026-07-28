@@ -11,12 +11,29 @@
 use std::{
     future::Future,
     pin::Pin,
-    task::{Context, Poll, Waker},
+    task::{
+        Context,
+        Poll,
+        Waker,
+    },
 };
 
-use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
-use qubit_clock::{ManualMonotonicClock, MonotonicClock};
-use qubit_lock::{ArcTokioMonitor, AsyncConditionWaiter};
+use criterion::{
+    BatchSize,
+    BenchmarkId,
+    Criterion,
+    criterion_group,
+    criterion_main,
+};
+use qubit_clock::{
+    ManualMonotonicClock,
+    MonotonicClock,
+};
+use qubit_lock::{
+    AsyncConditionWaiter,
+    TokioMonitor,
+};
+use std::sync::Arc;
 
 /// Registry sizes used to reveal cancellation scaling.
 const WAITER_COUNTS: [usize; 4] = [32, 128, 512, 2_048];
@@ -26,7 +43,7 @@ type OwnedWaitFuture = Pin<Box<dyn Future<Output = ()> + Send + 'static>>;
 
 /// Pending Tokio monitor waiters registered against one monitor.
 struct RegisteredWaiters {
-    monitor: ArcTokioMonitor<bool>,
+    monitor: Arc<TokioMonitor<bool>>,
     waiters: Vec<OwnedWaitFuture>,
 }
 
@@ -42,7 +59,7 @@ struct RegisteredWaiters {
 /// cancellation.
 fn create_registered_waiters(count: usize) -> RegisteredWaiters {
     let clock = ManualMonotonicClock::new_shared();
-    let monitor = ArcTokioMonitor::with_timer(false, clock.new_timer());
+    let monitor = Arc::new(TokioMonitor::with_timer(false, clock.new_timer()));
     let mut waiters = Vec::with_capacity(count);
     for _ in 0..count {
         let waiter_monitor = monitor.clone();

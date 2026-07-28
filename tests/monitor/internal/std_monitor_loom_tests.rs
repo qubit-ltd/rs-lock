@@ -10,7 +10,10 @@
 use loom::{
     sync::{
         Arc,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{
+            AtomicUsize,
+            Ordering,
+        },
     },
     thread,
 };

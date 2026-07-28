@@ -33,10 +33,12 @@ the queue and notify a registered waiter without leaving a lost-notification
 window:
 
 ```rust
-use qubit_lock::ArcParkingLotMonitor;
+use std::sync::Arc;
+
+use qubit_lock::ParkingLotMonitor;
 
 fn main() {
-    let queue = ArcParkingLotMonitor::new(Vec::<i32>::new());
+    let queue = Arc::new(ParkingLotMonitor::new(Vec::<i32>::new()));
     let worker_queue = queue.clone();
 
     let worker = std::thread::spawn(move || {
@@ -59,11 +61,11 @@ of truth; the notification is only a prompt to check it again.
 
 ## 2. Installation and feature selection
 
-The default configuration provides the complete synchronous API:
+The default feature set is empty. Enable the components used by your program:
 
 ```toml
 [dependencies]
-qubit-lock = "0.11"
+qubit-lock = { version = "0.11", features = ["parking-lot", "monitor"] }
 ```
 
 Choose features according to the components you use:
@@ -318,11 +320,11 @@ designed for static generic bounds, not `dyn` trait-object interfaces.
 
 ## 6. Concrete monitor components
 
-### `ParkingLotMonitor<T>` and `ArcParkingLotMonitor<T>`
+### `ParkingLotMonitor<T>`
 
 Use `ParkingLotMonitor<T>` for efficient blocking coordination when the
 `parking-lot` and `monitor` features are enabled. Use
-`ArcParkingLotMonitor<T>` when the handle must be cloned or retained by
+`Arc<ParkingLotMonitor<T>>` when the handle must be cloned or retained by
 multiple threads.
 
 Important methods are:
@@ -335,15 +337,14 @@ Important methods are:
   `_for` timed variants.
 - `lock` when explicit guard-level control is necessary.
 
-The `Arc*` wrapper dereferences to its inner monitor. `from_arc`, `as_arc`, and
-`into_arc` expose the ownership boundary without another allocation.
+Use the standard `Arc` directly; its deref coercion preserves the monitor API
+without a crate-specific wrapper.
 
-### `StdMonitor<T>` and `ArcStdMonitor<T>`
+### `StdMonitor<T>`
 
 `StdMonitor<T>` has the same high-level API and uses standard-library
 primitives. Choose it when avoiding the parking_lot dependency matters more
-than using that backend. `ArcStdMonitor<T>` is its cloneable shared handle and
-also provides `from_arc`, `as_arc`, and `into_arc`.
+than using that backend. Use `Arc<StdMonitor<T>>` when it must be shared.
 
 Unlike the standard-library `Lock` and `DataLock` adapters, `StdMonitor`
 recovers the inner state instead of rejecting access after poisoning. A panic
@@ -353,14 +354,16 @@ while the state lock is held can leave that state partially modified.
 After inspecting and, when necessary, repairing the protected invariant, call
 `clear_poison` to explicitly accept the recovered state. `clear_poison` only
 clears the marker: it neither validates nor rolls back state, and a later panic
-while holding the monitor can poison it again. `ArcStdMonitor` exposes both
-methods through its inner monitor.
+while holding the monitor can poison it again. `Arc<StdMonitor<T>>` exposes
+both methods through deref coercion.
 
 ```rust
-use qubit_lock::ArcStdMonitor;
+use std::sync::Arc;
+
+use qubit_lock::StdMonitor;
 
 fn main() {
-    let monitor = ArcStdMonitor::new(false);
+    let monitor = Arc::new(StdMonitor::new(false));
     let waiter_monitor = monitor.clone();
 
     let waiter = std::thread::spawn(move || {
@@ -399,10 +402,10 @@ fn main() {
 }
 ```
 
-### `TokioMonitor<T>` and `ArcTokioMonitor<T>`
+### `TokioMonitor<T>`
 
-These types require `async-monitor`. Use `TokioMonitor<T>` for task-local
-ownership and `ArcTokioMonitor<T>` for cloneable shared ownership.
+This type requires `async-monitor`. Use `TokioMonitor<T>` for task-local
+ownership and `Arc<TokioMonitor<T>>` for cloneable shared ownership.
 
 - `current` captures the current Tokio runtime handle for the default timer.
 - `try_current` reports a missing ambient runtime instead of panicking.
@@ -414,11 +417,13 @@ ownership and `ArcTokioMonitor<T>` for cloneable shared ownership.
   `wait_until_ready_for_async` provide action-free forms.
 
 ```rust
-use qubit_lock::{ArcTokioMonitor, AsyncConditionWaiter};
+use std::sync::Arc;
+
+use qubit_lock::{AsyncConditionWaiter, TokioMonitor};
 
 #[tokio::main]
 async fn main() {
-    let monitor = ArcTokioMonitor::current(Vec::<i32>::new());
+    let monitor = Arc::new(TokioMonitor::current(Vec::<i32>::new()));
     let worker_monitor = monitor.clone();
 
     let worker = tokio::spawn(async move {
@@ -474,11 +479,11 @@ use std::{
     thread,
 };
 
-use qubit_lock::ArcStdMonitor;
+use qubit_lock::StdMonitor;
 
 fn main() {
     let ready = Arc::new(AtomicBool::new(false));
-    let monitor = ArcStdMonitor::new(());
+    let monitor = Arc::new(StdMonitor::new(()));
     let waiter_ready = Arc::clone(&ready);
     let waiter_monitor = monitor.clone();
 
@@ -505,12 +510,12 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
-use qubit_lock::{ArcTokioMonitor, AsyncConditionWaiter};
+use qubit_lock::{AsyncConditionWaiter, TokioMonitor};
 
 #[tokio::main]
 async fn main() {
     let ready = Arc::new(AtomicBool::new(false));
-    let monitor = ArcTokioMonitor::current(());
+    let monitor = Arc::new(TokioMonitor::current(()));
     let waiter_ready = Arc::clone(&ready);
     let waiter_monitor = monitor.clone();
 
@@ -595,7 +600,7 @@ Declare the test clock directly:
 
 ```toml
 [dev-dependencies]
-qubit-clock = { version = "0.10", features = ["test-util"] }
+qubit-clock = { version = "0.10.1", features = ["test-util"] }
 ```
 
 ```rust

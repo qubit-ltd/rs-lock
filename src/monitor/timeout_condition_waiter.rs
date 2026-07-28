@@ -7,10 +7,19 @@
 // =============================================================================
 //! Blocking timeout condition-wait capability.
 
-use qubit_clock::{MonotonicInstant, TimeError};
-use std::{sync::Arc, time::Duration};
+use qubit_clock::{
+    MonotonicInstant,
+    TimeError,
+};
+use std::{
+    sync::Arc,
+    time::Duration,
+};
 
-use crate::monitor::{ConditionWaiter, WaitTimeoutResult};
+use crate::monitor::{
+    ConditionWaiter,
+    WaitTimeoutResult,
+};
 
 /// Waits for predicates over protected state with relative timeouts.
 ///
@@ -68,7 +77,11 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,
     {
-        self.wait_while_with_deadline(deadline, move |state| !predicate(state), action)
+        self.wait_while_with_deadline(
+            deadline,
+            move |state| !predicate(state),
+            action,
+        )
     }
 
     /// Blocks until the predicate becomes true or an absolute deadline passes.
@@ -305,6 +318,11 @@ where
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,
     {
-        <M as TimeoutConditionWaiter>::wait_while_for(self.as_ref(), timeout, predicate, action)
+        <M as TimeoutConditionWaiter>::wait_while_for(
+            self.as_ref(),
+            timeout,
+            predicate,
+            action,
+        )
     }
 }

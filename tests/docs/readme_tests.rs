@@ -7,7 +7,10 @@
 // =============================================================================
 //! README and lock documentation consistency tests.
 
-use semver::{Version, VersionReq};
+use semver::{
+    Version,
+    VersionReq,
+};
 
 const CARGO_TOML: &str = include_str!("../../Cargo.toml");
 const README_EN: &str = include_str!("../../README.md");
@@ -16,26 +19,31 @@ const USER_GUIDE_EN: &str = include_str!("../../doc/user_guide.md");
 const USER_GUIDE_ZH: &str = include_str!("../../doc/user_guide.zh_CN.md");
 const LIB_RS: &str = include_str!("../../src/lib.rs");
 const LOCK_SRC: &str = include_str!("../../src/lock/lock.rs");
-const READ_WRITE_LOCK_SRC: &str = include_str!("../../src/lock/read_write_lock.rs");
-const WAIT_TIMEOUT_RESULT_SRC: &str = include_str!("../../src/monitor/wait_timeout_result.rs");
-const WAIT_TIMEOUT_STATUS_SRC: &str = include_str!("../../src/monitor/wait_timeout_status.rs");
-const CONDITION_WAITER_SRC: &str = include_str!("../../src/monitor/condition_waiter.rs");
+const READ_WRITE_LOCK_SRC: &str =
+    include_str!("../../src/lock/read_write_lock.rs");
+const WAIT_TIMEOUT_RESULT_SRC: &str =
+    include_str!("../../src/monitor/wait_timeout_result.rs");
+const WAIT_TIMEOUT_STATUS_SRC: &str =
+    include_str!("../../src/monitor/wait_timeout_status.rs");
+const CONDITION_WAITER_SRC: &str =
+    include_str!("../../src/monitor/condition_waiter.rs");
 const ASYNC_CONDITION_WAITER_SRC: &str =
     include_str!("../../src/monitor/async_condition_waiter.rs");
-const ASYNC_READ_WRITE_LOCK_SRC: &str = include_str!("../../src/lock/async_read_write_lock.rs");
+const ASYNC_READ_WRITE_LOCK_SRC: &str =
+    include_str!("../../src/lock/async_read_write_lock.rs");
 const TIMEOUT_CONDITION_WAITER_SRC: &str =
     include_str!("../../src/monitor/timeout_condition_waiter.rs");
 const ASYNC_TIMEOUT_CONDITION_WAITER_SRC: &str =
     include_str!("../../src/monitor/async_timeout_condition_waiter.rs");
-const PARKING_LOT_MONITOR_SRC: &str = include_str!("../../src/monitor/parking_lot_monitor.rs");
+const PARKING_LOT_MONITOR_SRC: &str =
+    include_str!("../../src/monitor/parking_lot_monitor.rs");
 const PARKING_LOT_MONITOR_GUARD_SRC: &str =
     include_str!("../../src/monitor/parking_lot_monitor_guard.rs");
 const STD_MONITOR_SRC: &str = include_str!("../../src/monitor/std_monitor.rs");
-const STD_MONITOR_GUARD_SRC: &str = include_str!("../../src/monitor/std_monitor_guard.rs");
-const TOKIO_MONITOR_SRC: &str = include_str!("../../src/monitor/tokio_monitor.rs");
-const ARC_PARKING_LOT_MONITOR_SRC: &str =
-    include_str!("../../src/monitor/arc_parking_lot_monitor.rs");
-const ARC_STD_MONITOR_SRC: &str = include_str!("../../src/monitor/arc_std_monitor.rs");
+const STD_MONITOR_GUARD_SRC: &str =
+    include_str!("../../src/monitor/std_monitor_guard.rs");
+const TOKIO_MONITOR_SRC: &str =
+    include_str!("../../src/monitor/tokio_monitor.rs");
 
 /// Collapses Markdown whitespace so prose assertions do not depend on line
 /// wrapping.
@@ -120,10 +128,10 @@ fn test_readme_documents_exclusive_lock_capability() {
 #[test]
 /// Ensures guide monitor snippets show the combined write-and-notify API.
 fn test_readme_monitor_example_uses_with_write_notify_one() {
-    assert!(USER_GUIDE_EN.contains("use qubit_lock::ArcParkingLotMonitor;"));
+    assert!(USER_GUIDE_EN.contains("use qubit_lock::ParkingLotMonitor;"));
     assert!(USER_GUIDE_EN.contains("with_write_notify_one"));
     assert!(USER_GUIDE_EN.contains("state-update-and-notify protocol"));
-    assert!(USER_GUIDE_ZH.contains("use qubit_lock::ArcParkingLotMonitor;"));
+    assert!(USER_GUIDE_ZH.contains("use qubit_lock::ParkingLotMonitor;"));
     assert!(USER_GUIDE_ZH.contains("with_write_notify_one"));
     assert!(USER_GUIDE_ZH.contains("状态更新与通知协议"));
 }
@@ -150,14 +158,20 @@ fn test_readme_documents_monitor_wait_semantics() {
     assert!(guide_en.contains("Notifications are memoryless"));
     assert!(guide_en.contains("already registered waiter"));
     assert!(guide_en.contains("condition-wait budget"));
-    assert!(
-        guide_en.contains("After acquiring the state lock and before the first predicate check,")
-    );
-    assert!(guide_en.contains("may return after the timeout while reacquiring the state lock"));
+    assert!(guide_en.contains(
+        "After acquiring the state lock and before the first predicate check,"
+    ));
+    assert!(guide_en.contains(
+        "may return after the timeout while reacquiring the state lock"
+    ));
     assert!(guide_en.contains("one fixed absolute deadline"));
     assert!(guide_en.contains("A zero timeout still performs"));
     assert!(guide_en.contains("final predicate check under the lock wins"));
-    assert!(guide_en.contains("Timer registration or completion errors take precedence"));
+    assert!(
+        guide_en.contains(
+            "Timer registration or completion errors take precedence"
+        )
+    );
     assert!(guide_en.contains("the action is not run"));
     assert!(guide_zh.contains("Notification 是无记忆的"));
     assert!(guide_zh.contains("已经注册的 waiter"));
@@ -195,7 +209,9 @@ fn test_monitor_docs_cover_external_predicate_state_handshake() {
         assert!(source.contains("same monitor lock"));
     }
     assert!(ASYNC_CONDITION_WAITER_SRC.contains("let waiter = tokio::spawn"));
-    assert!(ASYNC_CONDITION_WAITER_SRC.contains(".with_write_notify_all_async"));
+    assert!(
+        ASYNC_CONDITION_WAITER_SRC.contains(".with_write_notify_all_async")
+    );
     assert!(guide_en.contains("with_write_notify_all_async"));
     assert!(guide_zh.contains("with_write_notify_all_async"));
 }
@@ -222,14 +238,14 @@ fn test_readme_documents_async_monitor_contract() {
 }
 
 #[test]
-/// Ensures both guides describe RPITIT and Arc monitor ownership boundaries.
+/// Ensures both guides describe RPITIT and native Arc monitor ownership.
 fn test_readme_documents_monitor_api_boundaries() {
     assert!(USER_GUIDE_EN.contains("return-position `impl Future`"));
-    assert!(USER_GUIDE_EN.contains("`from_arc`, `as_arc`, and"));
-    assert!(USER_GUIDE_EN.contains("dereferences to its inner monitor"));
+    assert!(USER_GUIDE_EN.contains("standard `Arc` directly"));
+    assert!(USER_GUIDE_EN.contains("deref coercion preserves the monitor API"));
     assert!(USER_GUIDE_ZH.contains("返回位置的 `impl Future`"));
-    assert!(USER_GUIDE_ZH.contains("`from_arc`、`as_arc` 和"));
-    assert!(USER_GUIDE_ZH.contains("通过 `Deref` 访问内部 monitor"));
+    assert!(USER_GUIDE_ZH.contains("标准库的 `Arc`"));
+    assert!(USER_GUIDE_ZH.contains("deref coercion 保留 monitor API"));
 }
 
 #[test]
@@ -265,21 +281,19 @@ fn test_readme_documents_feature_tiers() {
     const ASYNC_LOCK_DEPENDENCY: &str = "qubit-lock = { version = \"0.11\", default-features = false, features = [\"async-lock\"] }";
     const ASYNC_MONITOR_DEPENDENCY: &str = "qubit-lock = { version = \"0.11\", default-features = false, features = [\"async-monitor\"] }";
 
-    assert!(README_EN.contains("default feature set"));
-    assert!(README_EN.contains("`monitor` and `parking-lot`"));
+    assert!(README_EN.contains("default feature set is empty"));
     for document in [README_EN, README_ZH, USER_GUIDE_EN, USER_GUIDE_ZH] {
         assert!(
             document.contains(ASYNC_LOCK_DEPENDENCY),
-            "async-lock example must disable default features",
+            "async-lock example must select its feature",
         );
         assert!(
             document.contains(ASYNC_MONITOR_DEPENDENCY),
-            "async-monitor example must disable default features",
+            "async-monitor example must select its feature",
         );
     }
     assert!(!README_EN.contains("`mock` feature"));
-    assert!(README_ZH.contains("默认特性集"));
-    assert!(README_ZH.contains("`monitor` 和 `parking-lot`"));
+    assert!(README_ZH.contains("默认特性集为空"));
     assert!(!README_ZH.contains("`mock` feature"));
 }
 
@@ -294,7 +308,8 @@ fn test_monitor_docs_cover_callback_and_constructor_panics() {
         TOKIO_MONITOR_SRC,
     ] {
         assert!(
-            source.contains("# Panics") && source.contains("`predicate` or `action`"),
+            source.contains("# Panics")
+                && source.contains("`predicate` or `action`"),
             "waiter documentation must describe callback panics",
         );
     }
@@ -307,12 +322,7 @@ fn test_monitor_docs_cover_callback_and_constructor_panics() {
         );
     }
 
-    for source in [
-        PARKING_LOT_MONITOR_SRC,
-        STD_MONITOR_SRC,
-        ARC_PARKING_LOT_MONITOR_SRC,
-        ARC_STD_MONITOR_SRC,
-    ] {
+    for source in [PARKING_LOT_MONITOR_SRC, STD_MONITOR_SRC] {
         assert!(
             source.contains("Panics if all process-wide clock-domain identifiers are exhausted."),
             "default Timer constructors must describe clock-domain exhaustion",
@@ -321,7 +331,9 @@ fn test_monitor_docs_cover_callback_and_constructor_panics() {
 
     for source in [PARKING_LOT_MONITOR_GUARD_SRC, STD_MONITOR_GUARD_SRC] {
         assert!(
-            source.contains("Panics if the registry exhausts registration identifiers."),
+            source.contains(
+                "Panics if the registry exhausts registration identifiers."
+            ),
             "guard waits must describe waiter registration panics",
         );
     }
@@ -368,7 +380,9 @@ fn test_readme_zh_uses_contribution_template() {
 fn test_readme_documents_root_only_public_api() {
     assert!(!README_EN.contains("from `qubit_lock::monitor`"));
     assert!(!README_ZH.contains("\u{6216} crate root"));
-    assert!(README_EN.contains("Import public types directly from the crate root."));
+    assert!(
+        README_EN.contains("Import public types directly from the crate root.")
+    );
     assert!(README_ZH.contains("crate root"));
     assert!(LIB_RS.contains("mod lock;"));
     assert!(LIB_RS.contains("mod monitor;"));
@@ -388,8 +402,12 @@ fn test_rw_lock_docs_use_current_trait_names() {
 fn test_rustdoc_contracts_match_lock_and_monitor_semantics() {
     assert!(LIB_RS.contains("synchronous lock acquisition"));
     assert!(LOCK_SRC.contains("`Lock` does not imply exclusive entry."));
-    assert!(WAIT_TIMEOUT_RESULT_SRC.contains("deciding locked predicate check"));
-    assert!(WAIT_TIMEOUT_RESULT_SRC.contains("blocking and asynchronous monitor"));
+    assert!(
+        WAIT_TIMEOUT_RESULT_SRC.contains("deciding locked predicate check")
+    );
+    assert!(
+        WAIT_TIMEOUT_RESULT_SRC.contains("blocking and asynchronous monitor")
+    );
     assert!(WAIT_TIMEOUT_RESULT_SRC.contains("ParkingLotMonitor"));
     assert!(WAIT_TIMEOUT_RESULT_SRC.contains("TokioMonitor"));
     assert!(WAIT_TIMEOUT_STATUS_SRC.contains("blocking monitor guards"));
@@ -397,7 +415,11 @@ fn test_rustdoc_contracts_match_lock_and_monitor_semantics() {
 
     for source in [PARKING_LOT_MONITOR_SRC, STD_MONITOR_SRC] {
         assert!(!source.contains("condition variable"));
-        assert!(source.contains("predicate stops blocking on the deciding locked check"));
+        assert!(
+            source.contains(
+                "predicate stops blocking on the deciding locked check"
+            )
+        );
     }
 
     assert!(TOKIO_MONITOR_SRC.matches("fairness or FIFO").count() >= 3);
@@ -429,9 +451,10 @@ fn test_cargo_package_includes_user_guides() {
 /// Ensures all README `qubit-lock` version requirements accept the crate
 /// version in Cargo.toml.
 fn test_readme_dependency_versions_match_cargo_toml() {
-    let cargo_version =
-        extract_package_version(CARGO_TOML).expect("Failed to extract version from Cargo.toml");
-    let package_ver = Version::parse(cargo_version).expect("Invalid package version in Cargo.toml");
+    let cargo_version = extract_package_version(CARGO_TOML)
+        .expect("Failed to extract version from Cargo.toml");
+    let package_ver = Version::parse(cargo_version)
+        .expect("Invalid package version in Cargo.toml");
 
     let readme_en_reqs = extract_readme_dependency_versions(README_EN);
     let readme_zh_reqs = extract_readme_dependency_versions(README_ZH);
@@ -457,7 +480,12 @@ fn test_readme_dependency_versions_match_cargo_toml() {
         "README.zh_CN.md has qubit-lock dependency lines that were not parsed"
     );
 
-    assert_readme_versions_match("README.md", &readme_en_reqs, &package_ver, cargo_version);
+    assert_readme_versions_match(
+        "README.md",
+        &readme_en_reqs,
+        &package_ver,
+        cargo_version,
+    );
     assert_readme_versions_match(
         "README.zh_CN.md",
         &readme_zh_reqs,
@@ -470,15 +498,19 @@ fn test_readme_dependency_versions_match_cargo_toml() {
 /// Ensures both user guides use the same `qubit-clock` requirement as
 /// Cargo.toml.
 fn test_readme_qubit_clock_dependency_version_matches_cargo_toml() {
-    let cargo_requirement = extract_cargo_dependency_version(CARGO_TOML, "qubit-clock")
-        .expect("Cargo.toml does not declare qubit-clock");
+    let cargo_requirement =
+        extract_cargo_dependency_version(CARGO_TOML, "qubit-clock")
+            .expect("Cargo.toml does not declare qubit-clock");
 
     for (filename, content) in [
         ("doc/user_guide.md", USER_GUIDE_EN),
         ("doc/user_guide.zh_CN.md", USER_GUIDE_ZH),
     ] {
-        let readme_requirement = extract_inline_dependency_version(content, "qubit-clock")
-            .unwrap_or_else(|| panic!("{filename} does not mention qubit-clock"));
+        let readme_requirement =
+            extract_inline_dependency_version(content, "qubit-clock")
+                .unwrap_or_else(|| {
+                    panic!("{filename} does not mention qubit-clock")
+                });
         assert_eq!(
             readme_requirement, cargo_requirement,
             "{filename} qubit-clock version differs from Cargo.toml",
@@ -519,7 +551,10 @@ fn cargo_feature_names(content: &str) -> Vec<&str> {
 /// # Returns
 ///
 /// The first matching dependency version requirement, if present.
-fn extract_cargo_dependency_version<'a>(content: &'a str, dependency: &str) -> Option<&'a str> {
+fn extract_cargo_dependency_version<'a>(
+    content: &'a str,
+    dependency: &str,
+) -> Option<&'a str> {
     content.lines().find_map(|line| {
         let value = line.trim().strip_prefix(dependency)?.trim();
         let value = value.strip_prefix('=')?.trim();
@@ -541,7 +576,10 @@ fn extract_cargo_dependency_version<'a>(content: &'a str, dependency: &str) -> O
 /// # Returns
 ///
 /// The first quoted version following `dependency =`, if present.
-fn extract_inline_dependency_version<'a>(content: &'a str, dependency: &str) -> Option<&'a str> {
+fn extract_inline_dependency_version<'a>(
+    content: &'a str,
+    dependency: &str,
+) -> Option<&'a str> {
     content.lines().find_map(|line| {
         let value = line.trim().strip_prefix(dependency)?.trim();
         let value = value.strip_prefix('=')?.trim();
@@ -561,8 +599,9 @@ fn assert_readme_versions_match(
     cargo_version: &str,
 ) {
     for (index, readme_req) in readme_reqs.iter().enumerate() {
-        let req = VersionReq::parse(readme_req)
-            .unwrap_or_else(|_| panic!("Invalid version req in {filename}: {readme_req}"));
+        let req = VersionReq::parse(readme_req).unwrap_or_else(|_| {
+            panic!("Invalid version req in {filename}: {readme_req}")
+        });
         assert!(
             req.matches(package_ver),
             "{filename} qubit-lock dependency #{index} = \"{readme_req}\" does not accept package version {cargo_version}"

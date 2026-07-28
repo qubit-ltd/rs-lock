@@ -11,12 +11,23 @@
 //! them with Loom's equivalents so the production monitor handshake remains
 //! visible to the scheduler.
 
-use std::sync::{LockResult, PoisonError};
+use std::sync::{
+    LockResult,
+    PoisonError,
+};
 
 #[cfg(all(loom, feature = "loom-model"))]
-pub(in crate::monitor) use loom::sync::{Condvar, Mutex, MutexGuard};
+pub(in crate::monitor) use loom::sync::{
+    Condvar,
+    Mutex,
+    MutexGuard,
+};
 #[cfg(not(all(loom, feature = "loom-model")))]
-pub(in crate::monitor) use std::sync::{Condvar, Mutex, MutexGuard};
+pub(in crate::monitor) use std::sync::{
+    Condvar,
+    Mutex,
+    MutexGuard,
+};
 
 /// Recovers a synchronization primitive's protected value after poisoning.
 ///
