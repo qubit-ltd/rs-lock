@@ -66,12 +66,18 @@ Import public types directly from the crate root.
 
 ## Installation
 
-The default feature set is empty. Enable the blocking monitor backend
-explicitly:
+The default feature set is empty. Enable `ParkingLotMonitor` explicitly:
 
 ```toml
 [dependencies]
 qubit-lock = { version = "0.12", default-features = false, features = ["monitor", "parking-lot"] }
+```
+
+Use `StdMonitor` without a `parking_lot` dependency:
+
+```toml
+[dependencies]
+qubit-lock = { version = "0.12", default-features = false, features = ["monitor"] }
 ```
 
 Use only the synchronous lock traits and standard-library implementations:
