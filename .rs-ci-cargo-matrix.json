@@ -36,6 +36,19 @@
       ]
     },
     {
+      "name": "parking-lot-monitor",
+      "defaultFeatures": false,
+      "features": [
+        "monitor",
+        "parking-lot"
+      ],
+      "commands": [
+        "test",
+        "doc",
+        "clippy"
+      ]
+    },
+    {
       "name": "async-locks",
       "defaultFeatures": false,
       "features": [
@@ -61,10 +74,7 @@
     },
     {
       "name": "all-features",
-      "defaultFeatures": true,
-      "features": [
-        "async-monitor"
-      ],
+      "allFeatures": true,
       "commands": [
         "test",
         "doc",
