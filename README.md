@@ -71,28 +71,28 @@ explicitly:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", default-features = false, features = ["monitor", "parking-lot"] }
+qubit-lock = { version = "0.12", default-features = false, features = ["monitor", "parking-lot"] }
 ```
 
 Use only the synchronous lock traits and standard-library implementations:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", default-features = false }
+qubit-lock = { version = "0.12", default-features = false }
 ```
 
 Enable Tokio locks without Tokio monitors:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", default-features = false, features = ["async-lock"] }
+qubit-lock = { version = "0.12", default-features = false, features = ["async-lock"] }
 ```
 
 Enable Tokio monitors and timed waits:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", default-features = false, features = ["async-monitor"] }
+qubit-lock = { version = "0.12", default-features = false, features = ["async-monitor"] }
 ```
 
 If the application creates a Tokio runtime, enable its required runtime
@@ -104,8 +104,12 @@ Timed monitor waits align with `std::sync::Condvar::wait_timeout_while`.
 Their timeout is a condition-wait budget: after acquiring the state lock and
 before the first predicate check, the monitor samples one fixed deadline. The
 initial lock acquisition is excluded, predicate checks consume the budget, and
-the method may return after the timeout while reacquiring the state lock. See
-the [English user guide](doc/user_guide.md) or
+the method may return after the timeout while reacquiring the state lock.
+Blocking `*_with_total_timeout` methods instead fix their deadline before
+initial lock acquisition, so contention consumes the operation-wide budget.
+They are still not a hard return-time guarantee because mutex reacquisition
+and the ready action cannot be interrupted. See the
+[English user guide](doc/user_guide.md) or
 [中文用户手册](doc/user_guide.zh_CN.md) for zero-timeout, error, cancellation,
 and whole-call-deadline semantics.
 

@@ -173,7 +173,15 @@ fn test_readme_documents_monitor_wait_semantics() {
         )
     );
     assert!(guide_en.contains("the action is not run"));
+    assert!(guide_en.contains("`wait_until_with_total_timeout`"));
+    assert!(guide_en.contains(
+        "fix their absolute deadline before initial state-lock acquisition"
+    ));
+    assert!(guide_en.contains("still not hard return-time guarantees"));
     assert!(guide_zh.contains("Notification 是无记忆的"));
+    assert!(guide_zh.contains("`wait_until_with_total_timeout`"));
+    assert!(guide_zh.contains("会在初始获取状态锁之前固定绝对 deadline"));
+    assert!(guide_zh.contains("仍不是严格的返回时限"));
     assert!(guide_zh.contains("已经注册的 waiter"));
     assert!(guide_zh.contains("条件等待预算"));
     assert!(guide_zh.contains("取得状态锁后、首次 predicate 检查前"));
@@ -278,9 +286,9 @@ fn test_readme_documents_timer_ioc_testing() {
 /// Ensures README files document the default, async-lock, and async-monitor
 /// feature tiers.
 fn test_readme_documents_feature_tiers() {
-    const BLOCKING_MONITOR_DEPENDENCY: &str = "qubit-lock = { version = \"0.11\", default-features = false, features = [\"monitor\", \"parking-lot\"] }";
-    const ASYNC_LOCK_DEPENDENCY: &str = "qubit-lock = { version = \"0.11\", default-features = false, features = [\"async-lock\"] }";
-    const ASYNC_MONITOR_DEPENDENCY: &str = "qubit-lock = { version = \"0.11\", default-features = false, features = [\"async-monitor\"] }";
+    const BLOCKING_MONITOR_DEPENDENCY: &str = "qubit-lock = { version = \"0.12\", default-features = false, features = [\"monitor\", \"parking-lot\"] }";
+    const ASYNC_LOCK_DEPENDENCY: &str = "qubit-lock = { version = \"0.12\", default-features = false, features = [\"async-lock\"] }";
+    const ASYNC_MONITOR_DEPENDENCY: &str = "qubit-lock = { version = \"0.12\", default-features = false, features = [\"async-monitor\"] }";
 
     assert!(CARGO_TOML.contains("default = []"));
     assert!(README_EN.contains("default feature set is empty"));

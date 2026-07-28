@@ -12,6 +12,7 @@ macro_rules! blocking_monitor_contract_tests {
     ($module:ident, $monitor:ident) => {
         mod $module {
             use std::{
+                cell::Cell,
                 sync::{Arc, mpsc},
                 thread,
                 time::Duration,
@@ -19,6 +20,13 @@ macro_rules! blocking_monitor_contract_tests {
 
             use qubit_clock::{ManualMonotonicClock, MonotonicClock};
             use qubit_lock::{WaitTimeoutResult, WaitTimeoutStatus, $monitor};
+
+            use crate::monitor::failing_timer_tests::{
+                DeadlineSignalingTimer,
+                assert_backend_unavailable,
+                completion_failing_timer,
+                registration_failing_timer,
+            };
 
             #[test]
             fn test_new_read_write_updates_state() {
@@ -159,6 +167,156 @@ macro_rules! blocking_monitor_contract_tests {
                         .expect("ready predicate should not register a Timer"),
                     WaitTimeoutResult::Ready(()),
                 );
+            }
+
+            #[test]
+            fn test_total_timeout_preserves_ready_and_timeout_outcomes() {
+                let timed_out = $monitor::new(false);
+                let ready = $monitor::new(true);
+
+                assert_eq!(
+                    timed_out
+                        .wait_until_ready_with_total_timeout(
+                            Duration::ZERO,
+                            |ready| *ready,
+                        )
+                        .expect("zero total timeout should be representable"),
+                    WaitTimeoutResult::TimedOut,
+                );
+                assert_eq!(
+                    ready
+                        .wait_until_ready_with_total_timeout(
+                            Duration::ZERO,
+                            |ready| *ready,
+                        )
+                        .expect("ready predicate should win at the deadline"),
+                    WaitTimeoutResult::Ready(()),
+                );
+            }
+
+            #[test]
+            fn test_total_timeout_runs_action_only_when_ready() {
+                let ready = $monitor::new(false);
+                let timed_out = $monitor::new(true);
+                let timed_out_action_called = Cell::new(false);
+
+                assert_eq!(
+                    ready
+                        .wait_while_with_total_timeout(
+                            Duration::ZERO,
+                            |waiting| *waiting,
+                            |_| 7,
+                        )
+                        .expect("ready action should not register a Timer"),
+                    WaitTimeoutResult::Ready(7),
+                );
+                assert_eq!(
+                    timed_out
+                        .wait_while_with_total_timeout(
+                            Duration::ZERO,
+                            |waiting| *waiting,
+                            |_| {
+                                timed_out_action_called.set(true);
+                                7
+                            },
+                        )
+                        .expect("zero total timeout should be representable"),
+                    WaitTimeoutResult::TimedOut,
+                );
+                assert!(!timed_out_action_called.get());
+            }
+
+            #[test]
+            fn test_total_timeout_includes_initial_lock_contention() {
+                let timeout = Duration::from_secs(1);
+                let clock = ManualMonotonicClock::new_shared();
+                let (sampled_tx, sampled_rx) = mpsc::channel();
+                let timer = DeadlineSignalingTimer::new(
+                    clock.new_timer(),
+                    sampled_tx,
+                );
+                let monitor = Arc::new($monitor::with_timer(
+                    false,
+                    Arc::new(timer),
+                ));
+                let guard = monitor.lock();
+                let waiter_monitor = Arc::clone(&monitor);
+                let waiter = thread::spawn(move || {
+                    waiter_monitor.wait_until_ready_with_total_timeout(
+                        timeout,
+                        |ready| *ready,
+                    )
+                });
+
+                sampled_rx
+                    .recv()
+                    .expect("waiter should sample its total deadline");
+                clock
+                    .advance(timeout)
+                    .expect("manual clock should reach the total deadline");
+                drop(guard);
+
+                assert_eq!(
+                    waiter
+                        .join()
+                        .expect("total-timeout waiter should not panic")
+                        .expect("manual Timer should complete successfully"),
+                    WaitTimeoutResult::TimedOut,
+                );
+            }
+
+            #[test]
+            fn test_total_timeout_reports_overflow_before_predicate() {
+                let monitor = $monitor::new(false);
+                let predicate_called = Cell::new(false);
+
+                let result = monitor.wait_until_ready_with_total_timeout(
+                    Duration::MAX,
+                    |_| {
+                        predicate_called.set(true);
+                        false
+                    },
+                );
+
+                assert!(matches!(
+                    result,
+                    Err(qubit_clock::TimeError::InstantOverflow)
+                ));
+                assert!(!predicate_called.get());
+            }
+
+            #[test]
+            fn test_total_timeout_propagates_timer_registration_error() {
+                let monitor = $monitor::with_timer(
+                    false,
+                    Arc::new(registration_failing_timer()),
+                );
+
+                let error = monitor
+                    .wait_until_ready_with_total_timeout(
+                        Duration::from_secs(1),
+                        |ready| *ready,
+                    )
+                    .expect_err("registration failure should be propagated");
+
+                assert_backend_unavailable(error);
+            }
+
+            #[test]
+            fn test_total_timeout_propagates_timer_completion_error() {
+                let monitor = $monitor::with_timer(
+                    false,
+                    Arc::new(completion_failing_timer()),
+                );
+
+                let error = monitor
+                    .wait_until_ready_with_total_timeout(
+                        Duration::from_secs(1),
+                        |ready| *ready,
+                    )
+                    .expect_err("completion failure should be propagated");
+
+                assert_backend_unavailable(error);
             }
 
             #[test]

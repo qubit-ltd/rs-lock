@@ -56,7 +56,7 @@ notification 只是再次检查状态的提示。
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", default-features = false, features = ["monitor", "parking-lot"] }
+qubit-lock = { version = "0.12", default-features = false, features = ["monitor", "parking-lot"] }
 ```
 
 根据所需组件选择 Feature：
@@ -74,21 +74,21 @@ qubit-lock = { version = "0.11", default-features = false, features = ["monitor"
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", default-features = false }
+qubit-lock = { version = "0.12", default-features = false }
 ```
 
 只启用异步锁，不启用 Tokio monitor deadline：
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", default-features = false, features = ["async-lock"] }
+qubit-lock = { version = "0.12", default-features = false, features = ["async-lock"] }
 ```
 
 启用 Tokio monitor 协调和计时等待：
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.11", default-features = false, features = ["async-monitor"] }
+qubit-lock = { version = "0.12", default-features = false, features = ["async-monitor"] }
 ```
 
 如果应用创建 Tokio runtime，应在应用自己的 `Cargo.toml` 中启用所需的 runtime
@@ -271,7 +271,7 @@ monitor 持有受保护状态，并使用 notification 协调 predicate wait。�
 | --- | --- |
 | `Notifier` | 只提供 `notify_one` 和 `notify_all` |
 | `ConditionWaiter` | 同步 `wait_until`、`wait_until_ready` 和 `wait_while` |
-| `TimeoutConditionWaiter` | 同步 `wait_until_for`、`wait_until_ready_for` 和 `wait_while_for` |
+| `TimeoutConditionWaiter` | 同步条件预算 `*_for`、绝对 deadline `*_with_deadline` 和整个操作预算 `*_with_total_timeout` 等待 |
 | `Monitor` | 状态访问、notification 和无时限同步等待 |
 | `TimedMonitor` | `Monitor` 加同步计时等待 |
 | `SharedMonitor` | 可克隆的同步共享 monitor 句柄 |
@@ -515,8 +515,14 @@ async fn main() {
 
 零时长 timeout 仍会执行初始 predicate 检查。到达 deadline 后，最后一次持锁
 predicate 检查优先于成功的 Timer 完成。Timer 注册或完成错误优先于等待后的就绪结果，
-并且不会执行 action。如果应用需要整个调用的 deadline，必须在业务操作入口自行采样
-绝对 deadline，并将每次等待的剩余预算传入。
+并且不会执行 action。
+
+对于阻塞代码，`wait_while_with_total_timeout`、
+`wait_until_with_total_timeout` 和
+`wait_until_ready_with_total_timeout` 会在初始获取状态锁之前固定绝对 deadline。
+因此锁竞争、predicate 求值和等待会消耗同一个整个操作预算。
+这些方法仍不是严格的返回时限：到达 deadline 无法中断 mutex 的获取或重新获取，
+ready action 也没有执行时限。
 
 异步等待 future 是惰性的：首次 poll 前的时间不消耗预算，初始异步状态锁竞争也不
 计入预算。drop pending future 会注销其 waiter，也不会执行 action。取消不会回滚受保护状态的变化，
