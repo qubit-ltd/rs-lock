@@ -47,7 +47,8 @@ fn main() {
   `parking_lot::Mutex<T>` 和 `parking_lot::RwLock<T>` 提供统一同步能力。
 - `AsyncLock`、`AsyncReadWriteLock` 和 `AsyncDataLock<T>` 由
   `async-lock` 启用，并提供对应的 Tokio 能力。
-- `ParkingLotMonitor`、`StdMonitor` 和对应的 `Arc*` 句柄提供阻塞式 predicate
+- `ParkingLotMonitor`、`StdMonitor`，以及标准的
+  `Arc<ParkingLotMonitor<T>>` 和 `Arc<StdMonitor<T>>` 句柄提供阻塞式 predicate
   协调。
 - `TokioMonitor` 由 `async-monitor` 启用，并提供异步协调。
 - 每个具体 monitor 都支持注入 Timer，以便进行确定性测试。
@@ -56,11 +57,11 @@ fn main() {
 
 ## 安装
 
-默认特性集为空；请显式启用所需的 monitor 后端：
+默认特性集为空；请显式启用阻塞式 monitor 后端：
 
 ```toml
 [dependencies]
-qubit-lock = "0.11"
+qubit-lock = { version = "0.11", default-features = false, features = ["monitor", "parking-lot"] }
 ```
 
 只使用同步锁 trait 和标准库实现：
