@@ -283,10 +283,11 @@ fn test_readme_documents_timer_ioc_testing() {
 }
 
 #[test]
-/// Ensures README files document the default, async-lock, and async-monitor
-/// feature tiers.
+/// Ensures README files distinguish the blocking monitor implementations and
+/// document the async feature tiers.
 fn test_readme_documents_feature_tiers() {
     const BLOCKING_MONITOR_DEPENDENCY: &str = "qubit-lock = { version = \"0.12\", default-features = false, features = [\"monitor\", \"parking-lot\"] }";
+    const STD_MONITOR_DEPENDENCY: &str = "qubit-lock = { version = \"0.12\", default-features = false, features = [\"monitor\"] }";
     const ASYNC_LOCK_DEPENDENCY: &str = "qubit-lock = { version = \"0.12\", default-features = false, features = [\"async-lock\"] }";
     const ASYNC_MONITOR_DEPENDENCY: &str = "qubit-lock = { version = \"0.12\", default-features = false, features = [\"async-monitor\"] }";
 
@@ -304,6 +305,12 @@ fn test_readme_documents_feature_tiers() {
         assert!(
             document.contains(ASYNC_MONITOR_DEPENDENCY),
             "async-monitor example must select its feature",
+        );
+    }
+    for document in [README_EN, README_ZH] {
+        assert!(
+            document.contains(STD_MONITOR_DEPENDENCY),
+            "StdMonitor example must select only the monitor feature",
         );
     }
     assert!(USER_GUIDE_EN.contains("| default | no optional features |"));

@@ -57,11 +57,18 @@ fn main() {
 
 ## 安装
 
-默认特性集为空；请显式启用阻塞式 monitor 后端：
+默认特性集为空；请显式启用 `ParkingLotMonitor`：
 
 ```toml
 [dependencies]
 qubit-lock = { version = "0.12", default-features = false, features = ["monitor", "parking-lot"] }
+```
+
+只使用 `StdMonitor`，无需 `parking_lot` 依赖：
+
+```toml
+[dependencies]
+qubit-lock = { version = "0.12", default-features = false, features = ["monitor"] }
 ```
 
 只使用同步锁 trait 和标准库实现：
