@@ -7,12 +7,15 @@
 // =============================================================================
 //! Defines one latched blocking condition waiter and Timer waker.
 
-use std::sync::Arc;
 use std::task::{
     Context,
     Poll,
     Wake,
     Waker,
+};
+use std::{
+    ops::DerefMut,
+    sync::Arc,
 };
 
 use qubit_clock::{
@@ -28,6 +31,35 @@ use super::{
         recover,
     },
 };
+use crate::monitor::{
+    WaitTimeoutResult,
+    WaitTimeoutStatus,
+};
+
+/// Waits while a predicate remains true using one fixed timer future.
+pub(in crate::monitor) fn wait_while_with_timer_locked<G, T, R, P, F, W>(
+    mut guard: G,
+    mut future: TimerFuture,
+    mut waiting: P,
+    f: F,
+    mut wait: W,
+) -> Result<WaitTimeoutResult<R>, TimeError>
+where
+    G: DerefMut<Target = T>,
+    P: FnMut(&T) -> bool,
+    F: FnOnce(&mut T) -> R,
+    W: FnMut(&mut G, &mut TimerFuture) -> Result<WaitTimeoutStatus, TimeError>,
+{
+    loop {
+        let status = wait(&mut guard, &mut future)?;
+        if !waiting(&*guard) {
+            return Ok(WaitTimeoutResult::Ready(f(&mut *guard)));
+        }
+        if status.is_timed_out() {
+            return Ok(WaitTimeoutResult::TimedOut);
+        }
+    }
+}
 
 /// Private signal shared by monitor notification and a TimerFuture Waker.
 pub(in crate::monitor) struct BlockingConditionWaiter {
