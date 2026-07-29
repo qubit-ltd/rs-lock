@@ -390,6 +390,22 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
     /// running `action` or rolling back protected-state changes. A notification
     /// that already selected this waiter is discarded rather than transferred.
     ///
+    /// # Type Parameters
+    ///
+    /// * `'a` - Lifetime shared by the monitor, closures, and returned future.
+    /// * `R` - Value returned by `action`.
+    /// * `P` - Predicate deciding when the state is ready.
+    /// * `F` - Action run once the state is ready.
+    ///
+    /// # Parameters
+    ///
+    /// * `predicate` - Predicate returning `true` when the caller may continue.
+    /// * `action` - Action receiving mutable state once `predicate` succeeds.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to the value returned by `action`.
+    ///
     /// # Panics
     ///
     /// The returned future propagates a panic from `predicate` or `action` when
@@ -417,6 +433,22 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
     /// future while it is pending cancels and unregisters the wait without
     /// running `action` or rolling back protected-state changes. A notification
     /// that already selected this waiter is discarded rather than transferred.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `'a` - Lifetime shared by the monitor, closures, and returned future.
+    /// * `R` - Value returned by `action`.
+    /// * `P` - Predicate deciding whether waiting should continue.
+    /// * `F` - Action run once the state is ready.
+    ///
+    /// # Parameters
+    ///
+    /// * `predicate` - Predicate returning `true` while the caller must wait.
+    /// * `action` - Action receiving mutable state once `predicate` is false.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to the value returned by `action`.
     ///
     /// # Panics
     ///
@@ -453,6 +485,24 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
 
 impl<T: Send> AsyncMonitor for TokioMonitor<T> {
     /// Acquires the monitor and reads the protected state.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `'a` - Lifetime shared by the monitor, closure, and returned future.
+    /// * `R` - Value returned by `f`.
+    /// * `F` - Read-only operation performed while holding the state lock.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Operation receiving shared access to the protected state.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to the value returned by `f`.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `f` when it is polled.
     #[inline(always)]
     fn with_read_async<'a, R, F>(
         &'a self,
@@ -466,6 +516,24 @@ impl<T: Send> AsyncMonitor for TokioMonitor<T> {
     }
 
     /// Acquires the monitor and mutates the protected state.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `'a` - Lifetime shared by the monitor, closure, and returned future.
+    /// * `R` - Value returned by `f`.
+    /// * `F` - Mutating operation performed while holding the state lock.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Operation receiving mutable access to the protected state.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to the value returned by `f`.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `f` when it is polled.
     #[inline(always)]
     fn with_write_async<'a, R, F>(
         &'a self,
@@ -731,6 +799,31 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// registration. When the signal and deadline are both ready, the deadline
     /// is selected first. A zero timeout still checks the predicate once.
     ///
+    /// # Type Parameters
+    ///
+    /// * `'a` - Lifetime shared by the monitor, closures, and returned future.
+    /// * `R` - Value returned by `action`.
+    /// * `P` - Predicate deciding when the state is ready.
+    /// * `F` - Action run once the state is ready.
+    ///
+    /// # Parameters
+    ///
+    /// * `timeout` - Relative condition-wait budget fixed after acquiring the
+    ///   state lock.
+    /// * `predicate` - Predicate returning `true` when the caller may continue.
+    /// * `action` - Action receiving mutable state once `predicate` succeeds.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to [`WaitTimeoutResult::Ready`] with the value
+    /// returned by `action`, or [`WaitTimeoutResult::TimedOut`] if the fixed
+    /// condition-wait budget expires first.
+    ///
+    /// # Errors
+    ///
+    /// The returned future reports deadline overflow and Timer domain,
+    /// registration, or completion errors when waiting is required.
+    ///
     /// # Panics
     ///
     /// The returned future propagates a panic from `predicate` or `action` when
@@ -779,6 +872,31 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// waiter registration. When the signal and deadline are both ready, the
     /// deadline is selected first. A zero timeout still checks the predicate
     /// once.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `'a` - Lifetime shared by the monitor, closures, and returned future.
+    /// * `R` - Value returned by `action`.
+    /// * `P` - Predicate deciding whether waiting must continue.
+    /// * `F` - Action run once waiting finishes.
+    ///
+    /// # Parameters
+    ///
+    /// * `timeout` - Relative condition-wait budget fixed after acquiring the
+    ///   state lock.
+    /// * `predicate` - Predicate returning `true` while waiting must continue.
+    /// * `action` - Action receiving mutable state when waiting finishes.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to [`WaitTimeoutResult::Ready`] with the value
+    /// returned by `action`, or [`WaitTimeoutResult::TimedOut`] if the fixed
+    /// condition-wait budget expires while `predicate` remains true.
+    ///
+    /// # Errors
+    ///
+    /// The returned future reports deadline overflow and Timer domain,
+    /// registration, or completion errors when waiting is required.
     ///
     /// # Panics
     ///
