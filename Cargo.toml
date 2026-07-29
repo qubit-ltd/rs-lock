@@ -59,6 +59,10 @@ tokio = { version = "1.52", default-features = false, features = ["macros", "rt-
 name = "clone_test"
 required-features = ["monitor", "parking-lot"]
 
+[[example]]
+name = "bounded_queue"
+required-features = ["monitor", "parking-lot"]
+
 [[bench]]
 name = "tokio_monitor_cancellation"
 harness = false
