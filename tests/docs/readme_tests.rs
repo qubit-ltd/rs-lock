@@ -61,15 +61,18 @@ fn test_readme_documents_data_lock_api_names() {
 }
 
 #[test]
-/// Ensures README quick-start snippets import the trait needed for lock
-/// methods.
-fn test_readme_quick_start_imports_data_lock_trait() {
-    assert!(README_EN.contains("use qubit_lock::DataLock;"));
-    assert!(README_ZH.contains("use qubit_lock::DataLock;"));
-    assert!(README_EN.contains("let counter = std::sync::Mutex::new(0);"));
-    assert!(README_ZH.contains("let counter = std::sync::Mutex::new(0);"));
-    assert!(!README_EN.contains("let counter = parking_lot::Mutex::new(0);"));
-    assert!(!README_ZH.contains("let counter = parking_lot::Mutex::new(0);"));
+/// Ensures README quick-start snippets prove one domain operation can use
+/// multiple lock backends.
+fn test_readme_quick_start_proves_backend_neutral_data_access() {
+    for readme in [README_EN, README_ZH] {
+        assert!(readme.contains("use qubit_lock::DataLock;"));
+        assert!(readme.contains("fn record<L>"));
+        assert!(readme.contains("DataLock<ServiceStats>"));
+        assert!(readme.contains("std::sync::Mutex<ServiceStats>"));
+        assert!(readme.contains("std::sync::RwLock<ServiceStats>"));
+    }
+    assert!(README_EN.contains("When not to use this crate"));
+    assert!(README_ZH.contains("何时不需要这个 crate"));
 }
 
 #[test]
@@ -126,14 +129,30 @@ fn test_readme_documents_exclusive_lock_capability() {
 }
 
 #[test]
-/// Ensures guide monitor snippets show the combined write-and-notify API.
-fn test_readme_monitor_example_uses_with_write_notify_one() {
-    assert!(USER_GUIDE_EN.contains("use qubit_lock::ParkingLotMonitor;"));
-    assert!(USER_GUIDE_EN.contains("with_write_notify_one"));
-    assert!(USER_GUIDE_EN.contains("state-update-and-notify protocol"));
-    assert!(USER_GUIDE_ZH.contains("use qubit_lock::ParkingLotMonitor;"));
-    assert!(USER_GUIDE_ZH.contains("with_write_notify_one"));
-    assert!(USER_GUIDE_ZH.contains("状态更新与通知协议"));
+/// Ensures the queue case study explains why its two predicates require a
+/// broadcast notification after a state transition.
+fn test_user_guides_explain_queue_notification_policy() {
+    assert!(USER_GUIDE_EN.contains("with_write_notify_all"));
+    assert!(USER_GUIDE_EN.contains("two predicates"));
+    assert!(USER_GUIDE_EN.contains("notify_all"));
+    assert!(USER_GUIDE_ZH.contains("with_write_notify_all"));
+    assert!(USER_GUIDE_ZH.contains("两类 predicate"));
+    assert!(USER_GUIDE_ZH.contains("notify_all"));
+}
+
+#[test]
+/// Ensures both guides use the same backend-neutral queue case study.
+fn test_user_guides_present_backend_neutral_queue_case_study() {
+    for guide in [USER_GUIDE_EN, USER_GUIDE_ZH] {
+        assert!(guide.contains("QueueState<T>"));
+        assert!(guide.contains("NonZeroUsize"));
+        assert!(guide.contains("StdMonitor"));
+        assert!(guide.contains("ParkingLotMonitor"));
+        assert!(guide.contains("notify_all"));
+        assert!(guide.contains("TimedMonitor"));
+        assert!(guide.contains("ManualMonotonicClock"));
+        assert!(guide.contains("AsyncTimedMonitor"));
+    }
 }
 
 #[test]
