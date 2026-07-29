@@ -185,8 +185,12 @@ condition loop by hand, choose a poisoning policy, and preserve the ordering
 between state updates and waiter registration itself.
 
 The [complete runnable example](../examples/bounded_queue.rs) uses the same
-queue operations with `ParkingLotMonitor` and also checks the zero-timeout
-path.
+queue operations with `ParkingLotMonitor`, checks the zero-timeout path, and
+wakes a consumer after it has observed an empty queue. Run it with:
+
+```bash
+cargo run --example bounded_queue --features monitor,parking-lot
+```
 
 ### Timed receive and deterministic time
 
