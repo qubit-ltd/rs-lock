@@ -7,70 +7,164 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
-## The problem
+Write concurrent components against the synchronization capability they need,
+then choose the concrete backend at the integration boundary. `qubit-lock`
+makes that practical for native locks, predicate coordination, and
+deterministic timeout tests.
 
-Rust applications often mix `std`, `parking_lot`, and Tokio locks. Their
-concrete APIs differ, so reusable code becomes tied to a backend even when it
-only needs to acquire a lock or access protected data.
+## Why this crate exists
 
-Condition coordination adds another problem: a lock alone cannot express
-"wait until this predicate becomes true." Correct condition-variable code must
-keep state updates, predicate checks, waiter registration, and notification in
-one protocol. Timeout tests then become slow and flaky when they depend on real
-sleeps.
+A local `Mutex` in one function rarely needs another abstraction. The value
+appears when a component must be reused or its concurrency policy must change:
 
-`qubit-lock` provides backend-independent lock capabilities, closure-based data
-access, synchronous and asynchronous monitors, and injectable timers for
-deterministic tests.
+- A reusable component should not need separate implementations for
+  `std::sync::Mutex`, `std::sync::RwLock`, and `parking_lot` locks just because
+  their acquisition APIs and guard types differ.
+- A lock protects state, but it does not define the protocol for “wait until
+  this predicate becomes true.” Correct code must coordinate state changes,
+  predicate checks, waiter registration, and notifications.
+- Tests that call real sleep functions are slow and race-prone. Timeout
+  behavior is more useful when the production wait algorithm runs against a
+  controllable clock.
 
-## Quick start
+`qubit-lock` supplies capability traits for the first problem and monitor
+implementations for the second and third.
 
-`DataLock` gives supported mutexes and read-write locks the same closure-based
-read/write interface:
+Synchronous adapters support `std::sync::Mutex<T>`, `std::sync::RwLock<T>`,
+`parking_lot::Mutex<T>`, and `parking_lot::RwLock<T>` when the corresponding
+feature is enabled.
+
+## When not to use this crate
+
+Use the native lock directly when it is local to one implementation, the
+backend will not vary, and no condition waiting or deterministic timeout test
+is involved. Add this crate when a public or reusable boundary needs a
+backend-neutral contract, or when coordinating waiters becomes part of the
+domain behavior.
+
+## See the lock abstraction pay off
+
+The following domain functions know only that they can read or update
+`ServiceStats`. They do not know whether the caller chose a mutex for a
+low-contention test or a read-write lock for a read-heavy service.
 
 ```rust
 use qubit_lock::DataLock;
 
+#[derive(Clone, Default, Debug, PartialEq, Eq)]
+struct ServiceStats {
+    accepted: u64,
+    rejected: u64,
+}
+
+enum Outcome {
+    Accepted,
+    Rejected,
+}
+
+fn record<L>(stats: &L, outcome: Outcome)
+where
+    L: DataLock<ServiceStats>,
+{
+    stats.with_write(|stats| match outcome {
+        Outcome::Accepted => stats.accepted += 1,
+        Outcome::Rejected => stats.rejected += 1,
+    });
+}
+
+fn snapshot<L>(stats: &L) -> ServiceStats
+where
+    L: DataLock<ServiceStats>,
+{
+    stats.with_read(Clone::clone)
+}
+
 fn main() {
-    let counter = std::sync::Mutex::new(0);
-    counter.with_write(|value| *value += 1);
-    assert_eq!(counter.with_read(|value| *value), 1);
+    let test_stats: std::sync::Mutex<ServiceStats> =
+        std::sync::Mutex::new(ServiceStats::default());
+    record(&test_stats, Outcome::Accepted);
+    assert_eq!(snapshot(&test_stats).accepted, 1);
+
+    let service_stats: std::sync::RwLock<ServiceStats> =
+        std::sync::RwLock::new(ServiceStats::default());
+    record(&service_stats, Outcome::Accepted);
+    record(&service_stats, Outcome::Rejected);
+    assert_eq!(
+        snapshot(&service_stats),
+        ServiceStats {
+            accepted: 1,
+            rejected: 1,
+        },
+    );
 }
 ```
 
-## Complete user guide
+With the `parking-lot` feature enabled, the same functions also accept
+`parking_lot::Mutex<ServiceStats>` and `parking_lot::RwLock<ServiceStats>`.
+The caller chooses the contention and dependency policy; the component keeps
+one business implementation.
 
-The [English user guide](doc/user_guide.md) explains the motivating
-producer-consumer example, every public component, feature selection, monitor
-semantics, timed waits, deterministic testing, and common mistakes.
+| Without this abstraction | With `qubit-lock` |
+| --- | --- |
+| A component commits to one concrete lock type | A component declares `DataLock<T>` |
+| Domain code branches between `lock`, `read`, and `write` | Domain code uses `with_read` and `with_write` |
+| Guard and poisoning entry points leak into the component | The capability boundary owns backend acquisition details |
+| Replacing a backend changes business code | The backend is selected by the caller |
 
-The [Chinese user guide](doc/user_guide.zh_CN.md) covers the same material in
-Chinese.
+For operations that need a guard rather than data-bound closures, use `Lock`.
+When the algorithm requires true exclusive entry, require `ExclusiveLock`;
+`Lock` alone can also represent a read-mode adapter. `ReadWriteLock` preserves
+shared and exclusive modes and exposes `read_lock()` and `write_lock()`
+adapters.
 
-## Features
+## When a lock is not enough
 
-- `Lock`, `ExclusiveLock`, `ReadWriteLock`, and `DataLock<T>` provide common
-  synchronous capabilities for `std::sync::Mutex<T>`,
-  `std::sync::RwLock<T>`, `parking_lot::Mutex<T>`, and
-  `parking_lot::RwLock<T>`.
-- `AsyncLock`, `AsyncReadWriteLock`, and `AsyncDataLock<T>` provide matching
-  Tokio capabilities behind `async-lock`.
-- `ParkingLotMonitor` and `StdMonitor`, including standard
-  `Arc<ParkingLotMonitor<T>>` and `Arc<StdMonitor<T>>` handles, provide
-  blocking predicate coordination.
-- `TokioMonitor` provides asynchronous coordination behind
-  `async-monitor`.
-- Every concrete monitor supports Timer injection for deterministic tests.
+A work queue, readiness gate, or connection pool needs more than mutual
+exclusion: a worker must wait for a state predicate, producers must update
+that state without losing notifications, shutdown must wake every affected
+waiter, and timeout tests must not sleep.
 
-Import public types directly from the crate root.
+`ParkingLotMonitor` and `StdMonitor` provide the same predicate-oriented
+domain boundary for blocking code; `TokioMonitor` provides the asynchronous
+counterpart. The [English user guide](doc/user_guide.md) builds a closable,
+bounded task queue that runs unchanged on `StdMonitor` and
+`ParkingLotMonitor`, then tests its real timeout path with a manual clock.
+The [Chinese user guide](doc/user_guide.zh_CN.md) covers the same case study.
 
-## Installation
+## Choose a capability
 
-The default feature set is empty. Enable `ParkingLotMonitor` explicitly:
+| Need | Start with |
+| --- | --- |
+| Read or mutate data stored in a lock | `DataLock<T>` |
+| Abstract one guard acquisition mode | `Lock` |
+| Require true exclusive acquisition | `ExclusiveLock` |
+| Preserve explicit shared and exclusive modes | `ReadWriteLock` |
+| Coordinate blocking predicate waits | `ParkingLotMonitor` or `StdMonitor` |
+| Coordinate Tokio predicate waits | `TokioMonitor` |
+| Express a reusable monitor dependency | The narrowest capability trait |
+| Test deadlines without sleeping | `with_timer` and `ManualMonotonicClock` |
+
+All public types are exported from the crate root. Import public types directly from the crate root.
+
+## Installation and features
+
+The default feature set is empty. Enable only the components used by the
+program:
+
+| Feature | What it enables |
+| --- | --- |
+| no optional features | Synchronous lock traits and `std` lock implementations |
+| `parking-lot` | Implementations for `parking_lot` mutexes and read-write locks |
+| `monitor` | Monitor traits, `StdMonitor`, timed waits, and timer injection |
+| `async-lock` | Tokio lock traits and adapters |
+| `async-monitor` | `async-lock`, monitor support, and `TokioMonitor` |
+| default | no optional features |
+
+Use only synchronous lock traits and standard-library implementations:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.12", default-features = false, features = ["monitor", "parking-lot"] }
+qubit-lock = { version = "0.12", default-features = false }
 ```
 
 Use `StdMonitor` without a `parking_lot` dependency:
@@ -80,11 +174,11 @@ Use `StdMonitor` without a `parking_lot` dependency:
 qubit-lock = { version = "0.12", default-features = false, features = ["monitor"] }
 ```
 
-Use only the synchronous lock traits and standard-library implementations:
+Use `ParkingLotMonitor`:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.12", default-features = false }
+qubit-lock = { version = "0.12", default-features = false, features = ["monitor", "parking-lot"] }
 ```
 
 Enable Tokio locks without Tokio monitors:
@@ -101,23 +195,29 @@ Enable Tokio monitors and timed waits:
 qubit-lock = { version = "0.12", default-features = false, features = ["async-monitor"] }
 ```
 
-If the application creates a Tokio runtime, enable its required runtime
-features in the application's own `Cargo.toml`.
+Applications that create a Tokio runtime must enable their required runtime
+features, such as `rt` or `rt-multi-thread`, in their own `Cargo.toml`.
 
 ## Condition-wait semantics
 
-Timed monitor waits align with `std::sync::Condvar::wait_timeout_while`.
-Their timeout is a condition-wait budget: after acquiring the state lock and
-before the first predicate check, the monitor samples one fixed deadline. The
-initial lock acquisition is excluded, predicate checks consume the budget, and
-the method may return after the timeout while reacquiring the state lock.
-Blocking `*_with_total_timeout` methods instead fix their deadline before
-initial lock acquisition, so contention consumes the operation-wide budget.
-They are still not a hard return-time guarantee because mutex reacquisition
-and the ready action cannot be interrupted. See the
-[English user guide](doc/user_guide.md) or
-[中文用户手册](doc/user_guide.zh_CN.md) for zero-timeout, error, cancellation,
-and whole-call-deadline semantics.
+Monitor notifications are memoryless: `notify_one` selects at most one
+already registered waiter, while a notification with no waiter has no future
+effect. Store readiness in protected state; a wakeup only asks a waiter to
+check its predicate again.
+
+Timed monitor waits align with `std::sync::Condvar::wait_timeout_while`. A
+relative timeout is a condition-wait budget: after acquiring the state lock
+and before the first predicate check, the monitor samples one fixed deadline.
+Initial lock acquisition is excluded, but predicate checks and waiting consume
+the budget. A wait may return after the timeout while reacquiring the state
+lock. Blocking `*_with_total_timeout` methods instead fix their deadline
+before initial lock acquisition, so contention consumes the operation-wide
+budget. Neither form is a hard return-time guarantee because lock
+reacquisition and a ready action cannot be interrupted.
+
+See the user guide for zero-timeout behavior, Timer registration and
+completion errors, cancellation, external predicate state, and total-timeout
+semantics.
 
 ## Project layout
 
