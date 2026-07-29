@@ -7,10 +7,11 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![中文文档](https://img.shields.io/badge/文档-中文版-blue.svg)](README.zh_CN.md)
 
-Write concurrent components against the synchronization capability they need,
-then choose the concrete backend at the integration boundary. `qubit-lock`
-makes that practical for native locks, predicate coordination, and
-deterministic timeout tests.
+Build reusable concurrent components around the operations they need, not
+around a particular lock implementation. Choose the `std`, `parking_lot`, or
+Tokio backend where you assemble the application. `qubit-lock` provides the
+common interfaces for protected-data access and state-based waiting, and lets
+you test timeout behavior with a controllable clock.
 
 ## Why this crate exists
 
@@ -27,8 +28,9 @@ appears when a component must be reused or its concurrency policy must change:
   behavior is more useful when the production wait algorithm runs against a
   controllable clock.
 
-`qubit-lock` supplies capability traits for the first problem and monitor
-implementations for the second and third.
+`qubit-lock` supplies capability traits for the first problem. Its monitor
+implementations handle the waiting protocol and support injected time for the
+second and third.
 
 Synchronous adapters support `std::sync::Mutex<T>`, `std::sync::RwLock<T>`,
 `parking_lot::Mutex<T>`, and `parking_lot::RwLock<T>` when the corresponding
@@ -44,9 +46,9 @@ domain behavior.
 
 ## See the lock abstraction pay off
 
-The following domain functions know only that they can read or update
-`ServiceStats`. They do not know whether the caller chose a mutex for a
-low-contention test or a read-write lock for a read-heavy service.
+The following domain functions only require read and write access to
+`ServiceStats`. They work unchanged whether the caller uses a mutex in a test
+or a read-write lock in a read-heavy service.
 
 ```rust
 use qubit_lock::DataLock;
@@ -101,8 +103,8 @@ fn main() {
 
 With the `parking-lot` feature enabled, the same functions also accept
 `parking_lot::Mutex<ServiceStats>` and `parking_lot::RwLock<ServiceStats>`.
-The caller chooses the contention and dependency policy; the component keeps
-one business implementation.
+The caller chooses the locking and dependency policy; the component keeps one
+business implementation.
 
 | Without this abstraction | With `qubit-lock` |
 | --- | --- |
@@ -120,16 +122,16 @@ adapters.
 ## When a lock is not enough
 
 A work queue, readiness gate, or connection pool needs more than mutual
-exclusion: a worker must wait for a state predicate, producers must update
-that state without losing notifications, shutdown must wake every affected
-waiter, and timeout tests must not sleep.
+exclusion. A worker must wait until a condition on the shared state is true.
+Producers must change that state and notify waiters without losing a wakeup.
+Shutdown must wake every affected waiter, and timeout tests should not depend
+on real sleeps.
 
-`ParkingLotMonitor` and `StdMonitor` provide the same predicate-oriented
-domain boundary for blocking code; `TokioMonitor` provides the asynchronous
-counterpart. The [English user guide](doc/user_guide.md) builds a closable,
-bounded task queue that runs unchanged on `StdMonitor` and
-`ParkingLotMonitor`, then tests its real timeout path with a manual clock.
-The [Chinese user guide](doc/user_guide.zh_CN.md) covers the same case study.
+`ParkingLotMonitor` and `StdMonitor` give blocking code the same interface for
+state-based waiting. `TokioMonitor` is the asynchronous counterpart. The
+[English user guide](doc/user_guide.md) builds a closable, bounded task queue
+whose domain logic runs unchanged on `StdMonitor` and `ParkingLotMonitor`,
+then tests the real timeout path with a manual clock.
 
 ## Choose a capability
 

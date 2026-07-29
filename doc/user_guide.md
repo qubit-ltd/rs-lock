@@ -2,34 +2,35 @@
 
 [中文版](user_guide.zh_CN.md)
 
-`qubit-lock` provides a common vocabulary for synchronous locks, Tokio locks,
-and monitor-style condition coordination. This guide starts with the problem
-the crate solves, then explains how to choose and use each public component.
+`qubit-lock` helps you write reusable concurrent code without tying its public
+boundary to one synchronization backend. Its lock traits describe access to
+protected data. Its monitors package the lock / condition-wait protocol and
+can use an injected clock for timeout tests. This guide starts with the design
+decision, then explains each public component.
 
-+
+## 1. Make the boundary decision first
 
-## 1. Start with the decision
-
-Use a native lock directly when it is private to one implementation and no
-waiters, backend substitution, or deterministic timeout tests are involved.
-Use `qubit-lock` at a reusable boundary:
+Use a native lock directly when it is an internal detail of one implementation.
+Add `qubit-lock` when the component must support more than one backend, wait
+for a condition, or test timeout behavior without sleeping:
 
 | The component needs | Use |
 | --- | --- |
-| Read/write access to data held by several native lock types | `DataLock<T>` |
+| Read and write access through several native lock types | `DataLock<T>` |
 | One guard acquisition mode | `Lock` |
 | An acquisition mode that must exclude all other guards | `ExclusiveLock` |
 | Shared and exclusive modes | `ReadWriteLock` |
-| State plus predicate waiting and notification | A concrete monitor or a narrow monitor capability trait |
+| State plus condition waiting and notification | A concrete monitor or a narrow monitor capability trait |
 | A timeout test without sleeping | A monitor built with `with_timer` |
 
-The next case study proves these boundaries before the API reference sections.
+The following case study shows why these boundaries matter before the API
+reference sections.
 
 ## 2. Case study: a closable bounded task queue
 
-A task queue has two kinds of waiter: a worker waits until the queue is
-non-empty or closed, while a producer waits until the queue is not full or
-closed. Both readiness conditions belong to the same protected state.
+A task queue has two kinds of waiters. A worker waits until the queue has an
+item or is closed. A producer waits until the queue has space or is closed.
+Both conditions are derived from the same protected state.
 
 ```rust
 use std::{
@@ -54,14 +55,14 @@ impl<T> QueueState<T> {
 }
 ```
 
-The invariants are explicit: `items.len() <= capacity.get()` always holds;
+The invariants are simple: `items.len() <= capacity.get()` always holds;
 `closed` rejects new tasks; an empty, closed queue returns `None`; and adding,
-removing, or closing can make a different class of waiter ready.
+removing, or closing can make one of the waiting groups ready.
 
-### One domain implementation, two blocking backends
+### One queue implementation, two blocking backends
 
-The domain functions depend on `Monitor`, `ConditionWaiter`, and `Notifier`,
-not on a concrete lock or condition-variable guard.
+The domain functions depend on the monitor capabilities they use, not on a
+specific lock type or condition-variable guard.
 
 ```rust
 use qubit_lock::Monitor;
@@ -109,12 +110,12 @@ where
 }
 ```
 
-This queue has two predicates: “not full” and “not empty.” A `notify_one`
-could wake a waiter whose predicate is still false while a waiter of the other
-kind remains asleep. The case study therefore uses `notify_all` after a state
-transition that may change readiness, so each waiter rechecks its own
-predicate under the monitor lock. This is not a rule that `notify_all` is
-always better: a single-predicate waiter set can usually prefer `notify_one`.
+This queue has two predicates: “not full” and “not empty.” `notify_one` might
+wake a producer when only a worker can proceed, or the other way around. The
+example therefore calls `notify_all` after any state change that can affect
+readiness. Each waiter then rechecks its own predicate while holding the
+monitor lock. This does not make `notify_all` universally better: when every
+waiter has the same predicate, `notify_one` is usually the better choice.
 
 ```rust
 use std::{
@@ -149,11 +150,11 @@ fn main() {
 }
 ```
 
-The concrete monitor is selected where the queue is assembled. `exercise`,
-`push`, `pop`, and `close` do not change. Raw `Mutex`/`Condvar` code instead
-carries backend-specific guards through waits, loops manually around each
-predicate, decides how to handle poisoning, and must preserve the same
-state-update-and-waiter-registration protocol.
+Choose the concrete monitor where the queue is assembled. `exercise`, `push`,
+`pop`, and `close` stay the same. With raw `Mutex`/`Condvar` code, the queue
+would instead carry backend-specific guards through waits, repeat each
+condition loop by hand, choose a poisoning policy, and preserve the ordering
+between state updates and waiter registration itself.
 
 ### Timed receive and deterministic time
 
@@ -236,15 +237,15 @@ fn main() {
 }
 ```
 
-The production wait algorithm runs against the injected timer. Its waiter and
-deadline observers make registration visible before time advances; no
+The production wait algorithm runs against the injected timer. The clock lets
+the test observe waiter registration before advancing time, so no
 `thread::sleep` is needed.
 
 ### Tokio keeps the state machine, not the blocking calls
 
-The Tokio version retains `QueueState<T>`, both predicates, the close rule,
-and the result meanings. It uses `AsyncMonitor` and `AsyncTimedMonitor`, with
-`TokioMonitor` as the concrete type. Async closures stay synchronous while the
+The Tokio version keeps `QueueState<T>`, both predicates, the close rule, and
+the result meanings. It uses `AsyncMonitor` and `AsyncTimedMonitor`, with
+`TokioMonitor` as the concrete type. The closures run synchronously while the
 monitor holds state; do not await or perform blocking I/O inside them.
 
 ```rust
@@ -291,23 +292,23 @@ does not transfer it to another waiter.
 
 ## 3. Why these abstractions exist
 
-Rust already has excellent lock implementations, but application and library
-code still runs into three recurring problems:
+Rust already has excellent lock implementations. Application and library code
+still runs into three recurring problems when it needs to be reused:
 
-1. `std`, `parking_lot`, and Tokio expose different concrete APIs. Generic
-   code that only needs "acquire a lock" or "read protected data" should not
-   have to know which backend the caller chose.
-2. A lock protects state, but it does not by itself express "sleep until this
-   predicate is true." Hand-written condition-variable code can lose
-   notifications when state updates, predicate checks, and waiter registration
-   do not follow one protocol.
-3. Real sleeps make timeout tests slow and flaky. A test should run the
+1. `std`, `parking_lot`, and Tokio use different APIs. Generic code that only
+   needs to acquire a lock or access protected data should not need to know
+   which backend the caller selected.
+2. A lock protects state, but it does not describe how to wait until a
+   condition becomes true. Hand-written condition-variable code can lose a
+   notification when state updates, condition checks, and waiter registration
+   are not coordinated as one operation.
+3. Real sleeps make timeout tests slow and flaky. A useful test runs the
    production wait algorithm while controlling time deterministically.
 
-The queue case study makes those three boundaries concrete: lock traits avoid
-backend leakage, monitor operations own the locked predicate protocol, and
-Timer injection executes the production timeout path without a separate mock
-algorithm.
+The queue makes the three boundaries concrete. Lock traits keep a backend out
+of the queue API. Monitor operations keep the locked condition-wait protocol
+in one place. Timer injection runs the production timeout path without a
+second, test-only algorithm.
 
 ## 4. Installation and feature selection
 

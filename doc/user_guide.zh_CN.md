@@ -2,31 +2,30 @@
 
 [English](user_guide.md)
 
-`qubit-lock` 为同步锁、Tokio 锁和 monitor 风格的条件协调提供统一抽象。本手册先说明
-这个 crate 解决的问题，再详细介绍每个公开组件的选择与用法。
+`qubit-lock` 让可复用的并发代码不必把公开边界绑定到某一种同步后端。锁 trait 描述对
+受保护数据的访问；monitor 封装了锁与条件等待的配合方式，并可注入时钟来测试超时行为。
+本手册先说明如何做边界设计，再介绍各个公开组件的选择与用法。
 
-+
+## 1. 先决定组件边界
 
-## 1. 先做选择
-
-如果锁只服务于一个私有实现，没有 waiter、后端替换或确定性 timeout 测试需求，
-直接使用原生锁。可复用边界则应使用 `qubit-lock`：
+如果锁只是一个实现内部的细节，直接使用原生锁即可。组件需要支持多个后端、等待某个条件，
+或在不 sleep 的情况下测试超时行为时，再引入 `qubit-lock`：
 
 | 组件需要的能力 | 使用 |
 | --- | --- |
-| 读取或修改由多种原生锁持有的数据 | `DataLock<T>` |
+| 通过多种原生锁读取和修改数据 | `DataLock<T>` |
 | 一种 guard 获取模式 | `Lock` |
 | 必须排除所有其他 guard 的获取模式 | `ExclusiveLock` |
 | 共享与独占模式 | `ReadWriteLock` |
-| 状态、predicate wait 与 notification | 具体 monitor 或最小 monitor 能力 trait |
+| 状态、条件等待与通知 | 具体 monitor 或最小 monitor 能力 trait |
 | 不使用 sleep 的 timeout 测试 | 由 `with_timer` 构造的 monitor |
 
-下面的案例先证明这些边界，之后再提供完整 API 参考。
+下面的案例会先说明这些边界的价值，之后再提供完整 API 参考。
 
 ## 2. 案例：可关闭的有界任务队列
 
-任务队列中有两类 waiter：worker 等待队列非空或关闭；producer 等待队列未满或关闭。
-两类就绪条件都属于同一份受保护状态。
+任务队列中有两类等待者：worker 等待队列非空或关闭；producer 等待队列未满或关闭。
+这两个条件都由同一份受保护状态决定。
 
 ```rust
 use std::{
@@ -51,13 +50,12 @@ impl<T> QueueState<T> {
 }
 ```
 
-不变量是明确的：`items.len() <= capacity.get()` 始终成立；`closed` 后拒绝新任务；
-空且关闭的队列返回 `None`；加入、移除或关闭都可能让另一类 waiter 就绪。
+不变量很明确：`items.len() <= capacity.get()` 始终成立；`closed` 后拒绝新任务；空且
+关闭的队列返回 `None`；加入、移除或关闭都可能让某一类等待者继续执行。
 
-### 一份领域实现，两个阻塞后端
+### 一套队列逻辑，两个阻塞后端
 
-领域函数依赖 `Monitor`、`ConditionWaiter` 和 `Notifier`，而不是某一种具体锁或
-condition-variable guard。
+领域函数只依赖它们实际使用的 monitor 能力，而不依赖某一种具体锁或条件变量 guard。
 
 ```rust
 use qubit_lock::Monitor;
@@ -105,11 +103,10 @@ where
 }
 ```
 
-该队列有两类 predicate：“未满”和“非空”。`notify_one` 可能唤醒 predicate 仍为
-false 的 waiter，而另一类已经可以继续的 waiter 仍在休眠。因此，本案例在可能改变
-就绪条件的状态转换后使用 `notify_all`，让每个 waiter 在 monitor 锁内重新检查自己
-的 predicate。这不表示 `notify_all` 永远更好：单一 predicate 的 waiter 集通常可以
-优先使用 `notify_one`。
+该队列有两类 predicate：“未满”和“非空”。`notify_one` 可能唤醒 producer，而此时只有
+worker 能继续执行；反过来也一样。因此，示例在任何可能改变就绪条件的状态更新后调用
+`notify_all`，让每个等待者在持有 monitor 锁时重新检查自己的 predicate。这并不表示
+`notify_all` 永远更好：所有等待者使用同一个 predicate 时，`notify_one` 通常更合适。
 
 ```rust
 use std::{
@@ -144,9 +141,9 @@ fn main() {
 }
 ```
 
-具体 monitor 在组装队列的位置选择。`exercise`、`push`、`pop` 和 `close` 都不需要
-修改。原生 `Mutex`/`Condvar` 代码则需要让后端专用 guard 穿过每次等待、手动循环检查
-predicate、决定 poisoning 策略，并自己维持状态更新与 waiter 注册的同一协议。
+在组装队列时选择具体 monitor。`exercise`、`push`、`pop` 和 `close` 都无需修改。若直接
+使用 `Mutex`/`Condvar`，队列代码就得让后端专用 guard 穿过每次等待，手动编写条件循环，
+选择 poisoning 策略，并自行保证状态更新与等待者注册的顺序正确。
 
 ### 计时接收与确定性时间
 
@@ -227,14 +224,14 @@ fn main() {
 }
 ```
 
-生产等待算法运行在注入的 Timer 上。它的 waiter 与 deadline 观察接口会在推进时间前
-确认注册，因此不需要 `thread::sleep`。
+生产等待算法运行在注入的 Timer 上。时钟让测试能够在推进时间前确认等待者已注册，
+因此不需要 `thread::sleep`。
 
 ### Tokio 保留状态机，而不是阻塞调用
 
 Tokio 版本保留 `QueueState<T>`、两类 predicate、关闭规则和结果含义。它使用
-`AsyncMonitor` 和 `AsyncTimedMonitor`，具体类型是 `TokioMonitor`。持锁期间的
-async closure 仍然是同步 closure；不要在其中 await 或执行阻塞 I/O。
+`AsyncMonitor` 和 `AsyncTimedMonitor`，具体类型是 `TokioMonitor`。持锁期间传入的
+closure 仍同步执行；不要在其中 await 或执行阻塞 I/O。
 
 ```rust
 use std::{
@@ -278,17 +275,17 @@ action，也不会回滚其他 task 已经完成的状态修改。如果 `notify
 
 ## 3. 为什么需要这些抽象
 
-Rust 已经提供了优秀的锁实现，但应用和库代码仍会反复遇到三个问题：
+Rust 已经提供了优秀的锁实现；当组件需要复用时，应用和库代码仍会反复遇到三个问题：
 
-1. `std`、`parking_lot` 和 Tokio 暴露的具体 API 不同。只需要“获取锁”或“读取受保护
-   数据”的泛型代码，不应该被迫了解调用方选择了哪个后端。
-2. 锁可以保护状态，却不能独立表达“休眠直到某个 predicate 成立”。如果状态更新、
-   predicate 检查和 waiter 注册没有遵循同一个协议，手写的条件变量代码可能丢失通知。
-3. 真实 sleep 会让超时测试变慢且不稳定。测试应运行生产环境的等待算法，同时能够
-   确定性地控制时间。
+1. `std`、`parking_lot` 和 Tokio 的 API 不同。只需要获取锁或访问受保护数据的泛型代码，
+   不应被迫了解调用方选择了哪个后端。
+2. 锁可以保护状态，却不能说明怎样等到某个条件成立。如果状态更新、条件检查和等待者
+   注册没有作为一个整体协调，手写的条件变量代码可能丢失通知。
+3. 真实 sleep 会让超时测试变慢且不稳定。好的测试应运行生产环境的等待算法，同时以
+   确定性的方式控制时间。
 
-队列案例把这三类边界具体化：锁 trait 避免后端泄漏，monitor 操作承载持锁 predicate
-协议，Timer 注入则在没有独立 mock 算法的前提下执行生产 timeout 路径。
+队列案例把这三类边界具体化：锁 trait 让队列 API 不暴露后端；monitor 操作将持锁条件
+等待协议放在同一处；Timer 注入则运行生产环境的超时路径，而无需另写一套测试算法。
 
 ## 4. 安装与 Feature 选择
 

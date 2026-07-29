@@ -7,36 +7,38 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![English Document](https://img.shields.io/badge/Document-English-blue.svg)](README.md)
 
-让并发组件依赖它需要的同步能力，再在集成边界选择具体后端。`qubit-lock` 让原生锁、
-predicate 协调和确定性 timeout 测试都能采用这种方式。
+编写可复用的并发组件时，应让组件依赖所需的操作，而不是某一种锁实现；在组装应用时，
+再选择 `std`、`parking_lot` 或 Tokio 后端。`qubit-lock` 以统一的接口表示受保护数据的
+访问和基于状态的等待，并允许用可控时钟测试超时行为。
 
 ## 为什么需要这个 crate
 
-一个只在单个函数内使用的 `Mutex` 通常不需要额外抽象。价值出现在组件需要复用、
-或者并发策略需要变化时：
+只在一个函数中使用的 `Mutex` 通常不需要额外抽象。组件需要复用，或并发策略可能改变时，
+这个 crate 才能体现价值：
 
-- 可复用组件不应仅因获取 API 和 guard 类型不同，就为
-  `std::sync::Mutex`、`std::sync::RwLock` 和 `parking_lot` 锁分别实现一次。
-- 锁能保护状态，却不能定义“等待直到 predicate 成立”的协议。正确实现必须协调状态
-  更新、predicate 检查、waiter 注册和 notification。
-- 调用真实 sleep 的测试既慢又容易竞争。让生产等待算法运行在可控时钟上，timeout
-  行为才容易验证。
+- 可复用组件不应仅因获取 API 和 guard 类型不同，就为 `std::sync::Mutex`、
+  `std::sync::RwLock` 和 `parking_lot` 锁分别实现一次。
+- 锁能保护状态，却不能规定“等到某个条件成立”的配合方式。正确实现必须协调状态更新、
+  条件检查、等待者注册和通知。
+- 真实 sleep 会让测试变慢，也容易引入竞争。让生产等待算法运行在可控时钟上，超时行为
+  才容易验证。
 
-`qubit-lock` 用能力 trait 解决第一个问题，用 monitor 实现解决后两个问题。
+`qubit-lock` 用能力 trait 解决第一个问题；它的 monitor 实现负责处理等待协议，并支持
+注入时间来源来解决后两个问题。
 
 同步 adapter 支持 `std::sync::Mutex<T>`、`std::sync::RwLock<T>`，以及启用对应
 Feature 后的 `parking_lot::Mutex<T>` 和 `parking_lot::RwLock<T>`。
 
 ## 何时不需要这个 crate
 
-如果锁只服务于一个局部实现、后端不会变化，也没有条件等待或确定性 timeout 测试，
-直接使用原生锁通常更简单。当公共或可复用边界需要后端无关的契约，或者等待者协调
-已经成为领域行为的一部分时，再使用这个 crate。
+如果锁只服务于一个局部实现、后端不会变化，也没有条件等待或确定性的超时测试，直接使用
+原生锁通常更简单。当公开或可复用的边界需要后端无关的契约，或者等待者协调已经成为领域
+行为的一部分时，再使用这个 crate。
 
 ## 一眼看到锁抽象的价值
 
-下面的领域函数只知道如何读取或更新 `ServiceStats`。它不知道调用方选择的是低竞争
-测试中的 mutex，还是读多写多服务中的读写锁。
+下面的领域函数只要求能够读取和更新 `ServiceStats`。无论调用方在测试中使用 mutex，
+还是在读多写少的服务中使用读写锁，它们都不需要修改。
 
 ```rust
 use qubit_lock::DataLock;
@@ -91,7 +93,7 @@ fn main() {
 
 启用 `parking-lot` Feature 后，同一组函数还可直接接收
 `parking_lot::Mutex<ServiceStats>` 和 `parking_lot::RwLock<ServiceStats>`。
-调用方决定竞争和依赖策略；组件始终只有一份业务实现。
+调用方决定锁和依赖策略；组件始终只有一份业务实现。
 
 | 不使用这个抽象 | 使用 `qubit-lock` |
 | --- | --- |
@@ -100,33 +102,33 @@ fn main() {
 | guard 与 poisoning 入口泄漏进组件 | 能力边界处理后端获取细节 |
 | 替换后端会修改业务代码 | 调用方在集成边界选择后端 |
 
-需要 guard 而不是数据闭包时使用 `Lock`。泛型算法确实要求独占进入时使用
-`ExclusiveLock`；单独的 `Lock` 也可能表示读模式 adapter。`ReadWriteLock` 保留
-共享与独占模式，并提供 `read_lock()` 和 `write_lock()` adapter。
+如果操作必须返回 guard，而不能在闭包中完成数据访问，请使用 `Lock`。泛型算法确实
+要求独占进入时，请使用 `ExclusiveLock`；`Lock` 本身也可能表示读模式 adapter。
+`ReadWriteLock` 保留共享与独占两种模式，并提供 `read_lock()` 和 `write_lock()` adapter。
 
 ## 锁还不够时
 
-任务队列、就绪门和连接池不只需要互斥：worker 必须等待状态 predicate，producer
-必须在不丢失 notification 的情况下更新状态，shutdown 必须唤醒所有受影响 waiter，
-timeout 测试也不能依赖 sleep。
+任务队列、就绪门和连接池需要的不只是互斥。worker 必须等到共享状态满足条件；producer
+必须在更新状态后正确通知等待者；关闭操作必须唤醒所有受影响的等待者；超时测试也不应
+依赖真实 sleep。
 
-`ParkingLotMonitor` 和 `StdMonitor` 为阻塞代码提供相同的 predicate 导向领域边界；
-`TokioMonitor` 提供异步对应实现。[英文用户手册](doc/user_guide.md) 会构建一个可关闭
-的有界任务队列：同一份领域逻辑可运行在 `StdMonitor` 与 `ParkingLotMonitor` 上，
-并用手动时钟测试真实 timeout 路径。[中文用户手册](doc/user_guide.zh_CN.md)提供相同案例。
+`ParkingLotMonitor` 和 `StdMonitor` 为阻塞代码提供相同的、基于状态条件的等待接口；
+`TokioMonitor` 提供异步对应实现。[中文用户手册](doc/user_guide.zh_CN.md)会构建一个可关闭的
+有界任务队列：同一份领域逻辑可运行在 `StdMonitor` 与 `ParkingLotMonitor` 上，并用手动时钟
+测试真实的超时路径。
 
 ## 选择能力
 
 | 需求 | 首选组件 |
 | --- | --- |
 | 读取或修改锁内数据 | `DataLock<T>` |
-| 抽象一种 guard 获取模式 | `Lock` |
+| 抽象一种 guard 获取方式 | `Lock` |
 | 要求真正独占的获取 | `ExclusiveLock` |
 | 保留显式共享与独占模式 | `ReadWriteLock` |
-| 协调阻塞式 predicate wait | `ParkingLotMonitor` 或 `StdMonitor` |
-| 协调 Tokio predicate wait | `TokioMonitor` |
-| 表达可复用 monitor 依赖 | 满足操作的最小能力 trait |
-| 不使用 sleep 测试 deadline | `with_timer` 和 `ManualMonotonicClock` |
+| 协调阻塞式条件等待 | `ParkingLotMonitor` 或 `StdMonitor` |
+| 协调 Tokio 条件等待 | `TokioMonitor` |
+| 声明可复用组件所需的 monitor 能力 | 满足操作的最小能力 trait |
+| 不使用真实 sleep 测试 deadline | `with_timer` 和 `ManualMonotonicClock` |
 
 所有公开类型都从 crate root 导出。请直接从 crate root 导入公开类型。
 
@@ -183,19 +185,18 @@ Feature，例如 `rt` 或 `rt-multi-thread`。
 
 ## 条件等待语义
 
-Monitor notification 是无记忆的：`notify_one` 最多选择一个已注册 waiter；没有
-waiter 时发送的 notification 对未来没有作用。就绪状态应存入受保护数据；wakeup
-只会要求 waiter 再次检查 predicate。
+Monitor 的通知不会被记住：`notify_one` 最多选择一个已经注册的等待者；没有等待者时
+发出的通知不会影响未来。就绪状态应存入受保护数据；收到唤醒只意味着等待者应当再次
+检查条件。
 
-计时 monitor 等待与 `std::sync::Condvar::wait_timeout_while` 对齐。相对 timeout
-是条件等待预算：取得状态锁后、首次 predicate 检查前，monitor 会采样一个固定
-deadline。初始获取锁不计入预算，但 predicate 检查和等待会消耗预算。重新获取状态锁时
-可能在 timeout 后返回。同步 `*_with_total_timeout` 会在初始获取状态锁前固定
-deadline，因此锁竞争会消耗整个操作预算。两者都不是严格返回时限，因为重新获取锁和
-执行 ready action 都不能被中断。
+计时 monitor 等待与 `std::sync::Condvar::wait_timeout_while` 的行为一致。相对 timeout
+是一份条件等待预算：取得状态锁后、首次检查条件前，monitor 会确定一个固定 deadline。
+初始获取锁不计入预算，但条件检查和等待会消耗预算。重新获取状态锁时，方法可能在 timeout
+之后才返回。同步 `*_with_total_timeout` 会在初始获取状态锁前确定 deadline，因此锁竞争
+也会消耗整个操作预算。两者都不是严格的返回时限，因为重新获取锁和执行 ready action 都
+无法中断。
 
-零时长、Timer 注册与完成错误、取消、外部 predicate 状态和 total-timeout 语义请参阅
-用户手册。
+零时长、Timer 注册与完成错误、取消、外部条件状态和 total-timeout 语义，请参阅用户手册。
 
 ## 项目结构
 
