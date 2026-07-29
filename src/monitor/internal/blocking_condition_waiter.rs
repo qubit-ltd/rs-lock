@@ -37,6 +37,39 @@ use crate::monitor::{
 };
 
 /// Waits while a predicate remains true using one fixed timer future.
+///
+/// # Type Parameters
+///
+/// * `G` - Guard providing mutable access to the protected state.
+/// * `T` - Protected state type.
+/// * `R` - Value returned by the ready action.
+/// * `P` - Predicate deciding whether waiting must continue.
+/// * `F` - Action run once the predicate stops blocking.
+/// * `W` - Backend-specific suspension operation.
+///
+/// # Parameters
+///
+/// * `guard` - Acquired state guard retained across predicate checks.
+/// * `future` - Fixed Timer registration reused across wakeups.
+/// * `waiting` - Predicate returning `true` while suspension must continue.
+/// * `f` - Action receiving mutable state when waiting finishes.
+/// * `wait` - Operation that releases and reacquires `guard` while polling the
+///   fixed Timer.
+///
+/// # Returns
+///
+/// [`WaitTimeoutResult::Ready`] with the value returned by `f` when `waiting`
+/// becomes false, or [`WaitTimeoutResult::TimedOut`] when the Timer completes
+/// while the predicate still blocks.
+///
+/// # Errors
+///
+/// Returns Timer completion errors reported by `wait`. Such an error prevents
+/// `f` from running.
+///
+/// # Panics
+///
+/// Propagates a panic from `waiting`, `f`, or `wait`.
 pub(in crate::monitor) fn wait_while_with_timer_locked<G, T, R, P, F, W>(
     mut guard: G,
     mut future: TimerFuture,
@@ -99,6 +132,10 @@ impl BlockingConditionWaiter {
     /// # Returns
     ///
     /// The current Timer completion state.
+    ///
+    /// # Errors
+    ///
+    /// A ready result contains any Timer completion error.
     pub(in crate::monitor) fn poll_timer_without_waiter(
         future: &mut TimerFuture,
     ) -> Poll<Result<(), TimeError>> {
@@ -132,6 +169,9 @@ impl BlockingConditionWaiter {
 
     /// Blocks until monitor notification or the Timer Waker signals this
     /// waiter.
+    ///
+    /// A poisoned internal signal mutex is recovered so notification remains
+    /// observable after another thread panics.
     pub(in crate::monitor) fn wait(&self) {
         let mut state = recover(self.state.lock());
         while !state.signalled {
@@ -140,6 +180,8 @@ impl BlockingConditionWaiter {
     }
 
     /// Latches one signal and unparks the blocking thread.
+    ///
+    /// A poisoned internal signal mutex is recovered before the latch is set.
     #[inline]
     fn signal(&self) {
         let mut state = recover(self.state.lock());

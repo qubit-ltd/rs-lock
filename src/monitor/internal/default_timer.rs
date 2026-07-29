@@ -22,6 +22,11 @@ use qubit_clock::{
 /// # Returns
 ///
 /// A shared Timer driven by one standard monotonic clock domain.
+///
+/// # Panics
+///
+/// Panics if all process-wide clock-domain identifiers are exhausted while
+/// initializing the shared Timer.
 #[inline]
 pub(in crate::monitor) fn default_timer() -> Arc<dyn Timer> {
     static TIMER: OnceLock<Arc<dyn Timer>> = OnceLock::new();

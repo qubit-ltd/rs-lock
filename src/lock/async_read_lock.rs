@@ -16,6 +16,10 @@ use crate::lock::{
 };
 
 /// Adapts the read mode of an AsyncReadWriteLock to AsyncLock.
+///
+/// # Type Parameters
+///
+/// * `L` - The underlying asynchronous read-write lock type.
 #[must_use = "use the adapter to acquire an asynchronous read guard"]
 pub struct AsyncReadLock<'a, L: ?Sized> {
     /// Underlying asynchronous read-write lock.

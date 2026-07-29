@@ -71,6 +71,10 @@ use super::{
 /// a zero budget do not create a timer future. Closures and predicates execute
 /// while the state mutex is held and must not re-enter the same monitor; doing
 /// so can deadlock.
+///
+/// # Type Parameters
+///
+/// * `T` - State protected by the Tokio mutex.
 #[must_use = "retain and use the monitor to coordinate protected state"]
 pub struct TokioMonitor<T> {
     /// Protected monitor state.
@@ -164,6 +168,11 @@ impl<T> TokioMonitor<T> {
 
     /// Acquires the monitor and reads the protected state.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `F` - Closure used to read the protected state.
+    ///
     /// # Parameters
     ///
     /// * `f` - Closure that receives an immutable reference to the state.
@@ -187,6 +196,11 @@ impl<T> TokioMonitor<T> {
     /// Acquires the monitor and mutates the protected state.
     ///
     /// This does not notify waiters automatically.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `F` - Closure used to mutate the protected state.
     ///
     /// # Parameters
     ///
@@ -213,6 +227,11 @@ impl<T> TokioMonitor<T> {
     /// The state lock is released before notification is sent. If `f` panics,
     /// the panic propagates and no notification is sent.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `F` - Closure used to mutate the protected state.
+    ///
     /// # Parameters
     ///
     /// * `f` - Closure that receives a mutable reference to the state.
@@ -238,6 +257,11 @@ impl<T> TokioMonitor<T> {
     ///
     /// The state lock is released before notification is sent. If `f` panics,
     /// the panic propagates and no notification is sent.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `F` - Closure used to mutate the protected state.
     ///
     /// # Parameters
     ///
@@ -320,6 +344,11 @@ impl<T> TokioMonitor<T> {
     /// # Returns
     ///
     /// `true` when the deadline has completed.
+    ///
+    /// # Errors
+    ///
+    /// Returns a Timer completion error if the fixed registration fails while
+    /// being polled.
     #[inline]
     async fn deadline_reached(
         deadline: &mut TimerFuture,
@@ -454,8 +483,34 @@ impl<T: Send> TokioMonitor<T> {
     /// Returns a future that waits until a predicate becomes true or an
     /// absolute deadline passes.
     ///
-    /// The future resolves to a Timer error when waiting is required and
-    /// propagates a panic from ready or f when polled.
+    /// # Type Parameters
+    ///
+    /// * `'a` - Lifetime shared by the monitor, closures, and returned future.
+    /// * `R` - Value returned by `f`.
+    /// * `P` - Predicate deciding when the state is ready.
+    /// * `F` - Action run once the state is ready.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Absolute deadline in the injected Timer's clock domain.
+    /// * `ready` - Predicate returning `true` when the caller may continue.
+    /// * `f` - Action receiving mutable state once `ready` succeeds.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to [`WaitTimeoutResult::Ready`] with the value
+    /// returned by `f`, or [`WaitTimeoutResult::TimedOut`] if the deadline is
+    /// reached first.
+    ///
+    /// # Errors
+    ///
+    /// The returned future reports Timer domain, registration, or completion
+    /// errors when waiting is required.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `ready` or `f` when polled.
+    /// It also panics if the waiter registry exhausts registration identifiers.
     #[inline(always)]
     pub fn wait_until_with_deadline_async<'a, R, P, F>(
         &'a self,
@@ -476,8 +531,30 @@ impl<T: Send> TokioMonitor<T> {
     /// Returns a future that waits until a predicate becomes true or an
     /// absolute deadline passes without running an action.
     ///
-    /// The future resolves to a Timer error when waiting is required and
-    /// propagates a panic from ready when polled.
+    /// # Type Parameters
+    ///
+    /// * `'a` - Lifetime shared by the monitor, predicate, and returned future.
+    /// * `P` - Predicate deciding when the state is ready.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Absolute deadline in the injected Timer's clock domain.
+    /// * `ready` - Predicate returning `true` when the caller may continue.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to [`WaitTimeoutResult::Ready`] with `()`, or
+    /// [`WaitTimeoutResult::TimedOut`] if the deadline is reached first.
+    ///
+    /// # Errors
+    ///
+    /// The returned future reports Timer domain, registration, or completion
+    /// errors when waiting is required.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `ready` when polled. It also
+    /// panics if the waiter registry exhausts registration identifiers.
     #[inline(always)]
     pub fn wait_until_ready_with_deadline_async<'a, P>(
         &'a self,
@@ -495,8 +572,35 @@ impl<T: Send> TokioMonitor<T> {
     /// Returns a future that waits while a predicate remains true or until an
     /// absolute deadline passes.
     ///
-    /// The future resolves to a Timer error when waiting is required and
-    /// propagates a panic from predicate or action when polled.
+    /// # Type Parameters
+    ///
+    /// * `'a` - Lifetime shared by the monitor, closures, and returned future.
+    /// * `R` - Value returned by `action`.
+    /// * `P` - Predicate deciding whether waiting must continue.
+    /// * `F` - Action run once waiting finishes.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Absolute deadline in the injected Timer's clock domain.
+    /// * `predicate` - Predicate returning `true` while waiting must continue.
+    /// * `action` - Action receiving mutable state when waiting finishes.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to [`WaitTimeoutResult::Ready`] with the value
+    /// returned by `action`, or [`WaitTimeoutResult::TimedOut`] if the deadline
+    /// is reached while `predicate` remains true.
+    ///
+    /// # Errors
+    ///
+    /// The returned future reports Timer domain, registration, or completion
+    /// errors when waiting is required.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `predicate` or `action` when
+    /// polled. It also panics if the waiter registry exhausts registration
+    /// identifiers.
     #[inline(always)]
     pub fn wait_while_with_deadline_async<'a, R, P, F>(
         &'a self,

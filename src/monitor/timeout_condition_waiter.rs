@@ -54,6 +54,12 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// evaluating the predicate, waiting, and reacquiring the lock. A ready
     /// predicate wins even when the deadline has already passed.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes true.
+    /// * `P` - Readiness predicate evaluated against the protected state.
+    /// * `F` - Action closure run with mutable protected-state access.
+    ///
     /// # Parameters
     ///
     /// * deadline - Absolute monotonic deadline for the condition wait.
@@ -96,6 +102,10 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// This convenience method does not run an action and otherwise has the
     /// same deadline and error semantics as wait_until_with_deadline.
     ///
+    /// # Type Parameters
+    ///
+    /// * `P` - Readiness predicate evaluated against the protected state.
+    ///
     /// # Parameters
     ///
     /// * deadline - Absolute monotonic deadline for the condition wait.
@@ -125,6 +135,12 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     }
 
     /// Blocks while the predicate remains true or until an absolute deadline.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes false.
+    /// * `P` - Waiting predicate evaluated against the protected state.
+    /// * `F` - Action closure run with mutable protected-state access.
     ///
     /// # Parameters
     ///
@@ -163,6 +179,12 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// the same operation-wide budget. A ready predicate wins on the deciding
     /// locked check even when the deadline has already passed. The action runs
     /// without a time limit after that ready decision.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes true.
+    /// * `P` - Readiness predicate evaluated against the protected state.
+    /// * `F` - Action closure run with mutable protected-state access.
     ///
     /// # Parameters
     ///
@@ -210,6 +232,10 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// initial-lock, deadline-boundary, and Timer error semantics are identical
     /// to [`Self::wait_until_with_total_timeout`].
     ///
+    /// # Type Parameters
+    ///
+    /// * `P` - Readiness predicate evaluated against the protected state.
+    ///
     /// # Parameters
     ///
     /// * `timeout` - Relative budget fixed before initial lock acquisition.
@@ -252,6 +278,12 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// Reaching the deadline does not interrupt mutex acquisition or
     /// reacquisition, so this method may return after `timeout`.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes false.
+    /// * `P` - Waiting predicate evaluated against the protected state.
+    /// * `F` - Action closure run with mutable protected-state access.
+    ///
     /// # Parameters
     ///
     /// * `timeout` - Relative budget fixed before initial lock acquisition.
@@ -284,6 +316,12 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
         F: FnOnce(&mut Self::State) -> R;
 
     /// Blocks until the predicate becomes true or the timeout expires.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes true.
+    /// * `P` - Readiness predicate evaluated against the protected state.
+    /// * `F` - Action closure run with mutable protected-state access.
     ///
     /// # Parameters
     ///
@@ -327,6 +365,10 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// becomes true. Its timeout budget and deadline-boundary semantics are
     /// identical to [`Self::wait_until_for`].
     ///
+    /// # Type Parameters
+    ///
+    /// * `P` - Readiness predicate evaluated against the protected state.
+    ///
     /// # Parameters
     ///
     /// * `timeout` - Maximum relative duration to wait.
@@ -360,6 +402,12 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     }
 
     /// Blocks while the predicate remains true or until the timeout expires.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes false.
+    /// * `P` - Waiting predicate evaluated against the protected state.
+    /// * `F` - Action closure run with mutable protected-state access.
     ///
     /// # Parameters
     ///
@@ -403,6 +451,12 @@ where
     ///
     /// The deadline, result, errors, and panic behavior are forwarded
     /// unchanged to the wrapped monitor.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes false.
+    /// * `P` - Waiting predicate forwarded to the wrapped monitor.
+    /// * `F` - Action closure forwarded to the wrapped monitor.
     #[inline(always)]
     fn wait_while_with_deadline<R, P, F>(
         &self,
@@ -423,6 +477,12 @@ where
     }
 
     /// Delegates an operation-wide timed condition wait to the shared monitor.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes false.
+    /// * `P` - Waiting predicate forwarded to the wrapped monitor.
+    /// * `F` - Action closure forwarded to the wrapped monitor.
     ///
     /// # Parameters
     ///
@@ -462,6 +522,12 @@ where
     }
 
     /// Delegates a timed blocking condition wait to the shared monitor.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes false.
+    /// * `P` - Waiting predicate forwarded to the wrapped monitor.
+    /// * `F` - Action closure forwarded to the wrapped monitor.
     ///
     /// # Parameters
     ///

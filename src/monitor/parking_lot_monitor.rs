@@ -230,6 +230,11 @@ impl<T> ParkingLotMonitor<T> {
     /// The closure runs while the mutex is held. Keep the closure short and do
     /// not call code that may block for a long time.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `F` - Closure used to read the protected state.
+    ///
     /// # Parameters
     ///
     /// * `f` - Closure that receives an immutable reference to the state.
@@ -267,6 +272,11 @@ impl<T> ParkingLotMonitor<T> {
     /// [`Self::with_write_notify_all`] when the state change may let waiters
     /// proceed. Use this lower-level helper when no notification is needed or
     /// notification is controlled separately.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `F` - Closure used to mutate the protected state.
     ///
     /// # Parameters
     ///
@@ -309,6 +319,11 @@ impl<T> ParkingLotMonitor<T> {
     /// common "update state, then notify one waiter" pattern.
     ///
     /// If `f` panics, the panic is propagated and no notification is sent.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `F` - Closure used to mutate the protected state.
     ///
     /// # Parameters
     ///
@@ -355,6 +370,11 @@ impl<T> ParkingLotMonitor<T> {
     /// state changes that may allow multiple waiters to make progress.
     ///
     /// If `f` panics, the panic is propagated and no notification is sent.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `F` - Closure used to mutate the protected state.
     ///
     /// # Parameters
     ///
@@ -403,6 +423,12 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// This method may block indefinitely if no thread changes the state so
     /// that `waiting` becomes false and sends a notification.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `P` - Predicate deciding whether waiting must continue.
+    /// * `F` - Action run once waiting finishes.
     ///
     /// # Parameters
     ///
@@ -468,6 +494,12 @@ impl<T> ParkingLotMonitor<T> {
     /// This method may block indefinitely if no thread changes the state to
     /// satisfy the predicate and sends a notification.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `P` - Predicate deciding when the state is ready.
+    /// * `F` - Action run once the state is ready.
+    ///
     /// # Parameters
     ///
     /// * `ready` - Predicate that returns `true` when the state is ready.
@@ -523,6 +555,10 @@ impl<T> ParkingLotMonitor<T> {
     /// The predicate runs while the monitor lock is held. This convenience
     /// method is equivalent to [`Self::wait_until`] with a no-op action.
     ///
+    /// # Type Parameters
+    ///
+    /// * `P` - Predicate deciding when the state is ready.
+    ///
     /// # Parameters
     ///
     /// * `ready` - Predicate that returns `true` when the caller may continue.
@@ -537,27 +573,6 @@ impl<T> ParkingLotMonitor<T> {
         P: FnMut(&T) -> bool,
     {
         self.wait_until(ready, |_| ());
-    }
-
-    /// Continues a timed wait after its first locked predicate check.
-    fn wait_while_with_timer_locked<R, P, F>(
-        &self,
-        guard: ParkingLotMonitorGuard<'_, T>,
-        future: TimerFuture,
-        waiting: P,
-        f: F,
-    ) -> Result<WaitTimeoutResult<R>, TimeError>
-    where
-        P: FnMut(&T) -> bool,
-        F: FnOnce(&mut T) -> R,
-    {
-        wait_while_with_timer_locked(
-            guard,
-            future,
-            waiting,
-            f,
-            |guard, future| guard.wait_with_timer(future),
-        )
     }
 
     /// Waits while a predicate remains true with a relative condition-wait
@@ -583,6 +598,12 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// Timeout status alone is not used as proof that the predicate is still
     /// true; the predicate is always rechecked under the lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `P` - Predicate deciding whether waiting must continue.
+    /// * `F` - Action run once waiting finishes.
     ///
     /// # Parameters
     ///
@@ -660,6 +681,12 @@ impl<T> ParkingLotMonitor<T> {
     /// Reaching the deadline does not interrupt mutex acquisition or
     /// reacquisition, so this method may return after `timeout`.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `P` - Predicate deciding whether waiting must continue.
+    /// * `F` - Action run once waiting finishes.
+    ///
     /// # Parameters
     ///
     /// * `timeout` - Relative budget fixed before initial lock acquisition.
@@ -702,6 +729,24 @@ impl<T> ParkingLotMonitor<T> {
     /// The deadline includes initial lock contention and predicate evaluation.
     /// A ready predicate wins even when the deadline has passed.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `P` - Predicate deciding whether waiting must continue.
+    /// * `F` - Action run once waiting finishes.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Absolute deadline in the monitor Timer's clock domain.
+    /// * `waiting` - Predicate returning `true` while waiting must continue.
+    /// * `f` - Action receiving mutable state when waiting finishes.
+    ///
+    /// # Returns
+    ///
+    /// [`WaitTimeoutResult::Ready`] with the value returned by `f`, or
+    /// [`WaitTimeoutResult::TimedOut`] if the deadline is reached while
+    /// `waiting` remains true.
+    ///
     /// # Errors
     ///
     /// Returns Timer domain, registration, or completion errors when waiting
@@ -709,7 +754,8 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// # Panics
     ///
-    /// Propagates a panic from waiting or f.
+    /// Propagates a panic from `waiting` or `f`. Panics if the registry
+    /// exhausts registration identifiers.
     pub fn wait_while_with_deadline<R, P, F>(
         &self,
         deadline: MonotonicInstant,
@@ -756,6 +802,12 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// Timeout status alone is not used as proof that the predicate is still
     /// false; the predicate is always rechecked under the lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `P` - Predicate deciding when the state is ready.
+    /// * `F` - Action run once the state is ready.
     ///
     /// # Parameters
     ///
@@ -836,6 +888,12 @@ impl<T> ParkingLotMonitor<T> {
     /// already passed. The closure then runs without a time limit while the
     /// monitor lock remains held.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `P` - Predicate deciding when the state is ready.
+    /// * `F` - Action run once the state is ready.
+    ///
     /// # Parameters
     ///
     /// * `timeout` - Relative budget fixed before initial lock acquisition.
@@ -873,14 +931,32 @@ impl<T> ParkingLotMonitor<T> {
 
     /// Waits until a predicate becomes true or an absolute deadline passes.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `P` - Predicate deciding when the state is ready.
+    /// * `F` - Action run once the state is ready.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Absolute deadline in the monitor Timer's clock domain.
+    /// * `ready` - Predicate returning `true` when the caller may continue.
+    /// * `f` - Action receiving mutable state once `ready` succeeds.
+    ///
+    /// # Returns
+    ///
+    /// [`WaitTimeoutResult::Ready`] with the value returned by `f`, or
+    /// [`WaitTimeoutResult::TimedOut`] if the deadline is reached first.
+    ///
     /// # Errors
     ///
-    /// Returns Timer errors from wait_while_with_deadline when waiting is
-    /// required.
+    /// Returns Timer domain, registration, or completion errors from
+    /// [`Self::wait_while_with_deadline`] when waiting is required.
     ///
     /// # Panics
     ///
-    /// Propagates a panic from ready or f.
+    /// Propagates a panic from `ready` or `f`. Panics if the registry exhausts
+    /// registration identifiers.
     #[inline(always)]
     pub fn wait_until_with_deadline<R, P, F>(
         &self,
@@ -901,6 +977,10 @@ impl<T> ParkingLotMonitor<T> {
     /// This convenience method is equivalent to [`Self::wait_until_for`] with
     /// a no-op action. Its timeout budget and deadline-boundary semantics are
     /// unchanged.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `P` - Predicate deciding when the state is ready.
     ///
     /// # Parameters
     ///
@@ -941,6 +1021,10 @@ impl<T> ParkingLotMonitor<T> {
     /// succeeds. Its initial-lock, deadline-boundary, and Timer error semantics
     /// are identical to [`Self::wait_until_with_total_timeout`].
     ///
+    /// # Type Parameters
+    ///
+    /// * `P` - Predicate deciding when the state is ready.
+    ///
     /// # Parameters
     ///
     /// * `timeout` - Relative budget fixed before initial lock acquisition.
@@ -974,14 +1058,29 @@ impl<T> ParkingLotMonitor<T> {
 
     /// Waits until a predicate becomes true or an absolute deadline passes.
     ///
+    /// # Type Parameters
+    ///
+    /// * `P` - Predicate deciding when the state is ready.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Absolute deadline in the monitor Timer's clock domain.
+    /// * `ready` - Predicate returning `true` when the caller may continue.
+    ///
+    /// # Returns
+    ///
+    /// [`WaitTimeoutResult::Ready`] with `()` when `ready` succeeds, or
+    /// [`WaitTimeoutResult::TimedOut`] if the deadline is reached first.
+    ///
     /// # Errors
     ///
-    /// Returns Timer errors from wait_until_with_deadline when waiting is
-    /// required.
+    /// Returns Timer domain, registration, or completion errors from
+    /// [`Self::wait_until_with_deadline`] when waiting is required.
     ///
     /// # Panics
     ///
-    /// Propagates a panic from ready.
+    /// Propagates a panic from `ready`. Panics if the registry exhausts
+    /// registration identifiers.
     #[inline(always)]
     pub fn wait_until_ready_with_deadline<P>(
         &self,
@@ -1069,6 +1168,54 @@ impl<T> ParkingLotMonitor<T> {
     #[inline(always)]
     pub fn notify_all(&self) {
         self.waiters.notify_all();
+    }
+
+    /// Continues a timed wait after its first locked predicate check.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by the ready action.
+    /// * `P` - Predicate deciding whether waiting must continue.
+    /// * `F` - Action run once the predicate stops blocking.
+    ///
+    /// # Parameters
+    ///
+    /// * `guard` - Acquired monitor guard retained across predicate checks.
+    /// * `future` - Fixed Timer registration reused across wakeups.
+    /// * `waiting` - Predicate returning `true` while suspension must continue.
+    /// * `f` - Action receiving mutable state when waiting finishes.
+    ///
+    /// # Returns
+    ///
+    /// [`WaitTimeoutResult::Ready`] with the value returned by `f`, or
+    /// [`WaitTimeoutResult::TimedOut`] when the Timer completes first.
+    ///
+    /// # Errors
+    ///
+    /// Returns Timer completion errors reported while the guard is suspended.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `waiting` or `f`.
+    #[inline(always)]
+    fn wait_while_with_timer_locked<R, P, F>(
+        &self,
+        guard: ParkingLotMonitorGuard<'_, T>,
+        future: TimerFuture,
+        waiting: P,
+        f: F,
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
+    where
+        P: FnMut(&T) -> bool,
+        F: FnOnce(&mut T) -> R,
+    {
+        wait_while_with_timer_locked(
+            guard,
+            future,
+            waiting,
+            f,
+            |guard, future| guard.wait_with_timer(future),
+        )
     }
 }
 

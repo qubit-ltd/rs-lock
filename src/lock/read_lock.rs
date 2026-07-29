@@ -17,6 +17,10 @@ use crate::lock::{
 ///
 /// Multiple guards from this adapter may coexist. It must not be used where
 /// the consumer requires exclusive entry.
+///
+/// # Type Parameters
+///
+/// * `L` - The underlying read-write lock type.
 #[must_use = "use the adapter to acquire a read guard"]
 pub struct ReadLock<'a, L: ?Sized> {
     /// Underlying read-write lock.

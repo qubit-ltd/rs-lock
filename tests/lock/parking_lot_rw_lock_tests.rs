@@ -5,7 +5,6 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-// qubit-style: allow explicit-imports
 //! # Parking Lot RwLock Tests
 //!
 //! Tests for the parking_lot::RwLock implementation of the DataLock trait.
@@ -25,10 +24,17 @@ use qubit_lock::{
     TryLockError,
 };
 
-#[cfg(test)]
 #[allow(clippy::module_inception)]
 mod parking_lot_rw_lock_tests {
-    use super::*;
+    use super::{
+        Arc,
+        DataLock,
+        Duration,
+        ParkingLotRwLock,
+        TryLockError,
+        mpsc,
+        thread,
+    };
 
     fn read_i32(value: &i32) -> i32 {
         *value

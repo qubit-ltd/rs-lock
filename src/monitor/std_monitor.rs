@@ -291,6 +291,11 @@ impl<T> StdMonitor<T> {
     /// If the mutex is poisoned, this method recovers the inner state and still
     /// executes the closure.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `F` - Closure used to read the protected state.
+    ///
     /// # Parameters
     ///
     /// * `f` - Closure that receives an immutable reference to the state.
@@ -331,6 +336,11 @@ impl<T> StdMonitor<T> {
     ///
     /// If the mutex is poisoned, this method recovers the inner state and still
     /// executes the closure.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `F` - Closure used to mutate the protected state.
     ///
     /// # Parameters
     ///
@@ -375,6 +385,11 @@ impl<T> StdMonitor<T> {
     /// If the mutex is poisoned, this method recovers the inner state before
     /// running the closure. If `f` panics, the panic is propagated and no
     /// notification is sent.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `F` - Closure used to mutate the protected state.
     ///
     /// # Parameters
     ///
@@ -423,6 +438,11 @@ impl<T> StdMonitor<T> {
     /// If the mutex is poisoned, this method recovers the inner state before
     /// running the closure. If `f` panics, the panic is propagated and no
     /// notification is sent.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `F` - Closure used to mutate the protected state.
     ///
     /// # Parameters
     ///
@@ -475,6 +495,12 @@ impl<T> StdMonitor<T> {
     ///
     /// If the mutex is poisoned before or during the wait, this method recovers
     /// the inner state and continues waiting or executes the closure.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `P` - Predicate deciding whether waiting must continue.
+    /// * `F` - Action run once waiting finishes.
     ///
     /// # Parameters
     ///
@@ -543,6 +569,12 @@ impl<T> StdMonitor<T> {
     /// If the mutex is poisoned before or during the wait, this method recovers
     /// the inner state and continues waiting or executes the closure.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `P` - Predicate deciding when the state is ready.
+    /// * `F` - Action run once the state is ready.
+    ///
     /// # Parameters
     ///
     /// * `ready` - Predicate that returns `true` when the state is ready.
@@ -598,6 +630,10 @@ impl<T> StdMonitor<T> {
     /// The predicate runs while the monitor lock is held. This convenience
     /// method is equivalent to [`Self::wait_until`] with a no-op action.
     ///
+    /// # Type Parameters
+    ///
+    /// * `P` - Predicate deciding when the state is ready.
+    ///
     /// # Parameters
     ///
     /// * `ready` - Predicate that returns `true` when the caller may continue.
@@ -612,27 +648,6 @@ impl<T> StdMonitor<T> {
         P: FnMut(&T) -> bool,
     {
         self.wait_until(ready, |_| ());
-    }
-
-    /// Continues a timed wait after its first locked predicate check.
-    fn wait_while_with_timer_locked<R, P, F>(
-        &self,
-        guard: StdMonitorGuard<'_, T>,
-        future: TimerFuture,
-        waiting: P,
-        f: F,
-    ) -> Result<WaitTimeoutResult<R>, TimeError>
-    where
-        P: FnMut(&T) -> bool,
-        F: FnOnce(&mut T) -> R,
-    {
-        wait_while_with_timer_locked(
-            guard,
-            future,
-            waiting,
-            f,
-            |guard, future| guard.wait_with_timer(future),
-        )
     }
 
     /// Waits while a predicate remains true with a relative condition-wait
@@ -662,6 +677,12 @@ impl<T> StdMonitor<T> {
     ///
     /// If the mutex is poisoned before or during the wait, this method recovers
     /// the inner state and continues waiting or executes the closure.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `P` - Predicate deciding whether waiting must continue.
+    /// * `F` - Action run once waiting finishes.
     ///
     /// # Parameters
     ///
@@ -740,6 +761,12 @@ impl<T> StdMonitor<T> {
     /// reacquisition, so this method may return after `timeout`. If the mutex
     /// is poisoned, this method recovers its inner state and continues.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `P` - Predicate deciding whether waiting must continue.
+    /// * `F` - Action run once waiting finishes.
+    ///
     /// # Parameters
     ///
     /// * `timeout` - Relative budget fixed before initial lock acquisition.
@@ -783,6 +810,24 @@ impl<T> StdMonitor<T> {
     /// A ready predicate wins even when the deadline has passed. The action
     /// runs while the monitor lock is held and is not limited by the deadline.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `P` - Predicate deciding whether waiting must continue.
+    /// * `F` - Action run once waiting finishes.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Absolute deadline in the monitor Timer's clock domain.
+    /// * `waiting` - Predicate returning `true` while waiting must continue.
+    /// * `f` - Action receiving mutable state when waiting finishes.
+    ///
+    /// # Returns
+    ///
+    /// [`WaitTimeoutResult::Ready`] with the value returned by `f`, or
+    /// [`WaitTimeoutResult::TimedOut`] if the deadline is reached while
+    /// `waiting` remains true.
+    ///
     /// # Errors
     ///
     /// Returns Timer domain, registration, or completion errors when waiting
@@ -790,7 +835,8 @@ impl<T> StdMonitor<T> {
     ///
     /// # Panics
     ///
-    /// Propagates a panic from waiting or f.
+    /// Propagates a panic from `waiting` or `f`. Panics if the registry
+    /// exhausts registration identifiers.
     pub fn wait_while_with_deadline<R, P, F>(
         &self,
         deadline: MonotonicInstant,
@@ -841,6 +887,12 @@ impl<T> StdMonitor<T> {
     ///
     /// If the mutex is poisoned before or during the wait, this method recovers
     /// the inner state and continues waiting or executes the closure.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `P` - Predicate deciding when the state is ready.
+    /// * `F` - Action run once the state is ready.
     ///
     /// # Parameters
     ///
@@ -922,6 +974,12 @@ impl<T> StdMonitor<T> {
     /// monitor lock remains held. Poisoned state is recovered before predicate
     /// evaluation.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `P` - Predicate deciding when the state is ready.
+    /// * `F` - Action run once the state is ready.
+    ///
     /// # Parameters
     ///
     /// * `timeout` - Relative budget fixed before initial lock acquisition.
@@ -959,14 +1017,32 @@ impl<T> StdMonitor<T> {
 
     /// Waits until a predicate becomes true or an absolute deadline passes.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `P` - Predicate deciding when the state is ready.
+    /// * `F` - Action run once the state is ready.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Absolute deadline in the monitor Timer's clock domain.
+    /// * `ready` - Predicate returning `true` when the caller may continue.
+    /// * `f` - Action receiving mutable state once `ready` succeeds.
+    ///
+    /// # Returns
+    ///
+    /// [`WaitTimeoutResult::Ready`] with the value returned by `f`, or
+    /// [`WaitTimeoutResult::TimedOut`] if the deadline is reached first.
+    ///
     /// # Errors
     ///
-    /// Returns Timer errors from wait_while_with_deadline when waiting is
-    /// required.
+    /// Returns Timer domain, registration, or completion errors from
+    /// [`Self::wait_while_with_deadline`] when waiting is required.
     ///
     /// # Panics
     ///
-    /// Propagates a panic from ready or f.
+    /// Propagates a panic from `ready` or `f`. Panics if the registry exhausts
+    /// registration identifiers.
     #[inline(always)]
     pub fn wait_until_with_deadline<R, P, F>(
         &self,
@@ -987,6 +1063,10 @@ impl<T> StdMonitor<T> {
     /// This convenience method is equivalent to [`Self::wait_until_for`] with
     /// a no-op action. Its timeout budget and deadline-boundary semantics are
     /// unchanged.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `P` - Predicate deciding when the state is ready.
     ///
     /// # Parameters
     ///
@@ -1028,6 +1108,10 @@ impl<T> StdMonitor<T> {
     /// recovery semantics are identical to
     /// [`Self::wait_until_with_total_timeout`].
     ///
+    /// # Type Parameters
+    ///
+    /// * `P` - Predicate deciding when the state is ready.
+    ///
     /// # Parameters
     ///
     /// * `timeout` - Relative budget fixed before initial lock acquisition.
@@ -1061,14 +1145,29 @@ impl<T> StdMonitor<T> {
 
     /// Waits until a predicate becomes true or an absolute deadline passes.
     ///
+    /// # Type Parameters
+    ///
+    /// * `P` - Predicate deciding when the state is ready.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Absolute deadline in the monitor Timer's clock domain.
+    /// * `ready` - Predicate returning `true` when the caller may continue.
+    ///
+    /// # Returns
+    ///
+    /// [`WaitTimeoutResult::Ready`] with `()` when `ready` succeeds, or
+    /// [`WaitTimeoutResult::TimedOut`] if the deadline is reached first.
+    ///
     /// # Errors
     ///
-    /// Returns Timer errors from wait_until_with_deadline when waiting is
-    /// required.
+    /// Returns Timer domain, registration, or completion errors from
+    /// [`Self::wait_until_with_deadline`] when waiting is required.
     ///
     /// # Panics
     ///
-    /// Propagates a panic from ready.
+    /// Propagates a panic from `ready`. Panics if the registry exhausts
+    /// registration identifiers.
     #[inline(always)]
     pub fn wait_until_ready_with_deadline<P>(
         &self,
@@ -1156,6 +1255,54 @@ impl<T> StdMonitor<T> {
     #[inline(always)]
     pub fn notify_all(&self) {
         self.waiters.notify_all();
+    }
+
+    /// Continues a timed wait after its first locked predicate check.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by the ready action.
+    /// * `P` - Predicate deciding whether waiting must continue.
+    /// * `F` - Action run once the predicate stops blocking.
+    ///
+    /// # Parameters
+    ///
+    /// * `guard` - Acquired monitor guard retained across predicate checks.
+    /// * `future` - Fixed Timer registration reused across wakeups.
+    /// * `waiting` - Predicate returning `true` while suspension must continue.
+    /// * `f` - Action receiving mutable state when waiting finishes.
+    ///
+    /// # Returns
+    ///
+    /// [`WaitTimeoutResult::Ready`] with the value returned by `f`, or
+    /// [`WaitTimeoutResult::TimedOut`] when the Timer completes first.
+    ///
+    /// # Errors
+    ///
+    /// Returns Timer completion errors reported while the guard is suspended.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `waiting` or `f`.
+    #[inline(always)]
+    fn wait_while_with_timer_locked<R, P, F>(
+        &self,
+        guard: StdMonitorGuard<'_, T>,
+        future: TimerFuture,
+        waiting: P,
+        f: F,
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
+    where
+        P: FnMut(&T) -> bool,
+        F: FnOnce(&mut T) -> R,
+    {
+        wait_while_with_timer_locked(
+            guard,
+            future,
+            waiting,
+            f,
+            |guard, future| guard.wait_with_timer(future),
+        )
     }
 }
 

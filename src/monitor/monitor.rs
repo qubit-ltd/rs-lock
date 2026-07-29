@@ -28,6 +28,11 @@ use crate::monitor::{
 pub trait Monitor: Notifier + ConditionWaiter {
     /// Reads protected monitor state while holding its lock.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `F` - Read closure executed with immutable protected-state access.
+    ///
     /// # Parameters
     ///
     /// * `f` - Closure receiving immutable access to the protected state.
@@ -46,6 +51,11 @@ pub trait Monitor: Notifier + ConditionWaiter {
     /// Mutates protected monitor state while holding its lock.
     ///
     /// This method does not notify waiters automatically.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `F` - Write closure executed with mutable protected-state access.
     ///
     /// # Parameters
     ///
@@ -66,6 +76,11 @@ pub trait Monitor: Notifier + ConditionWaiter {
     ///
     /// The monitor lock is released before notification. If `f` panics, the
     /// panic propagates and no notification is sent.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `F` - Write closure executed before notification.
     ///
     /// # Parameters
     ///
@@ -92,6 +107,11 @@ pub trait Monitor: Notifier + ConditionWaiter {
     ///
     /// The monitor lock is released before notification. If `f` panics, the
     /// panic propagates and no notification is sent.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `F` - Write closure executed before notification.
     ///
     /// # Parameters
     ///
@@ -120,6 +140,11 @@ where
     M: Monitor,
 {
     /// Delegates protected-state reading to the shared monitor.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by the forwarded read closure.
+    /// * `F` - Read closure forwarded to the wrapped monitor.
     #[inline(always)]
     fn with_read<R, F>(&self, f: F) -> R
     where
@@ -129,6 +154,11 @@ where
     }
 
     /// Delegates protected-state mutation to the shared monitor.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by the forwarded write closure.
+    /// * `F` - Write closure forwarded to the wrapped monitor.
     #[inline(always)]
     fn with_write<R, F>(&self, f: F) -> R
     where

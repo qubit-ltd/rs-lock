@@ -225,7 +225,10 @@ fn test_std_monitor_notify_one_wakes_exactly_one_waiter() {
         .recv_timeout(Duration::from_secs(1))
         .expect("one waiter should finish after notify_one");
     assert!(
-        done_rx.try_recv().is_err(),
+        matches!(
+            done_rx.try_recv(),
+            Err(std::sync::mpsc::TryRecvError::Empty),
+        ),
         "notify_one must not finish both registered waiters"
     );
 

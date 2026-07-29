@@ -40,6 +40,10 @@ impl LoomWaiterRegistry {
     /// # Returns
     ///
     /// The stable identifier required to cancel `waiter`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the underlying Loom mutex is poisoned.
     #[must_use]
     #[inline]
     pub fn register(&self, waiter: usize) -> u64 {
@@ -51,6 +55,10 @@ impl LoomWaiterRegistry {
     /// # Returns
     ///
     /// The selected waiter, or `None` when no waiter was active.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the underlying Loom mutex is poisoned.
     #[inline]
     pub fn take_one(&self) -> Option<usize> {
         self.inner.lock().unwrap().take_one()
@@ -61,6 +69,10 @@ impl LoomWaiterRegistry {
     /// # Returns
     ///
     /// All waiters active when selection began.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the underlying Loom mutex is poisoned.
     #[inline]
     pub fn take_all(&self) -> Vec<usize> {
         self.inner.lock().unwrap().take_all().collect()
@@ -75,6 +87,10 @@ impl LoomWaiterRegistry {
     /// # Returns
     ///
     /// The cancelled waiter, or `None` when selection already removed it.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the underlying Loom mutex is poisoned.
     #[inline]
     pub fn unregister(&self, waiter_id: u64) -> Option<usize> {
         self.inner.lock().unwrap().unregister(waiter_id)

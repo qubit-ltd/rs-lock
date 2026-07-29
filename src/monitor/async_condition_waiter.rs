@@ -87,6 +87,14 @@ pub trait AsyncConditionWaiter {
     /// trait-level laziness and cancellation contract applies to the returned
     /// future.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes true.
+    /// * `P` - Predicate closure evaluated against the protected state. It must
+    ///   be sendable and remain valid for `'a`.
+    /// * `F` - Action closure run with mutable protected-state access. It must
+    ///   be sendable and remain valid for `'a`.
+    ///
     /// # Parameters
     ///
     /// * `predicate` - Predicate that returns `true` when the state is ready.
@@ -121,6 +129,11 @@ pub trait AsyncConditionWaiter {
     /// trait-level laziness and cancellation contract applies to the returned
     /// future.
     ///
+    /// # Type Parameters
+    ///
+    /// * `P` - Predicate closure evaluated against the protected state. It must
+    ///   be sendable and remain valid for `'a`.
+    ///
     /// # Parameters
     ///
     /// * `predicate` - Predicate that returns `true` when the state is ready.
@@ -149,6 +162,14 @@ pub trait AsyncConditionWaiter {
     /// The predicate and action run while the monitor state is locked. The
     /// trait-level laziness and cancellation contract applies to the returned
     /// future.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes false.
+    /// * `P` - Predicate closure evaluated against the protected state. It must
+    ///   be sendable and remain valid for `'a`.
+    /// * `F` - Action closure run with mutable protected-state access. It must
+    ///   be sendable and remain valid for `'a`.
     ///
     /// # Parameters
     ///
@@ -182,6 +203,14 @@ where
     type State = M::State;
 
     /// Forwards the asynchronous wait to the wrapped monitor.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes false.
+    /// * `P` - Predicate closure forwarded to the wrapped monitor. It must be
+    ///   sendable and remain valid for `'a`.
+    /// * `F` - Action closure forwarded to the wrapped monitor. It must be
+    ///   sendable and remain valid for `'a`.
     ///
     /// # Parameters
     ///

@@ -103,6 +103,11 @@ pub trait DataLock<T: ?Sized>: Send + Sync {
     /// - **RwLock-based locks**: Allows concurrent readers, better for
     ///   read-heavy workloads
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to inspect the protected data.
+    ///
     /// # Parameters
     ///
     /// * `f` - Closure that receives an immutable reference (`&T`) to the
@@ -163,6 +168,11 @@ pub trait DataLock<T: ?Sized>: Send + Sync {
     /// - **All lock types**: Exclusive access, blocks all other operations
     /// - **RwLock advantage**: Only blocks during actual writes, not reads
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to mutate the protected data.
+    ///
     /// # Parameters
     ///
     /// * `f` - Closure that receives a mutable reference (`&mut T`) to the
@@ -205,6 +215,11 @@ pub trait DataLock<T: ?Sized>: Send + Sync {
     /// This method tries to acquire a read lock immediately. If the lock
     /// cannot be acquired, it returns a detailed error. Otherwise, it executes
     /// the closure and returns `Ok` containing the result.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to inspect the protected data.
     ///
     /// # Parameters
     ///
@@ -250,6 +265,11 @@ pub trait DataLock<T: ?Sized>: Send + Sync {
     /// This method tries to acquire a write lock immediately. If the lock
     /// cannot be acquired, it returns a detailed error. Otherwise, it executes
     /// the closure and returns `Ok` containing the result.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to mutate the protected data.
     ///
     /// # Parameters
     ///

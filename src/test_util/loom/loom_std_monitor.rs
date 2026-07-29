@@ -8,4 +8,8 @@
 //! Exposes the production synchronous monitor to Loom models.
 
 /// Production synchronous monitor configured with Loom synchronization.
+///
+/// # Type Parameters
+///
+/// * `T` - The state type protected by the monitor.
 pub type LoomStdMonitor<T> = crate::monitor::StdMonitor<T>;

@@ -55,6 +55,14 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     /// The future is lazy, but the supplied deadline is not reset when it is
     /// first polled. A ready predicate wins even when the deadline has passed.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes true.
+    /// * `P` - Readiness predicate. It must be sendable and remain valid for
+    ///   `'a`.
+    /// * `F` - Action closure run with mutable protected-state access. It must
+    ///   be sendable and remain valid for `'a`.
+    ///
     /// # Parameters
     ///
     /// * deadline - Absolute monotonic deadline for the condition wait.
@@ -94,6 +102,11 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     /// Returns a future that waits until the predicate becomes true or an
     /// absolute deadline passes without running an action.
     ///
+    /// # Type Parameters
+    ///
+    /// * `P` - Readiness predicate. It must be sendable and remain valid for
+    ///   `'a`.
+    ///
     /// # Parameters
     ///
     /// * deadline - Absolute monotonic deadline for the condition wait.
@@ -124,6 +137,14 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
 
     /// Returns a future that waits while the predicate remains true or until
     /// an absolute deadline passes.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes false.
+    /// * `P` - Waiting predicate. It must be sendable and remain valid for
+    ///   `'a`.
+    /// * `F` - Action closure run with mutable protected-state access. It must
+    ///   be sendable and remain valid for `'a`.
     ///
     /// # Parameters
     ///
@@ -158,6 +179,14 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     ///
     /// The trait-level timeout, laziness, and cancellation contract applies to
     /// the returned future.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes true.
+    /// * `P` - Readiness predicate. It must be sendable and remain valid for
+    ///   `'a`.
+    /// * `F` - Action closure run with mutable protected-state access. It must
+    ///   be sendable and remain valid for `'a`.
     ///
     /// # Parameters
     ///
@@ -209,6 +238,11 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     /// deadline-boundary semantics are identical to
     /// [`Self::wait_until_for_async`].
     ///
+    /// # Type Parameters
+    ///
+    /// * `P` - Readiness predicate. It must be sendable and remain valid for
+    ///   `'a`.
+    ///
     /// # Parameters
     ///
     /// * `timeout` - Relative condition-wait budget.
@@ -247,6 +281,14 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     ///
     /// The trait-level timeout, laziness, and cancellation contract applies to
     /// the returned future.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes false.
+    /// * `P` - Waiting predicate. It must be sendable and remain valid for
+    ///   `'a`.
+    /// * `F` - Action closure run with mutable protected-state access. It must
+    ///   be sendable and remain valid for `'a`.
     ///
     /// # Parameters
     ///
@@ -290,6 +332,14 @@ where
 {
     /// Forwards an absolute-deadline async condition wait to the wrapped
     /// monitor.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes false.
+    /// * `P` - Waiting predicate forwarded to the wrapped monitor. It must be
+    ///   sendable and remain valid for `'a`.
+    /// * `F` - Action closure forwarded to the wrapped monitor. It must be
+    ///   sendable and remain valid for `'a`.
     #[inline(always)]
     fn wait_while_with_deadline_async<'a, R, P, F>(
         &'a self,
@@ -307,6 +357,14 @@ where
     }
 
     /// Forwards the timed asynchronous wait to the wrapped monitor.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes false.
+    /// * `P` - Waiting predicate forwarded to the wrapped monitor. It must be
+    ///   sendable and remain valid for `'a`.
+    /// * `F` - Action closure forwarded to the wrapped monitor. It must be
+    ///   sendable and remain valid for `'a`.
     ///
     /// # Parameters
     ///
