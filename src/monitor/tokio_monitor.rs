@@ -567,8 +567,8 @@ impl<T: Send> TokioMonitor<T> {
     /// # Returns
     ///
     /// A future resolving to [`WaitTimeoutResult::Ready`] with the value
-    /// returned by `f`, or [`WaitTimeoutResult::TimedOut`] if the deadline is
-    /// reached first.
+    /// returned by `f`, or [`WaitTimeoutResult::TimedOut`] when the Timer
+    /// completes and `ready` remains false on the deciding locked check.
     ///
     /// # Errors
     ///
@@ -612,7 +612,8 @@ impl<T: Send> TokioMonitor<T> {
     /// # Returns
     ///
     /// A future resolving to [`WaitTimeoutResult::Ready`] with `()`, or
-    /// [`WaitTimeoutResult::TimedOut`] if the deadline is reached first.
+    /// [`WaitTimeoutResult::TimedOut`] when the Timer completes and `ready`
+    /// remains false on the deciding locked check.
     ///
     /// # Errors
     ///
@@ -816,8 +817,9 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// # Returns
     ///
     /// A future resolving to [`WaitTimeoutResult::Ready`] with the value
-    /// returned by `action`, or [`WaitTimeoutResult::TimedOut`] if the fixed
-    /// condition-wait budget expires first.
+    /// returned by `action`, or [`WaitTimeoutResult::TimedOut`] when the fixed
+    /// condition-wait budget expires and `predicate` remains false on the
+    /// deciding locked check.
     ///
     /// # Errors
     ///
@@ -890,8 +892,9 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// # Returns
     ///
     /// A future resolving to [`WaitTimeoutResult::Ready`] with the value
-    /// returned by `action`, or [`WaitTimeoutResult::TimedOut`] if the fixed
-    /// condition-wait budget expires while `predicate` remains true.
+    /// returned by `action`, or [`WaitTimeoutResult::TimedOut`] when the fixed
+    /// condition-wait budget expires and `predicate` remains true on the
+    /// deciding locked check.
     ///
     /// # Errors
     ///
