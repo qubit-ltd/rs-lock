@@ -626,6 +626,37 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     /// The deadline includes time before the first poll, async mutex
     /// contention, predicate evaluation, and all subsequent waits. A ready
     /// predicate wins even when the deadline has passed.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `'a` - Lifetime shared by the monitor, closures, and returned future.
+    /// * `R` - Value returned by `action`.
+    /// * `P` - Predicate deciding whether waiting must continue.
+    /// * `F` - Action run once waiting finishes.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline_at` - Absolute deadline in the injected Timer's clock
+    ///   domain.
+    /// * `predicate` - Predicate returning `true` while waiting must continue.
+    /// * `action` - Action receiving mutable state when waiting finishes.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to [`WaitTimeoutResult::Ready`] with the value
+    /// returned by `action`, or [`WaitTimeoutResult::TimedOut`] if the deadline
+    /// is reached while `predicate` remains true.
+    ///
+    /// # Errors
+    ///
+    /// The returned future reports Timer domain, registration, or completion
+    /// errors when waiting is required.
+    ///
+    /// # Panics
+    ///
+    /// The returned future propagates a panic from `predicate` or `action` when
+    /// polled. It also panics if the waiter registry exhausts registration
+    /// identifiers.
     #[allow(
         clippy::manual_async_fn,
         reason = "the explicit Send bound is part of the trait contract"
