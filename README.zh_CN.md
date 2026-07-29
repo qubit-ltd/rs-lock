@@ -117,6 +117,9 @@ fn main() {
 有界任务队列：同一份领域逻辑可运行在 `StdMonitor` 与 `ParkingLotMonitor` 上，并用手动时钟
 测试真实的超时路径。
 
+[完整可运行的有界队列示例](examples/bounded_queue.rs)使用 `ParkingLotMonitor`
+演示相同的阻塞式队列行为。
+
 ## 选择能力
 
 | 需求 | 首选组件 |

@@ -116,7 +116,8 @@ fn test_readme_documents_native_lock_support() {
 #[test]
 /// Ensures the introductions state the crate's boundary and testing value in
 /// direct reader-facing language.
-fn test_documentation_introductions_explain_the_abstraction_in_plain_language() {
+fn test_documentation_introductions_explain_the_abstraction_in_plain_language()
+{
     let readme_en = normalize_readme_text(README_EN);
     let readme_zh = normalize_readme_text(README_ZH);
     let guide_en = normalize_readme_text(USER_GUIDE_EN);
@@ -593,6 +594,24 @@ fn test_readme_qubit_clock_dependency_version_matches_cargo_toml() {
             readme_requirement, cargo_requirement,
             "{filename} qubit-clock version differs from Cargo.toml",
         );
+    }
+}
+
+#[test]
+/// Ensures the public documents provide navigation, deadline selection, and a
+/// runnable version of the bounded-queue case study.
+fn test_documentation_provides_navigation_deadline_and_runnable_example() {
+    assert!(USER_GUIDE_EN.contains("## Reading paths"));
+    assert!(USER_GUIDE_ZH.contains("## 阅读路径"));
+
+    for guide in [USER_GUIDE_EN, USER_GUIDE_ZH] {
+        assert!(guide.contains("`wait_until_with_deadline_async`"));
+        assert!(guide.contains("`loom-model`"));
+        assert!(guide.contains("../examples/bounded_queue.rs"));
+    }
+
+    for readme in [README_EN, README_ZH] {
+        assert!(readme.contains("examples/bounded_queue.rs"));
     }
 }
 

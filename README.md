@@ -133,6 +133,9 @@ state-based waiting. `TokioMonitor` is the asynchronous counterpart. The
 whose domain logic runs unchanged on `StdMonitor` and `ParkingLotMonitor`,
 then tests the real timeout path with a manual clock.
 
+The [complete runnable bounded-queue example](examples/bounded_queue.rs)
+exercises the same blocking queue behavior with `ParkingLotMonitor`.
+
 ## Choose a capability
 
 | Need | Start with |

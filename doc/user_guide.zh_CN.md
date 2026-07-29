@@ -6,6 +6,27 @@
 受保护数据的访问；monitor 封装了锁与条件等待的配合方式，并可注入时钟来测试超时行为。
 本手册先说明如何做边界设计，再介绍各个公开组件的选择与用法。
 
+## 阅读路径
+
+- **初次使用：** 阅读第 1、2、4 和 12 节，完成边界、Feature 与组件选择。
+- **查找组件：** 从第 5 至第 8 节开始；精确签名请继续查阅 API 文档。
+- **正确等待与测试：** 编写条件等待、deadline 或确定性超时测试前，阅读第 9 至第 11 节。
+
+## 目录
+
+1. [先决定组件边界](#1-先决定组件边界)
+2. [案例：可关闭的有界任务队列](#2-案例可关闭的有界任务队列)
+3. [为什么需要这些抽象](#3-为什么需要这些抽象)
+4. [安装与 Feature 选择](#4-安装与-feature-选择)
+5. [同步锁组件](#5-同步锁组件)
+6. [异步锁组件](#6-异步锁组件)
+7. [Monitor 能力组件](#7-monitor-能力组件)
+8. [具体 Monitor 组件](#8-具体-monitor-组件)
+9. [等待、通知与超时语义](#9-等待通知与超时语义)
+10. [等待结果与错误](#10-等待结果与错误)
+11. [测试中的确定性时间](#11-测试中的确定性时间)
+12. [组件选择与常见错误](#12-组件选择与常见错误)
+
 ## 1. 先决定组件边界
 
 如果锁只是一个实现内部的细节，直接使用原生锁即可。组件需要支持多个后端、等待某个条件，
@@ -20,12 +41,15 @@
 | 状态、条件等待与通知 | 具体 monitor 或最小 monitor 能力 trait |
 | 不使用 sleep 的 timeout 测试 | 由 `with_timer` 构造的 monitor |
 
-下面的案例会先说明这些边界的价值，之后再提供完整 API 参考。
+下面的案例会先说明这些边界的价值，之后再提供组件说明与使用指南。
 
 ## 2. 案例：可关闭的有界任务队列
 
 任务队列中有两类等待者：worker 等待队列非空或关闭；producer 等待队列未满或关闭。
 这两个条件都由同一份受保护状态决定。
+
+> **Feature 前提：** 阻塞式案例使用 `StdMonitor` 和 `ParkingLotMonitor`。前者需要
+> `monitor`，后者同时需要 `monitor` 与 `parking-lot`；依赖声明见第 4 节。
 
 ```rust
 use std::{
@@ -144,6 +168,9 @@ fn main() {
 在组装队列时选择具体 monitor。`exercise`、`push`、`pop` 和 `close` 都无需修改。若直接
 使用 `Mutex`/`Condvar`，队列代码就得让后端专用 guard 穿过每次等待，手动编写条件循环，
 选择 poisoning 策略，并自行保证状态更新与等待者注册的顺序正确。
+
+[完整可运行示例](../examples/bounded_queue.rs)使用相同的队列操作和
+`ParkingLotMonitor`，并检查零时长 timeout 路径。
 
 ### 计时接收与确定性时间
 
@@ -305,6 +332,7 @@ qubit-lock = { version = "0.12", default-features = false, features = ["monitor"
 | `monitor` | monitor trait、标准库 monitor、计时等待和 Timer 注入 |
 | `async-lock` | Tokio 锁 trait 和适配器 |
 | `async-monitor` | `async-lock`、monitor 支持和 Tokio monitor |
+| `loom-model` | 内部 Loom 模型验证；普通应用无需启用 |
 | 默认配置 | 不启用可选 Feature |
 
 只使用锁的用户可以避免所有可选依赖：
@@ -330,6 +358,10 @@ qubit-lock = { version = "0.12", default-features = false, features = ["async-mo
 
 如果应用创建 Tokio runtime，应在应用自己的 `Cargo.toml` 中启用所需的 runtime
 Feature，例如 `rt` 或 `rt-multi-thread`。
+
+使用相对 timeout 方法时，无需在应用代码中命名时钟类型。只有在命名 `TimeError` 或
+`MonotonicInstant`、提供绝对 deadline，或注入 Timer 时，才需要直接声明
+`qubit-clock` 依赖。
 
 所有 `qubit-lock` 公开类型都从 crate root 导入。
 
@@ -513,7 +545,7 @@ monitor 持有受保护状态，并使用 notification 协调 predicate wait。�
 | `TimedMonitor` | `Monitor` 加同步计时等待 |
 | `SharedMonitor` | 可克隆的同步共享 monitor 句柄 |
 | `AsyncConditionWaiter` | 异步 `wait_until_async`、无 action 的 `wait_until_ready_async` 和 `wait_while_async` |
-| `AsyncTimeoutConditionWaiter` | 异步 `wait_until_for_async`、无 action 的 `wait_until_ready_for_async` 和 `wait_while_for_async` |
+| `AsyncTimeoutConditionWaiter` | 异步相对时间 `*_for_async` 与绝对 deadline `*_with_deadline_async` predicate wait |
 | `AsyncMonitor` | 异步状态访问、notification 和无时限等待 |
 | `AsyncTimedMonitor` | `AsyncMonitor` 加计时等待 |
 | `SharedAsyncMonitor` | 可克隆的异步共享 monitor 句柄 |
@@ -654,6 +686,23 @@ async fn main() {
 runtime。
 
 ## 9. 等待、通知与超时语义
+
+### 选择 timeout 形式
+
+| 需求 | 使用方式 |
+| --- | --- |
+| 初始获取状态锁后的一份条件等待预算 | `*_for` 或 `*_for_async` |
+| 由调用方协调的一份绝对单调时钟 deadline | `*_with_deadline` 或 `*_with_deadline_async` |
+| 包含初始锁竞争的一份阻塞式整个操作预算 | `*_with_total_timeout` |
+| guard 等待到某个绝对 deadline | `guard.wait_until(deadline)` |
+
+`*_with_deadline` 接收调用方提供的 `MonotonicInstant`；多个操作需要共享同一个截止点时，
+应使用它。异步 deadline future 是惰性的，但首次 poll 不会重置已提供的 deadline。
+`*_with_total_timeout` 只适用于阻塞式 monitor。guard 的 `wait_until` 接收 deadline，
+而不是就绪 predicate；它返回后仍应检查受保护状态。
+
+异步 deadline 形式为 `wait_until_with_deadline_async`、
+`wait_until_ready_with_deadline_async` 和 `wait_while_with_deadline_async`。
 
 ### Notification 是无记忆的
 
