@@ -149,7 +149,7 @@ exercises the same blocking queue behavior with `ParkingLotMonitor`.
 | Express a reusable monitor dependency | The narrowest capability trait |
 | Test deadlines without sleeping | `with_timer` and `ManualMonotonicClock` |
 
-All public types are exported from the crate root. Import public types directly from the crate root.
+All public types are exported from and should be imported directly from the crate root.
 
 ## Installation and features
 
@@ -163,7 +163,6 @@ program:
 | `monitor` | Monitor traits, `StdMonitor`, timed waits, and timer injection |
 | `async-lock` | Tokio lock traits and adapters |
 | `async-monitor` | `async-lock`, monitor support, and `TokioMonitor` |
-| default | no optional features |
 
 Use only synchronous lock traits and standard-library implementations:
 

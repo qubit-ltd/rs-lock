@@ -170,7 +170,11 @@ fn main() {
 选择 poisoning 策略，并自行保证状态更新与等待者注册的顺序正确。
 
 [完整可运行示例](../examples/bounded_queue.rs)使用相同的队列操作和
-`ParkingLotMonitor`，并检查零时长 timeout 路径。
+`ParkingLotMonitor`，检查零时长 timeout 路径，并在消费者观察到空队列后将其唤醒。运行命令：
+
+```bash
+cargo run --example bounded_queue --features monitor,parking-lot
+```
 
 ### 计时接收与确定性时间
 

@@ -17,6 +17,8 @@ const README_EN: &str = include_str!("../../README.md");
 const README_ZH: &str = include_str!("../../README.zh_CN.md");
 const USER_GUIDE_EN: &str = include_str!("../../doc/user_guide.md");
 const USER_GUIDE_ZH: &str = include_str!("../../doc/user_guide.zh_CN.md");
+const BOUNDED_QUEUE_EXAMPLE: &str =
+    include_str!("../../examples/bounded_queue.rs");
 const LIB_RS: &str = include_str!("../../src/lib.rs");
 const LOCK_SRC: &str = include_str!("../../src/lock/lock.rs");
 const READ_WRITE_LOCK_SRC: &str =
@@ -450,7 +452,7 @@ fn test_monitor_docs_cover_async_ready_wait_helpers() {
 /// template.
 fn test_readme_zh_uses_contribution_template() {
     assert!(README_ZH.contains(
-        "欢迎贡献。请遵循 Rust API 指南，及时更新公共 API 文档与测试，并在提交\nPull Request 前运行 `./align-ci.sh`格式化代码，运行`./ci-check.sh`对齐CI要求。"
+        "欢迎贡献。请遵循 Rust API 指南，及时更新公共 API 文档与测试，并在提交\nPull Request 前运行 `./align-ci.sh` 格式化代码，运行 `./ci-check.sh` 对齐 CI 要求。"
     ));
 }
 
@@ -460,9 +462,9 @@ fn test_readme_documents_root_only_public_api() {
     assert!(!README_EN.contains("from `qubit_lock::monitor`"));
     assert!(!README_ZH.contains("\u{6216} crate root"));
     assert!(
-        README_EN.contains("Import public types directly from the crate root.")
+        README_EN.contains("exported from and should be imported directly")
     );
-    assert!(README_ZH.contains("crate root"));
+    assert!(README_ZH.contains("直接从 crate root 导入"));
     assert!(LIB_RS.contains("mod lock;"));
     assert!(LIB_RS.contains("mod monitor;"));
     assert!(!LIB_RS.contains("pub mod lock;"));
@@ -608,11 +610,17 @@ fn test_documentation_provides_navigation_deadline_and_runnable_example() {
         assert!(guide.contains("`wait_until_with_deadline_async`"));
         assert!(guide.contains("`loom-model`"));
         assert!(guide.contains("../examples/bounded_queue.rs"));
+        assert!(guide.contains(
+            "cargo run --example bounded_queue --features monitor,parking-lot"
+        ));
     }
 
     for readme in [README_EN, README_ZH] {
         assert!(readme.contains("examples/bounded_queue.rs"));
     }
+
+    assert!(BOUNDED_QUEUE_EXAMPLE.contains("thread::spawn"));
+    assert!(BOUNDED_QUEUE_EXAMPLE.contains("Arc::new"));
 }
 
 /// Extracts the first package version entry from Cargo.toml content.
