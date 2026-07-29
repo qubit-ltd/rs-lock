@@ -163,6 +163,7 @@ program:
 | `monitor` | Monitor traits, `StdMonitor`, timed waits, and timer injection |
 | `async-lock` | Tokio lock traits and adapters |
 | `async-monitor` | `async-lock`, monitor support, and `TokioMonitor` |
+| default | no optional features |
 
 Use only synchronous lock traits and standard-library implementations:
 

@@ -146,6 +146,7 @@ fn main() {
 | `monitor` | Monitor trait、`StdMonitor`、计时等待和 Timer 注入 |
 | `async-lock` | Tokio 锁 trait 和 adapter |
 | `async-monitor` | `async-lock`、monitor 支持和 `TokioMonitor` |
+| 默认配置 | 不启用可选 Feature |
 
 只使用同步锁 trait 和标准库实现：
 
@@ -240,7 +241,7 @@ Copyright (c) 2025 - 2026. Haixing Hu. All rights reserved.
 ## 贡献
 
 欢迎贡献。请遵循 Rust API 指南，及时更新公共 API 文档与测试，并在提交
-Pull Request 前运行 `./align-ci.sh` 格式化代码，运行 `./ci-check.sh` 对齐 CI 要求。
+Pull Request 前运行 `./align-ci.sh`格式化代码，运行`./ci-check.sh`对齐CI要求。
 
 ## 作者
 
