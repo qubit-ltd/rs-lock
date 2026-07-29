@@ -51,7 +51,7 @@ qubit-clock = { version = "0.11", optional = true }
 [dev-dependencies]
 criterion = { version = "0.8.2", default-features = false }
 qubit-clock = { version = "0.11", features = ["test-util"] }
-qubit-collections = { version = "0.1" }
+qubit-collections = { version = "0.2" }
 semver = { version = "1.0", default-features = false }
 tokio = { version = "1.52", default-features = false, features = ["macros", "rt-multi-thread", "test-util", "time"] }
 
