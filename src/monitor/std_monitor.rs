@@ -825,8 +825,8 @@ impl<T> StdMonitor<T> {
     /// # Returns
     ///
     /// [`WaitTimeoutResult::Ready`] with the value returned by `f`, or
-    /// [`WaitTimeoutResult::TimedOut`] if the deadline is reached while
-    /// `waiting` remains true.
+    /// [`WaitTimeoutResult::TimedOut`] when the Timer completes and `waiting`
+    /// remains true on the deciding locked check.
     ///
     /// # Errors
     ///
@@ -989,8 +989,8 @@ impl<T> StdMonitor<T> {
     /// # Returns
     ///
     /// [`WaitTimeoutResult::Ready`] with the value returned by `f`, or
-    /// [`WaitTimeoutResult::TimedOut`] when the total budget expires while the
-    /// predicate remains false.
+    /// [`WaitTimeoutResult::TimedOut`] when the total budget expires and the
+    /// predicate remains false on the deciding locked check.
     ///
     /// # Errors
     ///
@@ -1032,7 +1032,8 @@ impl<T> StdMonitor<T> {
     /// # Returns
     ///
     /// [`WaitTimeoutResult::Ready`] with the value returned by `f`, or
-    /// [`WaitTimeoutResult::TimedOut`] if the deadline is reached first.
+    /// [`WaitTimeoutResult::TimedOut`] when the Timer completes and `ready`
+    /// remains false on the deciding locked check.
     ///
     /// # Errors
     ///
@@ -1120,7 +1121,8 @@ impl<T> StdMonitor<T> {
     /// # Returns
     ///
     /// [`WaitTimeoutResult::Ready`] with `()` when `ready` becomes true, or
-    /// [`WaitTimeoutResult::TimedOut`] when the total budget expires.
+    /// [`WaitTimeoutResult::TimedOut`] when the total budget expires and
+    /// `ready` remains false on the deciding locked check.
     ///
     /// # Errors
     ///
@@ -1157,7 +1159,8 @@ impl<T> StdMonitor<T> {
     /// # Returns
     ///
     /// [`WaitTimeoutResult::Ready`] with `()` when `ready` succeeds, or
-    /// [`WaitTimeoutResult::TimedOut`] if the deadline is reached first.
+    /// [`WaitTimeoutResult::TimedOut`] when the Timer completes and `ready`
+    /// remains false on the deciding locked check.
     ///
     /// # Errors
     ///
@@ -1275,7 +1278,8 @@ impl<T> StdMonitor<T> {
     /// # Returns
     ///
     /// [`WaitTimeoutResult::Ready`] with the value returned by `f`, or
-    /// [`WaitTimeoutResult::TimedOut`] when the Timer completes first.
+    /// [`WaitTimeoutResult::TimedOut`] when the Timer completes and `waiting`
+    /// remains true on the deciding locked check.
     ///
     /// # Errors
     ///
