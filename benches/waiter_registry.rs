@@ -72,10 +72,7 @@ impl BTreeWaiters {
         self.next_waiter_id = waiter_id
             .checked_add(1)
             .expect("benchmark waiter identifiers should not exhaust");
-        assert!(
-            self.waiters.insert(waiter_id, waiter).is_none(),
-            "benchmark waiter identifier should be unique",
-        );
+        let _ = self.waiters.insert(waiter_id, waiter);
         waiter_id
     }
 
@@ -149,10 +146,7 @@ impl OrderedIndexWaiters {
         self.next_waiter_id = waiter_id
             .checked_add(1)
             .expect("benchmark waiter identifiers should not exhaust");
-        let _ = self
-            .waiters
-            .try_insert(waiter_id, (), waiter)
-            .expect("benchmark waiter identifier should be unique");
+        let _ = self.waiters.try_insert(waiter_id, (), waiter);
         waiter_id
     }
 
@@ -232,14 +226,8 @@ impl BTreeHashWaiters {
         self.next_waiter_id = waiter_id
             .checked_add(1)
             .expect("benchmark waiter identifiers should not exhaust");
-        assert!(
-            self.values.insert(waiter_id, waiter).is_none(),
-            "benchmark waiter identifier should be unique",
-        );
-        assert!(
-            self.order.insert(waiter_id, ()).is_none(),
-            "benchmark waiter order should be unique",
-        );
+        let _ = self.values.insert(waiter_id, waiter);
+        let _ = self.order.insert(waiter_id, ());
         waiter_id
     }
 
@@ -279,13 +267,33 @@ impl BTreeHashWaiters {
     fn unregister(&mut self, waiter_id: u64) -> Option<usize> {
         let waiter = self.values.remove(&waiter_id);
         if waiter.is_some() {
-            assert!(
-                self.order.remove(&waiter_id).is_some(),
-                "active benchmark waiter should remain in the FIFO index",
-            );
+            let _ = self.order.remove(&waiter_id);
         }
         waiter
     }
+}
+
+/// Validates each benchmark registry before Criterion starts timing it.
+fn validate_waiter_implementations() {
+    let mut ordered = OrderedIndexWaiters::new();
+    assert_eq!(ordered.register(10), 1);
+    assert_eq!(ordered.register(20), 2);
+    assert_eq!(ordered.take_one(), Some(10));
+    assert_eq!(ordered.unregister(2), Some(20));
+
+    let mut btree = BTreeWaiters::new();
+    assert_eq!(btree.register(10), 1);
+    assert_eq!(btree.register(20), 2);
+    assert_eq!(btree.take_one(), Some(10));
+    assert_eq!(btree.unregister(2), Some(20));
+
+    let mut btree_hash = BTreeHashWaiters::new();
+    assert_eq!(btree_hash.register(10), 1);
+    assert_eq!(btree_hash.register(20), 2);
+    assert_eq!(btree_hash.take_one(), Some(10));
+    assert_eq!(btree_hash.unregister(2), Some(20));
+    assert!(btree_hash.values.is_empty());
+    assert!(btree_hash.order.is_empty());
 }
 
 /// Builds an OrderedIndexMap fixture outside the measured operation.
@@ -345,6 +353,7 @@ fn prepare_btree_hash_waiters(waiter_count: usize) -> BTreeHashWaiters {
 ///
 /// * `criterion` - Criterion runner receiving each registry workload.
 fn benchmark_waiter_registry(criterion: &mut Criterion) {
+    validate_waiter_implementations();
     let mut group = criterion.benchmark_group("waiter_registry");
     for waiter_count in WAITER_COUNTS {
         group.bench_with_input(

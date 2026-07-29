@@ -72,6 +72,12 @@ pub trait ConditionWaiter {
     ///
     /// The predicate and action run while the monitor state is locked.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes true.
+    /// * `P` - Readiness predicate evaluated against the protected state.
+    /// * `F` - Action closure run with mutable protected-state access.
+    ///
     /// # Parameters
     ///
     /// * `predicate` - Predicate that returns `true` when the state is ready.
@@ -98,6 +104,10 @@ pub trait ConditionWaiter {
     /// The predicate runs while the monitor state is locked. This convenience
     /// method does not run an action after the predicate becomes true.
     ///
+    /// # Type Parameters
+    ///
+    /// * `P` - Readiness predicate evaluated against the protected state.
+    ///
     /// # Parameters
     ///
     /// * `predicate` - Predicate that returns `true` when the state is ready.
@@ -116,6 +126,12 @@ pub trait ConditionWaiter {
     /// Blocks while the predicate remains true, then runs an action.
     ///
     /// The predicate and action run while the monitor state is locked.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes false.
+    /// * `P` - Waiting predicate evaluated against the protected state.
+    /// * `F` - Action closure run with mutable protected-state access.
     ///
     /// # Parameters
     ///
@@ -143,6 +159,12 @@ where
     type State = M::State;
 
     /// Delegates a blocking condition wait to the shared monitor.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value produced by `action` when the predicate becomes false.
+    /// * `P` - Waiting predicate forwarded to the wrapped monitor.
+    /// * `F` - Action closure forwarded to the wrapped monitor.
     ///
     /// # Parameters
     ///

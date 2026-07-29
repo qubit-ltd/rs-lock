@@ -18,6 +18,10 @@ use std::collections::{
 /// smallest active key in the [`BTreeMap`] is the oldest active registration.
 /// This only determines notification selection; it does not guarantee
 /// scheduling or mutex reacquisition order.
+///
+/// # Type Parameters
+///
+/// * `W` - Waiter value retained until notification or cancellation.
 pub(crate) struct WaiterRegistry<W> {
     /// Next nonzero registration identifier.
     next_waiter_id: u64,

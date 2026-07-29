@@ -5,7 +5,6 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-// qubit-style: allow explicit-imports
 //! # Parking Lot Mutex Tests
 //!
 //! Tests for the parking_lot::Mutex implementation of the DataLock trait
@@ -25,10 +24,17 @@ use qubit_lock::{
     TryLockError,
 };
 
-#[cfg(test)]
 #[allow(clippy::module_inception)]
 mod parking_lot_mutex_tests {
-    use super::*;
+    use super::{
+        Arc,
+        DataLock,
+        Duration,
+        ParkingLotMutex,
+        TryLockError,
+        mpsc,
+        thread,
+    };
 
     fn read_i32(value: &i32) -> i32 {
         *value
@@ -134,7 +140,7 @@ mod parking_lot_mutex_tests {
             .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
-        handle.join().unwrap();
+        handle.join().expect("holder thread should not panic");
 
         // Now should be able to successfully acquire the lock
         let result = DataLock::try_with_read(&*mutex, |value| *value);
@@ -174,7 +180,7 @@ mod parking_lot_mutex_tests {
             .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
-        handle.join().unwrap();
+        handle.join().expect("holder thread should not panic");
 
         // Now should be able to successfully acquire the lock
         let result = DataLock::try_with_write(&*mutex, |value| {
@@ -218,7 +224,7 @@ mod parking_lot_mutex_tests {
         release_tx
             .send(())
             .expect("holder thread should still be waiting for release");
-        handle.join().unwrap();
+        handle.join().expect("holder thread should not panic");
     }
 
     #[test]
@@ -239,7 +245,7 @@ mod parking_lot_mutex_tests {
 
         // Wait for all threads to complete
         for handle in handles {
-            handle.join().unwrap();
+            handle.join().expect("writer thread should not panic");
         }
 
         // Verify final value
@@ -296,7 +302,7 @@ mod parking_lot_mutex_tests {
 
         // Wait for all threads
         for handle in handles {
-            handle.join().unwrap();
+            handle.join().expect("worker thread should not panic");
         }
 
         // Verify correct result

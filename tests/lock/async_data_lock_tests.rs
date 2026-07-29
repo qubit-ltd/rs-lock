@@ -5,7 +5,6 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-// qubit-style: allow explicit-imports
 //! # AsyncDataLock Trait Tests
 //!
 //! Tests for the AsyncDataLock trait and its Tokio implementations.
@@ -29,11 +28,30 @@ fn increment_i32(value: &mut i32) -> i32 {
     *value
 }
 
-#[cfg(test)]
 mod async_data_lock_trait_tests {
-    use std::sync::Arc;
+    use std::{
+        future::{
+            Future,
+            poll_fn,
+        },
+        sync::{
+            Arc,
+            atomic::{
+                AtomicBool,
+                Ordering,
+            },
+        },
+        task::Poll,
+    };
 
-    use super::*;
+    use super::{
+        AsyncDataLock,
+        AsyncMutex,
+        AsyncRwLock,
+        TryLockError,
+        increment_i32,
+        read_i32,
+    };
 
     #[tokio::test]
     async fn test_async_data_lock_accepts_borrowed_forwarding() {
@@ -60,6 +78,36 @@ mod async_data_lock_trait_tests {
         assert_eq!(AsyncDataLock::with_write(&mutex, increment_i32).await, 1,);
         assert_eq!(AsyncDataLock::try_with_read(&mutex, read_i32), Ok(1));
         assert_eq!(AsyncDataLock::try_with_write(&mutex, increment_i32), Ok(2),);
+    }
+
+    /// Verifies that cancelling a pending read neither runs its closure nor
+    /// retains the lock.
+    #[tokio::test]
+    async fn test_async_data_lock_cancelled_read_waiter_has_no_effect() {
+        let lock = AsyncRwLock::new(0);
+        let write_guard = lock.write().await;
+        let closure_called = AtomicBool::new(false);
+        let closure_called_by_waiter = &closure_called;
+        let mut waiter = Box::pin(AsyncDataLock::with_read(&lock, move |_| {
+            closure_called_by_waiter.store(true, Ordering::SeqCst);
+        }));
+
+        poll_fn(|context| {
+            assert!(
+                waiter.as_mut().poll(context).is_pending(),
+                "read waiter should remain pending while the write guard is held",
+            );
+            Poll::Ready(())
+        })
+        .await;
+        drop(waiter);
+        drop(write_guard);
+
+        assert!(
+            !closure_called.load(Ordering::SeqCst),
+            "a cancelled read waiter must not execute its closure",
+        );
+        assert_eq!(AsyncDataLock::try_with_write(&lock, increment_i32), Ok(1),);
     }
 
     #[tokio::test]
@@ -186,7 +234,9 @@ mod async_data_lock_trait_tests {
 
         // Wait for all tasks to complete
         for handle in handles {
-            handle.await.unwrap();
+            handle
+                .await
+                .expect("concurrent mutex task should complete successfully");
         }
 
         // Verify final value
@@ -251,7 +301,9 @@ mod async_data_lock_trait_tests {
 
         // Wait for all tasks
         for handle in handles {
-            handle.await.unwrap();
+            handle
+                .await
+                .expect("concurrent mutex writer should complete successfully");
         }
 
         // Verify all tasks completed
@@ -321,7 +373,9 @@ mod async_data_lock_trait_tests {
             .send(())
             .expect("holder thread should still be waiting for release");
         holder.join().expect("holder thread should not panic");
-        writer.await.unwrap();
+        writer
+            .await
+            .expect("contended mutex writer task should complete successfully");
 
         let result = async_mutex.with_read(|value| *value).await;
         assert_eq!(result, 2);
@@ -439,9 +493,14 @@ mod async_data_lock_trait_tests {
     }
 }
 
-#[cfg(test)]
 mod async_rwlock_data_trait_tests {
-    use super::*;
+    use super::{
+        AsyncDataLock,
+        AsyncRwLock,
+        TryLockError,
+        increment_i32,
+        read_i32,
+    };
 
     #[tokio::test]
     async fn test_async_rwlock_read_basic() {
@@ -491,7 +550,9 @@ mod async_rwlock_data_trait_tests {
 
         // All readers should get the same result
         for handle in handles {
-            let sum = handle.await.unwrap();
+            let sum = handle.await.expect(
+                "concurrent rwlock reader should complete successfully",
+            );
             assert_eq!(sum, 15);
         }
     }
@@ -518,7 +579,9 @@ mod async_rwlock_data_trait_tests {
 
         // Wait for all tasks to complete
         for handle in handles {
-            handle.await.unwrap();
+            handle.await.expect(
+                "concurrent rwlock writer should complete successfully",
+            );
         }
 
         // Verify final value (should be 10 if writes are exclusive)
@@ -656,7 +719,9 @@ mod async_rwlock_data_trait_tests {
 
         // Wait for all tasks
         for handle in handles {
-            handle.await.unwrap();
+            handle
+                .await
+                .expect("mixed rwlock task should complete successfully");
         }
 
         // Verify final value

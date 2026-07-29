@@ -29,6 +29,12 @@ use crate::monitor::{
 pub trait AsyncMonitor: Notifier + AsyncConditionWaiter + Sync {
     /// Acquires the monitor and reads the protected state.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f` and produced by the returned future.
+    /// * `F` - Read closure executed while the protected state is locked. It
+    ///   must be sendable and remain valid for `'a`.
+    ///
     /// # Parameters
     ///
     /// * `f` - Closure receiving immutable access to the protected state.
@@ -52,6 +58,12 @@ pub trait AsyncMonitor: Notifier + AsyncConditionWaiter + Sync {
     /// Acquires the monitor and mutates the protected state.
     ///
     /// This method does not notify waiters automatically.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f` and produced by the returned future.
+    /// * `F` - Write closure executed while the protected state is locked. It
+    ///   must be sendable and remain valid for `'a`.
     ///
     /// # Parameters
     ///
@@ -77,6 +89,12 @@ pub trait AsyncMonitor: Notifier + AsyncConditionWaiter + Sync {
     ///
     /// The state lock is released before notification. If `f` panics, no
     /// notification is sent.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f` and produced by the returned future.
+    /// * `F` - Write closure executed before notification. It must be sendable
+    ///   and remain valid for `'a`.
     ///
     /// # Parameters
     ///
@@ -110,6 +128,12 @@ pub trait AsyncMonitor: Notifier + AsyncConditionWaiter + Sync {
     ///
     /// The state lock is released before notification. If `f` panics, no
     /// notification is sent.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f` and produced by the returned future.
+    /// * `F` - Write closure executed before notification. It must be sendable
+    ///   and remain valid for `'a`.
     ///
     /// # Parameters
     ///
@@ -145,6 +169,12 @@ where
     M: AsyncMonitor + Send + ?Sized,
 {
     /// Forwards protected-state reads to the wrapped monitor.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f` and produced by the forwarded future.
+    /// * `F` - Read closure forwarded to the wrapped monitor. It must be
+    ///   sendable and remain valid for `'a`.
     #[inline(always)]
     fn with_read_async<'a, R, F>(
         &'a self,
@@ -158,6 +188,12 @@ where
     }
 
     /// Forwards protected-state writes to the wrapped monitor.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f` and produced by the forwarded future.
+    /// * `F` - Write closure forwarded to the wrapped monitor. It must be
+    ///   sendable and remain valid for `'a`.
     #[inline(always)]
     fn with_write_async<'a, R, F>(
         &'a self,

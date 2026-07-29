@@ -31,6 +31,10 @@ use super::{
 use crate::monitor::WaitTimeoutStatus;
 
 /// Removes an active waiter registration on cancellation or normal exit.
+///
+/// # Type Parameters
+///
+/// * `'a` - Lifetime of the registry that owns the active entry.
 #[must_use = "retain the registration while the waiter remains eligible for notification"]
 pub(in crate::monitor) struct TokioConditionWaiterRegistration<'a> {
     /// Registry containing this waiter while it remains selectable.
@@ -47,6 +51,7 @@ impl<'a> TokioConditionWaiterRegistration<'a> {
     /// # Parameters
     ///
     /// * `registry` - Registry that currently contains `waiter`.
+    /// * `waiter_id` - Stable identifier assigned to `waiter`.
     /// * `waiter` - Independently signalled waiter owned by the pending wait.
     ///
     /// # Returns
@@ -87,6 +92,10 @@ impl<'a> TokioConditionWaiterRegistration<'a> {
     /// # Returns
     ///
     /// Whether notification or the deadline completed this suspension.
+    ///
+    /// # Errors
+    ///
+    /// Returns a Timer completion error when polling `deadline` fails.
     pub(in crate::monitor) async fn wait_until_signalled_or_deadline(
         &self,
         deadline: &mut TimerFuture,

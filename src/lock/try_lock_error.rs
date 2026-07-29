@@ -36,6 +36,11 @@ impl fmt::Display for TryLockError {
     /// # Returns
     ///
     /// The formatter result.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`fmt::Error`] if the destination formatter reports a write
+    /// failure.
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

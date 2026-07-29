@@ -101,6 +101,11 @@ impl<R> WaitTimeoutResult<R> {
 
     /// Maps a ready value while preserving timeout status.
     ///
+    /// # Type Parameters
+    ///
+    /// * `U` - Value type produced by mapping a ready result.
+    /// * `F` - Mapping closure applied exactly once when this result is ready.
+    ///
     /// # Parameters
     ///
     /// * `f` - Closure applied to the contained value when this result is

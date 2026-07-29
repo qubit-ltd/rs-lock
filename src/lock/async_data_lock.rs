@@ -121,6 +121,11 @@ pub trait AsyncDataLock<T: ?Sized>: Send + Sync {
     /// - **RwLock-based async locks**: Allows concurrent readers, better for
     ///   read-heavy async workloads
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The `Send` result type produced by the closure.
+    /// * `F` - The `Send` closure type used to inspect the protected data.
+    ///
     /// # Parameters
     ///
     /// * `f` - Closure that receives an immutable reference (`&T`) to the
@@ -185,6 +190,11 @@ pub trait AsyncDataLock<T: ?Sized>: Send + Sync {
     ///   operations
     /// - **RwLock advantage**: Only blocks during actual writes, not reads
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The `Send` result type produced by the closure.
+    /// * `F` - The `Send` closure type used to mutate the protected data.
+    ///
     /// # Parameters
     ///
     /// * `f` - Closure that receives a mutable reference (`&mut T`) to the
@@ -235,6 +245,11 @@ pub trait AsyncDataLock<T: ?Sized>: Send + Sync {
     /// waiting. Otherwise, it executes the closure and returns `Ok` containing
     /// the result.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to inspect the protected data.
+    ///
     /// # Parameters
     ///
     /// * `f` - Closure that receives an immutable reference (`&T`) to the
@@ -279,6 +294,11 @@ pub trait AsyncDataLock<T: ?Sized>: Send + Sync {
     /// is currently unavailable, it returns [`TryLockError::WouldBlock`]
     /// without waiting. Otherwise, it executes the closure and returns `Ok`
     /// containing the result.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to mutate the protected data.
     ///
     /// # Parameters
     ///

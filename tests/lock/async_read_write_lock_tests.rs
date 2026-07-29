@@ -7,7 +7,14 @@
 // =============================================================================
 //! Tests for asynchronous read-write lock capabilities.
 
-use std::sync::Arc;
+use std::{
+    future::{
+        Future,
+        poll_fn,
+    },
+    sync::Arc,
+    task::Poll,
+};
 
 use qubit_lock::AsyncReadWriteLock;
 use tokio::sync::RwLock;
@@ -47,4 +54,28 @@ async fn test_async_read_write_lock_accepts_arc_forwarding() {
         2,
     );
     *AsyncReadWriteLock::try_write(&lock).expect("write should succeed") = 3;
+}
+
+/// Verifies that cancelling a pending reader does not retain the lock.
+#[tokio::test]
+async fn test_async_read_write_lock_cancelled_reader_does_not_retain_lock() {
+    let lock = RwLock::new(());
+    let write_guard = AsyncReadWriteLock::write(&lock).await;
+    let mut waiter = Box::pin(AsyncReadWriteLock::read(&lock));
+
+    poll_fn(|context| {
+        assert!(
+            waiter.as_mut().poll(context).is_pending(),
+            "read waiter should remain pending while the write guard is held",
+        );
+        Poll::Ready(())
+    })
+    .await;
+    drop(waiter);
+    drop(write_guard);
+
+    assert!(
+        AsyncReadWriteLock::try_write(&lock).is_ok(),
+        "the lock should remain writable after cancelling the read waiter",
+    );
 }

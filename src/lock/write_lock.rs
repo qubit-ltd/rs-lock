@@ -14,6 +14,10 @@ use crate::lock::{
 };
 
 /// Adapts the write mode of a ReadWriteLock to Lock.
+///
+/// # Type Parameters
+///
+/// * `L` - The underlying read-write lock type.
 #[must_use = "use the adapter to acquire a write guard"]
 pub struct WriteLock<'a, L: ?Sized> {
     /// Underlying read-write lock.
