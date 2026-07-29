@@ -5,6 +5,9 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
+//! Demonstrates backend-neutral data access, shared monitor handles, and
+//! timed predicate waits.
+
 use std::sync::RwLock;
 use std::time::Duration;
 
