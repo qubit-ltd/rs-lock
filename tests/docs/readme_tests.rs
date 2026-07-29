@@ -114,6 +114,36 @@ fn test_readme_documents_native_lock_support() {
 }
 
 #[test]
+/// Ensures the introductions state the crate's boundary and testing value in
+/// direct reader-facing language.
+fn test_documentation_introductions_explain_the_abstraction_in_plain_language() {
+    let readme_en = normalize_readme_text(README_EN);
+    let readme_zh = normalize_readme_text(README_ZH);
+    let guide_en = normalize_readme_text(USER_GUIDE_EN);
+    let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
+
+    assert!(readme_en.contains("not around a particular lock implementation"));
+    assert!(readme_en.contains("where you assemble the application"));
+    assert!(readme_zh.contains("而不是某一种锁实现"));
+    assert!(readme_zh.contains("在组装应用时"));
+    assert!(readme_zh.contains("再选择 `std`、`parking_lot` 或 Tokio 后端"));
+
+    assert!(guide_en.contains("without tying its public boundary"));
+    assert!(guide_en.contains("package the lock / condition-wait protocol"));
+    assert!(guide_zh.contains("不必把公开边界绑定到某一种同步后端"));
+    assert!(guide_zh.contains("封装了锁与条件等待的配合方式"));
+}
+
+#[test]
+/// Ensures each README points readers to the user guide in the same language.
+fn test_readmes_link_to_their_matching_language_user_guides() {
+    assert!(README_EN.contains("[English user guide](doc/user_guide.md)"));
+    assert!(!README_EN.contains("[Chinese user guide]"));
+    assert!(README_ZH.contains("[中文用户手册](doc/user_guide.zh_CN.md)"));
+    assert!(!README_ZH.contains("[英文用户手册]"));
+}
+
+#[test]
 /// Ensures both user guides distinguish generic acquisition modes from
 /// exclusive ones.
 fn test_readme_documents_exclusive_lock_capability() {
