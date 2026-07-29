@@ -6,7 +6,290 @@
 and monitor-style condition coordination. This guide starts with the problem
 the crate solves, then explains how to choose and use each public component.
 
-## 1. The problem this crate solves
++
+
+## 1. Start with the decision
+
+Use a native lock directly when it is private to one implementation and no
+waiters, backend substitution, or deterministic timeout tests are involved.
+Use `qubit-lock` at a reusable boundary:
+
+| The component needs | Use |
+| --- | --- |
+| Read/write access to data held by several native lock types | `DataLock<T>` |
+| One guard acquisition mode | `Lock` |
+| An acquisition mode that must exclude all other guards | `ExclusiveLock` |
+| Shared and exclusive modes | `ReadWriteLock` |
+| State plus predicate waiting and notification | A concrete monitor or a narrow monitor capability trait |
+| A timeout test without sleeping | A monitor built with `with_timer` |
+
+The next case study proves these boundaries before the API reference sections.
+
+## 2. Case study: a closable bounded task queue
+
+A task queue has two kinds of waiter: a worker waits until the queue is
+non-empty or closed, while a producer waits until the queue is not full or
+closed. Both readiness conditions belong to the same protected state.
+
+```rust
+use std::{
+    collections::VecDeque,
+    num::NonZeroUsize,
+};
+
+struct QueueState<T> {
+    items: VecDeque<T>,
+    capacity: NonZeroUsize,
+    closed: bool,
+}
+
+impl<T> QueueState<T> {
+    fn new(capacity: NonZeroUsize) -> Self {
+        Self {
+            items: VecDeque::new(),
+            capacity,
+            closed: false,
+        }
+    }
+}
+```
+
+The invariants are explicit: `items.len() <= capacity.get()` always holds;
+`closed` rejects new tasks; an empty, closed queue returns `None`; and adding,
+removing, or closing can make a different class of waiter ready.
+
+### One domain implementation, two blocking backends
+
+The domain functions depend on `Monitor`, `ConditionWaiter`, and `Notifier`,
+not on a concrete lock or condition-variable guard.
+
+```rust
+use qubit_lock::Monitor;
+
+fn push<M, T>(queue: &M, item: T) -> Result<(), T>
+where
+    M: Monitor<State = QueueState<T>> + ?Sized,
+{
+    let result = queue.wait_until(
+        |state| state.closed || state.items.len() < state.capacity.get(),
+        |state| {
+            if state.closed {
+                Err(item)
+            } else {
+                state.items.push_back(item);
+                Ok(())
+            }
+        },
+    );
+    if result.is_ok() {
+        queue.notify_all();
+    }
+    result
+}
+
+fn pop<M, T>(queue: &M) -> Option<T>
+where
+    M: Monitor<State = QueueState<T>> + ?Sized,
+{
+    let item = queue.wait_until(
+        |state| state.closed || !state.items.is_empty(),
+        |state| state.items.pop_front(),
+    );
+    if item.is_some() {
+        queue.notify_all();
+    }
+    item
+}
+
+fn close<M, T>(queue: &M)
+where
+    M: Monitor<State = QueueState<T>> + ?Sized,
+{
+    queue.with_write_notify_all(|state| state.closed = true);
+}
+```
+
+This queue has two predicates: “not full” and “not empty.” A `notify_one`
+could wake a waiter whose predicate is still false while a waiter of the other
+kind remains asleep. The case study therefore uses `notify_all` after a state
+transition that may change readiness, so each waiter rechecks its own
+predicate under the monitor lock. This is not a rule that `notify_all` is
+always better: a single-predicate waiter set can usually prefer `notify_one`.
+
+```rust
+use std::{
+    num::NonZeroUsize,
+    sync::Arc,
+};
+
+use qubit_lock::{
+    ParkingLotMonitor,
+    StdMonitor,
+};
+
+fn exercise<M>(queue: &M)
+where
+    M: Monitor<State = QueueState<i32>> + ?Sized,
+{
+    assert_eq!(push(queue, 7), Ok(()));
+    assert_eq!(pop(queue), Some(7));
+    close(queue);
+    assert_eq!(push(queue, 8), Err(8));
+    assert_eq!(pop(queue), None);
+}
+
+fn main() {
+    let capacity = NonZeroUsize::new(2).expect("capacity must be non-zero");
+
+    let std_queue = Arc::new(StdMonitor::new(QueueState::new(capacity)));
+    exercise(&std_queue);
+
+    let parking_lot_queue = Arc::new(ParkingLotMonitor::new(QueueState::new(capacity)));
+    exercise(&parking_lot_queue);
+}
+```
+
+The concrete monitor is selected where the queue is assembled. `exercise`,
+`push`, `pop`, and `close` do not change. Raw `Mutex`/`Condvar` code instead
+carries backend-specific guards through waits, loops manually around each
+predicate, decides how to handle poisoning, and must preserve the same
+state-update-and-waiter-registration protocol.
+
+### Timed receive and deterministic time
+
+A timed receive returns:
+
+```text
+Result<WaitTimeoutResult<Option<T>>, qubit_clock::TimeError>
+```
+
+`Ready(Some(task))` returns a task, `Ready(None)` reports a closed and drained
+queue, `TimedOut` means the final locked predicate check was still false, and
+`Err(TimeError)` identifies Timer registration or completion failure rather
+than a real timeout.
+
+```rust
+use std::time::Duration;
+
+use qubit_lock::{
+    TimedMonitor,
+    WaitTimeoutResult,
+};
+
+fn pop_for<M, T>(
+    queue: &M,
+    timeout: Duration,
+) -> Result<WaitTimeoutResult<Option<T>>, qubit_clock::TimeError>
+where
+    M: TimedMonitor<State = QueueState<T>> + ?Sized,
+{
+    queue.wait_until_for(
+        timeout,
+        |state| state.closed || !state.items.is_empty(),
+        |state| state.items.pop_front(),
+    )
+}
+```
+
+Every concrete monitor provides `with_timer`. The test injects a
+`ManualMonotonicClock` into the production `ParkingLotMonitor` type and advances
+only after the waiter is registered:
+
+```rust
+use std::{
+    num::NonZeroUsize,
+    sync::Arc,
+    time::Duration,
+};
+
+use qubit_clock::{
+    ManualMonotonicClock,
+    MonotonicClock,
+};
+use qubit_lock::{
+    ParkingLotMonitor,
+    WaitTimeoutResult,
+};
+
+fn main() {
+    let clock = ManualMonotonicClock::new_shared();
+    let capacity = NonZeroUsize::new(1).expect("capacity must be non-zero");
+    let queue = Arc::new(ParkingLotMonitor::with_timer(
+        QueueState::<i32>::new(capacity),
+        clock.new_timer(),
+    ));
+    let waiting_queue = Arc::clone(&queue);
+
+    let waiter = std::thread::spawn(move || {
+        pop_for(&*waiting_queue, Duration::from_secs(16))
+    });
+
+    let _ = clock.advance_to_next_deadline_after_waiters(
+        1,
+        Duration::from_secs(1),
+    );
+
+    assert!(matches!(
+        waiter.join().expect("waiter should finish"),
+        Ok(WaitTimeoutResult::TimedOut),
+    ));
+}
+```
+
+The production wait algorithm runs against the injected timer. Its waiter and
+deadline observers make registration visible before time advances; no
+`thread::sleep` is needed.
+
+### Tokio keeps the state machine, not the blocking calls
+
+The Tokio version retains `QueueState<T>`, both predicates, the close rule,
+and the result meanings. It uses `AsyncMonitor` and `AsyncTimedMonitor`, with
+`TokioMonitor` as the concrete type. Async closures stay synchronous while the
+monitor holds state; do not await or perform blocking I/O inside them.
+
+```rust
+use std::{
+    num::NonZeroUsize,
+    sync::Arc,
+};
+
+use qubit_lock::{
+    AsyncConditionWaiter,
+    AsyncMonitor,
+    TokioMonitor,
+};
+
+#[tokio::main]
+async fn main() {
+    let capacity = NonZeroUsize::new(1).expect("capacity must be non-zero");
+    let queue = Arc::new(TokioMonitor::current(QueueState::new(capacity)));
+    let worker_queue = Arc::clone(&queue);
+
+    let worker = tokio::spawn(async move {
+        worker_queue
+            .wait_until_async(
+                |state| state.closed || !state.items.is_empty(),
+                |state| state.items.pop_front(),
+            )
+            .await
+    });
+
+    queue
+        .with_write_notify_all_async(|state| state.items.push_back(7))
+        .await;
+
+    assert_eq!(worker.await.expect("worker should finish"), Some(7));
+}
+```
+
+Async wait futures are lazy. Their timer belongs to the captured or injected
+target runtime, which must stay alive and have time enabled until a timed wait
+completes. Dropping a pending future unregisters its waiter, does not run the
+action, and does not roll back protected-state changes made by another task.
+If `notify_one` selected that waiter, cancellation discards the selection; it
+does not transfer it to another waiter.
+
+## 3. Why these abstractions exist
 
 Rust already has excellent lock implementations, but application and library
 code still runs into three recurring problems:
@@ -21,45 +304,12 @@ code still runs into three recurring problems:
 3. Real sleeps make timeout tests slow and flaky. A test should run the
    production wait algorithm while controlling time deterministically.
 
-`qubit-lock` addresses these problems with backend-independent lock traits,
-closure-based data access, synchronous and asynchronous monitors, and
-injectable timers.
+The queue case study makes those three boundaries concrete: lock traits avoid
+backend leakage, monitor operations own the locked predicate protocol, and
+Timer injection executes the production timeout path without a separate mock
+algorithm.
 
-### A motivating example: a one-item work queue
-
-The worker must sleep while the queue is empty, then remove an item while
-holding the same lock that protects the predicate. The producer must update
-the queue and notify a registered waiter without leaving a lost-notification
-window:
-
-```rust
-use std::sync::Arc;
-
-use qubit_lock::ParkingLotMonitor;
-
-fn main() {
-    let queue = Arc::new(ParkingLotMonitor::new(Vec::<i32>::new()));
-    let worker_queue = queue.clone();
-
-    let worker = std::thread::spawn(move || {
-        worker_queue.wait_until(
-            |items| !items.is_empty(),
-            |items| items.remove(0),
-        )
-    });
-
-    queue.with_write_notify_one(|items| items.push(7));
-
-    assert_eq!(worker.join().expect("worker should finish"), 7);
-}
-```
-
-`with_write_notify_one` performs the state-update-and-notify handshake.
-`wait_until` checks the predicate under the monitor lock, registers the waiter
-when necessary, and checks again after wakeup. The queue state is the source
-of truth; the notification is only a prompt to check it again.
-
-## 2. Installation and feature selection
+## 4. Installation and feature selection
 
 The default feature set is empty. Enable the components used by your program:
 
@@ -106,7 +356,7 @@ features, such as `rt` or `rt-multi-thread`, in the application's own
 
 All public `qubit-lock` types are imported from the crate root.
 
-## 3. Synchronous lock components
+## 5. Synchronous lock components
 
 ### `DataLock<T>`
 
@@ -226,7 +476,7 @@ All non-blocking lock APIs use the backend-independent `TryLockError`:
 parking_lot and Tokio locks do not have poisoning, so they report only
 contention.
 
-## 4. Asynchronous lock components
+## 6. Asynchronous lock components
 
 The types in this section require the `async-lock` feature.
 
@@ -281,7 +531,7 @@ async fn main() {
 implement `AsyncLock` when `T: Send`; Tokio read-write locks implement
 `AsyncReadWriteLock` when `T: Send + Sync`.
 
-## 5. Monitor capability components
+## 7. Monitor capability components
 
 A monitor owns protected state and coordinates predicate waits with
 notifications. Application code should normally select a concrete monitor.
@@ -318,7 +568,7 @@ where
 These traits use return-position `impl Future` and generic methods. They are
 designed for static generic bounds, not `dyn` trait-object interfaces.
 
-## 6. Concrete monitor components
+## 8. Concrete monitor components
 
 ### `ParkingLotMonitor<T>`
 
@@ -447,7 +697,7 @@ The captured target runtime must stay alive, have time enabled, and keep
 running until a timed wait completes. A timed future may be polled from another
 runtime context; the timer still belongs to the captured or injected runtime.
 
-## 7. Waiting, notification, and timeout semantics
+## 9. Waiting, notification, and timeout semantics
 
 ### Notifications are memoryless
 
@@ -572,7 +822,7 @@ does not roll back protected-state changes made by other tasks. If `notify_one`
 already selected that waiter, cancellation discards the selection; it is not
 transferred to another or future waiter.
 
-## 8. Wait results and errors
+## 10. Wait results and errors
 
 Predicate-based timed waits return:
 
@@ -597,7 +847,7 @@ a real timeout. The guard remains held and usable after such an error.
 `WaitTimeoutResult` provides `is_ready`, `is_timed_out`, `into_option`, and
 `map`; `WaitTimeoutStatus` provides `is_woken` and `is_timed_out`.
 
-## 9. Deterministic time in tests
+## 11. Deterministic time in tests
 
 Every concrete monitor provides `with_timer`. Tests can inject a
 `ManualTimer` from `qubit-clock` into the same monitor type used in production,
@@ -648,7 +898,7 @@ registration instead of guessing with a real sleep. Monitor and timer
 registrations are cancellation-safe, and multiple components can share one
 manual clock domain. Tokio monitors use the same injection design.
 
-## 10. Choosing components and avoiding mistakes
+## 12. Choosing components and avoiding mistakes
 
 ### Selection guide
 

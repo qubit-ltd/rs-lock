@@ -5,7 +5,278 @@
 `qubit-lock` 为同步锁、Tokio 锁和 monitor 风格的条件协调提供统一抽象。本手册先说明
 这个 crate 解决的问题，再详细介绍每个公开组件的选择与用法。
 
-## 1. 这个库解决什么问题
++
+
+## 1. 先做选择
+
+如果锁只服务于一个私有实现，没有 waiter、后端替换或确定性 timeout 测试需求，
+直接使用原生锁。可复用边界则应使用 `qubit-lock`：
+
+| 组件需要的能力 | 使用 |
+| --- | --- |
+| 读取或修改由多种原生锁持有的数据 | `DataLock<T>` |
+| 一种 guard 获取模式 | `Lock` |
+| 必须排除所有其他 guard 的获取模式 | `ExclusiveLock` |
+| 共享与独占模式 | `ReadWriteLock` |
+| 状态、predicate wait 与 notification | 具体 monitor 或最小 monitor 能力 trait |
+| 不使用 sleep 的 timeout 测试 | 由 `with_timer` 构造的 monitor |
+
+下面的案例先证明这些边界，之后再提供完整 API 参考。
+
+## 2. 案例：可关闭的有界任务队列
+
+任务队列中有两类 waiter：worker 等待队列非空或关闭；producer 等待队列未满或关闭。
+两类就绪条件都属于同一份受保护状态。
+
+```rust
+use std::{
+    collections::VecDeque,
+    num::NonZeroUsize,
+};
+
+struct QueueState<T> {
+    items: VecDeque<T>,
+    capacity: NonZeroUsize,
+    closed: bool,
+}
+
+impl<T> QueueState<T> {
+    fn new(capacity: NonZeroUsize) -> Self {
+        Self {
+            items: VecDeque::new(),
+            capacity,
+            closed: false,
+        }
+    }
+}
+```
+
+不变量是明确的：`items.len() <= capacity.get()` 始终成立；`closed` 后拒绝新任务；
+空且关闭的队列返回 `None`；加入、移除或关闭都可能让另一类 waiter 就绪。
+
+### 一份领域实现，两个阻塞后端
+
+领域函数依赖 `Monitor`、`ConditionWaiter` 和 `Notifier`，而不是某一种具体锁或
+condition-variable guard。
+
+```rust
+use qubit_lock::Monitor;
+
+fn push<M, T>(queue: &M, item: T) -> Result<(), T>
+where
+    M: Monitor<State = QueueState<T>> + ?Sized,
+{
+    let result = queue.wait_until(
+        |state| state.closed || state.items.len() < state.capacity.get(),
+        |state| {
+            if state.closed {
+                Err(item)
+            } else {
+                state.items.push_back(item);
+                Ok(())
+            }
+        },
+    );
+    if result.is_ok() {
+        queue.notify_all();
+    }
+    result
+}
+
+fn pop<M, T>(queue: &M) -> Option<T>
+where
+    M: Monitor<State = QueueState<T>> + ?Sized,
+{
+    let item = queue.wait_until(
+        |state| state.closed || !state.items.is_empty(),
+        |state| state.items.pop_front(),
+    );
+    if item.is_some() {
+        queue.notify_all();
+    }
+    item
+}
+
+fn close<M, T>(queue: &M)
+where
+    M: Monitor<State = QueueState<T>> + ?Sized,
+{
+    queue.with_write_notify_all(|state| state.closed = true);
+}
+```
+
+该队列有两类 predicate：“未满”和“非空”。`notify_one` 可能唤醒 predicate 仍为
+false 的 waiter，而另一类已经可以继续的 waiter 仍在休眠。因此，本案例在可能改变
+就绪条件的状态转换后使用 `notify_all`，让每个 waiter 在 monitor 锁内重新检查自己
+的 predicate。这不表示 `notify_all` 永远更好：单一 predicate 的 waiter 集通常可以
+优先使用 `notify_one`。
+
+```rust
+use std::{
+    num::NonZeroUsize,
+    sync::Arc,
+};
+
+use qubit_lock::{
+    ParkingLotMonitor,
+    StdMonitor,
+};
+
+fn exercise<M>(queue: &M)
+where
+    M: Monitor<State = QueueState<i32>> + ?Sized,
+{
+    assert_eq!(push(queue, 7), Ok(()));
+    assert_eq!(pop(queue), Some(7));
+    close(queue);
+    assert_eq!(push(queue, 8), Err(8));
+    assert_eq!(pop(queue), None);
+}
+
+fn main() {
+    let capacity = NonZeroUsize::new(2).expect("capacity must be non-zero");
+
+    let std_queue = Arc::new(StdMonitor::new(QueueState::new(capacity)));
+    exercise(&std_queue);
+
+    let parking_lot_queue = Arc::new(ParkingLotMonitor::new(QueueState::new(capacity)));
+    exercise(&parking_lot_queue);
+}
+```
+
+具体 monitor 在组装队列的位置选择。`exercise`、`push`、`pop` 和 `close` 都不需要
+修改。原生 `Mutex`/`Condvar` 代码则需要让后端专用 guard 穿过每次等待、手动循环检查
+predicate、决定 poisoning 策略，并自己维持状态更新与 waiter 注册的同一协议。
+
+### 计时接收与确定性时间
+
+计时接收的结果为：
+
+```text
+Result<WaitTimeoutResult<Option<T>>, qubit_clock::TimeError>
+```
+
+`Ready(Some(task))` 表示取得任务，`Ready(None)` 表示队列关闭且排空，`TimedOut` 表示
+最终持锁 predicate 检查仍为 false，`Err(TimeError)` 表示 Timer 注册或完成失败，而
+不是真实 timeout。
+
+```rust
+use std::time::Duration;
+
+use qubit_lock::{
+    TimedMonitor,
+    WaitTimeoutResult,
+};
+
+fn pop_for<M, T>(
+    queue: &M,
+    timeout: Duration,
+) -> Result<WaitTimeoutResult<Option<T>>, qubit_clock::TimeError>
+where
+    M: TimedMonitor<State = QueueState<T>> + ?Sized,
+{
+    queue.wait_until_for(
+        timeout,
+        |state| state.closed || !state.items.is_empty(),
+        |state| state.items.pop_front(),
+    )
+}
+```
+
+每个具体 monitor 都提供 `with_timer`。测试向生产使用的 `ParkingLotMonitor` 注入
+`ManualMonotonicClock`，并且只在 waiter 注册后推进时间：
+
+```rust
+use std::{
+    num::NonZeroUsize,
+    sync::Arc,
+    time::Duration,
+};
+
+use qubit_clock::{
+    ManualMonotonicClock,
+    MonotonicClock,
+};
+use qubit_lock::{
+    ParkingLotMonitor,
+    WaitTimeoutResult,
+};
+
+fn main() {
+    let clock = ManualMonotonicClock::new_shared();
+    let capacity = NonZeroUsize::new(1).expect("capacity must be non-zero");
+    let queue = Arc::new(ParkingLotMonitor::with_timer(
+        QueueState::<i32>::new(capacity),
+        clock.new_timer(),
+    ));
+    let waiting_queue = Arc::clone(&queue);
+
+    let waiter = std::thread::spawn(move || {
+        pop_for(&*waiting_queue, Duration::from_secs(16))
+    });
+
+    let _ = clock.advance_to_next_deadline_after_waiters(
+        1,
+        Duration::from_secs(1),
+    );
+
+    assert!(matches!(
+        waiter.join().expect("waiter should finish"),
+        Ok(WaitTimeoutResult::TimedOut),
+    ));
+}
+```
+
+生产等待算法运行在注入的 Timer 上。它的 waiter 与 deadline 观察接口会在推进时间前
+确认注册，因此不需要 `thread::sleep`。
+
+### Tokio 保留状态机，而不是阻塞调用
+
+Tokio 版本保留 `QueueState<T>`、两类 predicate、关闭规则和结果含义。它使用
+`AsyncMonitor` 和 `AsyncTimedMonitor`，具体类型是 `TokioMonitor`。持锁期间的
+async closure 仍然是同步 closure；不要在其中 await 或执行阻塞 I/O。
+
+```rust
+use std::{
+    num::NonZeroUsize,
+    sync::Arc,
+};
+
+use qubit_lock::{
+    AsyncConditionWaiter,
+    AsyncMonitor,
+    TokioMonitor,
+};
+
+#[tokio::main]
+async fn main() {
+    let capacity = NonZeroUsize::new(1).expect("capacity must be non-zero");
+    let queue = Arc::new(TokioMonitor::current(QueueState::new(capacity)));
+    let worker_queue = Arc::clone(&queue);
+
+    let worker = tokio::spawn(async move {
+        worker_queue
+            .wait_until_async(
+                |state| state.closed || !state.items.is_empty(),
+                |state| state.items.pop_front(),
+            )
+            .await
+    });
+
+    queue
+        .with_write_notify_all_async(|state| state.items.push_back(7))
+        .await;
+
+    assert_eq!(worker.await.expect("worker should finish"), Some(7));
+}
+```
+
+异步等待 future 是惰性的。Timer 属于捕获或注入的目标 runtime；该 runtime 必须存活并
+启用 time driver，直到计时等待完成。drop pending future 会注销 waiter，不执行
+action，也不会回滚其他 task 已经完成的状态修改。如果 `notify_one` 已选择该 waiter，
+取消会丢弃这次 selection，而不会转交给另一个 waiter。
+
+## 3. 为什么需要这些抽象
 
 Rust 已经提供了优秀的锁实现，但应用和库代码仍会反复遇到三个问题：
 
@@ -16,41 +287,10 @@ Rust 已经提供了优秀的锁实现，但应用和库代码仍会反复遇到
 3. 真实 sleep 会让超时测试变慢且不稳定。测试应运行生产环境的等待算法，同时能够
    确定性地控制时间。
 
-`qubit-lock` 通过后端无关的锁 trait、基于闭包的数据访问、同步与异步 monitor 以及
-可注入 Timer 解决这些问题。
+队列案例把这三类边界具体化：锁 trait 避免后端泄漏，monitor 操作承载持锁 predicate
+协议，Timer 注入则在没有独立 mock 算法的前提下执行生产 timeout 路径。
 
-### 引导示例：单任务工作队列
-
-队列为空时 worker 必须休眠；队列非空后，它必须在持有同一把锁时取出任务。producer
-必须更新队列并通知已注册 waiter，同时不能留下丢失通知的窗口：
-
-```rust
-use std::sync::Arc;
-
-use qubit_lock::ParkingLotMonitor;
-
-fn main() {
-    let queue = Arc::new(ParkingLotMonitor::new(Vec::<i32>::new()));
-    let worker_queue = queue.clone();
-
-    let worker = std::thread::spawn(move || {
-        worker_queue.wait_until(
-            |items| !items.is_empty(),
-            |items| items.remove(0),
-        )
-    });
-
-    queue.with_write_notify_one(|items| items.push(7));
-
-    assert_eq!(worker.join().expect("worker should finish"), 7);
-}
-```
-
-`with_write_notify_one` 完成状态更新并通知的握手。`wait_until` 在 monitor 锁内检查
-predicate，必要时注册 waiter，并在唤醒后重新检查。队列状态才是事实来源；
-notification 只是再次检查状态的提示。
-
-## 2. 安装与 Feature 选择
+## 4. 安装与 Feature 选择
 
 默认特性集为空；请显式启用程序使用的组件：
 
@@ -96,7 +336,7 @@ Feature，例如 `rt` 或 `rt-multi-thread`。
 
 所有 `qubit-lock` 公开类型都从 crate root 导入。
 
-## 3. 同步锁组件
+## 5. 同步锁组件
 
 ### `DataLock<T>`
 
@@ -208,7 +448,7 @@ fn main() {
 
 parking_lot 和 Tokio 锁没有 poisoning，因此它们只会报告竞争。
 
-## 4. 异步锁组件
+## 6. 异步锁组件
 
 本节类型需要 `async-lock` Feature。
 
@@ -262,7 +502,7 @@ async fn main() {
 `T: Send` 时实现 `AsyncLock`；Tokio 读写锁在 `T: Send + Sync` 时实现
 `AsyncReadWriteLock`。
 
-## 5. Monitor 能力组件
+## 7. Monitor 能力组件
 
 monitor 持有受保护状态，并使用 notification 协调 predicate wait。应用代码通常应
 选择具体 monitor；在泛型 API 边界使用能力 trait：
@@ -298,7 +538,7 @@ where
 这些 trait 使用返回位置的 `impl Future` 和泛型方法。它们用于静态泛型约束，不用于
 `dyn` trait-object 接口。
 
-## 6. 具体 Monitor 组件
+## 8. 具体 Monitor 组件
 
 ### `ParkingLotMonitor<T>`
 
@@ -416,7 +656,7 @@ async fn main() {
 计时 future 可以在另一个 runtime context 中 poll，但 Timer 仍属于捕获或注入的
 runtime。
 
-## 7. 等待、通知与超时语义
+## 9. 等待、通知与超时语义
 
 ### Notification 是无记忆的
 
@@ -529,7 +769,7 @@ ready action 也没有执行时限。
 包括其他任务已经完成的修改。如果 `notify_one` 已经选择该 waiter，
 取消会丢弃这次选择，不会转交给其他或未来 waiter。
 
-## 8. 等待结果与错误
+## 10. 等待结果与错误
 
 基于 predicate 的计时等待返回：
 
@@ -551,7 +791,7 @@ Timer 注册或完成失败，不是真实超时。发生该错误后，guard �
 `WaitTimeoutResult` 提供 `is_ready`、`is_timed_out`、`into_option` 和 `map`；
 `WaitTimeoutStatus` 提供 `is_woken` 和 `is_timed_out`。
 
-## 9. 测试中的确定性时间
+## 11. 测试中的确定性时间
 
 每个具体 monitor 都提供 `with_timer`。测试可注入 `qubit-clock` 的 `ManualTimer`，
 使生产环境使用的 monitor 类型和等待算法在没有真实 sleep 的情况下直接运行。
@@ -600,7 +840,7 @@ clock 的 waiter 和 deadline 观察接口会在注册后协调推进时间，�
 猜测。Monitor 和 Timer 注册都支持安全取消，多个组件也可以共享同一个手动时间域。
 Tokio monitor 使用相同的注入设计。
 
-## 10. 组件选择与常见错误
+## 12. 组件选择与常见错误
 
 ### 选择指南
 
