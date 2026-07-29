@@ -8,6 +8,30 @@ protected data. Its monitors package the lock / condition-wait protocol and
 can use an injected clock for timeout tests. This guide starts with the design
 decision, then explains each public component.
 
+## Reading paths
+
+- **First use:** read Sections 1, 2, 4, and 12 to choose a boundary, enable
+  features, and select a component.
+- **Component lookup:** start with Sections 5 through 8, then use the API
+  documentation for exact signatures.
+- **Correct waiting and testing:** read Sections 9 through 11 before writing
+  condition waits, deadlines, or deterministic timeout tests.
+
+## Contents
+
+1. [Make the boundary decision first](#1-make-the-boundary-decision-first)
+2. [Case study: a closable bounded task queue](#2-case-study-a-closable-bounded-task-queue)
+3. [Why these abstractions exist](#3-why-these-abstractions-exist)
+4. [Installation and feature selection](#4-installation-and-feature-selection)
+5. [Synchronous lock components](#5-synchronous-lock-components)
+6. [Asynchronous lock components](#6-asynchronous-lock-components)
+7. [Monitor capability components](#7-monitor-capability-components)
+8. [Concrete monitor components](#8-concrete-monitor-components)
+9. [Waiting, notification, and timeout semantics](#9-waiting-notification-and-timeout-semantics)
+10. [Wait results and errors](#10-wait-results-and-errors)
+11. [Deterministic time in tests](#11-deterministic-time-in-tests)
+12. [Choosing components and avoiding mistakes](#12-choosing-components-and-avoiding-mistakes)
+
 ## 1. Make the boundary decision first
 
 Use a native lock directly when it is an internal detail of one implementation.
@@ -31,6 +55,10 @@ reference sections.
 A task queue has two kinds of waiters. A worker waits until the queue has an
 item or is closed. A producer waits until the queue has space or is closed.
 Both conditions are derived from the same protected state.
+
+> **Feature prerequisite:** the blocking case study uses `StdMonitor` and
+> `ParkingLotMonitor`. Enable `monitor` for the former and both `monitor` and
+> `parking-lot` for the latter; Section 4 shows the dependency declarations.
 
 ```rust
 use std::{
@@ -155,6 +183,10 @@ Choose the concrete monitor where the queue is assembled. `exercise`, `push`,
 would instead carry backend-specific guards through waits, repeat each
 condition loop by hand, choose a poisoning policy, and preserve the ordering
 between state updates and waiter registration itself.
+
+The [complete runnable example](../examples/bounded_queue.rs) uses the same
+queue operations with `ParkingLotMonitor` and also checks the zero-timeout
+path.
 
 ### Timed receive and deterministic time
 
@@ -328,6 +360,7 @@ Choose features according to the components you use:
 | `monitor` | Monitor traits, std monitors, timed waits, and timer injection |
 | `async-lock` | Tokio lock traits and adapters |
 | `async-monitor` | `async-lock`, monitor support, and Tokio monitors |
+| `loom-model` | Internal Loom model checking; not for normal application use |
 | default | no optional features |
 
 Lock-only users can avoid all optional dependencies:
@@ -354,6 +387,10 @@ qubit-lock = { version = "0.12", default-features = false, features = ["async-mo
 If the application creates a Tokio runtime, enable the required runtime
 features, such as `rt` or `rt-multi-thread`, in the application's own
 `Cargo.toml`.
+
+Using relative timeout methods does not require naming clock types. Add a
+direct `qubit-clock` dependency when application code names `TimeError` or
+`MonotonicInstant`, supplies an absolute deadline, or injects a timer.
 
 All public `qubit-lock` types are imported from the crate root.
 
@@ -547,7 +584,7 @@ Use the capability traits at generic API boundaries:
 | `TimedMonitor` | `Monitor` plus timed synchronous waits |
 | `SharedMonitor` | A cloneable shared synchronous monitor handle |
 | `AsyncConditionWaiter` | Asynchronous `wait_until_async`, action-free `wait_until_ready_async`, and `wait_while_async` |
-| `AsyncTimeoutConditionWaiter` | Asynchronous `wait_until_for_async`, action-free `wait_until_ready_for_async`, and `wait_while_for_async` |
+| `AsyncTimeoutConditionWaiter` | Asynchronous relative `*_for_async` and absolute-deadline `*_with_deadline_async` predicate waits |
 | `AsyncMonitor` | Async state access, notification, and untimed waits |
 | `AsyncTimedMonitor` | `AsyncMonitor` plus timed waits |
 | `SharedAsyncMonitor` | A cloneable shared asynchronous monitor handle |
@@ -699,6 +736,25 @@ running until a timed wait completes. A timed future may be polled from another
 runtime context; the timer still belongs to the captured or injected runtime.
 
 ## 9. Waiting, notification, and timeout semantics
+
+### Choose the timeout form
+
+| Need | Use |
+| --- | --- |
+| One condition-wait budget after initial state-lock acquisition | `*_for` or `*_for_async` |
+| One caller-coordinated absolute monotonic deadline | `*_with_deadline` or `*_with_deadline_async` |
+| One blocking operation-wide budget that includes initial lock contention | `*_with_total_timeout` |
+| A guard-level wait until an absolute deadline | `guard.wait_until(deadline)` |
+
+`*_with_deadline` accepts a caller-supplied `MonotonicInstant`; use it when
+several operations must share one cutoff. Async deadline futures are lazy, but
+their supplied deadline is not reset on first poll. `*_with_total_timeout` is
+available only to blocking monitors. Guard `wait_until` takes a deadline, not
+a readiness predicate; inspect the protected state after it returns.
+
+The async deadline forms are `wait_until_with_deadline_async`,
+`wait_until_ready_with_deadline_async`, and
+`wait_while_with_deadline_async`.
 
 ### Notifications are memoryless
 
