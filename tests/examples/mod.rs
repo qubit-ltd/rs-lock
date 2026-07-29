@@ -5,15 +5,6 @@
 //
 //    Licensed under the Apache License, Version 2.0.
 // =============================================================================
-//! # Qubit Lock Integration Tests
-//!
-//! Organized by source module: `lock` and `monitor`.
+//! Tests for runnable examples.
 
-mod docs;
-#[cfg(all(feature = "monitor", feature = "parking-lot"))]
-mod examples;
-mod lock;
-#[cfg(feature = "monitor")]
-mod monitor;
-#[cfg(all(loom, feature = "loom-model"))]
-mod test_util;
+mod bounded_queue_tests;

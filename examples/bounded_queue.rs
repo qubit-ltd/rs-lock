@@ -10,6 +10,11 @@
 use std::{
     collections::VecDeque,
     num::NonZeroUsize,
+    sync::{
+        Arc,
+        mpsc,
+    },
+    thread,
     time::Duration,
 };
 
@@ -21,7 +26,7 @@ use qubit_lock::{
 };
 
 /// Holds the queue data and its close state.
-struct QueueState<T> {
+pub(crate) struct QueueState<T> {
     items: VecDeque<T>,
     capacity: NonZeroUsize,
     closed: bool,
@@ -29,7 +34,7 @@ struct QueueState<T> {
 
 impl<T> QueueState<T> {
     /// Creates an open queue with the specified non-zero capacity.
-    fn new(capacity: NonZeroUsize) -> Self {
+    pub(crate) fn new(capacity: NonZeroUsize) -> Self {
         Self {
             items: VecDeque::new(),
             capacity,
@@ -39,7 +44,7 @@ impl<T> QueueState<T> {
 }
 
 /// Adds an item once the queue has space, or returns it after closure.
-fn push<M, T>(queue: &M, item: T) -> Result<(), T>
+pub(crate) fn push<M, T>(queue: &M, item: T) -> Result<(), T>
 where
     M: Monitor<State = QueueState<T>> + ?Sized,
 {
@@ -76,18 +81,22 @@ where
 }
 
 /// Waits up to the condition-wait budget for an item or queue closure.
-fn pop_for<M, T>(
+pub(crate) fn pop_for<M, T>(
     queue: &M,
     timeout: Duration,
 ) -> Result<WaitTimeoutResult<Option<T>>, qubit_clock::TimeError>
 where
     M: TimedMonitor<State = QueueState<T>> + ?Sized,
 {
-    queue.wait_until_for(
+    let result = queue.wait_until_for(
         timeout,
         |state| state.closed || !state.items.is_empty(),
         |state| state.items.pop_front(),
-    )
+    );
+    if matches!(&result, Ok(WaitTimeoutResult::Ready(Some(_)))) {
+        queue.notify_all();
+    }
+    result
 }
 
 /// Closes the queue and wakes all producers and consumers.
@@ -98,20 +107,42 @@ where
     queue.with_write_notify_all(|state| state.closed = true);
 }
 
-/// Exercises timeout, enqueue, dequeue, and closure behavior.
+/// Exercises timeout, blocking wakeup, enqueue, dequeue, and closure behavior.
 fn main() {
     let capacity =
         NonZeroUsize::new(1).expect("queue capacity must be non-zero");
-    let queue = ParkingLotMonitor::new(QueueState::new(capacity));
+    let queue = Arc::new(ParkingLotMonitor::new(QueueState::new(capacity)));
 
     assert!(matches!(
-        pop_for(&queue, Duration::ZERO),
+        pop_for(&*queue, Duration::ZERO),
         Ok(WaitTimeoutResult::TimedOut),
     ));
-    assert_eq!(push(&queue, 7), Ok(()));
-    assert_eq!(pop(&queue), Some(7));
 
-    close(&queue);
-    assert_eq!(push(&queue, 8), Err(8));
-    assert_eq!(pop(&queue), None);
+    let (predicate_checked_sender, predicate_checked_receiver) =
+        mpsc::sync_channel(0);
+    let waiting_queue = Arc::clone(&queue);
+    let consumer = thread::spawn(move || {
+        let mut predicate_checked_sender = Some(predicate_checked_sender);
+        waiting_queue.wait_until(
+            |state| {
+                if let Some(sender) = predicate_checked_sender.take() {
+                    sender
+                        .send(())
+                        .expect("main thread should observe the empty queue");
+                }
+                state.closed || !state.items.is_empty()
+            },
+            |state| state.items.pop_front(),
+        )
+    });
+
+    predicate_checked_receiver
+        .recv()
+        .expect("consumer should check the empty queue");
+    assert_eq!(push(&*queue, 7), Ok(()));
+    assert_eq!(consumer.join().expect("consumer should finish"), Some(7));
+
+    close(&*queue);
+    assert_eq!(push(&*queue, 8), Err(8));
+    assert_eq!(pop(&*queue), None);
 }
