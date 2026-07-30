@@ -352,7 +352,7 @@ The default feature set is empty. Enable the components used by your program:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.12", default-features = false, features = ["monitor", "parking-lot"] }
+qubit-lock = { version = "0.13", default-features = false, features = ["monitor", "parking-lot"] }
 ```
 
 Choose features according to the components you use:
@@ -371,21 +371,21 @@ Lock-only users can avoid all optional dependencies:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.12", default-features = false }
+qubit-lock = { version = "0.13", default-features = false }
 ```
 
 Enable asynchronous locks without Tokio monitor deadlines:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.12", default-features = false, features = ["async-lock"] }
+qubit-lock = { version = "0.13", default-features = false, features = ["async-lock"] }
 ```
 
 Enable Tokio monitor coordination and timed waits:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.12", default-features = false, features = ["async-monitor"] }
+qubit-lock = { version = "0.13", default-features = false, features = ["async-monitor"] }
 ```
 
 If the application creates a Tokio runtime, enable the required runtime
@@ -918,7 +918,7 @@ Declare the test clock directly:
 
 ```toml
 [dev-dependencies]
-qubit-clock = { version = "0.11", features = ["test-util"] }
+qubit-clock = { version = "0.12", features = ["test-util"] }
 ```
 
 ```rust

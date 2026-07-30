@@ -338,10 +338,10 @@ fn test_readme_documents_timer_ioc_testing() {
 /// Ensures README files distinguish the blocking monitor implementations and
 /// document the async feature tiers.
 fn test_readme_documents_feature_tiers() {
-    const BLOCKING_MONITOR_DEPENDENCY: &str = "qubit-lock = { version = \"0.12\", default-features = false, features = [\"monitor\", \"parking-lot\"] }";
-    const STD_MONITOR_DEPENDENCY: &str = "qubit-lock = { version = \"0.12\", default-features = false, features = [\"monitor\"] }";
-    const ASYNC_LOCK_DEPENDENCY: &str = "qubit-lock = { version = \"0.12\", default-features = false, features = [\"async-lock\"] }";
-    const ASYNC_MONITOR_DEPENDENCY: &str = "qubit-lock = { version = \"0.12\", default-features = false, features = [\"async-monitor\"] }";
+    const BLOCKING_MONITOR_DEPENDENCY: &str = "qubit-lock = { version = \"0.13\", default-features = false, features = [\"monitor\", \"parking-lot\"] }";
+    const STD_MONITOR_DEPENDENCY: &str = "qubit-lock = { version = \"0.13\", default-features = false, features = [\"monitor\"] }";
+    const ASYNC_LOCK_DEPENDENCY: &str = "qubit-lock = { version = \"0.13\", default-features = false, features = [\"async-lock\"] }";
+    const ASYNC_MONITOR_DEPENDENCY: &str = "qubit-lock = { version = \"0.13\", default-features = false, features = [\"async-monitor\"] }";
 
     assert!(CARGO_TOML.contains("default = []"));
     assert!(README_EN.contains("default feature set is empty"));
