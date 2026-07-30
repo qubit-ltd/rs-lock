@@ -152,35 +152,35 @@ fn main() {
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.12", default-features = false }
+qubit-lock = { version = "0.13", default-features = false }
 ```
 
 只使用 `StdMonitor`，无需 `parking_lot` 依赖：
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.12", default-features = false, features = ["monitor"] }
+qubit-lock = { version = "0.13", default-features = false, features = ["monitor"] }
 ```
 
 使用 `ParkingLotMonitor`：
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.12", default-features = false, features = ["monitor", "parking-lot"] }
+qubit-lock = { version = "0.13", default-features = false, features = ["monitor", "parking-lot"] }
 ```
 
 启用 Tokio 锁但不启用 Tokio monitor：
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.12", default-features = false, features = ["async-lock"] }
+qubit-lock = { version = "0.13", default-features = false, features = ["async-lock"] }
 ```
 
 启用 Tokio monitor 和计时等待：
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.12", default-features = false, features = ["async-monitor"] }
+qubit-lock = { version = "0.13", default-features = false, features = ["async-monitor"] }
 ```
 
 如果应用创建 Tokio runtime，应在应用自己的 `Cargo.toml` 中启用所需 runtime
