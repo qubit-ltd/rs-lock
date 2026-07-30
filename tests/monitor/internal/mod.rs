@@ -8,9 +8,13 @@
 //! Tests mapped to private Monitor implementation modules through public APIs.
 
 #[cfg(not(loom))]
+mod blocking_condition_wait_tests;
+#[cfg(not(loom))]
 mod blocking_condition_waiter_state_tests;
 #[cfg(not(loom))]
 mod blocking_condition_waiter_tests;
+#[cfg(not(loom))]
+mod blocking_monitor_guard_wait_tests;
 #[cfg(not(loom))]
 mod blocking_timed_wait_tests;
 #[cfg(not(loom))]

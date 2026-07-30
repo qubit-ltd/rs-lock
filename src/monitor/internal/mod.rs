@@ -7,8 +7,10 @@
 // =============================================================================
 //! Private implementation types shared by monitor implementations.
 
+mod blocking_condition_wait;
 mod blocking_condition_waiter;
 mod blocking_condition_waiter_state;
+mod blocking_monitor_guard_wait;
 mod blocking_waiter_registration;
 mod blocking_waiter_registry;
 mod default_timer;
@@ -19,9 +21,16 @@ mod tokio_condition_waiter;
 mod tokio_condition_waiter_registration;
 mod waiter_registry;
 
-pub(in crate::monitor) use blocking_condition_waiter::{
-    BlockingConditionWaiter,
-    wait_while_with_timer_locked,
+pub(in crate::monitor) use blocking_condition_wait::{
+    wait_while_for,
+    wait_while_locked,
+    wait_while_with_deadline,
+};
+pub(in crate::monitor) use blocking_condition_waiter::BlockingConditionWaiter;
+pub(in crate::monitor) use blocking_monitor_guard_wait::{
+    release_guard,
+    wait_for_notification,
+    wait_with_timer,
 };
 pub(in crate::monitor) use blocking_waiter_registration::BlockingWaiterRegistration;
 pub(in crate::monitor) use blocking_waiter_registry::BlockingWaiterRegistry;
