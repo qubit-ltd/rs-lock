@@ -1,6 +1,6 @@
 [package]
 name = "qubit-lock"
-version = "0.13.0"
+version = "0.13.1"
 edition = "2024"
 rust-version = "1.94"
 authors = ["Haixing Hu <starfish.hu@gmail.com>"]
@@ -17,11 +17,11 @@ include = [
     "/LICENSE",
     "/README.md",
     "/README.zh_CN.md",
-    "/benches/**",
+    "/src/**",
     "/doc/**",
     "/examples/**",
-    "/src/**",
     "/tests/**",
+    "/benches/**",
 ]
 
 [package.metadata.docs.rs]
