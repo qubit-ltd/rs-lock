@@ -233,6 +233,7 @@ macro_rules! blocking_monitor_contract_tests {
                 let (sampled_tx, sampled_rx) = mpsc::channel();
                 let timer = DeadlineSignalingTimer::new(
                     clock.new_timer(),
+                    Arc::clone(&clock),
                     sampled_tx,
                 );
                 let monitor = Arc::new($monitor::with_timer(

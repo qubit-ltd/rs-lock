@@ -80,7 +80,7 @@ async fn test_async_timeout_condition_waiter_trait_accepts_tokio_monitor() {
 /// Verifies an Arc-wrapped monitor preserves async timeout trait forwarding.
 async fn test_async_timeout_condition_waiter_trait_accepts_arc_tokio_monitor() {
     let monitor = Arc::new(TokioMonitor::current(false));
-    let deadline = monitor.timer().now();
+    let deadline = monitor.timer().clock().now();
 
     assert_time_result_eq!(
         wait_through_trait(&monitor).await,
@@ -104,8 +104,8 @@ async fn test_async_timeout_condition_waiter_wait_until_ready_with_deadline_pres
  {
     let timed_out = TokioMonitor::current(false);
     let ready = TokioMonitor::current(true);
-    let timed_out_deadline = timed_out.timer().now();
-    let ready_deadline = ready.timer().now();
+    let timed_out_deadline = timed_out.timer().clock().now();
+    let ready_deadline = ready.timer().clock().now();
 
     assert_time_result_eq!(
         wait_until_ready_with_deadline_through_trait(

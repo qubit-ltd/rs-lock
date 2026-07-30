@@ -737,7 +737,7 @@ impl<T> StdMonitor<T> {
         F: FnOnce(&mut T) -> R,
     {
         let mut guard = self.lock();
-        let started_at = self.timer.now();
+        let started_at = self.timer.clock().now();
         if !waiting(&*guard) {
             return Ok(WaitTimeoutResult::Ready(f(&mut *guard)));
         }
@@ -800,7 +800,7 @@ impl<T> StdMonitor<T> {
         P: FnMut(&T) -> bool,
         F: FnOnce(&mut T) -> R,
     {
-        let deadline = self.timer().deadline_after(timeout)?;
+        let deadline = self.timer().clock().deadline_after(timeout)?;
         self.wait_while_with_deadline(deadline, waiting, f)
     }
 
