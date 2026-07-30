@@ -1,0 +1,7 @@
+{
+  "threshold_exempt_files": {
+    "qubit-lock": [
+      "src/monitor/internal/blocking_condition_wait.rs"
+    ]
+  }
+}
