@@ -923,7 +923,7 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
     {
         async move {
             let mut guard = self.state.lock().await;
-            let started_at = self.timer.now();
+            let started_at = self.timer.clock().now();
             if !predicate(&*guard) {
                 return Ok(WaitTimeoutResult::Ready(action(&mut *guard)));
             }

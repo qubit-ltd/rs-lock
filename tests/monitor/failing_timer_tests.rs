@@ -35,27 +35,27 @@ use qubit_clock::{
     },
 };
 
-/// Timer wrapper that reports when an operation samples its deadline clock.
-pub(super) struct DeadlineSignalingTimer<T> {
-    /// Wrapped timer providing clock access and deadline futures.
-    inner: T,
+/// Clock wrapper that reports when an operation fixes a relative deadline.
+struct DeadlineSignalingClock<C> {
+    /// Wrapped clock providing the real monotonic time behavior.
+    inner: C,
     /// One-shot signal emitted by the first clock sample.
     sampled_tx: Mutex<Option<Sender<()>>>,
 }
 
-impl<T> DeadlineSignalingTimer<T> {
-    /// Creates a wrapper that signals the supplied channel on its first clock
-    /// sample.
+impl<C> DeadlineSignalingClock<C> {
+    /// Creates a clock wrapper that signals the supplied channel on its first
+    /// relative deadline calculation.
     ///
     /// # Parameters
     ///
-    /// * `inner` - Timer providing the real deadline behavior.
-    /// * `sampled_tx` - Channel notified when the wrapper's clock is sampled.
+    /// * `inner` - Clock providing the real deadline behavior.
+    /// * `sampled_tx` - Channel notified when the wrapper fixes a deadline.
     ///
     /// # Returns
     ///
-    /// A Timer wrapper retaining the one-shot sampling signal.
-    pub(super) fn new(inner: T, sampled_tx: Sender<()>) -> Self {
+    /// A clock wrapper retaining the one-shot sampling signal.
+    fn new(inner: C, sampled_tx: Sender<()>) -> Self {
         Self {
             inner,
             sampled_tx: Mutex::new(Some(sampled_tx)),
@@ -63,16 +63,21 @@ impl<T> DeadlineSignalingTimer<T> {
     }
 }
 
-impl<T> Timer for DeadlineSignalingTimer<T>
+impl<C> MonotonicClock for DeadlineSignalingClock<C>
 where
-    T: Timer,
+    C: MonotonicClock,
 {
-    /// Returns the wrapped timer's monotonic clock.
-    fn clock(&self) -> &dyn MonotonicClock {
-        self.inner.clock()
+    /// Returns the wrapped clock's stable monotonic domain identity.
+    fn domain(&self) -> qubit_clock::ClockDomain {
+        self.inner.domain()
     }
 
-    /// Reports the first completed deadline sample.
+    /// Returns the wrapped clock's current monotonic instant.
+    fn now(&self) -> MonotonicInstant {
+        self.inner.now()
+    }
+
+    /// Reports the first completed relative deadline calculation.
     fn deadline_after(
         &self,
         duration: Duration,
@@ -89,6 +94,50 @@ where
                 .expect("deadline sampling receiver should remain connected");
         }
         Ok(deadline)
+    }
+
+    /// Creates a timer in the wrapped clock's monotonic domain.
+    fn new_timer(&self) -> Arc<dyn Timer> {
+        self.inner.new_timer()
+    }
+}
+
+/// Timer wrapper that exposes a deadline-signaling clock.
+pub(super) struct DeadlineSignalingTimer<T, C> {
+    /// Wrapped timer providing deadline futures.
+    inner: T,
+    /// Clock wrapper that reports relative deadline calculation.
+    clock: DeadlineSignalingClock<C>,
+}
+
+impl<T, C> DeadlineSignalingTimer<T, C> {
+    /// Creates a timer wrapper with a clock that signals the supplied channel.
+    ///
+    /// # Parameters
+    ///
+    /// * `inner` - Timer providing the real deadline behavior.
+    /// * `clock` - Clock from the same domain as `inner`.
+    /// * `sampled_tx` - Channel notified when the clock fixes a deadline.
+    ///
+    /// # Returns
+    ///
+    /// A timer wrapper retaining the clock sampling signal.
+    pub(super) fn new(inner: T, clock: C, sampled_tx: Sender<()>) -> Self {
+        Self {
+            inner,
+            clock: DeadlineSignalingClock::new(clock, sampled_tx),
+        }
+    }
+}
+
+impl<T, C> Timer for DeadlineSignalingTimer<T, C>
+where
+    T: Timer,
+    C: MonotonicClock,
+{
+    /// Returns the deadline-signaling monotonic clock.
+    fn clock(&self) -> &dyn MonotonicClock {
+        &self.clock
     }
 
     /// Registers the deadline with the wrapped timer.

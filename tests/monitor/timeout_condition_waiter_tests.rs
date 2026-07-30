@@ -128,8 +128,8 @@ fn test_timeout_condition_waiter_wait_until_ready_with_deadline_preserves_outcom
  {
     let timed_out = StdMonitor::new(false);
     let ready = StdMonitor::new(true);
-    let timed_out_deadline = timed_out.timer().now();
-    let ready_deadline = ready.timer().now();
+    let timed_out_deadline = timed_out.timer().clock().now();
+    let ready_deadline = ready.timer().clock().now();
 
     assert_time_result_eq!(
         wait_until_ready_with_deadline_through_trait(
