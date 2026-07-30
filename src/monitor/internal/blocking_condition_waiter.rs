@@ -7,15 +7,12 @@
 // =============================================================================
 //! Defines one latched blocking condition waiter and Timer waker.
 
+use std::sync::Arc;
 use std::task::{
     Context,
     Poll,
     Wake,
     Waker,
-};
-use std::{
-    ops::DerefMut,
-    sync::Arc,
 };
 
 use qubit_clock::{
@@ -31,69 +28,6 @@ use super::{
         recover,
     },
 };
-use crate::monitor::{
-    WaitTimeoutResult,
-    WaitTimeoutStatus,
-};
-
-/// Waits while a predicate remains true using one fixed timer future.
-///
-/// # Type Parameters
-///
-/// * `G` - Guard providing mutable access to the protected state.
-/// * `T` - Protected state type.
-/// * `R` - Value returned by the ready action.
-/// * `P` - Predicate deciding whether waiting must continue.
-/// * `F` - Action run once the predicate stops blocking.
-/// * `W` - Backend-specific suspension operation.
-///
-/// # Parameters
-///
-/// * `guard` - Acquired state guard retained across predicate checks.
-/// * `future` - Fixed Timer registration reused across wakeups.
-/// * `waiting` - Predicate returning `true` while suspension must continue.
-/// * `f` - Action receiving mutable state when waiting finishes.
-/// * `wait` - Operation that releases and reacquires `guard` while polling the
-///   fixed Timer.
-///
-/// # Returns
-///
-/// [`WaitTimeoutResult::Ready`] with the value returned by `f` when `waiting`
-/// becomes false, or [`WaitTimeoutResult::TimedOut`] when the Timer completes
-/// while the predicate still blocks.
-///
-/// # Errors
-///
-/// Returns Timer completion errors reported by `wait`. Such an error prevents
-/// `f` from running.
-///
-/// # Panics
-///
-/// Propagates a panic from `waiting`, `f`, or `wait`.
-pub(in crate::monitor) fn wait_while_with_timer_locked<G, T, R, P, F, W>(
-    mut guard: G,
-    mut future: TimerFuture,
-    mut waiting: P,
-    f: F,
-    mut wait: W,
-) -> Result<WaitTimeoutResult<R>, TimeError>
-where
-    G: DerefMut<Target = T>,
-    P: FnMut(&T) -> bool,
-    F: FnOnce(&mut T) -> R,
-    W: FnMut(&mut G, &mut TimerFuture) -> Result<WaitTimeoutStatus, TimeError>,
-{
-    loop {
-        let status = wait(&mut guard, &mut future)?;
-        if !waiting(&*guard) {
-            return Ok(WaitTimeoutResult::Ready(f(&mut *guard)));
-        }
-        if status.is_timed_out() {
-            return Ok(WaitTimeoutResult::TimedOut);
-        }
-    }
-}
-
 /// Private signal shared by monitor notification and a TimerFuture Waker.
 pub(in crate::monitor) struct BlockingConditionWaiter {
     /// Latched notification state.

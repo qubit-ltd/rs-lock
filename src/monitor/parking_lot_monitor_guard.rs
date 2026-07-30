@@ -17,7 +17,6 @@ use std::{
         Deref,
         DerefMut,
     },
-    task::Poll,
     time::Duration,
 };
 
@@ -29,6 +28,11 @@ use qubit_clock::{
 };
 
 use super::{
+    internal::{
+        release_guard,
+        wait_for_notification,
+        wait_with_timer,
+    },
     parking_lot_monitor::ParkingLotMonitor,
     wait_timeout_status::WaitTimeoutStatus,
 };
@@ -107,10 +111,9 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     /// Panics only if the guard's internal ownership invariant is violated.
     #[inline]
     pub fn notify_one(mut self) {
-        drop(
-            self.inner
-                .take()
-                .expect("parking-lot monitor guard slot must be occupied"),
+        release_guard(
+            &mut self.inner,
+            "parking-lot monitor guard slot must be occupied",
         );
         self.monitor.notify_one();
     }
@@ -128,10 +131,9 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     /// Panics only if the guard's internal ownership invariant is violated.
     #[inline]
     pub fn notify_all(mut self) {
-        drop(
-            self.inner
-                .take()
-                .expect("parking-lot monitor guard slot must be occupied"),
+        release_guard(
+            &mut self.inner,
+            "parking-lot monitor guard slot must be occupied",
         );
         self.monitor.notify_all();
     }
@@ -188,15 +190,13 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     /// Panics if the registry exhausts registration identifiers.
     #[inline]
     pub fn wait(&mut self) {
-        let registration = self.monitor.waiters.register();
-        let inner = self
-            .inner
-            .take()
-            .expect("parking-lot monitor guard slot must be occupied");
-        drop(inner);
-        registration.waiter().wait();
-        drop(registration);
-        self.inner = Some(self.monitor.state.lock());
+        let monitor = self.monitor;
+        wait_for_notification(
+            &mut self.inner,
+            &monitor.waiters,
+            "parking-lot monitor guard slot must be occupied",
+            || monitor.state.lock(),
+        );
     }
 
     /// Waits for a notification or timeout while temporarily releasing the
@@ -308,36 +308,14 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
         &mut self,
         future: &mut TimerFuture,
     ) -> Result<WaitTimeoutStatus, TimeError> {
-        if let Poll::Ready(result) =
-            super::internal::BlockingConditionWaiter::poll_timer_without_waiter(
-                future,
-            )
-        {
-            return result.map(|()| WaitTimeoutStatus::TimedOut);
-        }
-        let registration = self.monitor.waiters.register();
-        let waiter = std::sync::Arc::clone(registration.waiter());
-        if let Poll::Ready(result) =
-            super::internal::BlockingConditionWaiter::poll_timer(
-                &waiter, future,
-            )
-        {
-            return result.map(|()| WaitTimeoutStatus::TimedOut);
-        }
-        let inner = self
-            .inner
-            .take()
-            .expect("parking-lot monitor guard slot must be occupied");
-        drop(inner);
-        waiter.wait();
-        drop(registration);
-        self.inner = Some(self.monitor.state.lock());
-        match super::internal::BlockingConditionWaiter::poll_timer(
-            &waiter, future,
-        ) {
-            Poll::Ready(result) => result.map(|()| WaitTimeoutStatus::TimedOut),
-            Poll::Pending => Ok(WaitTimeoutStatus::Woken),
-        }
+        let monitor = self.monitor;
+        wait_with_timer(
+            &mut self.inner,
+            &monitor.waiters,
+            future,
+            "parking-lot monitor guard slot must be occupied",
+            || monitor.state.lock(),
+        )
     }
 }
 
