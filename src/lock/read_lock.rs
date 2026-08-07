@@ -7,11 +7,9 @@
 // =============================================================================
 //! Borrowed shared-mode lock adapter.
 
-use crate::lock::{
-    Lock,
-    ReadWriteLock,
-    TryLockError,
-};
+use crate::lock::Lock;
+use crate::lock::ReadWriteLock;
+use crate::lock::TryLockError;
 
 /// Adapts the read mode of a ReadWriteLock to Lock.
 ///

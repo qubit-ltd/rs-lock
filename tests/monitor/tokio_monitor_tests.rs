@@ -7,48 +7,35 @@
 // =============================================================================
 //! Tests for [`TokioMonitor`](qubit_lock::TokioMonitor).
 
-use std::{
-    future::Future,
-    pin::Pin,
-    sync::{
-        Arc,
-        atomic::{
-            AtomicUsize,
-            Ordering,
-        },
-        mpsc,
-    },
-    task::{
-        Context,
-        Poll,
-        Wake,
-        Waker,
-    },
-    thread,
-    time::Duration,
-};
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+use std::sync::mpsc;
+use std::task::Context;
+use std::task::Poll;
+use std::task::Wake;
+use std::task::Waker;
+use std::thread;
+use std::time::Duration;
 
-use super::failing_timer_tests::{
-    assert_backend_unavailable,
-    completion_failing_timer,
-    registration_failing_timer,
-};
-use qubit_clock::{
-    ManualMonotonicClock,
-    MonotonicClock,
-    MonotonicInstant,
-    TimeError,
-    Timer,
-    TimerFuture,
-    TokioRuntimeError,
-};
-use qubit_lock::{
-    AsyncConditionWaiter,
-    AsyncTimeoutConditionWaiter,
-    Notifier,
-    TokioMonitor,
-    WaitTimeoutResult,
-};
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::MonotonicClock;
+use qubit_clock::MonotonicInstant;
+use qubit_clock::TimeError;
+use qubit_clock::Timer;
+use qubit_clock::TimerFuture;
+use qubit_clock::TokioRuntimeError;
+use qubit_lock::AsyncConditionWaiter;
+use qubit_lock::AsyncTimeoutConditionWaiter;
+use qubit_lock::Notifier;
+use qubit_lock::TokioMonitor;
+use qubit_lock::WaitTimeoutResult;
+
+use super::failing_timer_tests::assert_backend_unavailable;
+use super::failing_timer_tests::completion_failing_timer;
+use super::failing_timer_tests::registration_failing_timer;
 
 /// Returns a future after proving at compile time that it is sendable.
 fn assert_send<F: Future + Send>(future: F) -> F {
@@ -883,8 +870,8 @@ async fn test_tokio_monitor_async_wait_while_for_uses_condition_wait_budget() {
     assert_time_result_eq!(wait.await, Ok(WaitTimeoutResult::TimedOut));
 }
 
-#[tokio::test]
 /// Verifies an absolute deadline includes time before the first poll.
+#[tokio::test]
 async fn test_tokio_monitor_async_wait_while_with_deadline_includes_pre_poll_time()
  {
     let clock = ManualMonotonicClock::new_shared();
@@ -901,8 +888,8 @@ async fn test_tokio_monitor_async_wait_while_with_deadline_includes_pre_poll_tim
     assert_eq!(clock.pending_waiters(), 0);
 }
 
-#[tokio::test]
 /// Verifies concrete deadline helpers cover notification and timeout paths.
+#[tokio::test]
 async fn test_tokio_monitor_deadline_helpers_wait_and_complete() {
     const WAIT_TIMEOUT: Duration = Duration::from_millis(20);
 

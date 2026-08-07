@@ -7,24 +7,18 @@
 // =============================================================================
 //! Defines backend-neutral blocking predicate-wait algorithms.
 
-use std::{
-    ops::DerefMut,
-    task::Poll,
-    time::Duration,
-};
+use std::ops::DerefMut;
+use std::task::Poll;
+use std::time::Duration;
 
-use qubit_clock::{
-    MonotonicInstant,
-    TimeError,
-    Timer,
-    TimerFuture,
-};
+use qubit_clock::MonotonicInstant;
+use qubit_clock::TimeError;
+use qubit_clock::Timer;
+use qubit_clock::TimerFuture;
 
 use super::BlockingConditionWaiter;
-use crate::monitor::{
-    WaitTimeoutResult,
-    WaitTimeoutStatus,
-};
+use crate::monitor::WaitTimeoutResult;
+use crate::monitor::WaitTimeoutStatus;
 
 /// Waits while a predicate remains true using a backend-specific guard wait.
 ///

@@ -7,20 +7,14 @@
 // =============================================================================
 //! Tests for [`AsyncTimeoutConditionWaiter`](qubit_lock::AsyncTimeoutConditionWaiter).
 
-use std::{
-    sync::Arc,
-    time::Duration,
-};
+use std::sync::Arc;
+use std::time::Duration;
 
-use qubit_clock::{
-    MonotonicInstant,
-    TimeError,
-};
-use qubit_lock::{
-    AsyncTimeoutConditionWaiter,
-    TokioMonitor,
-    WaitTimeoutResult,
-};
+use qubit_clock::MonotonicInstant;
+use qubit_clock::TimeError;
+use qubit_lock::AsyncTimeoutConditionWaiter;
+use qubit_lock::TokioMonitor;
+use qubit_lock::WaitTimeoutResult;
 
 /// Runs a zero-budget async wait through a generic timeout bound.
 async fn wait_through_trait<W>(
@@ -59,8 +53,8 @@ where
         .await
 }
 
-#[tokio::test]
 /// Verifies a Tokio monitor satisfies [`AsyncTimeoutConditionWaiter`].
+#[tokio::test]
 async fn test_async_timeout_condition_waiter_trait_accepts_tokio_monitor() {
     assert_time_result_eq!(
         wait_through_trait(&TokioMonitor::current(false)).await,
@@ -76,8 +70,8 @@ async fn test_async_timeout_condition_waiter_trait_accepts_tokio_monitor() {
     );
 }
 
-#[tokio::test]
 /// Verifies an Arc-wrapped monitor preserves async timeout trait forwarding.
+#[tokio::test]
 async fn test_async_timeout_condition_waiter_trait_accepts_arc_tokio_monitor() {
     let monitor = Arc::new(TokioMonitor::current(false));
     let deadline = monitor.timer().clock().now();
@@ -98,8 +92,8 @@ async fn test_async_timeout_condition_waiter_trait_accepts_arc_tokio_monitor() {
     );
 }
 
-#[tokio::test]
 /// Verifies the deadline async helper preserves ready and timeout outcomes.
+#[tokio::test]
 async fn test_async_timeout_condition_waiter_wait_until_ready_with_deadline_preserves_outcome()
  {
     let timed_out = TokioMonitor::current(false);

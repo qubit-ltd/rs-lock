@@ -7,11 +7,10 @@
 // =============================================================================
 //! Tests for the synchronous read-mode lock adapter.
 
-use qubit_lock::{
-    Lock,
-    ReadWriteLock,
-};
 use std::sync::RwLock;
+
+use qubit_lock::Lock;
+use qubit_lock::ReadWriteLock;
 
 /// Verifies two read adapters may hold shared guards concurrently.
 #[test]

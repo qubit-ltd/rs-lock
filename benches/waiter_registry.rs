@@ -7,22 +7,16 @@
 // =============================================================================
 //! Compares the production BTreeMap waiter index with former index strategies.
 
-use std::{
-    collections::{
-        BTreeMap,
-        HashMap,
-        btree_map::IntoValues,
-    },
-    hint::black_box,
-};
+use std::collections::BTreeMap;
+use std::collections::HashMap;
+use std::collections::btree_map::IntoValues;
+use std::hint::black_box;
 
-use criterion::{
-    BatchSize,
-    BenchmarkId,
-    Criterion,
-    criterion_group,
-    criterion_main,
-};
+use criterion::BatchSize;
+use criterion::BenchmarkId;
+use criterion::Criterion;
+use criterion::criterion_group;
+use criterion::criterion_main;
 use qubit_collections::map::OrderedIndexMap;
 
 /// Registry sizes used to expose order-index maintenance costs.

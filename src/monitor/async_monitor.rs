@@ -7,15 +7,11 @@
 // =============================================================================
 //! Aggregate asynchronous monitor capability.
 
-use std::{
-    future::Future,
-    sync::Arc,
-};
+use std::future::Future;
+use std::sync::Arc;
 
-use crate::monitor::{
-    AsyncConditionWaiter,
-    Notifier,
-};
+use crate::monitor::AsyncConditionWaiter;
+use crate::monitor::Notifier;
 
 /// Aggregate trait for asynchronous monitor-style synchronization.
 ///

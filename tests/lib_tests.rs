@@ -8,13 +8,15 @@
 //! Tests for crate-root feature-gated public exports.
 
 #[cfg(feature = "async-lock")]
-use qubit_lock::{
-    AsyncDataLock,
-    AsyncLock,
-    AsyncReadLock,
-    AsyncReadWriteLock,
-    AsyncWriteLock,
-};
+use qubit_lock::AsyncDataLock;
+#[cfg(feature = "async-lock")]
+use qubit_lock::AsyncLock;
+#[cfg(feature = "async-lock")]
+use qubit_lock::AsyncReadLock;
+#[cfg(feature = "async-lock")]
+use qubit_lock::AsyncReadWriteLock;
+#[cfg(feature = "async-lock")]
+use qubit_lock::AsyncWriteLock;
 
 /// Verifies that `async-lock` exposes lock capabilities without requiring the
 /// Tokio monitor API.

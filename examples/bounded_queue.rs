@@ -7,23 +7,17 @@
 // =============================================================================
 //! Runs the closable bounded-queue case study from the user guide.
 
-use std::{
-    collections::VecDeque,
-    num::NonZeroUsize,
-    sync::{
-        Arc,
-        mpsc,
-    },
-    thread,
-    time::Duration,
-};
+use std::collections::VecDeque;
+use std::num::NonZeroUsize;
+use std::sync::Arc;
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 
-use qubit_lock::{
-    Monitor,
-    ParkingLotMonitor,
-    TimedMonitor,
-    WaitTimeoutResult,
-};
+use qubit_lock::Monitor;
+use qubit_lock::ParkingLotMonitor;
+use qubit_lock::TimedMonitor;
+use qubit_lock::WaitTimeoutResult;
 
 /// Holds the queue data and its close state.
 pub(crate) struct QueueState<T> {

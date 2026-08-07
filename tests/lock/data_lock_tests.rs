@@ -9,26 +9,19 @@
 //!
 //! Tests for the DataLock trait and its implementations.
 
-use std::{
-    sync::{
-        Arc,
-        Barrier,
-        mpsc,
-    },
-    thread,
-    time::Duration,
-};
-
+use std::sync::Arc;
+use std::sync::Barrier;
 use std::sync::Mutex;
 #[cfg(feature = "parking-lot")]
 use std::sync::RwLock;
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 
 #[cfg(feature = "parking-lot")]
 use parking_lot::RwLock as ParkingLotRwLock;
-use qubit_lock::{
-    DataLock,
-    TryLockError,
-};
+use qubit_lock::DataLock;
+use qubit_lock::TryLockError;
 
 fn read_i32(value: &i32) -> i32 {
     *value
@@ -48,19 +41,17 @@ where
 }
 
 mod data_lock_trait_tests {
-    use super::{
-        Arc,
-        Barrier,
-        DataLock,
-        Duration,
-        Mutex,
-        TryLockError,
-        increment_i32,
-        increment_through_lock,
-        mpsc,
-        read_i32,
-        thread,
-    };
+    use super::Arc;
+    use super::Barrier;
+    use super::DataLock;
+    use super::Duration;
+    use super::Mutex;
+    use super::TryLockError;
+    use super::increment_i32;
+    use super::increment_through_lock;
+    use super::mpsc;
+    use super::read_i32;
+    use super::thread;
 
     #[test]
     fn test_lock_trait_accepts_arc_wrapped_implementation() {
@@ -550,18 +541,16 @@ mod data_lock_trait_tests {
 
 #[cfg(feature = "parking-lot")]
 mod rwlock_trait_tests {
-    use super::{
-        Arc,
-        DataLock,
-        Duration,
-        ParkingLotRwLock,
-        RwLock,
-        TryLockError,
-        increment_i32,
-        mpsc,
-        read_i32,
-        thread,
-    };
+    use super::Arc;
+    use super::DataLock;
+    use super::Duration;
+    use super::ParkingLotRwLock;
+    use super::RwLock;
+    use super::TryLockError;
+    use super::increment_i32;
+    use super::mpsc;
+    use super::read_i32;
+    use super::thread;
 
     #[test]
     fn test_rwlock_read_basic() {

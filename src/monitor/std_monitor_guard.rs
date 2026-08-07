@@ -12,32 +12,21 @@
 //! standard-library mutex guard and keeps a reference to the monitor that
 //! created it, so waiting operations can use its waiter registry and Timer.
 
-use qubit_clock::{
-    MonotonicInstant,
-    TimeError,
-    TimerFuture,
-};
-use std::{
-    ops::{
-        Deref,
-        DerefMut,
-    },
-    time::Duration,
-};
+use std::ops::Deref;
+use std::ops::DerefMut;
+use std::time::Duration;
 
-use super::{
-    internal::{
-        release_guard,
-        sync::{
-            MutexGuard,
-            recover,
-        },
-        wait_for_notification,
-        wait_with_timer,
-    },
-    std_monitor::StdMonitor,
-    wait_timeout_status::WaitTimeoutStatus,
-};
+use qubit_clock::MonotonicInstant;
+use qubit_clock::TimeError;
+use qubit_clock::TimerFuture;
+
+use super::internal::release_guard;
+use super::internal::sync::MutexGuard;
+use super::internal::sync::recover;
+use super::internal::wait_for_notification;
+use super::internal::wait_with_timer;
+use super::std_monitor::StdMonitor;
+use super::wait_timeout_status::WaitTimeoutStatus;
 
 /// Guard returned by [`StdMonitor::lock`](super::StdMonitor::lock).
 ///

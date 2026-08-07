@@ -8,16 +8,13 @@
 //! Demonstrates backend-neutral data access, shared monitor handles, and
 //! timed predicate waits.
 
+use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::Duration;
 
-use std::sync::Arc;
-
-use qubit_lock::{
-    DataLock,
-    ParkingLotMonitor,
-    WaitTimeoutResult,
-};
+use qubit_lock::DataLock;
+use qubit_lock::ParkingLotMonitor;
+use qubit_lock::WaitTimeoutResult;
 
 fn main() {
     println!("Demonstrating rs-lock wrapper boundaries...");

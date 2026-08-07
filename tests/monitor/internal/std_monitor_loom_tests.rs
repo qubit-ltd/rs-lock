@@ -7,23 +7,19 @@
 // =============================================================================
 //! Loom models for the synchronous monitor notification handshake.
 
-use loom::{
-    sync::{
-        Arc,
-        atomic::{
-            AtomicUsize,
-            Ordering,
-        },
-    },
-    thread,
-};
+use loom::model;
+use loom::model::Builder;
+use loom::sync::Arc;
+use loom::sync::atomic::AtomicUsize;
+use loom::sync::atomic::Ordering;
+use loom::thread;
 use qubit_lock::test_util::loom::LoomStdMonitor;
 
 /// Verifies the public poison API remains available when Loom substitutes its
 /// non-poisoning mutex.
 #[test]
 fn test_loom_std_monitor_exposes_non_poisoning_status() {
-    loom::model(|| {
+    model(|| {
         let monitor = LoomStdMonitor::new(());
 
         assert!(!monitor.is_poisoned());
@@ -35,7 +31,7 @@ fn test_loom_std_monitor_exposes_non_poisoning_status() {
 /// Models one registered waiter receiving a state-changing notification.
 #[test]
 fn test_loom_std_monitor_notify_one_releases_registered_waiter() {
-    loom::model(|| {
+    model(|| {
         let monitor = Arc::new(LoomStdMonitor::new(false));
         let predicate_checks = Arc::new(AtomicUsize::new(0));
         let completed = Arc::new(AtomicUsize::new(0));
@@ -68,7 +64,7 @@ fn test_loom_std_monitor_notify_one_releases_registered_waiter() {
 /// Models a broadcast after two waiters have observed the unavailable state.
 #[test]
 fn test_loom_std_monitor_notify_all_releases_every_registered_waiter() {
-    let mut builder = loom::model::Builder::new();
+    let mut builder = Builder::new();
     builder.preemption_bound = Some(2);
     builder.check(|| {
         let monitor = Arc::new(LoomStdMonitor::new(false));
@@ -108,7 +104,7 @@ fn test_loom_std_monitor_notify_all_releases_every_registered_waiter() {
 /// Models a memoryless notification that is superseded by the protected state.
 #[test]
 fn test_loom_std_monitor_state_change_prevents_late_waiter_from_parking() {
-    loom::model(|| {
+    model(|| {
         let monitor = Arc::new(LoomStdMonitor::new(false));
         let completed = Arc::new(AtomicUsize::new(0));
 

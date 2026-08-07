@@ -9,10 +9,8 @@
 
 use std::sync::Arc;
 
-use crate::monitor::{
-    ConditionWaiter,
-    Notifier,
-};
+use crate::monitor::ConditionWaiter;
+use crate::monitor::Notifier;
 
 /// Aggregate trait for blocking monitor-style synchronization.
 ///

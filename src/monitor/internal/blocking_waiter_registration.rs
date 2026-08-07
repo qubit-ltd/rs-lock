@@ -9,10 +9,8 @@
 
 use std::sync::Arc;
 
-use super::{
-    BlockingConditionWaiter,
-    BlockingWaiterRegistry,
-};
+use super::BlockingConditionWaiter;
+use super::BlockingWaiterRegistry;
 
 /// RAII ownership of one active blocking waiter registration.
 ///

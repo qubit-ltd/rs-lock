@@ -7,10 +7,8 @@
 // =============================================================================
 //! Aggregate asynchronous monitor capability with timeout-based waits.
 
-use crate::monitor::{
-    AsyncMonitor,
-    AsyncTimeoutConditionWaiter,
-};
+use crate::monitor::AsyncMonitor;
+use crate::monitor::AsyncTimeoutConditionWaiter;
 
 /// An asynchronous [`AsyncMonitor`] that also supports timeout-based waits.
 ///

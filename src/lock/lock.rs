@@ -7,17 +7,14 @@
 // =============================================================================
 //! Data-independent synchronous RAII lock capability.
 
-use std::sync::{
-    Arc,
-    Mutex,
-    MutexGuard,
-};
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::MutexGuard;
 
 #[cfg(feature = "parking-lot")]
-use parking_lot::{
-    Mutex as ParkingLotMutex,
-    MutexGuard as ParkingLotMutexGuard,
-};
+use parking_lot::Mutex as ParkingLotMutex;
+#[cfg(feature = "parking-lot")]
+use parking_lot::MutexGuard as ParkingLotMutexGuard;
 
 use crate::lock::TryLockError;
 

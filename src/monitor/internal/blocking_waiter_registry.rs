@@ -10,15 +10,11 @@
 use std::sync::Arc;
 use std::task::Wake;
 
-use super::{
-    BlockingConditionWaiter,
-    BlockingWaiterRegistration,
-    WaiterRegistry,
-    sync::{
-        Mutex,
-        recover,
-    },
-};
+use super::BlockingConditionWaiter;
+use super::BlockingWaiterRegistration;
+use super::WaiterRegistry;
+use super::sync::Mutex;
+use super::sync::recover;
 
 /// Registry of blocking waiters eligible for current notifications.
 pub(in crate::monitor) struct BlockingWaiterRegistry {

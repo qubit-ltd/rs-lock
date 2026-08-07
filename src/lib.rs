@@ -70,49 +70,58 @@ mod lock;
 #[cfg(feature = "monitor")]
 mod monitor;
 #[cfg(feature = "async-lock")]
-pub use lock::{
-    AsyncDataLock,
-    AsyncLock,
-    AsyncReadLock,
-    AsyncReadWriteLock,
-    AsyncWriteLock,
-};
-pub use lock::{
-    DataLock,
-    ExclusiveLock,
-    Lock,
-    ReadLock,
-    ReadWriteLock,
-    TryLockError,
-    WriteLock,
-};
+pub use lock::AsyncDataLock;
+#[cfg(feature = "async-lock")]
+pub use lock::AsyncLock;
+#[cfg(feature = "async-lock")]
+pub use lock::AsyncReadLock;
+#[cfg(feature = "async-lock")]
+pub use lock::AsyncReadWriteLock;
+#[cfg(feature = "async-lock")]
+pub use lock::AsyncWriteLock;
+pub use lock::DataLock;
+pub use lock::ExclusiveLock;
+pub use lock::Lock;
+pub use lock::ReadLock;
+pub use lock::ReadWriteLock;
+pub use lock::TryLockError;
+pub use lock::WriteLock;
 #[cfg(all(feature = "loom-model", loom))]
 #[doc(hidden)]
 pub mod test_util;
 #[cfg(feature = "async-monitor")]
-pub use monitor::{
-    AsyncConditionWaiter,
-    AsyncMonitor,
-    AsyncTimedMonitor,
-    AsyncTimeoutConditionWaiter,
-    SharedAsyncMonitor,
-    TokioMonitor,
-};
+pub use monitor::AsyncConditionWaiter;
+#[cfg(feature = "async-monitor")]
+pub use monitor::AsyncMonitor;
+#[cfg(feature = "async-monitor")]
+pub use monitor::AsyncTimedMonitor;
+#[cfg(feature = "async-monitor")]
+pub use monitor::AsyncTimeoutConditionWaiter;
 #[cfg(feature = "monitor")]
-pub use monitor::{
-    ConditionWaiter,
-    Monitor,
-    Notifier,
-    SharedMonitor,
-    StdMonitor,
-    StdMonitorGuard,
-    TimedMonitor,
-    TimeoutConditionWaiter,
-    WaitTimeoutResult,
-    WaitTimeoutStatus,
-};
+pub use monitor::ConditionWaiter;
+#[cfg(feature = "monitor")]
+pub use monitor::Monitor;
+#[cfg(feature = "monitor")]
+pub use monitor::Notifier;
 #[cfg(all(feature = "monitor", feature = "parking-lot"))]
-pub use monitor::{
-    ParkingLotMonitor,
-    ParkingLotMonitorGuard,
-};
+pub use monitor::ParkingLotMonitor;
+#[cfg(all(feature = "monitor", feature = "parking-lot"))]
+pub use monitor::ParkingLotMonitorGuard;
+#[cfg(feature = "async-monitor")]
+pub use monitor::SharedAsyncMonitor;
+#[cfg(feature = "monitor")]
+pub use monitor::SharedMonitor;
+#[cfg(feature = "monitor")]
+pub use monitor::StdMonitor;
+#[cfg(feature = "monitor")]
+pub use monitor::StdMonitorGuard;
+#[cfg(feature = "monitor")]
+pub use monitor::TimedMonitor;
+#[cfg(feature = "monitor")]
+pub use monitor::TimeoutConditionWaiter;
+#[cfg(feature = "async-monitor")]
+pub use monitor::TokioMonitor;
+#[cfg(feature = "monitor")]
+pub use monitor::WaitTimeoutResult;
+#[cfg(feature = "monitor")]
+pub use monitor::WaitTimeoutStatus;

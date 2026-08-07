@@ -7,41 +7,29 @@
 // =============================================================================
 //! Tokio-based asynchronous monitor.
 
-use std::{
-    future::{
-        Future,
-        poll_fn,
-    },
-    sync::{
-        Arc,
-        Mutex as StdMutex,
-    },
-    task::Poll,
-    time::Duration,
-};
+use std::future::Future;
+use std::future::poll_fn;
+use std::sync::Arc;
+use std::sync::Mutex as StdMutex;
+use std::task::Poll;
+use std::time::Duration;
 
-use qubit_clock::{
-    MonotonicInstant,
-    TimeError,
-    Timer,
-    TimerFuture,
-    TokioRuntimeError,
-    TokioTimer,
-};
+use qubit_clock::MonotonicInstant;
+use qubit_clock::TimeError;
+use qubit_clock::Timer;
+use qubit_clock::TimerFuture;
+use qubit_clock::TokioRuntimeError;
+use qubit_clock::TokioTimer;
 use tokio::sync::Mutex;
 
-use super::{
-    AsyncConditionWaiter,
-    AsyncMonitor,
-    AsyncTimeoutConditionWaiter,
-    Notifier,
-    WaitTimeoutResult,
-    internal::{
-        TokioConditionWaiter,
-        TokioConditionWaiterRegistration,
-        WaiterRegistry,
-    },
-};
+use super::AsyncConditionWaiter;
+use super::AsyncMonitor;
+use super::AsyncTimeoutConditionWaiter;
+use super::Notifier;
+use super::WaitTimeoutResult;
+use super::internal::TokioConditionWaiter;
+use super::internal::TokioConditionWaiterRegistration;
+use super::internal::WaiterRegistry;
 
 /// Asynchronous monitor built on Tokio synchronization primitives.
 ///

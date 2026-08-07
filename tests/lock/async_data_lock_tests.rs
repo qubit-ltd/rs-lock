@@ -9,15 +9,10 @@
 //!
 //! Tests for the AsyncDataLock trait and its Tokio implementations.
 
-use tokio::sync::{
-    Mutex as AsyncMutex,
-    RwLock as AsyncRwLock,
-};
-
-use qubit_lock::{
-    AsyncDataLock,
-    TryLockError,
-};
+use qubit_lock::AsyncDataLock;
+use qubit_lock::TryLockError;
+use tokio::sync::Mutex as AsyncMutex;
+use tokio::sync::RwLock as AsyncRwLock;
 
 fn read_i32(value: &i32) -> i32 {
     *value
@@ -29,29 +24,23 @@ fn increment_i32(value: &mut i32) -> i32 {
 }
 
 mod async_data_lock_trait_tests {
-    use std::{
-        future::{
-            Future,
-            poll_fn,
-        },
-        sync::{
-            Arc,
-            atomic::{
-                AtomicBool,
-                Ordering,
-            },
-        },
-        task::Poll,
-    };
+    use std::future::Future;
+    use std::future::poll_fn;
+    use std::sync::Arc;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::atomic::Ordering;
+    use std::task::Poll;
 
-    use super::{
-        AsyncDataLock,
-        AsyncMutex,
-        AsyncRwLock,
-        TryLockError,
-        increment_i32,
-        read_i32,
-    };
+    use tokio::runtime::Runtime;
+    use tokio::spawn;
+    use tokio::sync::oneshot;
+
+    use super::AsyncDataLock;
+    use super::AsyncMutex;
+    use super::AsyncRwLock;
+    use super::TryLockError;
+    use super::increment_i32;
+    use super::read_i32;
 
     #[tokio::test]
     async fn test_async_data_lock_accepts_borrowed_forwarding() {
@@ -157,13 +146,9 @@ mod async_data_lock_trait_tests {
 
     #[tokio::test]
     async fn test_async_mutex_try_read_returns_would_block_when_locked() {
-        use std::{
-            sync::{
-                Arc,
-                mpsc,
-            },
-            time::Duration,
-        };
+        use std::sync::Arc;
+        use std::sync::mpsc;
+        use std::time::Duration;
 
         let async_mutex = Arc::new(AsyncMutex::new(0));
         let (locked_tx, locked_rx) = mpsc::channel();
@@ -175,8 +160,7 @@ mod async_data_lock_trait_tests {
         // Hold the lock in another thread (note: using thread instead of tokio
         // task)
         let handle = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new()
-                .expect("failed to create Tokio runtime");
+            let rt = Runtime::new().expect("failed to create Tokio runtime");
             rt.block_on(async {
                 async_mutex_clone
                     .with_write(move |_| {
@@ -222,7 +206,7 @@ mod async_data_lock_trait_tests {
         // Create multiple tasks accessing the lock concurrently
         for _ in 0..10 {
             let async_mutex = Arc::clone(&async_mutex);
-            let handle = tokio::spawn(async move {
+            let handle = spawn(async move {
                 async_mutex
                     .with_write(|value| {
                         *value += 1;
@@ -277,9 +261,9 @@ mod async_data_lock_trait_tests {
         assert_eq!(original, vec![1, 2, 3, 4, 5]);
     }
 
-    #[tokio::test]
     /// Verifies all concurrent writes complete without claiming an ordering
     /// guarantee.
+    #[tokio::test]
     async fn test_async_mutex_concurrent_writes_complete() {
         use std::sync::Arc;
 
@@ -289,7 +273,7 @@ mod async_data_lock_trait_tests {
         // Spawn multiple tasks that append their ID
         for i in 0..5 {
             let async_mutex = Arc::clone(&async_mutex);
-            let handle = tokio::spawn(async move {
+            let handle = spawn(async move {
                 async_mutex
                     .with_write(|v| {
                         v.push(i);
@@ -313,23 +297,18 @@ mod async_data_lock_trait_tests {
 
     #[tokio::test]
     async fn test_async_mutex_serializes_contended_writes() {
-        use std::{
-            sync::{
-                Arc,
-                mpsc,
-            },
-            time::Duration,
-        };
+        use std::sync::Arc;
+        use std::sync::mpsc;
+        use std::time::Duration;
 
         let async_mutex = Arc::new(AsyncMutex::new(0));
         let (locked_tx, locked_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
-        let (attempted_tx, attempted_rx) = tokio::sync::oneshot::channel();
+        let (attempted_tx, attempted_rx) = oneshot::channel();
         let async_mutex_clone = async_mutex.clone();
 
         let holder = std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new()
-                .expect("failed to create Tokio runtime");
+            let rt = Runtime::new().expect("failed to create Tokio runtime");
             rt.block_on(async {
                 async_mutex_clone
                     .with_write(move |value| {
@@ -350,7 +329,7 @@ mod async_data_lock_trait_tests {
             .expect("mutex should be held within timeout");
 
         let async_mutex_clone2 = async_mutex.clone();
-        let writer = tokio::spawn(async move {
+        let writer = spawn(async move {
             attempted_tx
                 .send(())
                 .expect("test should observe contended writer attempt");
@@ -494,13 +473,13 @@ mod async_data_lock_trait_tests {
 }
 
 mod async_rwlock_data_trait_tests {
-    use super::{
-        AsyncDataLock,
-        AsyncRwLock,
-        TryLockError,
-        increment_i32,
-        read_i32,
-    };
+    use tokio::spawn;
+
+    use super::AsyncDataLock;
+    use super::AsyncRwLock;
+    use super::TryLockError;
+    use super::increment_i32;
+    use super::read_i32;
 
     #[tokio::test]
     async fn test_async_rwlock_read_basic() {
@@ -537,7 +516,7 @@ mod async_rwlock_data_trait_tests {
         // Create multiple reader tasks
         for _ in 0..10 {
             let async_rw_lock = Arc::clone(&async_rw_lock);
-            let handle = tokio::spawn(async move {
+            let handle = spawn(async move {
                 async_rw_lock
                     .with_read(|data| {
                         // Simulate some read operation
@@ -567,7 +546,7 @@ mod async_rwlock_data_trait_tests {
         // Create multiple writer tasks
         for _ in 0..10 {
             let async_rw_lock = Arc::clone(&async_rw_lock);
-            let handle = tokio::spawn(async move {
+            let handle = spawn(async move {
                 async_rw_lock
                     .with_write(|value| {
                         *value += 1;
@@ -690,7 +669,7 @@ mod async_rwlock_data_trait_tests {
         // Create some readers
         for _ in 0..5 {
             let async_rw_lock = Arc::clone(&async_rw_lock);
-            let handle = tokio::spawn(async move {
+            let handle = spawn(async move {
                 for _ in 0..10 {
                     async_rw_lock
                         .with_read(|value| {
@@ -705,7 +684,7 @@ mod async_rwlock_data_trait_tests {
         // Create some writers
         for _ in 0..5 {
             let async_rw_lock = Arc::clone(&async_rw_lock);
-            let handle = tokio::spawn(async move {
+            let handle = spawn(async move {
                 for _ in 0..10 {
                     async_rw_lock
                         .with_write(|value| {

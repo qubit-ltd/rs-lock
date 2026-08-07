@@ -12,30 +12,20 @@
 //! a parking_lot mutex guard and keeps a reference to the monitor that created
 //! it, so waiting operations can use its waiter registry and Timer.
 
-use std::{
-    ops::{
-        Deref,
-        DerefMut,
-    },
-    time::Duration,
-};
+use std::ops::Deref;
+use std::ops::DerefMut;
+use std::time::Duration;
 
 use parking_lot::MutexGuard;
-use qubit_clock::{
-    MonotonicInstant,
-    TimeError,
-    TimerFuture,
-};
+use qubit_clock::MonotonicInstant;
+use qubit_clock::TimeError;
+use qubit_clock::TimerFuture;
 
-use super::{
-    internal::{
-        release_guard,
-        wait_for_notification,
-        wait_with_timer,
-    },
-    parking_lot_monitor::ParkingLotMonitor,
-    wait_timeout_status::WaitTimeoutStatus,
-};
+use super::internal::release_guard;
+use super::internal::wait_for_notification;
+use super::internal::wait_with_timer;
+use super::parking_lot_monitor::ParkingLotMonitor;
+use super::wait_timeout_status::WaitTimeoutStatus;
 
 /// Guard returned by
 /// [`ParkingLotMonitor::lock`](super::ParkingLotMonitor::lock).

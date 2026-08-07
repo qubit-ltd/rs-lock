@@ -7,40 +7,30 @@
 // =============================================================================
 //! Tests for [`ParkingLotMonitor`](qubit_lock::ParkingLotMonitor).
 
-use std::{
-    sync::{
-        Arc,
-        atomic::Ordering,
-        mpsc,
-    },
-    thread,
-    time::Duration,
-};
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 
-use qubit_clock::{
-    ManualMonotonicClock,
-    MonotonicClock,
-};
-use qubit_lock::{
-    ConditionWaiter,
-    Notifier,
-    ParkingLotMonitor,
-    TimeoutConditionWaiter,
-    WaitTimeoutResult,
-    WaitTimeoutStatus,
-};
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::MonotonicClock;
+use qubit_lock::ConditionWaiter;
+use qubit_lock::Notifier;
+use qubit_lock::ParkingLotMonitor;
+use qubit_lock::TimeoutConditionWaiter;
+use qubit_lock::WaitTimeoutResult;
+use qubit_lock::WaitTimeoutStatus;
 
 blocking_monitor_contract_tests!(
     parking_lot_monitor_contract,
     ParkingLotMonitor
 );
 
-use super::failing_timer_tests::{
-    OncePendingTimer,
-    assert_backend_unavailable,
-    completion_failing_timer,
-    registration_failing_timer,
-};
+use super::failing_timer_tests::OncePendingTimer;
+use super::failing_timer_tests::assert_backend_unavailable;
+use super::failing_timer_tests::completion_failing_timer;
+use super::failing_timer_tests::registration_failing_timer;
 
 #[test]
 fn test_parking_lot_monitor_new_read_write_updates_state() {
@@ -473,8 +463,8 @@ fn test_parking_lot_monitor_wait_while_for_returns_timed_out_when_timeout() {
     assert_time_result_eq!(result, Ok(WaitTimeoutResult::TimedOut));
 }
 
-#[test]
 /// Verifies a reached deadline checks the predicate once without registering.
+#[test]
 fn test_parking_lot_monitor_wait_while_with_deadline_times_out_without_registration()
  {
     let clock = ManualMonotonicClock::new_shared();
@@ -496,8 +486,8 @@ fn test_parking_lot_monitor_wait_while_with_deadline_times_out_without_registrat
     assert_eq!(clock.pending_waiters(), 0);
 }
 
-#[test]
 /// Verifies a ready predicate wins a reached absolute deadline.
+#[test]
 fn test_parking_lot_monitor_wait_until_with_deadline_ready_wins_reached_deadline()
  {
     let clock = ManualMonotonicClock::new_shared();
@@ -510,8 +500,8 @@ fn test_parking_lot_monitor_wait_until_with_deadline_ready_wins_reached_deadline
     assert_eq!(clock.pending_waiters(), 0);
 }
 
-#[test]
 /// Verifies deadline helpers register, wait, and preserve trait forwarding.
+#[test]
 fn test_parking_lot_monitor_deadline_helpers_wait_until_timeout() {
     const WAIT_TIMEOUT: Duration = Duration::from_millis(20);
 
@@ -559,8 +549,8 @@ fn test_parking_lot_monitor_deadline_helpers_wait_until_timeout() {
     );
 }
 
-#[test]
 /// Verifies the inherent deadline helper enters the pending wait path.
+#[test]
 fn test_parking_lot_monitor_deadline_wait_propagates_completion_error() {
     let (timer, poll_count) = OncePendingTimer::new(completion_failing_timer());
     let monitor =

@@ -11,22 +11,23 @@
 macro_rules! blocking_monitor_contract_tests {
     ($module:ident, $monitor:ident) => {
         mod $module {
-            use std::{
-                cell::Cell,
-                sync::{Arc, mpsc},
-                thread,
-                time::Duration,
-            };
+            use std::cell::Cell;
+            use std::sync::Arc;
+            use std::sync::mpsc;
+            use std::thread;
+            use std::time::Duration;
 
-            use qubit_clock::{ManualMonotonicClock, MonotonicClock};
-            use qubit_lock::{WaitTimeoutResult, WaitTimeoutStatus, $monitor};
+            use qubit_clock::ManualMonotonicClock;
+            use qubit_clock::MonotonicClock;
+            use qubit_clock::TimeError;
+            use qubit_lock::$monitor;
+            use qubit_lock::WaitTimeoutResult;
+            use qubit_lock::WaitTimeoutStatus;
 
-            use crate::monitor::failing_timer_tests::{
-                DeadlineSignalingTimer,
-                assert_backend_unavailable,
-                completion_failing_timer,
-                registration_failing_timer,
-            };
+            use crate::monitor::failing_timer_tests::DeadlineSignalingTimer;
+            use crate::monitor::failing_timer_tests::assert_backend_unavailable;
+            use crate::monitor::failing_timer_tests::completion_failing_timer;
+            use crate::monitor::failing_timer_tests::registration_failing_timer;
 
             #[test]
             fn test_new_read_write_updates_state() {
@@ -281,7 +282,7 @@ macro_rules! blocking_monitor_contract_tests {
 
                 assert!(matches!(
                     result,
-                    Err(qubit_clock::TimeError::InstantOverflow)
+                    Err(TimeError::InstantOverflow)
                 ));
                 assert!(!predicate_called.get());
             }

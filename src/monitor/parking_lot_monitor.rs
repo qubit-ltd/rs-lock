@@ -22,33 +22,25 @@
 //! [`ParkingLotMonitorGuard::wait_until`] for more complex state machines such
 //! as thread pools.
 
-use qubit_clock::{
-    MonotonicInstant,
-    TimeError,
-    Timer,
-};
-use std::{
-    sync::Arc,
-    time::Duration,
-};
+use std::sync::Arc;
+use std::time::Duration;
 
 use parking_lot::Mutex;
+use qubit_clock::MonotonicInstant;
+use qubit_clock::TimeError;
+use qubit_clock::Timer;
 
+use super::ConditionWaiter;
+use super::Monitor;
+use super::Notifier;
+use super::TimeoutConditionWaiter;
+use super::internal::BlockingWaiterRegistry;
+use super::internal::default_timer;
+use super::internal::wait_while_for as wait_while_for_internal;
+use super::internal::wait_while_locked;
+use super::internal::wait_while_with_deadline as wait_while_with_deadline_internal;
 use super::parking_lot_monitor_guard::ParkingLotMonitorGuard;
-use super::{
-    ConditionWaiter,
-    Monitor,
-    Notifier,
-    TimeoutConditionWaiter,
-    internal::{
-        BlockingWaiterRegistry,
-        default_timer,
-        wait_while_for as wait_while_for_internal,
-        wait_while_locked,
-        wait_while_with_deadline as wait_while_with_deadline_internal,
-    },
-    wait_timeout_result::WaitTimeoutResult,
-};
+use super::wait_timeout_result::WaitTimeoutResult;
 
 /// Shared state protected by a mutex with notification and Timer-driven waits.
 ///

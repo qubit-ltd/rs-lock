@@ -9,10 +9,8 @@
 
 use std::sync::Arc;
 
-use qubit_lock::{
-    AsyncMonitor,
-    TokioMonitor,
-};
+use qubit_lock::AsyncMonitor;
+use qubit_lock::TokioMonitor;
 
 /// Exercises state access and untimed waiting through the aggregate capability.
 async fn use_async_monitor<M>(monitor: &M)
@@ -32,14 +30,14 @@ where
     assert_eq!(monitor.wait_until_async(|ready| *ready, |_| 7).await, 7,);
 }
 
-#[tokio::test(start_paused = true)]
 /// Verifies a Tokio handle satisfies [`AsyncMonitor`].
+#[tokio::test(start_paused = true)]
 async fn test_async_monitor_trait_accepts_tokio_monitor() {
     use_async_monitor(&Arc::new(TokioMonitor::current(false))).await;
 }
 
-#[tokio::test(start_paused = true)]
 /// Verifies [`Arc`] forwards the aggregate async monitor capability.
+#[tokio::test(start_paused = true)]
 async fn test_async_monitor_trait_accepts_arc_forwarding() {
     let monitor = Arc::new(TokioMonitor::current(false));
     use_async_monitor(&monitor).await;

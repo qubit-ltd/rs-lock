@@ -7,10 +7,8 @@
 // =============================================================================
 //! Tests for [`Notifier`](qubit_lock::Notifier).
 
-use qubit_lock::{
-    Notifier,
-    StdMonitor,
-};
+use qubit_lock::Notifier;
+use qubit_lock::StdMonitor;
 
 /// Exercises both notification methods through a generic capability bound.
 fn notify_through_trait<N: Notifier>(notifier: &N) {
@@ -18,8 +16,8 @@ fn notify_through_trait<N: Notifier>(notifier: &N) {
     notifier.notify_all();
 }
 
-#[test]
 /// Verifies that a concrete blocking monitor satisfies [`Notifier`].
+#[test]
 fn test_notifier_trait_accepts_std_monitor() {
     notify_through_trait(&StdMonitor::new(()));
 }

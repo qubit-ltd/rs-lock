@@ -7,14 +7,10 @@
 // =============================================================================
 //! Public behavior tests backed by shared blocking monitor-guard waits.
 
-use qubit_clock::{
-    ManualMonotonicClock,
-    MonotonicClock,
-};
-use qubit_lock::{
-    StdMonitor,
-    WaitTimeoutStatus,
-};
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::MonotonicClock;
+use qubit_lock::StdMonitor;
+use qubit_lock::WaitTimeoutStatus;
 
 /// Verifies a timed guard wait retains the guard after an immediate timeout.
 #[test]

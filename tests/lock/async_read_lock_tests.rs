@@ -7,10 +7,8 @@
 // =============================================================================
 //! Tests for the asynchronous read-mode lock adapter.
 
-use qubit_lock::{
-    AsyncLock,
-    AsyncReadWriteLock,
-};
+use qubit_lock::AsyncLock;
+use qubit_lock::AsyncReadWriteLock;
 use tokio::sync::RwLock;
 
 /// Verifies two asynchronous read adapters may hold guards concurrently.

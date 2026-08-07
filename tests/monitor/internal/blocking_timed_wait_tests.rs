@@ -7,19 +7,13 @@
 // =============================================================================
 //! Public behavior tests backed by the shared blocking timed-wait loop.
 
-use std::{
-    sync::{
-        Arc,
-        mpsc,
-    },
-    thread,
-    time::Duration,
-};
+use std::sync::Arc;
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 
-use qubit_lock::{
-    StdMonitor,
-    WaitTimeoutResult,
-};
+use qubit_lock::StdMonitor;
+use qubit_lock::WaitTimeoutResult;
 
 /// Verifies a timed blocking wait performs its deciding predicate check.
 #[test]

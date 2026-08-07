@@ -7,20 +7,15 @@
 // =============================================================================
 //! Asynchronous timeout condition-wait capability.
 
-use qubit_clock::{
-    MonotonicInstant,
-    TimeError,
-};
-use std::{
-    future::Future,
-    sync::Arc,
-    time::Duration,
-};
+use std::future::Future;
+use std::sync::Arc;
+use std::time::Duration;
 
-use crate::monitor::{
-    AsyncConditionWaiter,
-    WaitTimeoutResult,
-};
+use qubit_clock::MonotonicInstant;
+use qubit_clock::TimeError;
+
+use crate::monitor::AsyncConditionWaiter;
+use crate::monitor::WaitTimeoutResult;
 
 /// Waits asynchronously for predicates over protected state with timeouts.
 ///

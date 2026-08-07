@@ -9,11 +9,9 @@
 
 use std::future::Future;
 
-use crate::lock::{
-    AsyncLock,
-    AsyncReadWriteLock,
-    TryLockError,
-};
+use crate::lock::AsyncLock;
+use crate::lock::AsyncReadWriteLock;
+use crate::lock::TryLockError;
 
 /// Adapts the write mode of an AsyncReadWriteLock to AsyncLock.
 ///
