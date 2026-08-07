@@ -7,10 +7,8 @@
 // =============================================================================
 //! Tests for [`AsyncConditionWaiter`](qubit_lock::AsyncConditionWaiter).
 
-use qubit_lock::{
-    AsyncConditionWaiter,
-    TokioMonitor,
-};
+use qubit_lock::AsyncConditionWaiter;
+use qubit_lock::TokioMonitor;
 
 /// Runs an immediately ready async wait through a generic capability bound.
 async fn wait_through_trait<W>(waiter: &W) -> i32
@@ -29,8 +27,8 @@ where
     waiter.wait_until_ready_async(|ready| *ready).await;
 }
 
-#[tokio::test]
 /// Verifies a Tokio monitor satisfies [`AsyncConditionWaiter`].
+#[tokio::test]
 async fn test_async_condition_waiter_trait_accepts_tokio_monitor() {
     assert_eq!(wait_through_trait(&TokioMonitor::current(true)).await, 7);
     wait_until_ready_through_trait(&TokioMonitor::current(true)).await;

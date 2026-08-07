@@ -9,10 +9,8 @@
 
 use std::time::Duration;
 
-use qubit_lock::{
-    AsyncConditionWaiter,
-    TokioMonitor,
-};
+use qubit_lock::AsyncConditionWaiter;
+use qubit_lock::TokioMonitor;
 
 /// Verifies cancelling a pending Tokio wait removes its registration.
 #[tokio::test]

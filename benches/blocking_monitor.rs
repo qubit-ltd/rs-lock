@@ -7,40 +7,26 @@
 // =============================================================================
 //! Benchmarks blocking Monitor wait registration and notification overhead.
 
-use std::{
-    hint::black_box,
-    sync::{
-        Arc,
-        Condvar as StdCondvar,
-        Mutex as StdMutex,
-        mpsc::{
-            self,
-            Receiver,
-        },
-    },
-    thread::{
-        self,
-        JoinHandle,
-    },
-    time::Duration,
-};
+use std::hint::black_box;
+use std::sync::Arc;
+use std::sync::Condvar as StdCondvar;
+use std::sync::Mutex as StdMutex;
+use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{self};
+use std::thread::JoinHandle;
+use std::thread::{self};
+use std::time::Duration;
 
-use criterion::{
-    BatchSize,
-    BenchmarkId,
-    Criterion,
-    criterion_group,
-    criterion_main,
-};
-use parking_lot::{
-    Condvar,
-    Mutex,
-};
-use qubit_lock::{
-    ParkingLotMonitor,
-    StdMonitor,
-    WaitTimeoutStatus,
-};
+use criterion::BatchSize;
+use criterion::BenchmarkId;
+use criterion::Criterion;
+use criterion::criterion_group;
+use criterion::criterion_main;
+use parking_lot::Condvar;
+use parking_lot::Mutex;
+use qubit_lock::ParkingLotMonitor;
+use qubit_lock::StdMonitor;
+use qubit_lock::WaitTimeoutStatus;
 
 /// Generous safety deadline that detects stalled notify-one benchmarks without
 /// allowing ordinary setup delays to select the timeout path.

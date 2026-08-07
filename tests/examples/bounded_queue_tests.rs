@@ -11,32 +11,22 @@
 #[path = "../../examples/bounded_queue.rs"]
 mod bounded_queue;
 
-use std::{
-    num::NonZeroUsize,
-    sync::atomic::{
-        AtomicUsize,
-        Ordering,
-    },
-    time::Duration,
-};
+use std::num::NonZeroUsize;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+use std::time::Duration;
 
-use bounded_queue::{
-    QueueState,
-    pop_for,
-    push,
-};
-use qubit_clock::{
-    MonotonicInstant,
-    TimeError,
-};
-use qubit_lock::{
-    ConditionWaiter,
-    Monitor,
-    Notifier,
-    ParkingLotMonitor,
-    TimeoutConditionWaiter,
-    WaitTimeoutResult,
-};
+use bounded_queue::QueueState;
+use bounded_queue::pop_for;
+use bounded_queue::push;
+use qubit_clock::MonotonicInstant;
+use qubit_clock::TimeError;
+use qubit_lock::ConditionWaiter;
+use qubit_lock::Monitor;
+use qubit_lock::Notifier;
+use qubit_lock::ParkingLotMonitor;
+use qubit_lock::TimeoutConditionWaiter;
+use qubit_lock::WaitTimeoutResult;
 
 /// Counts notifications while delegating queue behavior to a real monitor.
 struct CountingMonitor {

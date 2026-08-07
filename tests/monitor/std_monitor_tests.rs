@@ -7,37 +7,27 @@
 // =============================================================================
 //! Tests for [`StdMonitor`](qubit_lock::StdMonitor).
 
-use std::{
-    sync::{
-        Arc,
-        atomic::Ordering,
-        mpsc,
-    },
-    thread,
-    time::Duration,
-};
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 
-use qubit_clock::{
-    ManualMonotonicClock,
-    MonotonicClock,
-};
-use qubit_lock::{
-    ConditionWaiter,
-    Notifier,
-    StdMonitor,
-    TimeoutConditionWaiter,
-    WaitTimeoutResult,
-    WaitTimeoutStatus,
-};
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::MonotonicClock;
+use qubit_lock::ConditionWaiter;
+use qubit_lock::Notifier;
+use qubit_lock::StdMonitor;
+use qubit_lock::TimeoutConditionWaiter;
+use qubit_lock::WaitTimeoutResult;
+use qubit_lock::WaitTimeoutStatus;
 
 blocking_monitor_contract_tests!(std_monitor_contract, StdMonitor);
 
-use super::failing_timer_tests::{
-    OncePendingTimer,
-    assert_backend_unavailable,
-    completion_failing_timer,
-    registration_failing_timer,
-};
+use super::failing_timer_tests::OncePendingTimer;
+use super::failing_timer_tests::assert_backend_unavailable;
+use super::failing_timer_tests::completion_failing_timer;
+use super::failing_timer_tests::registration_failing_timer;
 
 #[test]
 fn test_std_monitor_new_read_write_updates_state() {
@@ -75,8 +65,8 @@ fn test_std_monitor_completion_error_wins_over_post_wait_readiness() {
     assert_eq!(action_calls, 0);
 }
 
-#[test]
 /// Verifies an error returned by a blocking timed wait is propagated.
+#[test]
 fn test_std_monitor_blocking_wait_propagates_post_wait_timer_error() {
     let (timer, poll_count) = OncePendingTimer::new(completion_failing_timer());
     let monitor = Arc::new(StdMonitor::with_timer(false, Arc::new(timer)));
@@ -505,8 +495,8 @@ fn test_std_monitor_wait_while_for_returns_timed_out_when_timeout() {
     assert_time_result_eq!(result, Ok(WaitTimeoutResult::TimedOut));
 }
 
-#[test]
 /// Verifies a reached deadline checks the predicate once without registering.
+#[test]
 fn test_std_monitor_wait_while_with_deadline_times_out_without_registration() {
     let clock = ManualMonotonicClock::new_shared();
     let monitor = StdMonitor::with_timer(false, clock.new_timer());
@@ -527,8 +517,8 @@ fn test_std_monitor_wait_while_with_deadline_times_out_without_registration() {
     assert_eq!(clock.pending_waiters(), 0);
 }
 
-#[test]
 /// Verifies a ready predicate wins a reached absolute deadline.
+#[test]
 fn test_std_monitor_wait_until_with_deadline_ready_wins_reached_deadline() {
     let clock = ManualMonotonicClock::new_shared();
     let monitor = StdMonitor::with_timer(true, clock.new_timer());
@@ -540,8 +530,8 @@ fn test_std_monitor_wait_until_with_deadline_ready_wins_reached_deadline() {
     assert_eq!(clock.pending_waiters(), 0);
 }
 
-#[test]
 /// Verifies deadline helpers register, wait, and preserve concrete forwarding.
+#[test]
 fn test_std_monitor_deadline_helpers_wait_until_timeout() {
     const WAIT_TIMEOUT: Duration = Duration::from_millis(20);
 
@@ -579,9 +569,9 @@ fn test_std_monitor_deadline_helpers_wait_until_timeout() {
     );
 }
 
-#[test]
 /// Verifies a deadline wait rechecks after a notification that leaves it
 /// blocked.
+#[test]
 fn test_std_monitor_deadline_wait_rechecks_after_notification() {
     const WAIT_TIMEOUT: Duration = Duration::from_millis(20);
 

@@ -7,19 +7,15 @@
 // =============================================================================
 //! Marker capability for exclusive synchronous lock-acquisition modes.
 
-use std::sync::{
-    Arc,
-    Mutex,
-};
+use std::sync::Arc;
+use std::sync::Mutex;
 
 #[cfg(feature = "parking-lot")]
 use parking_lot::Mutex as ParkingLotMutex;
 
-use crate::lock::{
-    Lock,
-    ReadWriteLock,
-    WriteLock,
-};
+use crate::lock::Lock;
+use crate::lock::ReadWriteLock;
+use crate::lock::WriteLock;
 
 /// Marks a [`Lock`] acquisition mode that excludes every competing guard.
 ///

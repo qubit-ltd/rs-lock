@@ -7,10 +7,8 @@
 // =============================================================================
 //! Tests for monitor internal-module collaboration through public behavior.
 
-use std::{
-    sync::Arc,
-    thread,
-};
+use std::sync::Arc;
+use std::thread;
 
 use qubit_lock::ParkingLotMonitor;
 

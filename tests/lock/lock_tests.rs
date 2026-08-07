@@ -7,23 +7,15 @@
 // =============================================================================
 //! Tests for data-independent synchronous RAII locks.
 
-use std::{
-    panic::{
-        AssertUnwindSafe,
-        catch_unwind,
-    },
-    sync::{
-        Arc,
-        Mutex,
-    },
-};
+use std::panic::AssertUnwindSafe;
+use std::panic::catch_unwind;
+use std::sync::Arc;
+use std::sync::Mutex;
 
 #[cfg(feature = "parking-lot")]
 use parking_lot::Mutex as ParkingLotMutex;
-use qubit_lock::{
-    Lock,
-    TryLockError,
-};
+use qubit_lock::Lock;
+use qubit_lock::TryLockError;
 
 /// Acquires and immediately releases any generic synchronous lock.
 fn acquire_once<L>(lock: &L)

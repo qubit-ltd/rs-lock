@@ -7,20 +7,14 @@
 // =============================================================================
 //! Defines backend-neutral blocking monitor-guard wait operations.
 
-use std::{
-    sync::Arc,
-    task::Poll,
-};
+use std::sync::Arc;
+use std::task::Poll;
 
-use qubit_clock::{
-    TimeError,
-    TimerFuture,
-};
+use qubit_clock::TimeError;
+use qubit_clock::TimerFuture;
 
-use super::{
-    BlockingConditionWaiter,
-    BlockingWaiterRegistry,
-};
+use super::BlockingConditionWaiter;
+use super::BlockingWaiterRegistry;
 use crate::monitor::WaitTimeoutStatus;
 
 /// Releases the occupied state-guard slot.

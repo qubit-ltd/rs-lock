@@ -7,20 +7,14 @@
 // =============================================================================
 //! Public behavior tests backed by shared blocking condition-wait algorithms.
 
-use std::{
-    cell::Cell,
-    time::Duration,
-};
+use std::cell::Cell;
+use std::time::Duration;
 
-use qubit_clock::{
-    ManualMonotonicClock,
-    MonotonicClock,
-    TimeError,
-};
-use qubit_lock::{
-    StdMonitor,
-    WaitTimeoutResult,
-};
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::MonotonicClock;
+use qubit_clock::TimeError;
+use qubit_lock::StdMonitor;
+use qubit_lock::WaitTimeoutResult;
 
 /// Verifies the shared relative wait algorithm checks a zero-budget predicate.
 #[test]

@@ -7,25 +7,21 @@
 // =============================================================================
 //! Synchronous RAII read-write lock capability.
 
-use std::sync::{
-    Arc,
-    RwLock,
-    RwLockReadGuard,
-    RwLockWriteGuard,
-};
+use std::sync::Arc;
+use std::sync::RwLock;
+use std::sync::RwLockReadGuard;
+use std::sync::RwLockWriteGuard;
 
 #[cfg(feature = "parking-lot")]
-use parking_lot::{
-    RwLock as ParkingLotRwLock,
-    RwLockReadGuard as ParkingLotRwLockReadGuard,
-    RwLockWriteGuard as ParkingLotRwLockWriteGuard,
-};
+use parking_lot::RwLock as ParkingLotRwLock;
+#[cfg(feature = "parking-lot")]
+use parking_lot::RwLockReadGuard as ParkingLotRwLockReadGuard;
+#[cfg(feature = "parking-lot")]
+use parking_lot::RwLockWriteGuard as ParkingLotRwLockWriteGuard;
 
-use crate::lock::{
-    ReadLock,
-    TryLockError,
-    WriteLock,
-};
+use crate::lock::ReadLock;
+use crate::lock::TryLockError;
+use crate::lock::WriteLock;
 
 /// Represents a synchronous lock with explicit shared and exclusive modes.
 pub trait ReadWriteLock: Send + Sync {

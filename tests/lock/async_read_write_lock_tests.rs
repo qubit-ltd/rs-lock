@@ -7,14 +7,10 @@
 // =============================================================================
 //! Tests for asynchronous read-write lock capabilities.
 
-use std::{
-    future::{
-        Future,
-        poll_fn,
-    },
-    sync::Arc,
-    task::Poll,
-};
+use std::future::Future;
+use std::future::poll_fn;
+use std::sync::Arc;
+use std::task::Poll;
 
 use qubit_lock::AsyncReadWriteLock;
 use tokio::sync::RwLock;

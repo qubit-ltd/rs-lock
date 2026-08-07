@@ -7,33 +7,24 @@
 // =============================================================================
 //! Shared fault-injecting Timer factories and assertions.
 
-use std::{
-    future::poll_fn,
-    sync::{
-        Arc,
-        Mutex,
-        atomic::{
-            AtomicUsize,
-            Ordering,
-        },
-        mpsc::Sender,
-    },
-    task::Poll,
-    time::Duration,
-};
+use std::future::poll_fn;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+use std::sync::mpsc::Sender;
+use std::task::Poll;
+use std::time::Duration;
 
-use qubit_clock::{
-    MonotonicClock,
-    MonotonicInstant,
-    TimeError,
-    Timer,
-    TimerFuture,
-    TimerUnavailableError,
-    test_util::{
-        FaultInjectingTimer,
-        TimerFailurePoint,
-    },
-};
+use qubit_clock::ClockDomain;
+use qubit_clock::MonotonicClock;
+use qubit_clock::MonotonicInstant;
+use qubit_clock::TimeError;
+use qubit_clock::Timer;
+use qubit_clock::TimerFuture;
+use qubit_clock::TimerUnavailableError;
+use qubit_clock::test_util::FaultInjectingTimer;
+use qubit_clock::test_util::TimerFailurePoint;
 
 /// Clock wrapper that reports when an operation fixes a relative deadline.
 struct DeadlineSignalingClock<C> {
@@ -68,7 +59,7 @@ where
     C: MonotonicClock,
 {
     /// Returns the wrapped clock's stable monotonic domain identity.
-    fn domain(&self) -> qubit_clock::ClockDomain {
+    fn domain(&self) -> ClockDomain {
         self.inner.domain()
     }
 

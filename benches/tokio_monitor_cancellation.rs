@@ -8,32 +8,22 @@
 //! Measures notification and cancellation costs for registered Tokio monitor
 //! waiters.
 
-use std::{
-    future::Future,
-    pin::Pin,
-    task::{
-        Context,
-        Poll,
-        Waker,
-    },
-};
-
-use criterion::{
-    BatchSize,
-    BenchmarkId,
-    Criterion,
-    criterion_group,
-    criterion_main,
-};
-use qubit_clock::{
-    ManualMonotonicClock,
-    MonotonicClock,
-};
-use qubit_lock::{
-    AsyncConditionWaiter,
-    TokioMonitor,
-};
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::Context;
+use std::task::Poll;
+use std::task::Waker;
+
+use criterion::BatchSize;
+use criterion::BenchmarkId;
+use criterion::Criterion;
+use criterion::criterion_group;
+use criterion::criterion_main;
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::MonotonicClock;
+use qubit_lock::AsyncConditionWaiter;
+use qubit_lock::TokioMonitor;
 
 /// Registry sizes used to reveal cancellation scaling.
 const WAITER_COUNTS: [usize; 4] = [32, 128, 512, 2_048];

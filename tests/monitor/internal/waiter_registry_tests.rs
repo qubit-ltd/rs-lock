@@ -7,16 +7,15 @@
 // =============================================================================
 //! Loom models for Monitor waiter registration, selection, and cancellation.
 
-use loom::{
-    sync::Arc,
-    thread,
-};
+use loom::model;
+use loom::sync::Arc;
+use loom::thread;
 use qubit_lock::test_util::loom::LoomWaiterRegistry;
 
 /// Models notification selection racing with cancellation of another waiter.
 #[test]
 fn test_loom_waiter_registry_notify_one_races_with_cancellation() {
-    loom::model(|| {
+    model(|| {
         let registry = Arc::new(LoomWaiterRegistry::new());
         let _ = registry.register(10);
         let cancelled_waiter_id = registry.register(20);
@@ -45,7 +44,7 @@ fn test_loom_waiter_registry_notify_one_races_with_cancellation() {
 /// Models notification selection racing with cancellation of the same waiter.
 #[test]
 fn test_loom_waiter_registry_notify_one_races_with_selected_cancellation() {
-    loom::model(|| {
+    model(|| {
         let registry = Arc::new(LoomWaiterRegistry::new());
         let waiter_id = registry.register(10);
 
@@ -70,7 +69,7 @@ fn test_loom_waiter_registry_notify_one_races_with_selected_cancellation() {
 /// Models notification of all waiters racing with cancellation of one waiter.
 #[test]
 fn test_loom_waiter_registry_notify_all_races_with_cancellation() {
-    loom::model(|| {
+    model(|| {
         let registry = Arc::new(LoomWaiterRegistry::new());
         let first_waiter_id = registry.register(10);
         let _ = registry.register(20);

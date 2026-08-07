@@ -9,32 +9,24 @@
 //!
 //! Tests for the parking_lot::RwLock implementation of the DataLock trait.
 
-use std::{
-    sync::{
-        Arc,
-        mpsc,
-    },
-    thread,
-    time::Duration,
-};
+use std::sync::Arc;
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 
 use parking_lot::RwLock as ParkingLotRwLock;
-use qubit_lock::{
-    DataLock,
-    TryLockError,
-};
+use qubit_lock::DataLock;
+use qubit_lock::TryLockError;
 
 #[allow(clippy::module_inception)]
 mod parking_lot_rw_lock_tests {
-    use super::{
-        Arc,
-        DataLock,
-        Duration,
-        ParkingLotRwLock,
-        TryLockError,
-        mpsc,
-        thread,
-    };
+    use super::Arc;
+    use super::DataLock;
+    use super::Duration;
+    use super::ParkingLotRwLock;
+    use super::TryLockError;
+    use super::mpsc;
+    use super::thread;
 
     fn read_i32(value: &i32) -> i32 {
         *value

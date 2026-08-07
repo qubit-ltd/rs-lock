@@ -12,34 +12,20 @@
 //! command, waiter registration, lock handoff, notification, wake-up, and
 //! `Done` acknowledgement.
 
-use std::{
-    sync::{
-        Arc,
-        mpsc::{
-            self,
-            Receiver,
-            Sender,
-        },
-    },
-    thread::{
-        self,
-        JoinHandle,
-    },
-    time::{
-        Duration,
-        Instant,
-    },
-};
+use std::sync::Arc;
+use std::sync::mpsc::Receiver;
+use std::sync::mpsc::Sender;
+use std::sync::mpsc::{self};
+use std::thread::JoinHandle;
+use std::thread::{self};
+use std::time::Duration;
+use std::time::Instant;
 
-use criterion::{
-    Criterion,
-    criterion_group,
-    criterion_main,
-};
-use parking_lot::{
-    Condvar,
-    Mutex,
-};
+use criterion::Criterion;
+use criterion::criterion_group;
+use criterion::criterion_main;
+use parking_lot::Condvar;
+use parking_lot::Mutex;
 use qubit_lock::ParkingLotMonitor;
 
 /// Command sent to a long-lived benchmark worker.

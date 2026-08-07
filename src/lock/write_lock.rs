@@ -7,11 +7,9 @@
 // =============================================================================
 //! Borrowed exclusive-mode lock adapter.
 
-use crate::lock::{
-    Lock,
-    ReadWriteLock,
-    TryLockError,
-};
+use crate::lock::Lock;
+use crate::lock::ReadWriteLock;
+use crate::lock::TryLockError;
 
 /// Adapts the write mode of a ReadWriteLock to Lock.
 ///

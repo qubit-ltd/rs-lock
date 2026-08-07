@@ -7,10 +7,8 @@
 // =============================================================================
 //! README and lock documentation consistency tests.
 
-use semver::{
-    Version,
-    VersionReq,
-};
+use semver::Version;
+use semver::VersionReq;
 
 const CARGO_TOML: &str = include_str!("../../Cargo.toml");
 const README_EN: &str = include_str!("../../README.md");
@@ -53,8 +51,8 @@ fn normalize_readme_text(content: &str) -> String {
     content.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-#[test]
 /// Ensures README files document the current data-lock method names.
+#[test]
 fn test_readme_documents_data_lock_api_names() {
     assert!(README_EN.contains("with_read"));
     assert!(README_EN.contains("with_write"));
@@ -62,12 +60,12 @@ fn test_readme_documents_data_lock_api_names() {
     assert!(README_ZH.contains("with_write"));
 }
 
-#[test]
 /// Ensures README quick-start snippets prove one domain operation can use
 /// multiple lock backends.
+#[test]
 fn test_readme_quick_start_proves_backend_neutral_data_access() {
     for readme in [README_EN, README_ZH] {
-        assert!(readme.contains("use qubit_lock::DataLock;"));
+        assert!(readme.contains(concat!("use qubit_lock", "::DataLock;")));
         assert!(readme.contains("fn record<L>"));
         assert!(readme.contains("DataLock<ServiceStats>"));
         assert!(readme.contains("std::sync::Mutex<ServiceStats>"));
@@ -77,8 +75,8 @@ fn test_readme_quick_start_proves_backend_neutral_data_access() {
     assert!(README_ZH.contains("何时不需要这个 crate"));
 }
 
-#[test]
 /// Ensures public docs cover failures after Timer registration.
+#[test]
 fn test_monitor_docs_cover_timer_registration_and_completion_errors() {
     let sources = [
         ("timeout_condition_waiter.rs", TIMEOUT_CONDITION_WAITER_SRC),
@@ -106,8 +104,8 @@ fn test_monitor_docs_cover_timer_registration_and_completion_errors() {
     assert!(USER_GUIDE_ZH.contains("Timer 注册或完成错误"));
 }
 
-#[test]
 /// Ensures README files document direct access to wrapped primitives.
+#[test]
 fn test_readme_documents_native_lock_support() {
     assert!(README_EN.contains("`std::sync::Mutex<T>`"));
     assert!(README_EN.contains("`parking_lot::RwLock<T>`"));
@@ -115,9 +113,9 @@ fn test_readme_documents_native_lock_support() {
     assert!(README_ZH.contains("`parking_lot::RwLock<T>`"));
 }
 
-#[test]
 /// Ensures the introductions state the crate's boundary and testing value in
 /// direct reader-facing language.
+#[test]
 fn test_documentation_introductions_explain_the_abstraction_in_plain_language()
 {
     let readme_en = normalize_readme_text(README_EN);
@@ -137,8 +135,8 @@ fn test_documentation_introductions_explain_the_abstraction_in_plain_language()
     assert!(guide_zh.contains("封装了锁与条件等待的配合方式"));
 }
 
-#[test]
 /// Ensures each README points readers to the user guide in the same language.
+#[test]
 fn test_readmes_link_to_their_matching_language_user_guides() {
     assert!(README_EN.contains("[English user guide](doc/user_guide.md)"));
     assert!(!README_EN.contains("[Chinese user guide]"));
@@ -146,9 +144,9 @@ fn test_readmes_link_to_their_matching_language_user_guides() {
     assert!(!README_ZH.contains("[英文用户手册]"));
 }
 
-#[test]
 /// Ensures both user guides distinguish generic acquisition modes from
 /// exclusive ones.
+#[test]
 fn test_readme_documents_exclusive_lock_capability() {
     let guide_en = normalize_readme_text(USER_GUIDE_EN);
     let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
@@ -161,9 +159,9 @@ fn test_readme_documents_exclusive_lock_capability() {
     assert!(guide_zh.contains("`ReadLock` 实现 `Lock`"));
 }
 
-#[test]
 /// Ensures the queue case study explains why its two predicates require a
 /// broadcast notification after a state transition.
+#[test]
 fn test_user_guides_explain_queue_notification_policy() {
     assert!(USER_GUIDE_EN.contains("with_write_notify_all"));
     assert!(USER_GUIDE_EN.contains("two predicates"));
@@ -173,8 +171,8 @@ fn test_user_guides_explain_queue_notification_policy() {
     assert!(USER_GUIDE_ZH.contains("notify_all"));
 }
 
-#[test]
 /// Ensures both guides use the same backend-neutral queue case study.
+#[test]
 fn test_user_guides_present_backend_neutral_queue_case_study() {
     for guide in [USER_GUIDE_EN, USER_GUIDE_ZH] {
         assert!(guide.contains("QueueState<T>"));
@@ -188,8 +186,8 @@ fn test_user_guides_present_backend_neutral_queue_case_study() {
     }
 }
 
-#[test]
 /// Ensures both guides explain the untimed and timed monitor aggregates.
+#[test]
 fn test_readme_documents_monitor_capability_split() {
     let guide_en = normalize_readme_text(USER_GUIDE_EN);
     let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
@@ -200,8 +198,8 @@ fn test_readme_documents_monitor_capability_split() {
     assert!(guide_zh.contains("`AsyncMonitor` 加计时等待"));
 }
 
-#[test]
 /// Ensures both guides describe monitor notification and timeout semantics.
+#[test]
 fn test_readme_documents_monitor_wait_semantics() {
     let guide_en = normalize_readme_text(USER_GUIDE_EN);
     let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
@@ -249,9 +247,9 @@ fn test_readme_documents_monitor_wait_semantics() {
     }
 }
 
-#[test]
 /// Ensures public docs explain the monitor handshake for external predicate
 /// state.
+#[test]
 fn test_monitor_docs_cover_external_predicate_state_handshake() {
     let guide_en = normalize_readme_text(USER_GUIDE_EN);
     let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
@@ -276,8 +274,8 @@ fn test_monitor_docs_cover_external_predicate_state_handshake() {
     assert!(guide_zh.contains("with_write_notify_all_async"));
 }
 
-#[test]
 /// Ensures both guides describe async cancellation and Tokio timer needs.
+#[test]
 fn test_readme_documents_async_monitor_contract() {
     let guide_en = normalize_readme_text(USER_GUIDE_EN);
     let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
@@ -297,8 +295,8 @@ fn test_readme_documents_async_monitor_contract() {
     assert!(guide_zh.contains("取消会丢弃这次选择"));
 }
 
-#[test]
 /// Ensures both guides describe RPITIT and native Arc monitor ownership.
+#[test]
 fn test_readme_documents_monitor_api_boundaries() {
     assert!(USER_GUIDE_EN.contains("return-position `impl Future`"));
     assert!(USER_GUIDE_EN.contains("standard `Arc` directly"));
@@ -308,8 +306,8 @@ fn test_readme_documents_monitor_api_boundaries() {
     assert!(USER_GUIDE_ZH.contains("deref coercion 保留 monitor API"));
 }
 
-#[test]
 /// Ensures both guides explain concrete and generic monitor selection.
+#[test]
 fn test_readme_documents_monitor_capability_selection() {
     let guide_en = normalize_readme_text(USER_GUIDE_EN);
     let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
@@ -323,8 +321,8 @@ fn test_readme_documents_monitor_capability_selection() {
     assert!(guide_zh.contains("每个具体 monitor 都提供 `with_timer`"));
 }
 
-#[test]
 /// Ensures both guides describe deterministic testing through Timer IOC.
+#[test]
 fn test_readme_documents_timer_ioc_testing() {
     let guide_en = normalize_readme_text(USER_GUIDE_EN);
     let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
@@ -334,9 +332,9 @@ fn test_readme_documents_timer_ioc_testing() {
     assert!(guide_zh.contains("`ManualMonotonicClock`"));
 }
 
-#[test]
 /// Ensures README files distinguish the blocking monitor implementations and
 /// document the async feature tiers.
+#[test]
 fn test_readme_documents_feature_tiers() {
     const BLOCKING_MONITOR_DEPENDENCY: &str = "qubit-lock = { version = \"0.13\", default-features = false, features = [\"monitor\", \"parking-lot\"] }";
     const STD_MONITOR_DEPENDENCY: &str = "qubit-lock = { version = \"0.13\", default-features = false, features = [\"monitor\"] }";
@@ -378,8 +376,8 @@ fn test_readme_documents_feature_tiers() {
     assert!(!README_ZH.contains("`mock` feature"));
 }
 
-#[test]
 /// Ensures monitor Rustdoc records callback and default-Timer panic paths.
+#[test]
 fn test_monitor_docs_cover_callback_and_constructor_panics() {
     for source in [
         CONDITION_WAITER_SRC,
@@ -420,9 +418,9 @@ fn test_monitor_docs_cover_callback_and_constructor_panics() {
     }
 }
 
-#[test]
 /// Ensures standard-monitor documentation explains poison observation,
 /// recovery, repair, and explicit acceptance.
+#[test]
 fn test_monitor_docs_cover_std_monitor_poisoning_policy() {
     assert!(STD_MONITOR_SRC.contains("pub fn is_poisoned"));
     assert!(STD_MONITOR_SRC.contains("pub fn clear_poison"));
@@ -437,9 +435,9 @@ fn test_monitor_docs_cover_std_monitor_poisoning_policy() {
     assert!(USER_GUIDE_ZH.contains("部分修改"));
 }
 
-#[test]
 /// Ensures both user guides document the action-free asynchronous wait
 /// conveniences.
+#[test]
 fn test_monitor_docs_cover_async_ready_wait_helpers() {
     for guide in [USER_GUIDE_EN, USER_GUIDE_ZH] {
         assert!(guide.contains("`wait_until_ready_async`"));
@@ -447,19 +445,19 @@ fn test_monitor_docs_cover_async_ready_wait_helpers() {
     }
 }
 
-#[test]
 /// Ensures the Chinese README contribution section matches the project
 /// template.
+#[test]
 fn test_readme_zh_uses_contribution_template() {
     assert!(README_ZH.contains(
         "欢迎贡献。请遵循 Rust API 指南，及时更新公共 API 文档与测试，并在提交\nPull Request 前运行 `./align-ci.sh`格式化代码，运行`./ci-check.sh`对齐CI要求。"
     ));
 }
 
-#[test]
 /// Ensures public API documentation stays aligned with root-only exports.
+#[test]
 fn test_readme_documents_root_only_public_api() {
-    assert!(!README_EN.contains("from `qubit_lock::monitor`"));
+    assert!(!README_EN.contains(concat!("from `qubit_lock", "::monitor`")));
     assert!(!README_ZH.contains("\u{6216} crate root"));
     assert!(
         README_EN.contains("exported from and should be imported directly")
@@ -471,15 +469,15 @@ fn test_readme_documents_root_only_public_api() {
     assert!(!LIB_RS.contains("pub mod monitor;"));
 }
 
-#[test]
 /// Ensures lock source examples reference the current trait names.
+#[test]
 fn test_rw_lock_docs_use_current_trait_names() {
     assert!(READ_WRITE_LOCK_SRC.contains("ReadWriteLock"));
     assert!(ASYNC_READ_WRITE_LOCK_SRC.contains("AsyncReadWriteLock"));
 }
 
-#[test]
 /// Ensures root and monitor Rustdoc preserve the implemented lock contracts.
+#[test]
 fn test_rustdoc_contracts_match_lock_and_monitor_semantics() {
     assert!(LIB_RS.contains("synchronous lock acquisition"));
     assert!(LOCK_SRC.contains("`Lock` does not imply exclusive entry."));
@@ -506,8 +504,8 @@ fn test_rustdoc_contracts_match_lock_and_monitor_semantics() {
     assert!(TOKIO_MONITOR_SRC.matches("fairness or FIFO").count() >= 3);
 }
 
-#[test]
 /// Ensures Cargo exposes only the current feature surface.
+#[test]
 fn test_cargo_features_match_current_api() {
     assert_eq!(
         cargo_feature_names(CARGO_TOML),
@@ -522,15 +520,15 @@ fn test_cargo_features_match_current_api() {
     );
 }
 
-#[test]
 /// Ensures the published crate contains the guides linked from both READMEs.
+#[test]
 fn test_cargo_package_includes_user_guides() {
     assert!(CARGO_TOML.contains("\"/doc/**\""));
 }
 
-#[test]
 /// Ensures all README `qubit-lock` version requirements accept the crate
 /// version in Cargo.toml.
+#[test]
 fn test_readme_dependency_versions_match_cargo_toml() {
     let cargo_version = extract_package_version(CARGO_TOML)
         .expect("Failed to extract version from Cargo.toml");
@@ -575,9 +573,9 @@ fn test_readme_dependency_versions_match_cargo_toml() {
     );
 }
 
-#[test]
 /// Ensures both user guides use the same `qubit-clock` requirement as
 /// Cargo.toml.
+#[test]
 fn test_readme_qubit_clock_dependency_version_matches_cargo_toml() {
     let cargo_requirement =
         extract_cargo_dependency_version(CARGO_TOML, "qubit-clock")
@@ -599,9 +597,9 @@ fn test_readme_qubit_clock_dependency_version_matches_cargo_toml() {
     }
 }
 
-#[test]
 /// Ensures the public documents provide navigation, deadline selection, and a
 /// runnable version of the bounded-queue case study.
+#[test]
 fn test_documentation_provides_navigation_deadline_and_runnable_example() {
     assert!(USER_GUIDE_EN.contains("## Reading paths"));
     assert!(USER_GUIDE_ZH.contains("## 阅读路径"));

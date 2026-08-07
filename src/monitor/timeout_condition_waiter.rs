@@ -7,19 +7,14 @@
 // =============================================================================
 //! Blocking timeout condition-wait capability.
 
-use qubit_clock::{
-    MonotonicInstant,
-    TimeError,
-};
-use std::{
-    sync::Arc,
-    time::Duration,
-};
+use std::sync::Arc;
+use std::time::Duration;
 
-use crate::monitor::{
-    ConditionWaiter,
-    WaitTimeoutResult,
-};
+use qubit_clock::MonotonicInstant;
+use qubit_clock::TimeError;
+
+use crate::monitor::ConditionWaiter;
+use crate::monitor::WaitTimeoutResult;
 
 /// Waits for predicates over protected state with bounded time budgets.
 ///

@@ -9,10 +9,8 @@
 
 use std::time::Duration;
 
-use qubit_lock::{
-    StdMonitor,
-    WaitTimeoutResult,
-};
+use qubit_lock::StdMonitor;
+use qubit_lock::WaitTimeoutResult;
 
 /// Verifies a default blocking timer reports an elapsed wait as timed out.
 #[test]

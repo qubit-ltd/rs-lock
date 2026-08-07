@@ -7,19 +7,13 @@
 // =============================================================================
 //! Tests for data-independent asynchronous RAII locks.
 
-use std::{
-    future::{
-        Future,
-        poll_fn,
-    },
-    sync::Arc,
-    task::Poll,
-};
+use std::future::Future;
+use std::future::poll_fn;
+use std::sync::Arc;
+use std::task::Poll;
 
-use qubit_lock::{
-    AsyncLock,
-    TryLockError,
-};
+use qubit_lock::AsyncLock;
+use qubit_lock::TryLockError;
 use tokio::sync::Mutex;
 
 #[tokio::test]
@@ -54,8 +48,8 @@ async fn test_async_lock_accepts_borrowed_forwarding() {
     assert!(AsyncLock::try_lock(&borrowed).is_ok());
 }
 
-#[tokio::test]
 /// Verifies dropping a waiter after registration does not retain the lock.
+#[tokio::test]
 async fn test_async_lock_cancelled_waiter_does_not_retain_lock() {
     let lock = Mutex::new(());
     let guard = AsyncLock::lock(&lock).await;

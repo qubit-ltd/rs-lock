@@ -11,17 +11,14 @@
 //! locks and executing operations within the locked context. This trait allows
 //! locks to be used in a generic way through closures, avoiding the complexity
 //! of explicitly managing lock guards and their lifetimes.
-use std::sync::{
-    Arc,
-    Mutex,
-    RwLock,
-};
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::RwLock;
 
 #[cfg(feature = "parking-lot")]
-use parking_lot::{
-    Mutex as ParkingLotMutex,
-    RwLock as ParkingLotRwLock,
-};
+use parking_lot::Mutex as ParkingLotMutex;
+#[cfg(feature = "parking-lot")]
+use parking_lot::RwLock as ParkingLotRwLock;
 
 use super::try_lock_error::TryLockError;
 

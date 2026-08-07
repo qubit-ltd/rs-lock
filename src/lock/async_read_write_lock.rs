@@ -7,22 +7,16 @@
 // =============================================================================
 //! Asynchronous RAII read-write lock capability.
 
-use std::{
-    future::Future,
-    sync::Arc,
-};
+use std::future::Future;
+use std::sync::Arc;
 
-use tokio::sync::{
-    RwLock,
-    RwLockReadGuard,
-    RwLockWriteGuard,
-};
+use tokio::sync::RwLock;
+use tokio::sync::RwLockReadGuard;
+use tokio::sync::RwLockWriteGuard;
 
-use crate::lock::{
-    AsyncReadLock,
-    AsyncWriteLock,
-    TryLockError,
-};
+use crate::lock::AsyncReadLock;
+use crate::lock::AsyncWriteLock;
+use crate::lock::TryLockError;
 
 /// Represents an asynchronous lock with shared and exclusive modes.
 ///

@@ -7,28 +7,19 @@
 // =============================================================================
 //! Tests for [`ParkingLotMonitorGuard`](qubit_lock::ParkingLotMonitorGuard).
 
-use std::{
-    sync::{
-        Arc,
-        mpsc,
-    },
-    thread,
-    time::Duration,
-};
+use std::sync::Arc;
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
 
-use super::failing_timer_tests::{
-    assert_backend_unavailable,
-    registration_failing_timer,
-};
-use qubit_clock::{
-    ManualMonotonicClock,
-    MonotonicClock,
-    TimeError,
-};
-use qubit_lock::{
-    ParkingLotMonitor,
-    WaitTimeoutStatus,
-};
+use qubit_clock::ManualMonotonicClock;
+use qubit_clock::MonotonicClock;
+use qubit_clock::TimeError;
+use qubit_lock::ParkingLotMonitor;
+use qubit_lock::WaitTimeoutStatus;
+
+use super::failing_timer_tests::assert_backend_unavailable;
+use super::failing_timer_tests::registration_failing_timer;
 
 #[test]
 fn test_parking_lot_monitor_guard_updates_state() {

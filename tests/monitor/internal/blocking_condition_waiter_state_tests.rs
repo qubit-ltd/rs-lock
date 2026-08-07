@@ -7,10 +7,8 @@
 // =============================================================================
 //! Public behavior tests backed by the blocking condition waiter's state.
 
-use std::{
-    sync::Arc,
-    thread,
-};
+use std::sync::Arc;
+use std::thread;
 
 use qubit_lock::StdMonitor;
 
