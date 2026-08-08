@@ -15,8 +15,9 @@ use std::task::Poll;
 use qubit_lock::AsyncLock;
 use qubit_lock::TryLockError;
 use tokio::sync::Mutex;
+use tokio::test as tokio_test;
 
-#[tokio::test]
+#[tokio_test]
 async fn test_async_lock_tokio_mutex_releases_on_guard_drop() {
     let lock = Mutex::new(7);
     let guard = AsyncLock::lock(&lock).await;
@@ -29,7 +30,7 @@ async fn test_async_lock_tokio_mutex_releases_on_guard_drop() {
     assert!(AsyncLock::try_lock(&lock).is_ok());
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn test_async_lock_accepts_arc_forwarding() {
     let lock = Arc::new(Mutex::new(()));
 
@@ -38,7 +39,7 @@ async fn test_async_lock_accepts_arc_forwarding() {
     assert!(AsyncLock::try_lock(&lock).is_ok());
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn test_async_lock_accepts_borrowed_forwarding() {
     let lock = Mutex::new(());
     let borrowed = &lock;
@@ -49,7 +50,7 @@ async fn test_async_lock_accepts_borrowed_forwarding() {
 }
 
 /// Verifies dropping a waiter after registration does not retain the lock.
-#[tokio::test]
+#[tokio_test]
 async fn test_async_lock_cancelled_waiter_does_not_retain_lock() {
     let lock = Mutex::new(());
     let guard = AsyncLock::lock(&lock).await;
