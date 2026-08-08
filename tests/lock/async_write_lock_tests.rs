@@ -11,9 +11,10 @@ use qubit_lock::AsyncLock;
 use qubit_lock::AsyncReadWriteLock;
 use qubit_lock::TryLockError;
 use tokio::sync::RwLock;
+use tokio::test as tokio_test;
 
 /// Verifies the asynchronous write adapter is exclusive.
-#[tokio::test]
+#[tokio_test]
 async fn test_async_write_lock_adapter_is_exclusive() {
     let lock = RwLock::new(());
     let write_lock = AsyncReadWriteLock::write_lock(&lock);

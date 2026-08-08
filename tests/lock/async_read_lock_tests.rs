@@ -10,9 +10,10 @@
 use qubit_lock::AsyncLock;
 use qubit_lock::AsyncReadWriteLock;
 use tokio::sync::RwLock;
+use tokio::test as tokio_test;
 
 /// Verifies two asynchronous read adapters may hold guards concurrently.
-#[tokio::test]
+#[tokio_test]
 async fn test_async_read_lock_adapter_is_shared() {
     let lock = RwLock::new(());
     let read_lock = AsyncReadWriteLock::read_lock(&lock);

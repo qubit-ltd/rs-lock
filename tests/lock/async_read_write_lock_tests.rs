@@ -14,8 +14,9 @@ use std::task::Poll;
 
 use qubit_lock::AsyncReadWriteLock;
 use tokio::sync::RwLock;
+use tokio::test as tokio_test;
 
-#[tokio::test]
+#[tokio_test]
 async fn test_async_read_write_lock_modes_return_native_guards() {
     let lock = RwLock::new(7);
 
@@ -24,7 +25,7 @@ async fn test_async_read_write_lock_modes_return_native_guards() {
     assert_eq!(*AsyncReadWriteLock::read(&lock).await, 11);
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn test_async_read_write_lock_accepts_borrowed_forwarding() {
     let lock = RwLock::new(1);
     let borrowed = &lock;
@@ -39,7 +40,7 @@ async fn test_async_read_write_lock_accepts_borrowed_forwarding() {
         3;
 }
 
-#[tokio::test]
+#[tokio_test]
 async fn test_async_read_write_lock_accepts_arc_forwarding() {
     let lock = Arc::new(RwLock::new(1));
 
@@ -53,7 +54,7 @@ async fn test_async_read_write_lock_accepts_arc_forwarding() {
 }
 
 /// Verifies that cancelling a pending reader does not retain the lock.
-#[tokio::test]
+#[tokio_test]
 async fn test_async_read_write_lock_cancelled_reader_does_not_retain_lock() {
     let lock = RwLock::new(());
     let write_guard = AsyncReadWriteLock::write(&lock).await;

@@ -34,6 +34,7 @@ mod async_data_lock_trait_tests {
     use tokio::runtime::Runtime;
     use tokio::spawn;
     use tokio::sync::oneshot;
+    use tokio::test as tokio_test;
 
     use super::AsyncDataLock;
     use super::AsyncMutex;
@@ -42,7 +43,7 @@ mod async_data_lock_trait_tests {
     use super::increment_i32;
     use super::read_i32;
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_data_lock_accepts_borrowed_forwarding() {
         let mutex = AsyncMutex::new(0);
         let borrowed = &mutex;
@@ -59,7 +60,7 @@ mod async_data_lock_trait_tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_data_lock_accepts_arc_forwarding() {
         let mutex = Arc::new(AsyncMutex::new(0));
 
@@ -71,7 +72,7 @@ mod async_data_lock_trait_tests {
 
     /// Verifies that cancelling a pending read neither runs its closure nor
     /// retains the lock.
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_data_lock_cancelled_read_waiter_has_no_effect() {
         let lock = AsyncRwLock::new(0);
         let write_guard = lock.write().await;
@@ -99,7 +100,7 @@ mod async_data_lock_trait_tests {
         assert_eq!(AsyncDataLock::try_with_write(&lock, increment_i32), Ok(1),);
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_mutex_read_write_basic_operations() {
         let async_mutex = AsyncMutex::new(0);
 
@@ -117,7 +118,7 @@ mod async_data_lock_trait_tests {
         assert_eq!(result, 1);
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_mutex_read_returns_closure_result() {
         let async_mutex = AsyncMutex::new(vec![1, 2, 3]);
 
@@ -128,7 +129,7 @@ mod async_data_lock_trait_tests {
         assert_eq!(sum, 6);
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_mutex_try_read_write_success() {
         let async_mutex = AsyncMutex::new(42);
 
@@ -144,7 +145,7 @@ mod async_data_lock_trait_tests {
         assert_eq!(result, Ok(43));
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_mutex_try_read_returns_would_block_when_locked() {
         use std::sync::Arc;
         use std::sync::mpsc;
@@ -196,7 +197,7 @@ mod async_data_lock_trait_tests {
         assert_eq!(result, Ok(0));
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_mutex_concurrent_access() {
         use std::sync::Arc;
 
@@ -228,7 +229,7 @@ mod async_data_lock_trait_tests {
         assert_eq!(result, 10);
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_mutex_read_write_complex_types() {
         let async_mutex = AsyncMutex::new(String::from("Hello"));
 
@@ -242,7 +243,7 @@ mod async_data_lock_trait_tests {
         assert_eq!(result, "Hello World");
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_mutex_nested_operations() {
         let async_mutex = AsyncMutex::new(vec![1, 2, 3]);
 
@@ -263,7 +264,7 @@ mod async_data_lock_trait_tests {
 
     /// Verifies all concurrent writes complete without claiming an ordering
     /// guarantee.
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_mutex_concurrent_writes_complete() {
         use std::sync::Arc;
 
@@ -295,7 +296,7 @@ mod async_data_lock_trait_tests {
         assert_eq!(result, 5);
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_mutex_serializes_contended_writes() {
         use std::sync::Arc;
         use std::sync::mpsc;
@@ -360,7 +361,7 @@ mod async_data_lock_trait_tests {
         assert_eq!(result, 2);
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_mutex_with_result_types() {
         let async_mutex = AsyncMutex::new(10);
 
@@ -378,14 +379,14 @@ mod async_data_lock_trait_tests {
     }
 
     // Tests for AsyncMutex trait implementation
-    #[tokio::test]
+    #[tokio_test]
     async fn test_tokio_async_mutex_read() {
         let mutex = AsyncMutex::new(42);
         let result = AsyncDataLock::with_read(&mutex, |value| *value).await;
         assert_eq!(result, 42);
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_tokio_async_mutex_write() {
         let mutex = AsyncMutex::new(0);
         let result = AsyncDataLock::with_write(&mutex, |value| {
@@ -396,14 +397,14 @@ mod async_data_lock_trait_tests {
         assert_eq!(result, 1);
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_tokio_async_mutex_try_read_success() {
         let mutex = AsyncMutex::new(42);
         let result = AsyncDataLock::try_with_read(&mutex, |value| *value);
         assert_eq!(result, Ok(42));
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_tokio_async_mutex_try_write_success() {
         let mutex = AsyncMutex::new(42);
         let result = AsyncDataLock::try_with_write(&mutex, |value| {
@@ -413,7 +414,7 @@ mod async_data_lock_trait_tests {
         assert_eq!(result, Ok(43));
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_tokio_async_mutex_try_write_succeeds_after_guard_released() {
         let mutex = AsyncMutex::new(0);
 
@@ -426,7 +427,7 @@ mod async_data_lock_trait_tests {
         assert_eq!(result, Ok(0)); // Should succeed again since lock was released
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_tokio_async_mutex_try_read_returns_would_block_when_locked() {
         let mutex = AsyncMutex::new(0);
         let _guard = mutex
@@ -437,7 +438,7 @@ mod async_data_lock_trait_tests {
         assert_eq!(result, Err(TryLockError::WouldBlock));
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_tokio_async_mutex_try_write_returns_would_block_when_guard_held()
      {
         let mutex = AsyncMutex::new(0);
@@ -449,7 +450,7 @@ mod async_data_lock_trait_tests {
         assert_eq!(result, Err(TryLockError::WouldBlock));
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_tokio_async_mutex_try_methods_cover_shared_function_pointer_paths()
      {
         let mutex = AsyncMutex::new(0);
@@ -474,6 +475,7 @@ mod async_data_lock_trait_tests {
 
 mod async_rwlock_data_trait_tests {
     use tokio::spawn;
+    use tokio::test as tokio_test;
 
     use super::AsyncDataLock;
     use super::AsyncRwLock;
@@ -481,7 +483,7 @@ mod async_rwlock_data_trait_tests {
     use super::increment_i32;
     use super::read_i32;
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_rwlock_read_basic() {
         let async_rw_lock = AsyncRwLock::new(42);
 
@@ -489,7 +491,7 @@ mod async_rwlock_data_trait_tests {
         assert_eq!(result, 42);
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_rwlock_write_basic() {
         let async_rw_lock = AsyncRwLock::new(0);
 
@@ -506,7 +508,7 @@ mod async_rwlock_data_trait_tests {
         assert_eq!(result, 1);
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_rwlock_concurrent_readers() {
         use std::sync::Arc;
 
@@ -536,7 +538,7 @@ mod async_rwlock_data_trait_tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_rwlock_write_lock_is_exclusive() {
         use std::sync::Arc;
 
@@ -568,7 +570,7 @@ mod async_rwlock_data_trait_tests {
         assert_eq!(result, 10);
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_rwlock_read_after_write() {
         let async_rw_lock = AsyncRwLock::new(String::from("Hello"));
 
@@ -584,7 +586,7 @@ mod async_rwlock_data_trait_tests {
         assert_eq!(result, "Hello World");
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_rwlock_with_complex_types() {
         let async_rw_lock = AsyncRwLock::new(vec![1, 2, 3]);
 
@@ -605,7 +607,7 @@ mod async_rwlock_data_trait_tests {
         assert_eq!(sum, 15);
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_rwlock_read_lock_returns_closure_result() {
         let async_rw_lock = AsyncRwLock::new(vec![10, 20, 30]);
 
@@ -620,7 +622,7 @@ mod async_rwlock_data_trait_tests {
         assert_eq!(original, vec![10, 20, 30]);
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_rwlock_write_lock_returns_closure_result() {
         let async_rw_lock = AsyncRwLock::new(5);
 
@@ -638,7 +640,7 @@ mod async_rwlock_data_trait_tests {
         assert_eq!(current, 10);
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_rwlock_try_read_success() {
         let async_rw_lock = AsyncRwLock::new(42);
 
@@ -647,7 +649,7 @@ mod async_rwlock_data_trait_tests {
         assert_eq!(result, Ok(42));
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_rwlock_try_write_success() {
         let async_rw_lock = AsyncRwLock::new(42);
 
@@ -659,7 +661,7 @@ mod async_rwlock_data_trait_tests {
         assert_eq!(result, Ok(43));
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_async_rwlock_mixed_read_write_operations() {
         use std::sync::Arc;
 
@@ -709,14 +711,14 @@ mod async_rwlock_data_trait_tests {
     }
 
     // Tests for AsyncRwLock trait implementation
-    #[tokio::test]
+    #[tokio_test]
     async fn test_tokio_async_rwlock_read() {
         let rwlock = AsyncRwLock::new(42);
         let result = AsyncDataLock::with_read(&rwlock, |value| *value).await;
         assert_eq!(result, 42);
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_tokio_async_rwlock_write() {
         let rwlock = AsyncRwLock::new(0);
         let result = AsyncDataLock::with_write(&rwlock, |value| {
@@ -727,14 +729,14 @@ mod async_rwlock_data_trait_tests {
         assert_eq!(result, 1);
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_tokio_async_rwlock_try_read_success() {
         let rwlock = AsyncRwLock::new(42);
         let result = AsyncDataLock::try_with_read(&rwlock, |value| *value);
         assert_eq!(result, Ok(42));
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_tokio_async_rwlock_try_write_success() {
         let rwlock = AsyncRwLock::new(42);
         let result = AsyncDataLock::try_with_write(&rwlock, |value| {
@@ -744,7 +746,7 @@ mod async_rwlock_data_trait_tests {
         assert_eq!(result, Ok(43));
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_tokio_async_rwlock_try_read_succeeds_after_write_guard_released()
      {
         let rwlock = AsyncRwLock::new(0);
@@ -759,7 +761,7 @@ mod async_rwlock_data_trait_tests {
         assert_eq!(result, Ok(0)); // Should succeed since lock was released
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_tokio_async_rwlock_try_write_succeeds_after_read_guard_released()
      {
         let rwlock = AsyncRwLock::new(0);
@@ -774,7 +776,7 @@ mod async_rwlock_data_trait_tests {
         assert_eq!(result, Ok(0)); // Should succeed since lock was released
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_tokio_async_rwlock_try_read_returns_would_block_when_write_guard_held()
      {
         let rwlock = AsyncRwLock::new(0);
@@ -786,7 +788,7 @@ mod async_rwlock_data_trait_tests {
         assert_eq!(result, Err(TryLockError::WouldBlock));
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_tokio_async_rwlock_try_write_returns_would_block_when_read_guard_held()
      {
         let rwlock = AsyncRwLock::new(0);
@@ -798,7 +800,7 @@ mod async_rwlock_data_trait_tests {
         assert_eq!(result, Err(TryLockError::WouldBlock));
     }
 
-    #[tokio::test]
+    #[tokio_test]
     async fn test_tokio_async_rwlock_try_methods_cover_shared_function_pointer_paths()
      {
         let rwlock = AsyncRwLock::new(0);
