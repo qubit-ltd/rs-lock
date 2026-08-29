@@ -78,10 +78,7 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     ///
     /// A monitor guard that can access state and wait for monitor notification.
     #[inline]
-    pub(super) fn new(
-        monitor: &'a ParkingLotMonitor<T>,
-        inner: MutexGuard<'a, T>,
-    ) -> Self {
+    pub(super) fn new(monitor: &'a ParkingLotMonitor<T>, inner: MutexGuard<'a, T>) -> Self {
         Self {
             monitor,
             inner: Some(inner),
@@ -101,10 +98,7 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     /// Panics only if the guard's internal ownership invariant is violated.
     #[inline]
     pub fn notify_one(mut self) {
-        release_guard(
-            &mut self.inner,
-            "parking-lot monitor guard slot must be occupied",
-        );
+        release_guard(&mut self.inner, "parking-lot monitor guard slot must be occupied");
         self.monitor.notify_one();
     }
 
@@ -121,10 +115,7 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     /// Panics only if the guard's internal ownership invariant is violated.
     #[inline]
     pub fn notify_all(mut self) {
-        release_guard(
-            &mut self.inner,
-            "parking-lot monitor guard slot must be occupied",
-        );
+        release_guard(&mut self.inner, "parking-lot monitor guard slot must be occupied");
         self.monitor.notify_all();
     }
 
@@ -240,10 +231,7 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     ///
     /// Panics if the registry exhausts registration identifiers.
     #[inline]
-    pub fn wait_for(
-        &mut self,
-        timeout: Duration,
-    ) -> Result<WaitTimeoutStatus, TimeError> {
+    pub fn wait_for(&mut self, timeout: Duration) -> Result<WaitTimeoutStatus, TimeError> {
         let mut future = self.monitor.timer().after(timeout)?;
         self.wait_with_timer(&mut future)
     }
@@ -268,10 +256,7 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     ///
     /// Panics if the registry exhausts registration identifiers.
     #[inline(always)]
-    pub fn wait_until(
-        &mut self,
-        deadline: MonotonicInstant,
-    ) -> Result<WaitTimeoutStatus, TimeError> {
+    pub fn wait_until(&mut self, deadline: MonotonicInstant) -> Result<WaitTimeoutStatus, TimeError> {
         let mut future = self.monitor.timer().at(deadline)?;
         self.wait_with_timer(&mut future)
     }
@@ -294,10 +279,7 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     ///
     /// Panics if the guard's internal ownership invariant is violated.
     /// Panics if the registry exhausts registration identifiers.
-    pub(super) fn wait_with_timer(
-        &mut self,
-        future: &mut TimerFuture,
-    ) -> Result<WaitTimeoutStatus, TimeError> {
+    pub(super) fn wait_with_timer(&mut self, future: &mut TimerFuture) -> Result<WaitTimeoutStatus, TimeError> {
         let monitor = self.monitor;
         wait_with_timer(
             &mut self.inner,

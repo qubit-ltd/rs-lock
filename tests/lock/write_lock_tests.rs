@@ -20,10 +20,7 @@ fn test_write_lock_adapter_is_exclusive() {
     let write_lock = ReadWriteLock::write_lock(&lock);
     let guard = Lock::lock(&write_lock);
 
-    assert!(matches!(
-        Lock::try_lock(&write_lock),
-        Err(TryLockError::WouldBlock)
-    ));
+    assert!(matches!(Lock::try_lock(&write_lock), Err(TryLockError::WouldBlock)));
     drop(guard);
     assert!(Lock::try_lock(&write_lock).is_ok());
 }

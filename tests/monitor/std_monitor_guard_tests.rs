@@ -45,16 +45,16 @@ fn test_std_monitor_guard_notify_one_releases_lock_and_wakes_waiter() {
         waiter_monitor.wait_until(
             |ready| {
                 if !*ready {
-                    checked_tx.send(()).expect(
-                        "test coordinator should receive predicate check",
-                    );
+                    checked_tx
+                        .send(())
+                        .expect("test coordinator should receive predicate check");
                 }
                 *ready
             },
             |_ready| {
-                done_tx.send(()).expect(
-                    "test coordinator should receive waiter completion",
-                );
+                done_tx
+                    .send(())
+                    .expect("test coordinator should receive waiter completion");
             },
         );
     });
@@ -146,9 +146,7 @@ fn test_std_monitor_guard_wait_until_accepts_reached_local_deadline() {
     let deadline = clock.now();
     let mut guard = monitor.lock();
 
-    let status = guard
-        .wait_until(deadline)
-        .expect("local deadline should register");
+    let status = guard.wait_until(deadline).expect("local deadline should register");
 
     assert_eq!(status, WaitTimeoutStatus::TimedOut);
     assert_eq!(*guard, 1);
@@ -156,8 +154,7 @@ fn test_std_monitor_guard_wait_until_accepts_reached_local_deadline() {
 
 #[test]
 fn test_std_monitor_guard_keeps_lock_after_timer_registration_error() {
-    let monitor =
-        StdMonitor::with_timer(1, Arc::new(registration_failing_timer()));
+    let monitor = StdMonitor::with_timer(1, Arc::new(registration_failing_timer()));
     let mut guard = monitor.lock();
 
     let error = guard

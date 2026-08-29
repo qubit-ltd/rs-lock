@@ -475,12 +475,8 @@ impl<T: ?Sized + Send> DataLock<T> for Mutex<T> {
     {
         match self.try_lock() {
             Ok(guard) => Ok(f(&*guard)),
-            Err(std::sync::TryLockError::WouldBlock) => {
-                Err(TryLockError::WouldBlock)
-            }
-            Err(std::sync::TryLockError::Poisoned(_)) => {
-                Err(TryLockError::Poisoned)
-            }
+            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
+            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
         }
     }
 
@@ -510,12 +506,8 @@ impl<T: ?Sized + Send> DataLock<T> for Mutex<T> {
     {
         match self.try_lock() {
             Ok(mut guard) => Ok(f(&mut *guard)),
-            Err(std::sync::TryLockError::WouldBlock) => {
-                Err(TryLockError::WouldBlock)
-            }
-            Err(std::sync::TryLockError::Poisoned(_)) => {
-                Err(TryLockError::Poisoned)
-            }
+            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
+            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
         }
     }
 }
@@ -601,12 +593,8 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for RwLock<T> {
     {
         match self.try_read() {
             Ok(guard) => Ok(f(&*guard)),
-            Err(std::sync::TryLockError::WouldBlock) => {
-                Err(TryLockError::WouldBlock)
-            }
-            Err(std::sync::TryLockError::Poisoned(_)) => {
-                Err(TryLockError::Poisoned)
-            }
+            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
+            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
         }
     }
 
@@ -636,12 +624,8 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for RwLock<T> {
     {
         match self.try_write() {
             Ok(mut guard) => Ok(f(&mut *guard)),
-            Err(std::sync::TryLockError::WouldBlock) => {
-                Err(TryLockError::WouldBlock)
-            }
-            Err(std::sync::TryLockError::Poisoned(_)) => {
-                Err(TryLockError::Poisoned)
-            }
+            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
+            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
         }
     }
 }
@@ -725,9 +709,7 @@ impl<T: ?Sized + Send> DataLock<T> for ParkingLotMutex<T> {
     where
         F: FnOnce(&T) -> R,
     {
-        self.try_lock()
-            .map(|guard| f(&*guard))
-            .ok_or(TryLockError::WouldBlock)
+        self.try_lock().map(|guard| f(&*guard)).ok_or(TryLockError::WouldBlock)
     }
 
     /// Attempts to acquire the parking_lot mutex without blocking for writing.
@@ -842,9 +824,7 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for ParkingLotRwLock<T> {
     where
         F: FnOnce(&T) -> R,
     {
-        self.try_read()
-            .map(|guard| f(&*guard))
-            .ok_or(TryLockError::WouldBlock)
+        self.try_read().map(|guard| f(&*guard)).ok_or(TryLockError::WouldBlock)
     }
 
     /// Attempts to acquire an exclusive write lock without blocking.

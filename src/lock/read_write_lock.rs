@@ -216,12 +216,8 @@ where
     fn try_read(&self) -> Result<Self::ReadGuard<'_>, TryLockError> {
         match RwLock::try_read(self) {
             Ok(guard) => Ok(guard),
-            Err(std::sync::TryLockError::WouldBlock) => {
-                Err(TryLockError::WouldBlock)
-            }
-            Err(std::sync::TryLockError::Poisoned(_)) => {
-                Err(TryLockError::Poisoned)
-            }
+            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
+            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
         }
     }
 
@@ -230,12 +226,8 @@ where
     fn try_write(&self) -> Result<Self::WriteGuard<'_>, TryLockError> {
         match RwLock::try_write(self) {
             Ok(guard) => Ok(guard),
-            Err(std::sync::TryLockError::WouldBlock) => {
-                Err(TryLockError::WouldBlock)
-            }
-            Err(std::sync::TryLockError::Poisoned(_)) => {
-                Err(TryLockError::Poisoned)
-            }
+            Err(std::sync::TryLockError::WouldBlock) => Err(TryLockError::WouldBlock),
+            Err(std::sync::TryLockError::Poisoned(_)) => Err(TryLockError::Poisoned),
         }
     }
 }

@@ -91,9 +91,7 @@ impl<T> TokioMonitor<T> {
     #[track_caller]
     #[inline]
     pub fn current(state: T) -> Self {
-        Self::try_current(state).unwrap_or_else(|error| {
-            panic!("cannot create Tokio monitor: {error}")
-        })
+        Self::try_current(state).unwrap_or_else(|error| panic!("cannot create Tokio monitor: {error}"))
     }
 
     /// Tries to create a monitor by capturing the current Tokio runtime.
@@ -116,8 +114,7 @@ impl<T> TokioMonitor<T> {
     /// Panics if all process-wide clock-domain identifiers are exhausted.
     #[inline]
     pub fn try_current(state: T) -> Result<Self, TokioRuntimeError> {
-        TokioTimer::try_current()
-            .map(|timer| Self::with_timer(state, Arc::new(timer)))
+        TokioTimer::try_current().map(|timer| Self::with_timer(state, Arc::new(timer)))
     }
 
     /// Creates a Tokio monitor using an injected Timer.
@@ -291,10 +288,7 @@ impl<T> TokioMonitor<T> {
     /// Selects all registered async waiters without retaining protected state.
     pub fn notify_all(&self) {
         let waiters = {
-            let mut registry = self
-                .waiters
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let mut registry = self.waiters.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             registry.take_all()
         };
         for waiter in waiters {
@@ -338,9 +332,7 @@ impl<T> TokioMonitor<T> {
     /// Returns a Timer completion error if the fixed registration fails while
     /// being polled.
     #[inline]
-    async fn deadline_reached(
-        deadline: &mut TimerFuture,
-    ) -> Result<bool, TimeError> {
+    async fn deadline_reached(deadline: &mut TimerFuture) -> Result<bool, TimeError> {
         poll_fn(|context| match deadline.as_mut().poll(context) {
             Poll::Pending => Poll::Ready(Ok(false)),
             Poll::Ready(result) => Poll::Ready(result.map(|()| true)),
@@ -400,11 +392,7 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
     /// it is polled. It also panics if the registry exhausts registration
     /// identifiers.
     #[inline(always)]
-    fn wait_until_async<'a, R, P, F>(
-        &'a self,
-        mut predicate: P,
-        action: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn wait_until_async<'a, R, P, F>(&'a self, mut predicate: P, action: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
@@ -447,11 +435,7 @@ impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
         clippy::manual_async_fn,
         reason = "the explicit Send bound is part of the trait contract"
     )]
-    fn wait_while_async<'a, R, P, F>(
-        &'a self,
-        mut predicate: P,
-        action: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn wait_while_async<'a, R, P, F>(&'a self, mut predicate: P, action: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
@@ -492,10 +476,7 @@ impl<T: Send> AsyncMonitor for TokioMonitor<T> {
     ///
     /// The returned future propagates a panic from `f` when it is polled.
     #[inline(always)]
-    fn with_read_async<'a, R, F>(
-        &'a self,
-        f: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn with_read_async<'a, R, F>(&'a self, f: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         F: FnOnce(&Self::State) -> R + Send + 'a,
@@ -523,10 +504,7 @@ impl<T: Send> AsyncMonitor for TokioMonitor<T> {
     ///
     /// The returned future propagates a panic from `f` when it is polled.
     #[inline(always)]
-    fn with_write_async<'a, R, F>(
-        &'a self,
-        f: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn with_write_async<'a, R, F>(&'a self, f: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
@@ -579,9 +557,7 @@ impl<T: Send> TokioMonitor<T> {
         P: FnMut(&T) -> bool + Send + 'a,
         F: FnOnce(&mut T) -> R + Send + 'a,
     {
-        <Self as AsyncTimeoutConditionWaiter>::wait_until_with_deadline_async(
-            self, deadline, ready, f,
-        )
+        <Self as AsyncTimeoutConditionWaiter>::wait_until_with_deadline_async(self, deadline, ready, f)
     }
 
     /// Returns a future that waits until a predicate becomes true or an
@@ -621,9 +597,7 @@ impl<T: Send> TokioMonitor<T> {
     where
         P: FnMut(&T) -> bool + Send + 'a,
     {
-        <Self as AsyncTimeoutConditionWaiter>::wait_until_ready_with_deadline_async(
-            self, deadline, ready,
-        )
+        <Self as AsyncTimeoutConditionWaiter>::wait_until_ready_with_deadline_async(self, deadline, ready)
     }
 
     /// Returns a future that waits while a predicate remains true or until an
@@ -670,9 +644,7 @@ impl<T: Send> TokioMonitor<T> {
         P: FnMut(&T) -> bool + Send + 'a,
         F: FnOnce(&mut T) -> R + Send + 'a,
     {
-        <Self as AsyncTimeoutConditionWaiter>::wait_while_with_deadline_async(
-            self, deadline, predicate, action,
-        )
+        <Self as AsyncTimeoutConditionWaiter>::wait_while_with_deadline_async(self, deadline, predicate, action)
     }
 }
 
@@ -742,9 +714,7 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
             loop {
                 let registration = self.register_waiter();
                 drop(guard);
-                let status = registration
-                    .wait_until_signalled_or_deadline(&mut deadline)
-                    .await;
+                let status = registration.wait_until_signalled_or_deadline(&mut deadline).await;
                 drop(registration);
                 guard = self.state.lock().await;
                 let status = status?;
@@ -831,11 +801,7 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
-        self.wait_while_for_async(
-            timeout,
-            move |state| !predicate(state),
-            action,
-        )
+        self.wait_while_for_async(timeout, move |state| !predicate(state), action)
     }
 
     /// Returns a future that rechecks the predicate while it remains true or
@@ -924,9 +890,7 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
             loop {
                 let registration = self.register_waiter();
                 drop(guard);
-                let status = registration
-                    .wait_until_signalled_or_deadline(&mut deadline)
-                    .await;
+                let status = registration.wait_until_signalled_or_deadline(&mut deadline).await;
                 drop(registration);
                 guard = self.state.lock().await;
                 let status = status?;

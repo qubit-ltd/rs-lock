@@ -49,15 +49,9 @@ mod async_data_lock_trait_tests {
         let borrowed = &mutex;
 
         assert_eq!(AsyncDataLock::with_read(&borrowed, read_i32).await, 0,);
-        assert_eq!(
-            AsyncDataLock::with_write(&borrowed, increment_i32).await,
-            1,
-        );
+        assert_eq!(AsyncDataLock::with_write(&borrowed, increment_i32).await, 1,);
         assert_eq!(AsyncDataLock::try_with_read(&borrowed, read_i32), Ok(1),);
-        assert_eq!(
-            AsyncDataLock::try_with_write(&borrowed, increment_i32),
-            Ok(2),
-        );
+        assert_eq!(AsyncDataLock::try_with_write(&borrowed, increment_i32), Ok(2),);
     }
 
     #[tokio_test]
@@ -165,9 +159,7 @@ mod async_data_lock_trait_tests {
             rt.block_on(async {
                 async_mutex_clone
                     .with_write(move |_| {
-                        locked_tx
-                            .send(())
-                            .expect("test should observe held mutex");
+                        locked_tx.send(()).expect("test should observe held mutex");
                         release_rx
                             .recv_timeout(Duration::from_secs(1))
                             .expect("test should release held mutex");
@@ -314,9 +306,7 @@ mod async_data_lock_trait_tests {
                 async_mutex_clone
                     .with_write(move |value| {
                         *value += 1;
-                        locked_tx
-                            .send(())
-                            .expect("test should observe held mutex");
+                        locked_tx.send(()).expect("test should observe held mutex");
                         release_rx
                             .recv_timeout(Duration::from_secs(1))
                             .expect("test should release held mutex");
@@ -344,10 +334,7 @@ mod async_data_lock_trait_tests {
         attempted_rx
             .await
             .expect("contended writer should attempt to acquire the mutex");
-        assert_eq!(
-            async_mutex.try_with_read(|value| *value),
-            Err(TryLockError::WouldBlock),
-        );
+        assert_eq!(async_mutex.try_with_read(|value| *value), Err(TryLockError::WouldBlock),);
 
         release_tx
             .send(())
@@ -430,37 +417,29 @@ mod async_data_lock_trait_tests {
     #[tokio_test]
     async fn test_tokio_async_mutex_try_read_returns_would_block_when_locked() {
         let mutex = AsyncMutex::new(0);
-        let _guard = mutex
-            .try_lock()
-            .expect("failed to acquire initial mutex guard");
+        let _guard = mutex.try_lock().expect("failed to acquire initial mutex guard");
 
         let result = AsyncDataLock::try_with_read(&mutex, |value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
     }
 
     #[tokio_test]
-    async fn test_tokio_async_mutex_try_write_returns_would_block_when_guard_held()
-     {
+    async fn test_tokio_async_mutex_try_write_returns_would_block_when_guard_held() {
         let mutex = AsyncMutex::new(0);
-        let _guard = mutex
-            .try_lock()
-            .expect("failed to acquire initial mutex guard");
+        let _guard = mutex.try_lock().expect("failed to acquire initial mutex guard");
 
         let result = AsyncDataLock::try_with_write(&mutex, |value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
     }
 
     #[tokio_test]
-    async fn test_tokio_async_mutex_try_methods_cover_shared_function_pointer_paths()
-     {
+    async fn test_tokio_async_mutex_try_methods_cover_shared_function_pointer_paths() {
         let mutex = AsyncMutex::new(0);
 
         assert_eq!(AsyncDataLock::try_with_read(&mutex, read_i32), Ok(0));
         assert_eq!(AsyncDataLock::try_with_write(&mutex, increment_i32), Ok(1));
 
-        let guard = mutex
-            .try_lock()
-            .expect("failed to acquire initial mutex guard");
+        let guard = mutex.try_lock().expect("failed to acquire initial mutex guard");
         assert_eq!(
             AsyncDataLock::try_with_read(&mutex, read_i32),
             Err(TryLockError::WouldBlock),
@@ -531,9 +510,9 @@ mod async_rwlock_data_trait_tests {
 
         // All readers should get the same result
         for handle in handles {
-            let sum = handle.await.expect(
-                "concurrent rwlock reader should complete successfully",
-            );
+            let sum = handle
+                .await
+                .expect("concurrent rwlock reader should complete successfully");
             assert_eq!(sum, 15);
         }
     }
@@ -560,9 +539,9 @@ mod async_rwlock_data_trait_tests {
 
         // Wait for all tasks to complete
         for handle in handles {
-            handle.await.expect(
-                "concurrent rwlock writer should complete successfully",
-            );
+            handle
+                .await
+                .expect("concurrent rwlock writer should complete successfully");
         }
 
         // Verify final value (should be 10 if writes are exclusive)
@@ -700,9 +679,7 @@ mod async_rwlock_data_trait_tests {
 
         // Wait for all tasks
         for handle in handles {
-            handle
-                .await
-                .expect("mixed rwlock task should complete successfully");
+            handle.await.expect("mixed rwlock task should complete successfully");
         }
 
         // Verify final value
@@ -747,8 +724,7 @@ mod async_rwlock_data_trait_tests {
     }
 
     #[tokio_test]
-    async fn test_tokio_async_rwlock_try_read_succeeds_after_write_guard_released()
-     {
+    async fn test_tokio_async_rwlock_try_read_succeeds_after_write_guard_released() {
         let rwlock = AsyncRwLock::new(0);
 
         // First acquire write lock to ensure it's locked
@@ -762,8 +738,7 @@ mod async_rwlock_data_trait_tests {
     }
 
     #[tokio_test]
-    async fn test_tokio_async_rwlock_try_write_succeeds_after_read_guard_released()
-     {
+    async fn test_tokio_async_rwlock_try_write_succeeds_after_read_guard_released() {
         let rwlock = AsyncRwLock::new(0);
 
         // First acquire read lock to ensure it's locked
@@ -777,52 +752,38 @@ mod async_rwlock_data_trait_tests {
     }
 
     #[tokio_test]
-    async fn test_tokio_async_rwlock_try_read_returns_would_block_when_write_guard_held()
-     {
+    async fn test_tokio_async_rwlock_try_read_returns_would_block_when_write_guard_held() {
         let rwlock = AsyncRwLock::new(0);
-        let _guard = rwlock
-            .try_write()
-            .expect("failed to acquire initial write guard");
+        let _guard = rwlock.try_write().expect("failed to acquire initial write guard");
 
         let result = AsyncDataLock::try_with_read(&rwlock, |value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
     }
 
     #[tokio_test]
-    async fn test_tokio_async_rwlock_try_write_returns_would_block_when_read_guard_held()
-     {
+    async fn test_tokio_async_rwlock_try_write_returns_would_block_when_read_guard_held() {
         let rwlock = AsyncRwLock::new(0);
-        let _guard = rwlock
-            .try_read()
-            .expect("failed to acquire initial read guard");
+        let _guard = rwlock.try_read().expect("failed to acquire initial read guard");
 
         let result = AsyncDataLock::try_with_write(&rwlock, |value| *value);
         assert_eq!(result, Err(TryLockError::WouldBlock));
     }
 
     #[tokio_test]
-    async fn test_tokio_async_rwlock_try_methods_cover_shared_function_pointer_paths()
-     {
+    async fn test_tokio_async_rwlock_try_methods_cover_shared_function_pointer_paths() {
         let rwlock = AsyncRwLock::new(0);
 
         assert_eq!(AsyncDataLock::try_with_read(&rwlock, read_i32), Ok(0));
-        assert_eq!(
-            AsyncDataLock::try_with_write(&rwlock, increment_i32),
-            Ok(1)
-        );
+        assert_eq!(AsyncDataLock::try_with_write(&rwlock, increment_i32), Ok(1));
 
-        let write_guard = rwlock
-            .try_write()
-            .expect("failed to acquire initial write guard");
+        let write_guard = rwlock.try_write().expect("failed to acquire initial write guard");
         assert_eq!(
             AsyncDataLock::try_with_read(&rwlock, read_i32),
             Err(TryLockError::WouldBlock),
         );
         drop(write_guard);
 
-        let read_guard = rwlock
-            .try_read()
-            .expect("failed to acquire initial read guard");
+        let read_guard = rwlock.try_read().expect("failed to acquire initial read guard");
         assert_eq!(
             AsyncDataLock::try_with_write(&rwlock, increment_i32),
             Err(TryLockError::WouldBlock),

@@ -119,8 +119,7 @@ impl TimeoutConditionWaiter for CountingMonitor {
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,
     {
-        self.inner
-            .wait_while_with_deadline(deadline, predicate, action)
+        self.inner.wait_while_with_deadline(deadline, predicate, action)
     }
 
     /// Delegates an operation-wide timeout predicate wait to the real monitor.
@@ -134,8 +133,7 @@ impl TimeoutConditionWaiter for CountingMonitor {
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,
     {
-        self.inner
-            .wait_while_with_total_timeout(timeout, predicate, action)
+        self.inner.wait_while_with_total_timeout(timeout, predicate, action)
     }
 
     /// Delegates a condition-wait timeout to the real monitor.
@@ -155,14 +153,12 @@ impl TimeoutConditionWaiter for CountingMonitor {
 
 #[test]
 fn test_pop_for_notifies_after_releasing_capacity() {
-    let capacity =
-        NonZeroUsize::new(1).expect("test capacity must be non-zero");
+    let capacity = NonZeroUsize::new(1).expect("test capacity must be non-zero");
     let queue = CountingMonitor::new(QueueState::new(capacity));
     assert_eq!(push(&queue, 1), Ok(()));
     let notifications_before_pop = queue.notify_all_count();
 
-    let result = pop_for(&queue, Duration::ZERO)
-        .expect("zero-timeout dequeue should use the monitor timer domain");
+    let result = pop_for(&queue, Duration::ZERO).expect("zero-timeout dequeue should use the monitor timer domain");
     assert_eq!(result, WaitTimeoutResult::Ready(Some(1)));
     assert_eq!(
         queue.notify_all_count(),

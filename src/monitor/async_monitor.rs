@@ -43,10 +43,7 @@ pub trait AsyncMonitor: Notifier + AsyncConditionWaiter + Sync {
     ///
     /// The returned future propagates a panic from `f` after the state lock is
     /// released.
-    fn with_read_async<'a, R, F>(
-        &'a self,
-        f: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn with_read_async<'a, R, F>(&'a self, f: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         F: FnOnce(&Self::State) -> R + Send + 'a;
@@ -73,10 +70,7 @@ pub trait AsyncMonitor: Notifier + AsyncConditionWaiter + Sync {
     ///
     /// The returned future propagates a panic from `f` after the state lock is
     /// released.
-    fn with_write_async<'a, R, F>(
-        &'a self,
-        f: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn with_write_async<'a, R, F>(&'a self, f: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a;
@@ -105,10 +99,7 @@ pub trait AsyncMonitor: Notifier + AsyncConditionWaiter + Sync {
     /// The returned future propagates a panic from `f`. In that case no
     /// notification is sent.
     #[inline]
-    fn with_write_notify_one_async<'a, R, F>(
-        &'a self,
-        f: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn with_write_notify_one_async<'a, R, F>(&'a self, f: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
@@ -144,10 +135,7 @@ pub trait AsyncMonitor: Notifier + AsyncConditionWaiter + Sync {
     /// The returned future propagates a panic from `f`. In that case no
     /// notification is sent.
     #[inline]
-    fn with_write_notify_all_async<'a, R, F>(
-        &'a self,
-        f: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn with_write_notify_all_async<'a, R, F>(&'a self, f: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
@@ -172,10 +160,7 @@ where
     /// * `F` - Read closure forwarded to the wrapped monitor. It must be
     ///   sendable and remain valid for `'a`.
     #[inline(always)]
-    fn with_read_async<'a, R, F>(
-        &'a self,
-        f: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn with_read_async<'a, R, F>(&'a self, f: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         F: FnOnce(&Self::State) -> R + Send + 'a,
@@ -191,10 +176,7 @@ where
     /// * `F` - Write closure forwarded to the wrapped monitor. It must be
     ///   sendable and remain valid for `'a`.
     #[inline(always)]
-    fn with_write_async<'a, R, F>(
-        &'a self,
-        f: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn with_write_async<'a, R, F>(&'a self, f: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,

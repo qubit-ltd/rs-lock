@@ -48,8 +48,7 @@ mod parking_lot_rw_lock_tests {
     }
 
     #[test]
-    fn test_parking_lot_rw_lock_try_read_returns_would_block_when_write_locked()
-    {
+    fn test_parking_lot_rw_lock_try_read_returns_would_block_when_write_locked() {
         let rw_lock = Arc::new(ParkingLotRwLock::new(0));
         let (locked_tx, locked_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
@@ -57,9 +56,7 @@ mod parking_lot_rw_lock_tests {
         let lock_clone = rw_lock.clone();
         let holder = thread::spawn(move || {
             DataLock::with_write(&*lock_clone, |_| {
-                locked_tx
-                    .send(())
-                    .expect("test should observe held write lock");
+                locked_tx.send(()).expect("test should observe held write lock");
                 release_rx
                     .recv_timeout(Duration::from_secs(1))
                     .expect("test should release held write lock");
@@ -85,8 +82,7 @@ mod parking_lot_rw_lock_tests {
     }
 
     #[test]
-    fn test_parking_lot_rw_lock_try_write_returns_would_block_when_read_locked()
-    {
+    fn test_parking_lot_rw_lock_try_write_returns_would_block_when_read_locked() {
         let rw_lock = Arc::new(ParkingLotRwLock::new(0));
         let (locked_tx, locked_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
@@ -94,9 +90,7 @@ mod parking_lot_rw_lock_tests {
         let lock_clone = rw_lock.clone();
         let holder = thread::spawn(move || {
             DataLock::with_read(&*lock_clone, |_| {
-                locked_tx
-                    .send(())
-                    .expect("test should observe held read lock");
+                locked_tx.send(()).expect("test should observe held read lock");
                 release_rx
                     .recv_timeout(Duration::from_secs(1))
                     .expect("test should release held read lock");

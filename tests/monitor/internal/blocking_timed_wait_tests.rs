@@ -52,9 +52,9 @@ fn test_blocking_timed_wait_returns_ready_after_notification() {
             Duration::from_secs(1),
             move |ready| {
                 if !*ready && let Some(checked_tx) = checked_tx.take() {
-                    checked_tx.send(()).expect(
-                        "test should observe the initial predicate check",
-                    );
+                    checked_tx
+                        .send(())
+                        .expect("test should observe the initial predicate check");
                 }
                 *ready
             },

@@ -109,10 +109,7 @@ impl Drop for TokioConditionWaiterRegistration<'_> {
     /// Removes this waiter if no notification has selected it yet.
     #[inline]
     fn drop(&mut self) {
-        let mut registry = self
-            .registry
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut registry = self.registry.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         registry.unregister(self.waiter_id);
     }
 }

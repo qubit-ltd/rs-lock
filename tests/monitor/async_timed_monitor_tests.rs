@@ -21,11 +21,7 @@ where
 {
     assert_time_result_eq!(
         monitor
-            .wait_until_for_async(
-                Duration::from_millis(1),
-                |ready| *ready,
-                |_| 7,
-            )
+            .wait_until_for_async(Duration::from_millis(1), |ready| *ready, |_| 7,)
             .await,
         Ok(WaitTimeoutResult::TimedOut),
     );

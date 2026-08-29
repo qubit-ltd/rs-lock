@@ -39,10 +39,7 @@ fn test_wait_timeout_result_ready_helpers() {
     assert_eq!(mapped, WaitTimeoutResult::Ready(42));
 
     let mapped_to_string = WaitTimeoutResult::Ready(21).map(i32_to_string);
-    assert_eq!(
-        mapped_to_string,
-        WaitTimeoutResult::Ready(String::from("21"))
-    );
+    assert_eq!(mapped_to_string, WaitTimeoutResult::Ready(String::from("21")));
 }
 
 /// Test wait-timeout result helper methods for timeout values.
@@ -57,7 +54,6 @@ fn test_wait_timeout_result_timed_out_helpers() {
     let mapped = WaitTimeoutResult::<i32>::TimedOut.map(double_i32);
     assert_eq!(mapped, WaitTimeoutResult::TimedOut);
 
-    let mapped_to_string: WaitTimeoutResult<String> =
-        WaitTimeoutResult::<i32>::TimedOut.map(i32_to_string);
+    let mapped_to_string: WaitTimeoutResult<String> = WaitTimeoutResult::<i32>::TimedOut.map(i32_to_string);
     assert_eq!(mapped_to_string, WaitTimeoutResult::TimedOut);
 }

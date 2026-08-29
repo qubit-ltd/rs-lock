@@ -33,18 +33,10 @@ use qubit_lock::WaitTimeoutStatus;
 const NOTIFY_WAIT_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Resources for one prepared ParkingLotMonitor notify-all measurement.
-type MonitorWaiters = (
-    Arc<ParkingLotMonitor<bool>>,
-    Vec<JoinHandle<()>>,
-    Receiver<()>,
-);
+type MonitorWaiters = (Arc<ParkingLotMonitor<bool>>, Vec<JoinHandle<()>>, Receiver<()>);
 
 /// Resources for one prepared parking_lot Condvar notify-all measurement.
-type CondvarWaiters = (
-    Arc<(Mutex<bool>, Condvar)>,
-    Vec<JoinHandle<()>>,
-    Receiver<()>,
-);
+type CondvarWaiters = (Arc<(Mutex<bool>, Condvar)>, Vec<JoinHandle<()>>, Receiver<()>);
 
 /// Resources for one timed ParkingLotMonitor notify-one measurement.
 type TimedMonitorWaiter = (
@@ -54,8 +46,7 @@ type TimedMonitorWaiter = (
 );
 
 /// Resources for one timed parking_lot Condvar notify-one measurement.
-type TimedCondvarWaiter =
-    (Arc<(Mutex<bool>, Condvar)>, JoinHandle<()>, Receiver<bool>);
+type TimedCondvarWaiter = (Arc<(Mutex<bool>, Condvar)>, JoinHandle<()>, Receiver<bool>);
 
 /// Prepares registered ParkingLotMonitor waiters outside the measured routine.
 ///
@@ -79,28 +70,20 @@ fn prepare_monitor_waiters(waiter_count: usize) -> MonitorWaiters {
                 let mut registered_tx = Some(registered_tx);
                 monitor.wait_until(
                     move |ready| {
-                        if !*ready
-                            && let Some(registered_tx) = registered_tx.take()
-                        {
-                            registered_tx.send(()).expect(
-                                "benchmark should observe registration",
-                            );
+                        if !*ready && let Some(registered_tx) = registered_tx.take() {
+                            registered_tx.send(()).expect("benchmark should observe registration");
                         }
                         *ready
                     },
                     |_| (),
                 );
-                done_tx
-                    .send(())
-                    .expect("benchmark should observe waiter completion");
+                done_tx.send(()).expect("benchmark should observe waiter completion");
             })
         })
         .collect::<Vec<_>>();
 
     for _ in 0..waiter_count {
-        registered_rx
-            .recv()
-            .expect("benchmark waiter should register");
+        registered_rx.recv().expect("benchmark waiter should register");
     }
     drop(monitor.lock());
     (monitor, waiters, done_rx)
@@ -129,23 +112,17 @@ fn prepare_condvar_waiters(waiter_count: usize) -> CondvarWaiters {
             thread::spawn(move || {
                 let (state, changed) = &*condition;
                 let mut ready = state.lock();
-                registered_tx
-                    .send(())
-                    .expect("benchmark should observe registration");
+                registered_tx.send(()).expect("benchmark should observe registration");
                 while !*ready {
                     changed.wait(&mut ready);
                 }
-                done_tx
-                    .send(())
-                    .expect("benchmark should observe waiter completion");
+                done_tx.send(()).expect("benchmark should observe waiter completion");
             })
         })
         .collect::<Vec<_>>();
 
     for _ in 0..waiter_count {
-        registered_rx
-            .recv()
-            .expect("benchmark waiter should register");
+        registered_rx.recv().expect("benchmark waiter should register");
     }
     drop(condition.0.lock());
     (condition, waiters, done_rx)
@@ -163,9 +140,7 @@ fn prepare_timed_monitor_waiter() -> TimedMonitorWaiter {
     let waiter_monitor = Arc::clone(&monitor);
     let waiter = thread::spawn(move || {
         let mut guard = waiter_monitor.lock();
-        registered_tx
-            .send(())
-            .expect("benchmark should observe registration");
+        registered_tx.send(()).expect("benchmark should observe registration");
         let status = guard
             .wait_for(NOTIFY_WAIT_TIMEOUT)
             .expect("standard Timer should register");
@@ -174,9 +149,7 @@ fn prepare_timed_monitor_waiter() -> TimedMonitorWaiter {
             .expect("benchmark should observe waiter completion");
     });
 
-    registered_rx
-        .recv()
-        .expect("benchmark timed waiter should register");
+    registered_rx.recv().expect("benchmark timed waiter should register");
     drop(monitor.lock());
     (monitor, waiter, done_rx)
 }
@@ -194,18 +167,14 @@ fn prepare_timed_condvar_waiter() -> TimedCondvarWaiter {
     let waiter = thread::spawn(move || {
         let (state, changed) = &*waiter_condition;
         let mut guard = state.lock();
-        registered_tx
-            .send(())
-            .expect("benchmark should observe registration");
+        registered_tx.send(()).expect("benchmark should observe registration");
         let status = changed.wait_for(&mut guard, NOTIFY_WAIT_TIMEOUT);
         done_tx
             .send(status.timed_out())
             .expect("benchmark should observe waiter completion");
     });
 
-    registered_rx
-        .recv()
-        .expect("benchmark timed waiter should register");
+    registered_rx.recv().expect("benchmark timed waiter should register");
     drop(condition.0.lock());
     (condition, waiter, done_rx)
 }
@@ -233,10 +202,7 @@ fn finish_timed_waiter<T>(done_rx: Receiver<T>, waiter: JoinHandle<()>) -> T {
 fn validate_notify_one_workloads() {
     let (monitor, waiter, done_rx) = prepare_timed_monitor_waiter();
     monitor.notify_one();
-    assert_eq!(
-        finish_timed_waiter(done_rx, waiter),
-        WaitTimeoutStatus::Woken,
-    );
+    assert_eq!(finish_timed_waiter(done_rx, waiter), WaitTimeoutStatus::Woken,);
 
     let (condition, waiter, done_rx) = prepare_timed_condvar_waiter();
     condition.1.notify_one();
@@ -253,11 +219,7 @@ fn validate_notify_one_workloads() {
 /// * `waiter_count` - Number of completion messages to receive.
 /// * `done_rx` - Receiver carrying waiter completion messages.
 /// * `waiters` - Threads to join after completion.
-fn finish_waiters(
-    waiter_count: usize,
-    done_rx: Receiver<()>,
-    waiters: Vec<JoinHandle<()>>,
-) {
+fn finish_waiters(waiter_count: usize, done_rx: Receiver<()>, waiters: Vec<JoinHandle<()>>) {
     for _ in 0..waiter_count {
         done_rx.recv().expect("benchmark waiter should complete");
     }
@@ -277,11 +239,7 @@ fn benchmark_zero_timeout(criterion: &mut Criterion) {
     group.bench_function("parking_lot_monitor", |bencher| {
         bencher.iter(|| {
             let mut guard = parking_monitor.lock();
-            black_box(
-                guard
-                    .wait_for(Duration::ZERO)
-                    .expect("standard Timer should register"),
-            )
+            black_box(guard.wait_for(Duration::ZERO).expect("standard Timer should register"))
         });
     });
 
@@ -289,11 +247,7 @@ fn benchmark_zero_timeout(criterion: &mut Criterion) {
     group.bench_function("std_monitor", |bencher| {
         bencher.iter(|| {
             let mut guard = std_monitor.lock();
-            black_box(
-                guard
-                    .wait_for(Duration::ZERO)
-                    .expect("standard Timer should register"),
-            )
+            black_box(guard.wait_for(Duration::ZERO).expect("standard Timer should register"))
         });
     });
 
@@ -310,8 +264,7 @@ fn benchmark_zero_timeout(criterion: &mut Criterion) {
     let std_changed = StdCondvar::new();
     group.bench_function("std_condvar", |bencher| {
         bencher.iter(|| {
-            let guard =
-                std_state.lock().expect("benchmark mutex should not poison");
+            let guard = std_state.lock().expect("benchmark mutex should not poison");
             let (guard, result) = std_changed
                 .wait_timeout(guard, Duration::ZERO)
                 .expect("benchmark mutex should not poison");

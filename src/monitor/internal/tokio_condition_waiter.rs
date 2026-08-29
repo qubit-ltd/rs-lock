@@ -24,9 +24,7 @@ impl TokioConditionWaiter {
     #[must_use]
     #[inline]
     pub(in crate::monitor) fn new() -> Self {
-        Self {
-            signal: Notify::new(),
-        }
+        Self { signal: Notify::new() }
     }
 
     /// Returns the notification primitive owned by this waiter.

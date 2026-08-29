@@ -38,9 +38,7 @@ impl BlockingConditionWaiter {
     #[inline]
     pub(in crate::monitor) fn new() -> Self {
         Self {
-            state: Mutex::new(BlockingConditionWaiterState {
-                signalled: false,
-            }),
+            state: Mutex::new(BlockingConditionWaiterState { signalled: false }),
             changed: Condvar::new(),
         }
     }
@@ -62,9 +60,7 @@ impl BlockingConditionWaiter {
     /// # Errors
     ///
     /// A ready result contains any Timer completion error.
-    pub(in crate::monitor) fn poll_timer_without_waiter(
-        future: &mut TimerFuture,
-    ) -> Poll<Result<(), TimeError>> {
+    pub(in crate::monitor) fn poll_timer_without_waiter(future: &mut TimerFuture) -> Poll<Result<(), TimeError>> {
         let mut context = Context::from_waker(Waker::noop());
         future.as_mut().poll(&mut context)
     }
@@ -84,10 +80,7 @@ impl BlockingConditionWaiter {
     ///
     /// A ready result contains any Timer completion error.
     #[inline]
-    pub(in crate::monitor) fn poll_timer(
-        waiter: &Arc<Self>,
-        future: &mut TimerFuture,
-    ) -> Poll<Result<(), TimeError>> {
+    pub(in crate::monitor) fn poll_timer(waiter: &Arc<Self>, future: &mut TimerFuture) -> Poll<Result<(), TimeError>> {
         let waker = Waker::from(Arc::clone(waiter));
         let mut context = Context::from_waker(&waker);
         future.as_mut().poll(&mut context)

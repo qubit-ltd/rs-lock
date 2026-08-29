@@ -19,9 +19,7 @@ fn test_blocking_monitor_guard_wait_retains_guard_after_timeout() {
     let monitor = StdMonitor::with_timer(1, clock.new_timer());
     let mut guard = monitor.lock();
 
-    let status = guard
-        .wait_until(clock.now())
-        .expect("local deadline should register");
+    let status = guard.wait_until(clock.now()).expect("local deadline should register");
 
     assert_eq!(status, WaitTimeoutStatus::TimedOut);
     *guard += 1;

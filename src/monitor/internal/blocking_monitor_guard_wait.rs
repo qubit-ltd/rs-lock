@@ -33,10 +33,7 @@ use crate::monitor::WaitTimeoutStatus;
 /// Panics with `missing_guard_message` when the state guard was already
 /// released.
 #[inline(always)]
-pub(in crate::monitor) fn release_guard<G>(
-    guard: &mut Option<G>,
-    missing_guard_message: &'static str,
-) {
+pub(in crate::monitor) fn release_guard<G>(guard: &mut Option<G>, missing_guard_message: &'static str) {
     drop(guard.take().expect(missing_guard_message));
 }
 
@@ -126,16 +123,12 @@ pub(in crate::monitor) fn wait_with_timer<G, L>(
 where
     L: FnOnce() -> G,
 {
-    if let Poll::Ready(result) =
-        BlockingConditionWaiter::poll_timer_without_waiter(future)
-    {
+    if let Poll::Ready(result) = BlockingConditionWaiter::poll_timer_without_waiter(future) {
         return result.map(|()| WaitTimeoutStatus::TimedOut);
     }
     let registration = waiters.register();
     let waiter = Arc::clone(registration.waiter());
-    if let Poll::Ready(result) =
-        BlockingConditionWaiter::poll_timer(&waiter, future)
-    {
+    if let Poll::Ready(result) = BlockingConditionWaiter::poll_timer(&waiter, future) {
         return result.map(|()| WaitTimeoutStatus::TimedOut);
     }
     release_guard(guard, missing_guard_message);

@@ -31,10 +31,7 @@ fn test_lock_std_mutex_releases_on_guard_drop() {
     let lock = Mutex::new(7);
     let guard = Lock::lock(&lock);
 
-    assert!(matches!(
-        Lock::try_lock(&lock),
-        Err(TryLockError::WouldBlock)
-    ));
+    assert!(matches!(Lock::try_lock(&lock), Err(TryLockError::WouldBlock)));
     drop(guard);
     assert!(Lock::try_lock(&lock).is_ok());
 }
@@ -73,9 +70,6 @@ fn test_lock_std_mutex_reports_poisoning() {
     })
     .join();
 
-    assert!(matches!(
-        Lock::try_lock(&*lock),
-        Err(TryLockError::Poisoned)
-    ));
+    assert!(matches!(Lock::try_lock(&*lock), Err(TryLockError::Poisoned)));
     assert!(catch_unwind(AssertUnwindSafe(|| Lock::lock(&*lock))).is_err());
 }

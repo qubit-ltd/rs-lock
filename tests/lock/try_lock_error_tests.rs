@@ -12,10 +12,7 @@ use qubit_lock::TryLockError;
 /// Test try-lock error display text and error trait implementation.
 #[test]
 fn test_try_lock_error_display_and_error_trait() {
-    assert_eq!(
-        TryLockError::WouldBlock.to_string(),
-        "lock acquisition would block",
-    );
+    assert_eq!(TryLockError::WouldBlock.to_string(), "lock acquisition would block",);
     assert_eq!(TryLockError::Poisoned.to_string(), "lock is poisoned");
 
     let error: &dyn Error = &TryLockError::WouldBlock;

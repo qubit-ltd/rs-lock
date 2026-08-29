@@ -85,11 +85,7 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,
     {
-        self.wait_while_with_deadline(
-            deadline,
-            move |state| !predicate(state),
-            action,
-        )
+        self.wait_while_with_deadline(deadline, move |state| !predicate(state), action)
     }
 
     /// Blocks until the predicate becomes true or an absolute deadline passes.
@@ -214,11 +210,7 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,
     {
-        self.wait_while_with_total_timeout(
-            timeout,
-            move |state| !predicate(state),
-            action,
-        )
+        self.wait_while_with_total_timeout(timeout, move |state| !predicate(state), action)
     }
 
     /// Blocks until the predicate becomes true or the total timeout expires.
@@ -385,11 +377,7 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     ///
     /// Propagates a panic from `predicate`.
     #[inline(always)]
-    fn wait_until_ready_for<P>(
-        &self,
-        timeout: Duration,
-        predicate: P,
-    ) -> Result<WaitTimeoutResult<()>, TimeError>
+    fn wait_until_ready_for<P>(&self, timeout: Duration, predicate: P) -> Result<WaitTimeoutResult<()>, TimeError>
     where
         P: FnMut(&Self::State) -> bool,
     {
@@ -463,12 +451,7 @@ where
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,
     {
-        <M as TimeoutConditionWaiter>::wait_while_with_deadline(
-            self.as_ref(),
-            deadline,
-            predicate,
-            action,
-        )
+        <M as TimeoutConditionWaiter>::wait_while_with_deadline(self.as_ref(), deadline, predicate, action)
     }
 
     /// Delegates an operation-wide timed condition wait to the shared monitor.
@@ -508,12 +491,7 @@ where
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,
     {
-        <M as TimeoutConditionWaiter>::wait_while_with_total_timeout(
-            self.as_ref(),
-            timeout,
-            predicate,
-            action,
-        )
+        <M as TimeoutConditionWaiter>::wait_while_with_total_timeout(self.as_ref(), timeout, predicate, action)
     }
 
     /// Delegates a timed blocking condition wait to the shared monitor.
@@ -553,11 +531,6 @@ where
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,
     {
-        <M as TimeoutConditionWaiter>::wait_while_for(
-            self.as_ref(),
-            timeout,
-            predicate,
-            action,
-        )
+        <M as TimeoutConditionWaiter>::wait_while_for(self.as_ref(), timeout, predicate, action)
     }
 }

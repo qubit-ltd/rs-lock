@@ -103,10 +103,7 @@ mod data_lock_trait_tests {
 
     #[test]
     fn test_try_lock_error_display_messages() {
-        assert_eq!(
-            TryLockError::WouldBlock.to_string(),
-            "lock acquisition would block",
-        );
+        assert_eq!(TryLockError::WouldBlock.to_string(), "lock acquisition would block",);
         assert_eq!(TryLockError::Poisoned.to_string(), "lock is poisoned");
     }
 
@@ -329,9 +326,7 @@ mod data_lock_trait_tests {
 
         // Hold the lock in another thread
         let handle = thread::spawn(move || {
-            let _guard = mutex_clone
-                .lock()
-                .expect("holder mutex should not be poisoned");
+            let _guard = mutex_clone.lock().expect("holder mutex should not be poisoned");
             locked_tx.send(()).expect("test should observe held mutex");
             release_rx
                 .recv_timeout(Duration::from_secs(1))
@@ -370,9 +365,7 @@ mod data_lock_trait_tests {
 
         // Hold the lock in another thread
         let handle = thread::spawn(move || {
-            let _guard = mutex_clone
-                .lock()
-                .expect("holder mutex should not be poisoned");
+            let _guard = mutex_clone.lock().expect("holder mutex should not be poisoned");
             locked_tx.send(()).expect("test should observe held mutex");
             release_rx
                 .recv_timeout(Duration::from_secs(1))
@@ -413,9 +406,7 @@ mod data_lock_trait_tests {
         let mutex_clone = mutex.clone();
 
         let handle = thread::spawn(move || {
-            let _guard = mutex_clone
-                .lock()
-                .expect("holder mutex should not be poisoned");
+            let _guard = mutex_clone.lock().expect("holder mutex should not be poisoned");
             locked_tx.send(()).expect("test should observe held mutex");
             release_rx
                 .recv_timeout(Duration::from_secs(1))
@@ -443,9 +434,9 @@ mod data_lock_trait_tests {
         let barrier_clone = barrier.clone();
 
         let handle = thread::spawn(move || {
-            let mut guard = mutex_clone.lock().expect(
-                "mutex should be unpoisoned before intentional poisoning",
-            );
+            let mut guard = mutex_clone
+                .lock()
+                .expect("mutex should be unpoisoned before intentional poisoning");
             *guard += 1;
             barrier_clone.wait();
             panic!("intentional panic to poison the lock");
@@ -467,9 +458,9 @@ mod data_lock_trait_tests {
         let barrier_clone = barrier.clone();
 
         let handle = thread::spawn(move || {
-            let mut guard = mutex_clone.lock().expect(
-                "mutex should be unpoisoned before intentional poisoning",
-            );
+            let mut guard = mutex_clone
+                .lock()
+                .expect("mutex should be unpoisoned before intentional poisoning");
             *guard += 1;
             barrier_clone.wait();
             panic!("intentional panic to poison the lock");
@@ -493,9 +484,7 @@ mod data_lock_trait_tests {
         let (release_tx, release_rx) = mpsc::channel();
         let mutex_clone = mutex.clone();
         let handle = thread::spawn(move || {
-            let _guard = mutex_clone
-                .lock()
-                .expect("holder mutex should not be poisoned");
+            let _guard = mutex_clone.lock().expect("holder mutex should not be poisoned");
             locked_tx.send(()).expect("test should observe held mutex");
             release_rx
                 .recv_timeout(Duration::from_secs(1))
@@ -520,9 +509,9 @@ mod data_lock_trait_tests {
         let poisoned = Arc::new(Mutex::new(0));
         let poisoned_clone = poisoned.clone();
         let handle = thread::spawn(move || {
-            let mut guard = poisoned_clone.lock().expect(
-                "mutex should be unpoisoned before intentional poisoning",
-            );
+            let mut guard = poisoned_clone
+                .lock()
+                .expect("mutex should be unpoisoned before intentional poisoning");
             *guard += 1;
             panic!("intentional panic to poison the lock");
         });
@@ -584,9 +573,7 @@ mod rwlock_trait_tests {
         let rw_lock_clone = Arc::clone(&rw_lock);
         let holder = thread::spawn(move || {
             let sum = rw_lock_clone.with_read(|data| {
-                locked_tx
-                    .send(())
-                    .expect("test should observe held read lock");
+                locked_tx.send(()).expect("test should observe held read lock");
                 let sum = data.iter().sum::<i32>();
                 release_rx
                     .recv_timeout(Duration::from_secs(1))
@@ -600,8 +587,7 @@ mod rwlock_trait_tests {
             .recv_timeout(Duration::from_secs(1))
             .expect("read lock should be held within timeout");
 
-        let concurrent_sum =
-            rw_lock.try_with_read(|data| data.iter().sum::<i32>());
+        let concurrent_sum = rw_lock.try_with_read(|data| data.iter().sum::<i32>());
         assert_eq!(concurrent_sum, Ok(15));
 
         release_tx
@@ -673,8 +659,7 @@ mod rwlock_trait_tests {
     fn test_rwlock_read_lock_returns_closure_result() {
         let rw_lock = ParkingLotRwLock::new(vec![10, 20, 30]);
 
-        let result =
-            rw_lock.with_read(|v| v.iter().map(|&x| x * 2).collect::<Vec<_>>());
+        let result = rw_lock.with_read(|v| v.iter().map(|&x| x * 2).collect::<Vec<_>>());
 
         assert_eq!(result, vec![20, 40, 60]);
 
@@ -732,9 +717,7 @@ mod rwlock_trait_tests {
         let handle = thread::spawn(move || {
             rw_lock_clone.with_write(|value| {
                 *value += 1;
-                locked_tx
-                    .send(())
-                    .expect("test should observe held write lock");
+                locked_tx.send(()).expect("test should observe held write lock");
                 release_rx
                     .recv_timeout(Duration::from_secs(1))
                     .expect("test should release held write lock");
@@ -862,12 +845,8 @@ mod rwlock_trait_tests {
 
         // Hold the write lock in another thread
         let handle = thread::spawn(move || {
-            let _guard = rwlock_clone
-                .write()
-                .expect("write-holder lock should not be poisoned");
-            locked_tx
-                .send(())
-                .expect("test should observe held write lock");
+            let _guard = rwlock_clone.write().expect("write-holder lock should not be poisoned");
+            locked_tx.send(()).expect("test should observe held write lock");
             release_rx
                 .recv_timeout(Duration::from_secs(1))
                 .expect("test should release held write lock");
@@ -896,8 +875,7 @@ mod rwlock_trait_tests {
     }
 
     #[test]
-    fn test_std_rwlock_try_write_returns_would_block_when_read_locked_short_path()
-     {
+    fn test_std_rwlock_try_write_returns_would_block_when_read_locked_short_path() {
         let rwlock = Arc::new(RwLock::new(0));
         let (locked_tx, locked_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
@@ -906,12 +884,8 @@ mod rwlock_trait_tests {
 
         // Hold the read lock in another thread
         let handle = thread::spawn(move || {
-            let _guard = rwlock_clone
-                .read()
-                .expect("read-holder lock should not be poisoned");
-            locked_tx
-                .send(())
-                .expect("test should observe held read lock");
+            let _guard = rwlock_clone.read().expect("read-holder lock should not be poisoned");
+            locked_tx.send(()).expect("test should observe held read lock");
             release_rx
                 .recv_timeout(Duration::from_secs(1))
                 .expect("test should release held read lock");
@@ -952,12 +926,8 @@ mod rwlock_trait_tests {
 
         // Hold the write lock in another thread
         let handle = thread::spawn(move || {
-            let _guard = rwlock_clone
-                .write()
-                .expect("write-holder lock should not be poisoned");
-            locked_tx
-                .send(())
-                .expect("test should observe held write lock");
+            let _guard = rwlock_clone.write().expect("write-holder lock should not be poisoned");
+            locked_tx.send(()).expect("test should observe held write lock");
             release_rx
                 .recv_timeout(Duration::from_secs(1))
                 .expect("test should release held write lock");
@@ -997,12 +967,8 @@ mod rwlock_trait_tests {
         let rwlock_clone = rwlock.clone();
 
         let handle = thread::spawn(move || {
-            let _guard = rwlock_clone
-                .read()
-                .expect("read-holder lock should not be poisoned");
-            locked_tx
-                .send(())
-                .expect("test should observe held read lock");
+            let _guard = rwlock_clone.read().expect("read-holder lock should not be poisoned");
+            locked_tx.send(()).expect("test should observe held read lock");
             release_rx
                 .recv_timeout(Duration::from_secs(1))
                 .expect("test should release held read lock");
@@ -1026,9 +992,9 @@ mod rwlock_trait_tests {
 
         let rwlock_clone = rwlock.clone();
         let handle = thread::spawn(move || {
-            let mut guard = rwlock_clone.write().expect(
-                "rwlock should be unpoisoned before intentional poisoning",
-            );
+            let mut guard = rwlock_clone
+                .write()
+                .expect("rwlock should be unpoisoned before intentional poisoning");
             *guard += 1;
             panic!("intentional panic to poison the lock");
         });
@@ -1045,9 +1011,9 @@ mod rwlock_trait_tests {
 
         let rwlock_clone = rwlock.clone();
         let handle = thread::spawn(move || {
-            let mut guard = rwlock_clone.write().expect(
-                "rwlock should be unpoisoned before intentional poisoning",
-            );
+            let mut guard = rwlock_clone
+                .write()
+                .expect("rwlock should be unpoisoned before intentional poisoning");
             *guard += 1;
             panic!("intentional panic to poison the lock");
         });
@@ -1069,12 +1035,8 @@ mod rwlock_trait_tests {
         let (read_release_tx, read_release_rx) = mpsc::channel();
         let read_lock = rwlock.clone();
         let read_holder = thread::spawn(move || {
-            let _guard = read_lock
-                .write()
-                .expect("write-holder lock should not be poisoned");
-            read_locked_tx
-                .send(())
-                .expect("test should observe held write lock");
+            let _guard = read_lock.write().expect("write-holder lock should not be poisoned");
+            read_locked_tx.send(()).expect("test should observe held write lock");
             read_release_rx
                 .recv_timeout(Duration::from_secs(1))
                 .expect("test should release held write lock");
@@ -1097,12 +1059,8 @@ mod rwlock_trait_tests {
         let (write_release_tx, write_release_rx) = mpsc::channel();
         let write_lock = rwlock.clone();
         let write_holder = thread::spawn(move || {
-            let _guard = write_lock
-                .read()
-                .expect("read-holder lock should not be poisoned");
-            write_locked_tx
-                .send(())
-                .expect("test should observe held read lock");
+            let _guard = write_lock.read().expect("read-holder lock should not be poisoned");
+            write_locked_tx.send(()).expect("test should observe held read lock");
             write_release_rx
                 .recv_timeout(Duration::from_secs(1))
                 .expect("test should release held read lock");
@@ -1124,9 +1082,9 @@ mod rwlock_trait_tests {
         let poisoned = Arc::new(RwLock::new(0));
         let poisoned_clone = poisoned.clone();
         let handle = thread::spawn(move || {
-            let mut guard = poisoned_clone.write().expect(
-                "rwlock should be unpoisoned before intentional poisoning",
-            );
+            let mut guard = poisoned_clone
+                .write()
+                .expect("rwlock should be unpoisoned before intentional poisoning");
             *guard += 1;
             panic!("intentional panic to poison the lock");
         });
