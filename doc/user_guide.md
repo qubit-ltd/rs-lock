@@ -918,7 +918,7 @@ Declare the test clock directly:
 
 ```toml
 [dev-dependencies]
-qubit-clock = { version = "0.12", features = ["test-util"] }
+qubit-clock = { version = "0.13", features = ["test-util"] }
 ```
 
 ```rust

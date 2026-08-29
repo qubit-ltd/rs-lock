@@ -46,11 +46,11 @@ parking-lot = ["dep:parking_lot"]
 parking_lot = { version = "0.12", optional = true }
 loom = { version = "0.7", optional = true }
 tokio = { version = "1.53", default-features = false, optional = true }
-qubit-clock = { version = "0.12", optional = true }
+qubit-clock = { version = "0.13", path = "../rs-clock", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.8", default-features = false }
-qubit-clock = { version = "0.12", features = ["test-util"] }
+qubit-clock = { version = "0.13", path = "../rs-clock", features = ["test-util"] }
 qubit-collections = { version = "0.2" }
 semver = { version = "1.0", default-features = false }
 tokio = { version = "1.53", default-features = false, features = ["macros", "rt-multi-thread", "test-util", "time"] }
