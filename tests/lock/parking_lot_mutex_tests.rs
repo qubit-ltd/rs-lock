@@ -183,8 +183,7 @@ mod parking_lot_mutex_tests {
     }
 
     #[test]
-    fn test_parking_lot_mutex_try_methods_cover_shared_function_pointer_paths()
-    {
+    fn test_parking_lot_mutex_try_methods_cover_shared_function_pointer_paths() {
         let mutex = Arc::new(ParkingLotMutex::new(0));
 
         assert_eq!(DataLock::try_with_read(&*mutex, read_i32), Ok(0));

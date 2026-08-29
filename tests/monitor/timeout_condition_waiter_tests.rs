@@ -19,9 +19,7 @@ use qubit_lock::TimeoutConditionWaiter;
 use qubit_lock::WaitTimeoutResult;
 
 /// Runs a zero-budget condition wait through a generic timeout bound.
-fn wait_through_trait<W>(
-    waiter: &W,
-) -> Result<WaitTimeoutResult<i32>, TimeError>
+fn wait_through_trait<W>(waiter: &W) -> Result<WaitTimeoutResult<i32>, TimeError>
 where
     W: TimeoutConditionWaiter<State = bool>,
 {
@@ -29,9 +27,7 @@ where
 }
 
 /// Runs an action-free timed condition wait through a generic timeout bound.
-fn wait_until_ready_for_through_trait<W>(
-    waiter: &W,
-) -> Result<WaitTimeoutResult<()>, TimeError>
+fn wait_until_ready_for_through_trait<W>(waiter: &W) -> Result<WaitTimeoutResult<()>, TimeError>
 where
     W: TimeoutConditionWaiter<State = bool>,
 {
@@ -50,23 +46,15 @@ where
 }
 
 /// Runs a total-timeout wait-while action through a generic timeout bound.
-fn wait_while_with_total_timeout_through_trait<W>(
-    waiter: &W,
-) -> Result<WaitTimeoutResult<i32>, TimeError>
+fn wait_while_with_total_timeout_through_trait<W>(waiter: &W) -> Result<WaitTimeoutResult<i32>, TimeError>
 where
     W: TimeoutConditionWaiter<State = bool>,
 {
-    waiter.wait_while_with_total_timeout(
-        Duration::ZERO,
-        |waiting| *waiting,
-        |_| 7,
-    )
+    waiter.wait_while_with_total_timeout(Duration::ZERO, |waiting| *waiting, |_| 7)
 }
 
 /// Runs a total-timeout wait-until action through a generic timeout bound.
-fn wait_until_with_total_timeout_through_trait<W>(
-    waiter: &W,
-) -> Result<WaitTimeoutResult<i32>, TimeError>
+fn wait_until_with_total_timeout_through_trait<W>(waiter: &W) -> Result<WaitTimeoutResult<i32>, TimeError>
 where
     W: TimeoutConditionWaiter<State = bool>,
 {
@@ -74,9 +62,7 @@ where
 }
 
 /// Runs an action-free total-timeout wait through a generic timeout bound.
-fn wait_until_ready_with_total_timeout_through_trait<W>(
-    waiter: &W,
-) -> Result<WaitTimeoutResult<()>, TimeError>
+fn wait_until_ready_with_total_timeout_through_trait<W>(waiter: &W) -> Result<WaitTimeoutResult<()>, TimeError>
 where
     W: TimeoutConditionWaiter<State = bool>,
 {
@@ -97,10 +83,7 @@ fn test_timeout_condition_waiter_trait_accepts_std_monitor() {
 fn test_timeout_condition_waiter_trait_accepts_arc_std_monitor() {
     let monitor = Arc::new(StdMonitor::new(false));
 
-    assert_time_result_eq!(
-        wait_through_trait(&monitor),
-        Ok(WaitTimeoutResult::TimedOut),
-    );
+    assert_time_result_eq!(wait_through_trait(&monitor), Ok(WaitTimeoutResult::TimedOut),);
 }
 
 /// Verifies the action-free timed helper preserves ready and timeout outcomes.
@@ -118,18 +101,14 @@ fn test_timeout_condition_waiter_wait_until_ready_for_preserves_outcome() {
 
 /// Verifies the deadline helper preserves ready and timeout outcomes.
 #[test]
-fn test_timeout_condition_waiter_wait_until_ready_with_deadline_preserves_outcome()
- {
+fn test_timeout_condition_waiter_wait_until_ready_with_deadline_preserves_outcome() {
     let timed_out = StdMonitor::new(false);
     let ready = StdMonitor::new(true);
     let timed_out_deadline = timed_out.timer().clock().now();
     let ready_deadline = ready.timer().clock().now();
 
     assert_time_result_eq!(
-        wait_until_ready_with_deadline_through_trait(
-            &timed_out,
-            timed_out_deadline
-        ),
+        wait_until_ready_with_deadline_through_trait(&timed_out, timed_out_deadline),
         Ok(WaitTimeoutResult::TimedOut),
     );
     assert_time_result_eq!(
@@ -150,9 +129,7 @@ fn test_timeout_condition_waiter_total_timeout_helpers_preserve_outcome() {
         Ok(WaitTimeoutResult::Ready(7)),
     );
     assert_time_result_eq!(
-        wait_until_ready_with_total_timeout_through_trait(&StdMonitor::new(
-            false
-        )),
+        wait_until_ready_with_total_timeout_through_trait(&StdMonitor::new(false)),
         Ok(WaitTimeoutResult::TimedOut),
     );
 }
@@ -163,9 +140,7 @@ fn test_timeout_condition_waiter_total_timeout_helpers_preserve_outcome() {
 #[test]
 fn test_timeout_condition_waiter_total_timeout_accepts_parking_lot_monitor() {
     assert_time_result_eq!(
-        wait_while_with_total_timeout_through_trait(&ParkingLotMonitor::new(
-            false
-        )),
+        wait_while_with_total_timeout_through_trait(&ParkingLotMonitor::new(false)),
         Ok(WaitTimeoutResult::Ready(7)),
     );
 }

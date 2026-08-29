@@ -87,11 +87,7 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
-        self.wait_while_with_deadline_async(
-            deadline,
-            move |state| !predicate(state),
-            action,
-        )
+        self.wait_while_with_deadline_async(deadline, move |state| !predicate(state), action)
     }
 
     /// Returns a future that waits until the predicate becomes true or an
@@ -218,11 +214,7 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
-        self.wait_while_for_async(
-            timeout,
-            move |state| !predicate(state),
-            action,
-        )
+        self.wait_while_for_async(timeout, move |state| !predicate(state), action)
     }
 
     /// Returns a future that waits until the predicate becomes true or times
@@ -393,7 +385,6 @@ where
         P: FnMut(&Self::State) -> bool + Send + 'a,
         F: FnOnce(&mut Self::State) -> R + Send + 'a,
     {
-        self.as_ref()
-            .wait_while_for_async(timeout, predicate, action)
+        self.as_ref().wait_while_for_async(timeout, predicate, action)
     }
 }

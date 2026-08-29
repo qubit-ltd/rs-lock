@@ -45,12 +45,7 @@ use crate::monitor::WaitTimeoutStatus;
 /// # Panics
 ///
 /// Propagates a panic from `waiting`, `f`, or `wait`.
-pub(in crate::monitor) fn wait_while_locked<G, T, R, P, F, W>(
-    mut guard: G,
-    mut waiting: P,
-    f: F,
-    mut wait: W,
-) -> R
+pub(in crate::monitor) fn wait_while_locked<G, T, R, P, F, W>(mut guard: G, mut waiting: P, f: F, mut wait: W) -> R
 where
     G: DerefMut<Target = T>,
     P: FnMut(&T) -> bool,
@@ -247,9 +242,7 @@ where
         return Ok(WaitTimeoutResult::Ready(f(&mut *guard)));
     }
     let mut future = timer.at(deadline)?;
-    if let Poll::Ready(result) =
-        BlockingConditionWaiter::poll_timer_without_waiter(&mut future)
-    {
+    if let Poll::Ready(result) = BlockingConditionWaiter::poll_timer_without_waiter(&mut future) {
         result?;
         return Ok(WaitTimeoutResult::TimedOut);
     }

@@ -17,27 +17,19 @@ use qubit_lock::TokioMonitor;
 use qubit_lock::WaitTimeoutResult;
 
 /// Runs a zero-budget async wait through a generic timeout bound.
-async fn wait_through_trait<W>(
-    waiter: &W,
-) -> Result<WaitTimeoutResult<i32>, TimeError>
+async fn wait_through_trait<W>(waiter: &W) -> Result<WaitTimeoutResult<i32>, TimeError>
 where
     W: AsyncTimeoutConditionWaiter<State = bool>,
 {
-    waiter
-        .wait_until_for_async(Duration::ZERO, |ready| *ready, |_| 7)
-        .await
+    waiter.wait_until_for_async(Duration::ZERO, |ready| *ready, |_| 7).await
 }
 
 /// Runs a zero-budget action-free wait through a generic timeout bound.
-async fn wait_until_ready_for_through_trait<W>(
-    waiter: &W,
-) -> Result<WaitTimeoutResult<()>, TimeError>
+async fn wait_until_ready_for_through_trait<W>(waiter: &W) -> Result<WaitTimeoutResult<()>, TimeError>
 where
     W: AsyncTimeoutConditionWaiter<State = bool>,
 {
-    waiter
-        .wait_until_ready_for_async(Duration::ZERO, |ready| *ready)
-        .await
+    waiter.wait_until_ready_for_async(Duration::ZERO, |ready| *ready).await
 }
 
 /// Runs an action-free deadline async wait through a generic timeout bound.
@@ -76,10 +68,7 @@ async fn test_async_timeout_condition_waiter_trait_accepts_arc_tokio_monitor() {
     let monitor = Arc::new(TokioMonitor::current(false));
     let deadline = monitor.timer().clock().now();
 
-    assert_time_result_eq!(
-        wait_through_trait(&monitor).await,
-        Ok(WaitTimeoutResult::TimedOut),
-    );
+    assert_time_result_eq!(wait_through_trait(&monitor).await, Ok(WaitTimeoutResult::TimedOut),);
     assert_time_result_eq!(
         <Arc<TokioMonitor<bool>> as AsyncTimeoutConditionWaiter>::wait_while_with_deadline_async(
             &monitor,
@@ -94,24 +83,18 @@ async fn test_async_timeout_condition_waiter_trait_accepts_arc_tokio_monitor() {
 
 /// Verifies the deadline async helper preserves ready and timeout outcomes.
 #[tokio::test]
-async fn test_async_timeout_condition_waiter_wait_until_ready_with_deadline_preserves_outcome()
- {
+async fn test_async_timeout_condition_waiter_wait_until_ready_with_deadline_preserves_outcome() {
     let timed_out = TokioMonitor::current(false);
     let ready = TokioMonitor::current(true);
     let timed_out_deadline = timed_out.timer().clock().now();
     let ready_deadline = ready.timer().clock().now();
 
     assert_time_result_eq!(
-        wait_until_ready_with_deadline_through_trait(
-            &timed_out,
-            timed_out_deadline
-        )
-        .await,
+        wait_until_ready_with_deadline_through_trait(&timed_out, timed_out_deadline).await,
         Ok(WaitTimeoutResult::TimedOut),
     );
     assert_time_result_eq!(
-        wait_until_ready_with_deadline_through_trait(&ready, ready_deadline)
-            .await,
+        wait_until_ready_with_deadline_through_trait(&ready, ready_deadline).await,
         Ok(WaitTimeoutResult::Ready(())),
     );
 }

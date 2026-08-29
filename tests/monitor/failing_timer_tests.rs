@@ -69,10 +69,7 @@ where
     }
 
     /// Reports the first completed relative deadline calculation.
-    fn deadline_after(
-        &self,
-        duration: Duration,
-    ) -> Result<MonotonicInstant, TimeError> {
+    fn deadline_after(&self, duration: Duration) -> Result<MonotonicInstant, TimeError> {
         let deadline = self.inner.deadline_after(duration)?;
         if let Some(sampled_tx) = self
             .sampled_tx
@@ -201,11 +198,7 @@ pub(super) fn registration_failing_timer() -> FaultInjectingTimer {
 ///
 /// A fault-injecting Timer reporting backend unavailability at completion.
 pub(super) fn completion_failing_timer() -> FaultInjectingTimer {
-    FaultInjectingTimer::backend_unavailable(
-        TimerFailurePoint::Completion,
-        "test",
-        "test timer backend unavailable",
-    )
+    FaultInjectingTimer::backend_unavailable(TimerFailurePoint::Completion, "test", "test timer backend unavailable")
 }
 
 /// Verifies the stable category and source of the failing test Timer.

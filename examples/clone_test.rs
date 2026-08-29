@@ -30,29 +30,14 @@ fn main() {
     );
 
     let monitor = Arc::new(ParkingLotMonitor::new(Vec::<i32>::new()));
-    let result = monitor.wait_while_for(
-        Duration::from_millis(1),
-        |items| items.is_empty(),
-        |items| items.pop(),
-    );
-    assert!(
-        result
-            .expect("standard Timer should register")
-            .is_timed_out()
-    );
+    let result = monitor.wait_while_for(Duration::from_millis(1), |items| items.is_empty(), |items| items.pop());
+    assert!(result.expect("standard Timer should register").is_timed_out());
 
     monitor.with_write_notify_one(|items| items.push(7));
-    let result = monitor.wait_until_for(
-        Duration::from_millis(1),
-        |items| !items.is_empty(),
-        |items| items.pop(),
-    );
+    let result = monitor.wait_until_for(Duration::from_millis(1), |items| !items.is_empty(), |items| items.pop());
     let result = result.expect("standard Timer should register");
     assert_eq!(result, WaitTimeoutResult::Ready(Some(7)));
-    assert_eq!(
-        result.map(|item| item.unwrap_or_default()).into_option(),
-        Some(7)
-    );
+    assert_eq!(result.map(|item| item.unwrap_or_default()).into_option(), Some(7));
 
     println!("All wrapper boundary examples passed.");
 }

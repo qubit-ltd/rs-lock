@@ -60,14 +60,9 @@ impl<W> WaiterRegistry<W> {
     #[inline]
     pub(crate) fn register(&mut self, waiter: W) -> u64 {
         let waiter_id = self.next_waiter_id;
-        self.next_waiter_id = waiter_id
-            .checked_add(1)
-            .expect("monitor waiter identifiers exhausted");
+        self.next_waiter_id = waiter_id.checked_add(1).expect("monitor waiter identifiers exhausted");
         let previous = self.waiters.insert(waiter_id, waiter);
-        assert!(
-            previous.is_none(),
-            "monitor waiter identifier must be unique"
-        );
+        assert!(previous.is_none(), "monitor waiter identifier must be unique");
         waiter_id
     }
 

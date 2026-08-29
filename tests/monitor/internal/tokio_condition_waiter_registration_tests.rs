@@ -16,8 +16,7 @@ use qubit_lock::TokioMonitor;
 #[tokio::test]
 async fn test_tokio_waiter_registration_is_removed_after_cancellation() {
     let monitor = TokioMonitor::current(false);
-    let mut cancelled =
-        Box::pin(monitor.wait_until_async(|ready| *ready, |_| unreachable!()));
+    let mut cancelled = Box::pin(monitor.wait_until_async(|ready| *ready, |_| unreachable!()));
 
     assert!(
         tokio::time::timeout(Duration::from_millis(1), &mut cancelled)
@@ -28,9 +27,5 @@ async fn test_tokio_waiter_registration_is_removed_after_cancellation() {
 
     monitor.notify_one();
     monitor.with_write_async(|ready| *ready = true).await;
-    assert!(
-        monitor
-            .wait_until_async(|ready| *ready, |ready| *ready)
-            .await
-    );
+    assert!(monitor.wait_until_async(|ready| *ready, |ready| *ready).await);
 }

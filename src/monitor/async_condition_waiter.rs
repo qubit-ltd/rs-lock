@@ -107,11 +107,7 @@ pub trait AsyncConditionWaiter {
     /// The returned future propagates a panic from `predicate` or `action` when
     /// it is polled.
     #[inline(always)]
-    fn wait_until_async<'a, R, P, F>(
-        &'a self,
-        mut predicate: P,
-        action: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn wait_until_async<'a, R, P, F>(&'a self, mut predicate: P, action: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
@@ -145,10 +141,7 @@ pub trait AsyncConditionWaiter {
     /// The returned future propagates a panic from `predicate` when it is
     /// polled.
     #[inline(always)]
-    fn wait_until_ready_async<'a, P>(
-        &'a self,
-        predicate: P,
-    ) -> impl Future<Output = ()> + Send + 'a
+    fn wait_until_ready_async<'a, P>(&'a self, predicate: P) -> impl Future<Output = ()> + Send + 'a
     where
         P: FnMut(&Self::State) -> bool + Send + 'a,
     {
@@ -183,11 +176,7 @@ pub trait AsyncConditionWaiter {
     ///
     /// The returned future propagates a panic from `predicate` or `action` when
     /// it is polled.
-    fn wait_while_async<'a, R, P, F>(
-        &'a self,
-        predicate: P,
-        action: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn wait_while_async<'a, R, P, F>(&'a self, predicate: P, action: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,
@@ -225,11 +214,7 @@ where
     /// The returned future propagates a panic from the wrapped monitor,
     /// including from `predicate` or `action`, when it is polled.
     #[inline(always)]
-    fn wait_while_async<'a, R, P, F>(
-        &'a self,
-        predicate: P,
-        action: F,
-    ) -> impl Future<Output = R> + Send + 'a
+    fn wait_while_async<'a, R, P, F>(&'a self, predicate: P, action: F) -> impl Future<Output = R> + Send + 'a
     where
         R: Send + 'a,
         P: FnMut(&Self::State) -> bool + Send + 'a,

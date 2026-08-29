@@ -36,8 +36,7 @@ async fn test_async_read_write_lock_accepts_borrowed_forwarding() {
         *AsyncReadWriteLock::try_read(&borrowed).expect("read should succeed"),
         2,
     );
-    *AsyncReadWriteLock::try_write(&borrowed).expect("write should succeed") =
-        3;
+    *AsyncReadWriteLock::try_write(&borrowed).expect("write should succeed") = 3;
 }
 
 #[tokio_test]
@@ -46,10 +45,7 @@ async fn test_async_read_write_lock_accepts_arc_forwarding() {
 
     assert_eq!(*AsyncReadWriteLock::read(&lock).await, 1);
     *AsyncReadWriteLock::write(&lock).await = 2;
-    assert_eq!(
-        *AsyncReadWriteLock::try_read(&lock).expect("read should succeed"),
-        2,
-    );
+    assert_eq!(*AsyncReadWriteLock::try_read(&lock).expect("read should succeed"), 2,);
     *AsyncReadWriteLock::try_write(&lock).expect("write should succeed") = 3;
 }
 

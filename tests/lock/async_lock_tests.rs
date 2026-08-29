@@ -22,10 +22,7 @@ async fn test_async_lock_tokio_mutex_releases_on_guard_drop() {
     let lock = Mutex::new(7);
     let guard = AsyncLock::lock(&lock).await;
 
-    assert!(matches!(
-        AsyncLock::try_lock(&lock),
-        Err(TryLockError::WouldBlock)
-    ));
+    assert!(matches!(AsyncLock::try_lock(&lock), Err(TryLockError::WouldBlock)));
     drop(guard);
     assert!(AsyncLock::try_lock(&lock).is_ok());
 }

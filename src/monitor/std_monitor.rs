@@ -1070,11 +1070,7 @@ impl<T> StdMonitor<T> {
     /// Propagates a panic from `ready`. Panics if the registry exhausts
     /// registration identifiers.
     #[inline(always)]
-    pub fn wait_until_ready_for<P>(
-        &self,
-        timeout: Duration,
-        ready: P,
-    ) -> Result<WaitTimeoutResult<()>, TimeError>
+    pub fn wait_until_ready_for<P>(&self, timeout: Duration, ready: P) -> Result<WaitTimeoutResult<()>, TimeError>
     where
         P: FnMut(&T) -> bool,
     {

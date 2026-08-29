@@ -42,8 +42,7 @@ fn test_std_monitor_new_read_write_updates_state() {
 
 #[test]
 fn test_std_monitor_completion_error_wins_over_post_wait_readiness() {
-    let monitor =
-        StdMonitor::with_timer(false, Arc::new(completion_failing_timer()));
+    let monitor = StdMonitor::with_timer(false, Arc::new(completion_failing_timer()));
     let mut predicate_checks = 0;
     let mut action_calls = 0;
 
@@ -58,8 +57,7 @@ fn test_std_monitor_completion_error_wins_over_post_wait_readiness() {
         },
     );
 
-    let error =
-        result.expect_err("Timer completion failure should outrank readiness");
+    let error = result.expect_err("Timer completion failure should outrank readiness");
     assert_backend_unavailable(error);
     assert_eq!(predicate_checks, 1);
     assert_eq!(action_calls, 0);
@@ -78,9 +76,7 @@ fn test_std_monitor_blocking_wait_propagates_post_wait_timer_error() {
             Duration::from_secs(1),
             move |_| {
                 if let Some(checked_tx) = checked_tx.take() {
-                    checked_tx
-                        .send(())
-                        .expect("test should observe the initial predicate");
+                    checked_tx.send(()).expect("test should observe the initial predicate");
                 }
                 false
             },
@@ -114,9 +110,9 @@ fn test_std_monitor_write_notify_one_updates_state_and_wakes_waiter() {
         let result = waiter_monitor.wait_until(
             move |ready| {
                 if !*ready && let Some(checked_tx) = checked_tx.take() {
-                    checked_tx.send(()).expect(
-                        "test should observe waiter before notification",
-                    );
+                    checked_tx
+                        .send(())
+                        .expect("test should observe waiter before notification");
                 }
                 *ready
             },
@@ -125,9 +121,7 @@ fn test_std_monitor_write_notify_one_updates_state_and_wakes_waiter() {
                 7
             },
         );
-        done_tx
-            .send(result)
-            .expect("test should receive waiter result");
+        done_tx.send(result).expect("test should receive waiter result");
     });
 
     checked_rx
@@ -167,17 +161,13 @@ fn test_std_monitor_notify_one_wakes_exactly_one_waiter() {
                 if *available == 0
                     && let Some(checked_tx) = checked_tx.take()
                 {
-                    checked_tx
-                        .send(())
-                        .expect("test should observe first waiter");
+                    checked_tx.send(()).expect("test should observe first waiter");
                 }
                 *available > 0
             },
             |available| *available -= 1,
         );
-        first_done_tx
-            .send(())
-            .expect("test should receive first waiter result");
+        first_done_tx.send(()).expect("test should receive first waiter result");
     });
 
     let second_monitor = Arc::clone(&monitor);
@@ -188,17 +178,13 @@ fn test_std_monitor_notify_one_wakes_exactly_one_waiter() {
                 if *available == 0
                     && let Some(checked_tx) = checked_tx.take()
                 {
-                    checked_tx
-                        .send(())
-                        .expect("test should observe second waiter");
+                    checked_tx.send(()).expect("test should observe second waiter");
                 }
                 *available > 0
             },
             |available| *available -= 1,
         );
-        done_tx
-            .send(())
-            .expect("test should receive second waiter result");
+        done_tx.send(()).expect("test should receive second waiter result");
     });
 
     first_checked_rx
@@ -215,10 +201,7 @@ fn test_std_monitor_notify_one_wakes_exactly_one_waiter() {
         .recv_timeout(Duration::from_secs(1))
         .expect("one waiter should finish after notify_one");
     assert!(
-        matches!(
-            done_rx.try_recv(),
-            Err(std::sync::mpsc::TryRecvError::Empty),
-        ),
+        matches!(done_rx.try_recv(), Err(std::sync::mpsc::TryRecvError::Empty),),
         "notify_one must not finish both registered waiters"
     );
 
@@ -227,9 +210,7 @@ fn test_std_monitor_notify_one_wakes_exactly_one_waiter() {
         .recv_timeout(Duration::from_secs(1))
         .expect("remaining waiter should finish during cleanup");
     first_waiter.join().expect("first waiter should not panic");
-    second_waiter
-        .join()
-        .expect("second waiter should not panic");
+    second_waiter.join().expect("second waiter should not panic");
 }
 
 #[test]
@@ -246,17 +227,13 @@ fn test_std_monitor_write_notify_all_wakes_all_waiters() {
         first_monitor.wait_until(
             move |ready| {
                 if !*ready && let Some(checked_tx) = checked_tx.take() {
-                    checked_tx
-                        .send(())
-                        .expect("test should observe first waiter");
+                    checked_tx.send(()).expect("test should observe first waiter");
                 }
                 *ready
             },
             |_| (),
         );
-        first_done_tx
-            .send(())
-            .expect("test should receive first waiter result");
+        first_done_tx.send(()).expect("test should receive first waiter result");
     });
 
     let second_monitor = Arc::clone(&monitor);
@@ -265,17 +242,13 @@ fn test_std_monitor_write_notify_all_wakes_all_waiters() {
         second_monitor.wait_until(
             move |ready| {
                 if !*ready && let Some(checked_tx) = checked_tx.take() {
-                    checked_tx
-                        .send(())
-                        .expect("test should observe second waiter");
+                    checked_tx.send(()).expect("test should observe second waiter");
                 }
                 *ready
             },
             |_| (),
         );
-        done_tx
-            .send(())
-            .expect("test should receive second waiter result");
+        done_tx.send(()).expect("test should receive second waiter result");
     });
 
     first_checked_rx
@@ -299,9 +272,7 @@ fn test_std_monitor_write_notify_all_wakes_all_waiters() {
         .recv_timeout(Duration::from_secs(1))
         .expect("second waiter should finish after with_write_notify_all");
     first_waiter.join().expect("first waiter should not panic");
-    second_waiter
-        .join()
-        .expect("second waiter should not panic");
+    second_waiter.join().expect("second waiter should not panic");
 }
 
 #[test]
@@ -408,9 +379,7 @@ fn test_std_monitor_wait_until_blocks_until_notify_one() {
         let result = waiter_monitor.wait_until(
             move |ready| {
                 if !*ready && let Some(checked_tx) = checked_tx.take() {
-                    checked_tx
-                        .send(())
-                        .expect("test should observe predicate check");
+                    checked_tx.send(()).expect("test should observe predicate check");
                 }
                 *ready
             },
@@ -419,9 +388,7 @@ fn test_std_monitor_wait_until_blocks_until_notify_one() {
                 42
             },
         );
-        done_tx
-            .send(result)
-            .expect("test should receive waiter result");
+        done_tx.send(result).expect("test should receive waiter result");
     });
 
     checked_rx
@@ -453,15 +420,11 @@ fn test_std_monitor_guard_wait_for_returns_woken_when_notified() {
     let waiter_monitor = Arc::clone(&monitor);
     let waiter = thread::spawn(move || {
         let mut guard = waiter_monitor.lock();
-        waiting_tx
-            .send(())
-            .expect("test should observe waiter before wait");
+        waiting_tx.send(()).expect("test should observe waiter before wait");
         let notified = guard
             .wait_for(Duration::from_secs(5))
             .expect("standard Timer should register");
-        done_tx
-            .send(notified)
-            .expect("test should receive waiter result");
+        done_tx.send(notified).expect("test should receive waiter result");
     });
 
     waiting_rx
@@ -486,11 +449,7 @@ fn test_std_monitor_guard_wait_for_returns_woken_when_notified() {
 fn test_std_monitor_wait_while_for_returns_timed_out_when_timeout() {
     let monitor = StdMonitor::new(false);
 
-    let result = monitor.wait_while_for(
-        Duration::from_millis(20),
-        |ready| !*ready,
-        |_| (),
-    );
+    let result = monitor.wait_while_for(Duration::from_millis(20), |ready| !*ready, |_| ());
 
     assert_time_result_eq!(result, Ok(WaitTimeoutResult::TimedOut));
 }
@@ -523,8 +482,7 @@ fn test_std_monitor_wait_until_with_deadline_ready_wins_reached_deadline() {
     let clock = ManualMonotonicClock::new_shared();
     let monitor = StdMonitor::with_timer(true, clock.new_timer());
 
-    let result =
-        monitor.wait_until_with_deadline(clock.now(), |ready| *ready, |_| 7);
+    let result = monitor.wait_until_with_deadline(clock.now(), |ready| *ready, |_| 7);
 
     assert_time_result_eq!(result, Ok(WaitTimeoutResult::Ready(7)));
     assert_eq!(clock.pending_waiters(), 0);
@@ -542,13 +500,8 @@ fn test_std_monitor_deadline_helpers_wait_until_timeout() {
         .checked_add(WAIT_TIMEOUT)
         .expect("manual clock deadline should be representable");
     let waiter_monitor = Arc::clone(&monitor);
-    let waiter = thread::spawn(move || {
-        StdMonitor::wait_until_ready_with_deadline(
-            &waiter_monitor,
-            deadline,
-            |ready| *ready,
-        )
-    });
+    let waiter =
+        thread::spawn(move || StdMonitor::wait_until_ready_with_deadline(&waiter_monitor, deadline, |ready| *ready));
 
     let _ = clock
         .advance_to_next_deadline_after_waiters(1, Duration::from_secs(1))
@@ -559,12 +512,7 @@ fn test_std_monitor_deadline_helpers_wait_until_timeout() {
         Ok(WaitTimeoutResult::TimedOut),
     );
     assert_time_result_eq!(
-        <StdMonitor<bool> as TimeoutConditionWaiter>::wait_while_with_deadline(
-            &monitor,
-            clock.now(),
-            |_| false,
-            |_| 7,
-        ),
+        <StdMonitor<bool> as TimeoutConditionWaiter>::wait_while_with_deadline(&monitor, clock.now(), |_| false, |_| 7,),
         Ok(WaitTimeoutResult::Ready(7)),
     );
 }
@@ -599,9 +547,9 @@ fn test_std_monitor_deadline_wait_rechecks_after_notification() {
     });
 
     assert_eq!(
-        checked_rx.recv_timeout(Duration::from_secs(1)).expect(
-            "deadline waiter should perform its initial predicate check"
-        ),
+        checked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("deadline waiter should perform its initial predicate check"),
         1,
     );
     let _ = clock
@@ -627,11 +575,9 @@ fn test_std_monitor_deadline_wait_rechecks_after_notification() {
 
 #[test]
 fn test_std_monitor_timed_predicate_wait_propagates_timer_error() {
-    let monitor =
-        StdMonitor::with_timer(false, Arc::new(registration_failing_timer()));
+    let monitor = StdMonitor::with_timer(false, Arc::new(registration_failing_timer()));
 
-    let result =
-        monitor.wait_until_for(Duration::from_secs(1), |ready| *ready, |_| ());
+    let result = monitor.wait_until_for(Duration::from_secs(1), |ready| *ready, |_| ());
 
     let error = result.expect_err("failing Timer should reject registration");
     assert_backend_unavailable(error);
@@ -639,8 +585,7 @@ fn test_std_monitor_timed_predicate_wait_propagates_timer_error() {
 
 #[test]
 fn test_std_monitor_ready_predicate_skips_timer_registration() {
-    let monitor =
-        StdMonitor::with_timer(true, Arc::new(registration_failing_timer()));
+    let monitor = StdMonitor::with_timer(true, Arc::new(registration_failing_timer()));
 
     let result = monitor.wait_until_for(Duration::MAX, |ready| *ready, |_| 7);
 
@@ -653,13 +598,7 @@ fn test_std_monitor_uses_injected_manual_timer_without_real_delay() {
     let monitor = Arc::new(StdMonitor::with_timer(false, clock.new_timer()));
     assert_eq!(clock.now().domain(), monitor.timer().clock().now().domain(),);
     let waiter_monitor = Arc::clone(&monitor);
-    let waiter = thread::spawn(move || {
-        waiter_monitor.wait_until_for(
-            Duration::from_secs(8),
-            |ready| *ready,
-            |_| (),
-        )
-    });
+    let waiter = thread::spawn(move || waiter_monitor.wait_until_for(Duration::from_secs(8), |ready| *ready, |_| ()));
 
     let _reached = clock
         .advance_to_next_deadline_after_waiters(1, Duration::from_secs(1))
@@ -675,19 +614,14 @@ fn test_std_monitor_uses_injected_manual_timer_without_real_delay() {
 fn test_std_monitor_wait_until_for_returns_timed_out_when_timeout() {
     let monitor = StdMonitor::new(false);
 
-    let result = monitor.wait_until_for(
-        Duration::from_millis(20),
-        |ready| *ready,
-        |_| (),
-    );
+    let result = monitor.wait_until_for(Duration::from_millis(20), |ready| *ready, |_| ());
 
     assert_time_result_eq!(result, Ok(WaitTimeoutResult::TimedOut));
 }
 
 /// Verifies that initial lock contention does not consume timeout budget.
 #[test]
-fn test_std_monitor_wait_while_for_excludes_initial_lock_contention_from_timeout()
- {
+fn test_std_monitor_wait_while_for_excludes_initial_lock_contention_from_timeout() {
     const WAIT_TIMEOUT: Duration = Duration::from_millis(20);
 
     let clock = ManualMonotonicClock::new_shared();
@@ -698,14 +632,8 @@ fn test_std_monitor_wait_while_for_excludes_initial_lock_contention_from_timeout
     let waiter_monitor = Arc::clone(&monitor);
     let waiter = thread::spawn(move || {
         started_tx.send(()).expect("test should observe wait start");
-        let result = waiter_monitor.wait_while_for(
-            WAIT_TIMEOUT,
-            |ready| !*ready,
-            |_| (),
-        );
-        done_tx
-            .send(result)
-            .expect("test should receive wait result");
+        let result = waiter_monitor.wait_while_for(WAIT_TIMEOUT, |ready| !*ready, |_| ());
+        done_tx.send(result).expect("test should receive wait result");
     });
     started_rx
         .recv_timeout(Duration::from_secs(1))
@@ -719,10 +647,7 @@ fn test_std_monitor_wait_while_for_excludes_initial_lock_contention_from_timeout
     let deadline = clock
         .wait_for_next_deadline(Duration::from_secs(1))
         .expect("condition-wait deadline should be registered");
-    assert_eq!(
-        deadline.elapsed_since_origin(),
-        WAIT_TIMEOUT.saturating_mul(4),
-    );
+    assert_eq!(deadline.elapsed_since_origin(), WAIT_TIMEOUT.saturating_mul(4),);
     let _ = clock
         .advance_to_next_deadline()
         .expect("registered deadline should advance");
@@ -738,8 +663,7 @@ fn test_std_monitor_wait_while_for_excludes_initial_lock_contention_from_timeout
 
 /// Verifies that the first predicate check consumes the timeout budget.
 #[test]
-fn test_std_monitor_wait_while_for_includes_initial_predicate_time_in_deadline()
-{
+fn test_std_monitor_wait_while_for_includes_initial_predicate_time_in_deadline() {
     const WAIT_TIMEOUT: Duration = Duration::from_millis(20);
     const PREDICATE_TIME: Duration = Duration::from_millis(5);
 
@@ -756,9 +680,7 @@ fn test_std_monitor_wait_while_for_includes_initial_predicate_time_in_deadline()
             WAIT_TIMEOUT,
             move |ready| {
                 if let Some(checked_tx) = checked_tx.take() {
-                    checked_tx
-                        .send(())
-                        .expect("test should observe the initial predicate");
+                    checked_tx.send(()).expect("test should observe the initial predicate");
                     continue_rx
                         .take()
                         .expect("predicate should pause once")
@@ -769,9 +691,7 @@ fn test_std_monitor_wait_while_for_includes_initial_predicate_time_in_deadline()
             },
             |_| (),
         );
-        done_tx
-            .send(result)
-            .expect("test should receive wait result");
+        done_tx.send(result).expect("test should receive wait result");
     });
 
     checked_rx
@@ -780,9 +700,7 @@ fn test_std_monitor_wait_while_for_includes_initial_predicate_time_in_deadline()
     clock
         .advance(PREDICATE_TIME)
         .expect("manual clock should advance during predicate evaluation");
-    continue_tx
-        .send(())
-        .expect("test should release the predicate");
+    continue_tx.send(()).expect("test should release the predicate");
     let deadline = clock
         .wait_for_next_deadline(Duration::from_secs(1))
         .expect("condition-wait deadline should be registered");
@@ -830,17 +748,15 @@ fn test_std_monitor_wait_while_for_timeout_final_predicate_wins() {
             Duration::from_millis(20),
             move |ready| {
                 if let Some(checked_tx) = checked_tx.take() {
-                    checked_tx.send(()).expect(
-                        "test should observe the initial predicate check",
-                    );
+                    checked_tx
+                        .send(())
+                        .expect("test should observe the initial predicate check");
                 }
                 !*ready
             },
             |_| 7,
         );
-        done_tx
-            .send(result)
-            .expect("test should receive wait result");
+        done_tx.send(result).expect("test should receive wait result");
     });
 
     checked_rx
@@ -866,9 +782,7 @@ fn test_std_monitor_wait_until_for_returns_result_when_predicate_true() {
 
     let waiter_monitor = Arc::clone(&monitor);
     let waiter = thread::spawn(move || {
-        started_tx
-            .send(())
-            .expect("test should observe waiter start");
+        started_tx.send(()).expect("test should observe waiter start");
         let result = waiter_monitor.wait_until_for(
             Duration::from_secs(1),
             |ready| *ready,
@@ -877,9 +791,7 @@ fn test_std_monitor_wait_until_for_returns_result_when_predicate_true() {
                 7
             },
         );
-        done_tx
-            .send(result)
-            .expect("test should receive waiter result");
+        done_tx.send(result).expect("test should receive waiter result");
     });
 
     started_rx
@@ -911,9 +823,7 @@ fn test_std_monitor_wait_until_ignores_notification_until_predicate_true() {
         waiter_monitor.wait_until(
             move |ready| {
                 if !*ready {
-                    checked_tx
-                        .send(())
-                        .expect("test should observe predicate check");
+                    checked_tx.send(()).expect("test should observe predicate check");
                 }
                 *ready
             },
@@ -959,9 +869,7 @@ fn test_std_monitor_notify_all_wakes_all_ready_waiters() {
         let started_tx = started_tx.clone();
         let done_tx = done_tx.clone();
         waiters.push(thread::spawn(move || {
-            started_tx
-                .send(())
-                .expect("test should observe waiter start");
+            started_tx.send(()).expect("test should observe waiter start");
             waiter_monitor.wait_until(
                 |permits| *permits > 0,
                 |permits| {
@@ -1067,9 +975,7 @@ fn test_std_monitor_wait_until_continues_after_panic_while_locked() {
         waiter_monitor.wait_until(
             move |ready| {
                 if !*ready && let Some(checked_tx) = checked_tx.take() {
-                    checked_tx
-                        .send(())
-                        .expect("test should observe predicate check");
+                    checked_tx.send(()).expect("test should observe predicate check");
                 }
                 *ready
             },

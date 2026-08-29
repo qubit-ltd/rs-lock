@@ -26,9 +26,7 @@ async fn test_tokio_condition_waiter_observes_ready_state() {
     })
     .await;
 
-    monitor
-        .with_write_notify_one_async(|ready| *ready = true)
-        .await;
+    monitor.with_write_notify_one_async(|ready| *ready = true).await;
 
     assert_eq!(waiter.await, 7);
 }

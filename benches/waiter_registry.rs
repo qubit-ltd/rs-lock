@@ -176,9 +176,7 @@ impl OrderedIndexWaiters {
     ///
     /// The cancelled value, or `None` when it was already selected.
     fn unregister(&mut self, waiter_id: u64) -> Option<usize> {
-        self.waiters
-            .remove(&waiter_id)
-            .map(|entry| entry.into_value())
+        self.waiters.remove(&waiter_id).map(|entry| entry.into_value())
     }
 }
 

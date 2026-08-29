@@ -32,10 +32,7 @@ fn test_read_write_lock_accepts_arc_forwarding() {
     assert_eq!(*ReadWriteLock::read(&lock), 1);
     *ReadWriteLock::write(&lock) = 2;
     assert_eq!(*ReadWriteLock::read(&lock), 2);
-    assert_eq!(
-        *ReadWriteLock::try_read(&lock).expect("read should succeed"),
-        2,
-    );
+    assert_eq!(*ReadWriteLock::try_read(&lock).expect("read should succeed"), 2,);
     *ReadWriteLock::try_write(&lock).expect("write should succeed") = 3;
 }
 
@@ -46,10 +43,7 @@ fn test_read_write_lock_accepts_borrowed_forwarding() {
 
     assert_eq!(*ReadWriteLock::read(&borrowed), 1);
     *ReadWriteLock::write(&borrowed) = 2;
-    assert_eq!(
-        *ReadWriteLock::try_read(&borrowed).expect("read should succeed"),
-        2,
-    );
+    assert_eq!(*ReadWriteLock::try_read(&borrowed).expect("read should succeed"), 2,);
     *ReadWriteLock::try_write(&borrowed).expect("write should succeed") = 3;
 }
 
@@ -58,21 +52,12 @@ fn test_read_write_lock_std_try_modes_report_contention() {
     let lock = RwLock::new(0);
     let write_guard = ReadWriteLock::write(&lock);
 
-    assert!(matches!(
-        ReadWriteLock::try_read(&lock),
-        Err(TryLockError::WouldBlock)
-    ));
-    assert!(matches!(
-        ReadWriteLock::try_write(&lock),
-        Err(TryLockError::WouldBlock)
-    ));
+    assert!(matches!(ReadWriteLock::try_read(&lock), Err(TryLockError::WouldBlock)));
+    assert!(matches!(ReadWriteLock::try_write(&lock), Err(TryLockError::WouldBlock)));
     drop(write_guard);
 
     let read_guard = ReadWriteLock::read(&lock);
-    assert!(matches!(
-        ReadWriteLock::try_write(&lock),
-        Err(TryLockError::WouldBlock)
-    ));
+    assert!(matches!(ReadWriteLock::try_write(&lock), Err(TryLockError::WouldBlock)));
     drop(read_guard);
 }
 
@@ -86,14 +71,8 @@ fn test_read_write_lock_std_try_modes_report_poisoning() {
     })
     .join();
 
-    assert!(matches!(
-        ReadWriteLock::try_read(&*lock),
-        Err(TryLockError::Poisoned)
-    ));
-    assert!(matches!(
-        ReadWriteLock::try_write(&*lock),
-        Err(TryLockError::Poisoned)
-    ));
+    assert!(matches!(ReadWriteLock::try_read(&*lock), Err(TryLockError::Poisoned)));
+    assert!(matches!(ReadWriteLock::try_write(&*lock), Err(TryLockError::Poisoned)));
 }
 
 #[test]
@@ -103,20 +82,11 @@ fn test_read_write_lock_supports_parking_lot_modes() {
 
     assert_eq!(*ReadWriteLock::read(&lock), 1);
     *ReadWriteLock::write(&lock) = 2;
-    assert_eq!(
-        *ReadWriteLock::try_read(&lock).expect("read should succeed"),
-        2,
-    );
+    assert_eq!(*ReadWriteLock::try_read(&lock).expect("read should succeed"), 2,);
     *ReadWriteLock::try_write(&lock).expect("write should succeed") = 3;
 
     let write_guard = ReadWriteLock::write(&lock);
-    assert!(matches!(
-        ReadWriteLock::try_read(&lock),
-        Err(TryLockError::WouldBlock)
-    ));
-    assert!(matches!(
-        ReadWriteLock::try_write(&lock),
-        Err(TryLockError::WouldBlock)
-    ));
+    assert!(matches!(ReadWriteLock::try_read(&lock), Err(TryLockError::WouldBlock)));
+    assert!(matches!(ReadWriteLock::try_write(&lock), Err(TryLockError::WouldBlock)));
     drop(write_guard);
 }

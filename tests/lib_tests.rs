@@ -30,10 +30,6 @@ fn test_async_lock_feature_exports_async_lock_capabilities() {
     accepts_async_lock::<tokio::sync::Mutex<usize>>();
     accepts_async_read_write_lock::<tokio::sync::RwLock<usize>>();
     accepts_async_data_lock::<tokio::sync::RwLock<usize>>();
-    let _ = std::any::type_name::<
-        AsyncReadLock<'static, tokio::sync::RwLock<usize>>,
-    >();
-    let _ = std::any::type_name::<
-        AsyncWriteLock<'static, tokio::sync::RwLock<usize>>,
-    >();
+    let _ = std::any::type_name::<AsyncReadLock<'static, tokio::sync::RwLock<usize>>>();
+    let _ = std::any::type_name::<AsyncWriteLock<'static, tokio::sync::RwLock<usize>>>();
 }

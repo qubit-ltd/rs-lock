@@ -54,9 +54,7 @@ fn create_registered_waiters(count: usize) -> RegisteredWaiters {
     for _ in 0..count {
         let waiter_monitor = monitor.clone();
         let waiter: OwnedWaitFuture = Box::pin(async move {
-            waiter_monitor
-                .wait_until_async(|ready| *ready, |_| ())
-                .await;
+            waiter_monitor.wait_until_async(|ready| *ready, |_| ()).await;
         });
         waiters.push(waiter);
     }

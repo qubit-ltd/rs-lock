@@ -69,17 +69,13 @@ impl MonitorWaitRegistration {
                 {
                     WorkerCommand::Start => {
                         state.wait();
-                        done_sender.send(()).expect(
-                            "benchmark should observe the woken worker",
-                        );
+                        done_sender.send(()).expect("benchmark should observe the woken worker");
                     }
                     WorkerCommand::Stop => return,
                 }
             }
         });
-        ready_receiver
-            .recv()
-            .expect("benchmark worker should become ready");
+        ready_receiver.recv().expect("benchmark worker should become ready");
         Self {
             monitor,
             command_sender,
@@ -117,9 +113,7 @@ impl MonitorWaitRegistration {
         self.command_sender
             .send(WorkerCommand::Stop)
             .expect("benchmark worker should stop");
-        self.worker
-            .join()
-            .expect("benchmark worker should not panic");
+        self.worker.join().expect("benchmark worker should not panic");
     }
 }
 
@@ -157,17 +151,13 @@ impl CondvarWaitRegistration {
                 {
                     WorkerCommand::Start => {
                         changed.wait(&mut state);
-                        done_sender.send(()).expect(
-                            "benchmark should observe the woken worker",
-                        );
+                        done_sender.send(()).expect("benchmark should observe the woken worker");
                     }
                     WorkerCommand::Stop => return,
                 }
             }
         });
-        ready_receiver
-            .recv()
-            .expect("benchmark worker should become ready");
+        ready_receiver.recv().expect("benchmark worker should become ready");
         Self {
             condition,
             command_sender,
@@ -207,9 +197,7 @@ impl CondvarWaitRegistration {
         self.command_sender
             .send(WorkerCommand::Stop)
             .expect("benchmark worker should stop");
-        self.worker
-            .join()
-            .expect("benchmark worker should not panic");
+        self.worker.join().expect("benchmark worker should not panic");
     }
 }
 
@@ -219,8 +207,7 @@ impl CondvarWaitRegistration {
 ///
 /// * `criterion` - Criterion runner receiving the benchmark cases.
 fn benchmark_blocking_wait_registration_round_trip(criterion: &mut Criterion) {
-    let mut group =
-        criterion.benchmark_group("blocking_wait_registration_round_trip");
+    let mut group = criterion.benchmark_group("blocking_wait_registration_round_trip");
 
     let monitor = MonitorWaitRegistration::new();
     group.bench_function("parking_lot_monitor", |bencher| {

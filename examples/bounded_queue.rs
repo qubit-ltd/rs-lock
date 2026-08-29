@@ -103,8 +103,7 @@ where
 
 /// Exercises timeout, blocking wakeup, enqueue, dequeue, and closure behavior.
 fn main() {
-    let capacity =
-        NonZeroUsize::new(1).expect("queue capacity must be non-zero");
+    let capacity = NonZeroUsize::new(1).expect("queue capacity must be non-zero");
     let queue = Arc::new(ParkingLotMonitor::new(QueueState::new(capacity)));
 
     assert!(matches!(
@@ -112,17 +111,14 @@ fn main() {
         Ok(WaitTimeoutResult::TimedOut),
     ));
 
-    let (predicate_checked_sender, predicate_checked_receiver) =
-        mpsc::sync_channel(0);
+    let (predicate_checked_sender, predicate_checked_receiver) = mpsc::sync_channel(0);
     let waiting_queue = Arc::clone(&queue);
     let consumer = thread::spawn(move || {
         let mut predicate_checked_sender = Some(predicate_checked_sender);
         waiting_queue.wait_until(
             |state| {
                 if let Some(sender) = predicate_checked_sender.take() {
-                    sender
-                        .send(())
-                        .expect("main thread should observe the empty queue");
+                    sender.send(()).expect("main thread should observe the empty queue");
                 }
                 state.closed || !state.items.is_empty()
             },
