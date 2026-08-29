@@ -324,7 +324,7 @@ Rust 已经提供了优秀的锁实现；当组件需要复用时，应用和库
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.13", default-features = false, features = ["monitor", "parking-lot"] }
+qubit-lock = { version = "0.14", default-features = false, features = ["monitor", "parking-lot"] }
 ```
 
 根据所需组件选择 Feature：
@@ -343,21 +343,21 @@ qubit-lock = { version = "0.13", default-features = false, features = ["monitor"
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.13", default-features = false }
+qubit-lock = { version = "0.14", default-features = false }
 ```
 
 只启用异步锁，不启用 Tokio monitor deadline：
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.13", default-features = false, features = ["async-lock"] }
+qubit-lock = { version = "0.14", default-features = false, features = ["async-lock"] }
 ```
 
 启用 Tokio monitor 协调和计时等待：
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.13", default-features = false, features = ["async-monitor"] }
+qubit-lock = { version = "0.14", default-features = false, features = ["async-monitor"] }
 ```
 
 如果应用创建 Tokio runtime，应在应用自己的 `Cargo.toml` 中启用所需的 runtime

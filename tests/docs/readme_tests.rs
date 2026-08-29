@@ -305,13 +305,13 @@ fn test_readme_documents_timer_ioc_testing() {
 #[test]
 fn test_readme_documents_feature_tiers() {
     const BLOCKING_MONITOR_DEPENDENCY: &str =
-        "qubit-lock = { version = \"0.13\", default-features = false, features = [\"monitor\", \"parking-lot\"] }";
+        "qubit-lock = { version = \"0.14\", default-features = false, features = [\"monitor\", \"parking-lot\"] }";
     const STD_MONITOR_DEPENDENCY: &str =
-        "qubit-lock = { version = \"0.13\", default-features = false, features = [\"monitor\"] }";
+        "qubit-lock = { version = \"0.14\", default-features = false, features = [\"monitor\"] }";
     const ASYNC_LOCK_DEPENDENCY: &str =
-        "qubit-lock = { version = \"0.13\", default-features = false, features = [\"async-lock\"] }";
+        "qubit-lock = { version = \"0.14\", default-features = false, features = [\"async-lock\"] }";
     const ASYNC_MONITOR_DEPENDENCY: &str =
-        "qubit-lock = { version = \"0.13\", default-features = false, features = [\"async-monitor\"] }";
+        "qubit-lock = { version = \"0.14\", default-features = false, features = [\"async-monitor\"] }";
 
     assert!(CARGO_TOML.contains("default = []"));
     assert!(README_EN.contains("default feature set is empty"));

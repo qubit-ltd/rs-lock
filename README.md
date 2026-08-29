@@ -169,35 +169,35 @@ Use only synchronous lock traits and standard-library implementations:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.13", default-features = false }
+qubit-lock = { version = "0.14", default-features = false }
 ```
 
 Use `StdMonitor` without a `parking_lot` dependency:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.13", default-features = false, features = ["monitor"] }
+qubit-lock = { version = "0.14", default-features = false, features = ["monitor"] }
 ```
 
 Use `ParkingLotMonitor`:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.13", default-features = false, features = ["monitor", "parking-lot"] }
+qubit-lock = { version = "0.14", default-features = false, features = ["monitor", "parking-lot"] }
 ```
 
 Enable Tokio locks without Tokio monitors:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.13", default-features = false, features = ["async-lock"] }
+qubit-lock = { version = "0.14", default-features = false, features = ["async-lock"] }
 ```
 
 Enable Tokio monitors and timed waits:
 
 ```toml
 [dependencies]
-qubit-lock = { version = "0.13", default-features = false, features = ["async-monitor"] }
+qubit-lock = { version = "0.14", default-features = false, features = ["async-monitor"] }
 ```
 
 Applications that create a Tokio runtime must enable their required runtime
