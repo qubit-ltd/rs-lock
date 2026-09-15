@@ -1,0 +1,6 @@
+format = 1
+
+[[exceptions]]
+rule = "test-redirect"
+path = "tests/examples/bounded_queue_tests.rs"
+reason = "Imports the real bounded queue example as the subject under test; concrete notification protocol tests remain in this file."
