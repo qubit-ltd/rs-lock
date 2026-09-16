@@ -43,16 +43,16 @@ monitor = ["dep:qubit-clock"]
 parking-lot = ["dep:parking_lot"]
 
 [dependencies]
-parking_lot = { version = "0.12", optional = true }
-loom = { version = "0.7", optional = true }
-tokio = { version = "1.53", default-features = false, optional = true }
+parking_lot = { version = "^0.12", optional = true }
+loom = { version = "^0.7", optional = true }
+tokio = { version = "^1.53", default-features = false, optional = true }
 qubit-clock = { version = "0.13", optional = true }
 
 [dev-dependencies]
-criterion = { version = "0.8", default-features = false }
+criterion = { version = "^0.8", default-features = false }
 qubit-clock = { version = "0.13", features = ["test-util"] }
 qubit-collections = { version = "0.2" }
-semver = { version = "1.0", default-features = false }
+semver = { version = "^1.0", default-features = false }
 tokio = { version = "1.53", default-features = false, features = ["macros", "rt-multi-thread", "test-util", "time"] }
 
 [[example]]
