@@ -93,3 +93,25 @@ external/
 /lcov.info
 /public/
 /pages-artifact.tar.gz
+
+/.infra/*/bin/
+
+/.infra/*/.crates*
+
+/.infra/*/tool.revision*
+
+!/.infra/coverage/
+
+/.infra/coverage/*
+
+!/.infra/coverage/coverage.json
+
+!/.infra/coverage/tool.toml
+
+# Shared Rust project ignore entries (rs-infra)
+**/target/
+/fuzz/artifacts/
+/fuzz/target/
+*.profdata
+*.profraw
+__pycache__/
