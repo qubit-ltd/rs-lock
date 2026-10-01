@@ -11,10 +11,10 @@ use std::hint::black_box;
 use std::sync::Arc;
 use std::sync::Condvar as StdCondvar;
 use std::sync::Mutex as StdMutex;
+use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
-use std::sync::mpsc::{self};
+use std::thread;
 use std::thread::JoinHandle;
-use std::thread::{self};
 use std::time::Duration;
 
 use criterion::BatchSize;

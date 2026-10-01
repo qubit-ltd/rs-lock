@@ -13,11 +13,11 @@
 //! `Done` acknowledgement.
 
 use std::sync::Arc;
+use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
-use std::sync::mpsc::{self};
+use std::thread;
 use std::thread::JoinHandle;
-use std::thread::{self};
 use std::time::Duration;
 use std::time::Instant;
 
