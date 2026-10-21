@@ -22,12 +22,12 @@ use qubit_lock::TimeoutConditionWaiter;
 use qubit_lock::WaitTimeoutResult;
 use qubit_lock::WaitTimeoutStatus;
 
-blocking_monitor_contract_tests!(std_monitor_contract, StdMonitor);
-
 use super::failing_timer_tests::OncePendingTimer;
 use super::failing_timer_tests::assert_backend_unavailable;
 use super::failing_timer_tests::completion_failing_timer;
 use super::failing_timer_tests::registration_failing_timer;
+
+blocking_monitor_contract_tests!(std_monitor_contract, StdMonitor);
 
 #[test]
 fn test_std_monitor_new_read_write_updates_state() {

@@ -28,6 +28,18 @@ use crate::lock::TryLockError;
 /// [`crate::ReadLock`] implements this trait and permits multiple guards to
 /// coexist. Generic APIs that require mutual exclusion should additionally
 /// require [`crate::ExclusiveLock`].
+///
+/// # Examples
+///
+/// ```
+/// use qubit_lock::Lock;
+///
+/// fn acquire<L: Lock + ?Sized>(lock: &L) {
+///     let _guard = lock.lock();
+/// }
+///
+/// acquire(&std::sync::Mutex::new(()));
+/// ```
 pub trait Lock: Send + Sync {
     /// RAII guard returned by this lock implementation.
     type Guard<'a>: 'a

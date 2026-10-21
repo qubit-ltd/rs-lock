@@ -72,6 +72,18 @@ use super::try_lock_error::TryLockError;
 /// # Type Parameters
 ///
 /// * `T` - The type of data protected by the lock
+///
+/// # Examples
+///
+/// ```rust
+/// use qubit_lock::DataLock;
+/// use std::sync::RwLock;
+///
+/// let lock = RwLock::new(1);
+/// lock.with_write(|value| *value += 1);
+/// let value = lock.with_read(|value| *value);
+/// assert_eq!(value, 2);
+/// ```
 pub trait DataLock<T: ?Sized>: Send + Sync {
     /// Acquires a read lock and executes a closure
     ///

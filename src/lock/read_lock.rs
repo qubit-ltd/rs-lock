@@ -19,6 +19,18 @@ use crate::lock::TryLockError;
 /// # Type Parameters
 ///
 /// * `L` - The underlying read-write lock type.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_lock::Lock;
+/// use qubit_lock::ReadWriteLock;
+///
+/// let lock = std::sync::RwLock::new(42);
+/// let read_lock = lock.read_lock();
+/// let guard = read_lock.lock();
+/// assert_eq!(*guard, 42);
+/// ```
 #[must_use = "use the adapter to acquire a read guard"]
 pub struct ReadLock<'a, L: ?Sized> {
     /// Underlying read-write lock.

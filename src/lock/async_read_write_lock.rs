@@ -24,6 +24,30 @@ use crate::lock::TryLockError;
 /// pending read or write acquisition cancels that attempt without producing a
 /// guard. A completed acquisition remains active until its returned guard is
 /// dropped.
+///
+/// # Examples
+///
+/// ```rust
+/// use qubit_lock::AsyncReadWriteLock;
+/// use tokio::sync::RwLock;
+///
+/// let runtime = tokio::runtime::Builder::new_current_thread()
+///     .enable_all()
+///     .build()
+///     .unwrap();
+/// runtime.block_on(async {
+///     let lock = RwLock::new(1);
+///     {
+///         let read_guard = lock.read().await;
+///         assert_eq!(*read_guard, 1);
+///     }
+///     {
+///         let mut write_guard = lock.write().await;
+///         *write_guard += 1;
+///     }
+///     assert_eq!(*lock.try_read().unwrap(), 2);
+/// });
+/// ```
 pub trait AsyncReadWriteLock: Send + Sync {
     /// Shared asynchronous read guard.
     type ReadGuard<'a>: 'a

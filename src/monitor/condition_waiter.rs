@@ -30,17 +30,13 @@ use std::sync::Arc;
 /// [`crate::monitor::Monitor::with_write_notify_all`] for this protocol:
 ///
 /// ```
-/// use std::{
-///     sync::{
-///         Arc,
-///         atomic::{
-///             AtomicBool,
-///             Ordering,
-///         },
-///     },
-///     thread,
-/// };
+/// use std::sync::Arc;
+/// use std::sync::atomic::AtomicBool;
+/// use std::sync::atomic::Ordering;
+/// use std::thread;
 ///
+/// use qubit_lock::ConditionWaiter;
+/// use qubit_lock::Monitor;
 /// use qubit_lock::StdMonitor;
 ///
 /// let ready = Arc::new(AtomicBool::new(false));

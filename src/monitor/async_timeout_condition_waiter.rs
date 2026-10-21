@@ -43,6 +43,29 @@ use crate::monitor::WaitTimeoutResult;
 /// Use this trait as a static generic bound when asynchronous code needs timed
 /// predicate waits. Its return-position `impl Future` methods make it
 /// unsuitable as a `dyn` trait-object interface.
+///
+/// # Examples
+///
+/// ```
+/// use std::time::Duration;
+///
+/// use qubit_lock::{
+///     AsyncTimeoutConditionWaiter,
+///     TokioMonitor,
+///     WaitTimeoutResult,
+/// };
+///
+/// # #[tokio::main]
+/// # async fn main() {
+/// let monitor = TokioMonitor::current(true);
+/// let result = monitor
+///     .wait_until_for_async(Duration::from_secs(1), |ready| *ready, |_| "ready")
+///     .await
+///     .expect("timer should remain available");
+///
+/// assert_eq!(result, WaitTimeoutResult::Ready("ready"));
+/// # }
+/// ```
 pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     /// Returns a future that waits until the predicate becomes true or an
     /// absolute deadline passes.

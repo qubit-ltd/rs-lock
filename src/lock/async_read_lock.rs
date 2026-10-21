@@ -18,6 +18,24 @@ use crate::lock::TryLockError;
 /// # Type Parameters
 ///
 /// * `L` - The underlying asynchronous read-write lock type.
+///
+/// # Examples
+///
+/// ```rust
+/// use qubit_lock::AsyncLock;
+/// use qubit_lock::AsyncReadWriteLock;
+/// use tokio::sync::RwLock;
+///
+/// let runtime = tokio::runtime::Builder::new_current_thread()
+///     .enable_all()
+///     .build()
+///     .unwrap();
+/// runtime.block_on(async {
+///     let lock = RwLock::new(1);
+///     let read_lock = lock.read_lock();
+///     assert_eq!(*read_lock.lock().await, 1);
+/// });
+/// ```
 #[must_use = "use the adapter to acquire an asynchronous read guard"]
 pub struct AsyncReadLock<'a, L: ?Sized> {
     /// Underlying asynchronous read-write lock.

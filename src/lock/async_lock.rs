@@ -23,6 +23,26 @@ use crate::lock::TryLockError;
 /// one does not acquire the lock. Dropping a pending acquisition future
 /// cancels that attempt and does not produce a guard. Once acquisition
 /// resolves, the returned guard owns the lock until the guard is dropped.
+///
+/// # Examples
+///
+/// ```rust
+/// use qubit_lock::AsyncLock;
+/// use tokio::sync::Mutex;
+///
+/// let runtime = tokio::runtime::Builder::new_current_thread()
+///     .enable_all()
+///     .build()
+///     .unwrap();
+/// runtime.block_on(async {
+///     let lock = Mutex::new(1);
+///     {
+///         let mut guard = lock.lock().await;
+///         *guard += 1;
+///     }
+///     assert_eq!(*lock.try_lock().unwrap(), 2);
+/// });
+/// ```
 pub trait AsyncLock: Send + Sync {
     /// RAII guard returned by this asynchronous lock.
     type Guard<'a>: 'a
@@ -58,13 +78,13 @@ where
         Self: 'a;
 
     /// Delegates asynchronous acquisition to the borrowed lock.
-    #[inline(always)]
+    #[inline]
     fn lock(&self) -> impl Future<Output = Self::Guard<'_>> + Send {
         L::lock(*self)
     }
 
     /// Delegates immediate acquisition to the borrowed lock.
-    #[inline(always)]
+    #[inline]
     fn try_lock(&self) -> Result<Self::Guard<'_>, TryLockError> {
         L::try_lock(*self)
     }
@@ -80,13 +100,13 @@ where
         Self: 'a;
 
     /// Delegates asynchronous acquisition to the shared lock.
-    #[inline(always)]
+    #[inline]
     fn lock(&self) -> impl Future<Output = Self::Guard<'_>> + Send {
         L::lock(self.as_ref())
     }
 
     /// Delegates immediate acquisition to the shared lock.
-    #[inline(always)]
+    #[inline]
     fn try_lock(&self) -> Result<Self::Guard<'_>, TryLockError> {
         L::try_lock(self.as_ref())
     }

@@ -40,7 +40,7 @@ where
 /// Verifies a named shared monitor handle satisfies [`Monitor`].
 #[test]
 fn test_monitor_trait_accepts_std_monitor() {
-    use_monitor(&Arc::new(StdMonitor::new(false)));
+    use_monitor(&StdMonitor::new(false));
 }
 
 /// Verifies blanket Arc delegation satisfies [`Monitor`].

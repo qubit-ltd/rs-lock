@@ -244,7 +244,7 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     ///
     /// # Returns
     ///
-    /// Whether notification or the deadline completed the wait.
+    /// The timed-wait status after this guard has reacquired the lock.
     ///
     /// # Errors
     ///
@@ -269,7 +269,7 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
     ///
     /// # Returns
     ///
-    /// Whether notification or the deadline completed the wait.
+    /// The timed-wait status after this guard has reacquired the lock.
     ///
     /// # Errors
     ///

@@ -14,6 +14,19 @@ use crate::monitor::Monitor;
 /// This is a static generic bound for APIs that retain or clone a monitor
 /// handle. The inherited generic methods make it unsuitable as a `dyn`
 /// trait-object interface.
+///
+/// # Examples
+///
+/// ```
+/// use std::sync::Arc;
+///
+/// use qubit_lock::SharedMonitor;
+/// use qubit_lock::StdMonitor;
+///
+/// fn require_shared_monitor<M: SharedMonitor>() {}
+///
+/// require_shared_monitor::<Arc<StdMonitor<bool>>>();
+/// ```
 pub trait SharedMonitor: Monitor + Clone + Send + Sync + 'static {}
 
 impl<T> SharedMonitor for T where T: Monitor + Clone + Send + Sync + 'static {}

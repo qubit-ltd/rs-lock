@@ -14,6 +14,7 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
+use qubit_clock::TimeError;
 use qubit_lock::Monitor;
 use qubit_lock::ParkingLotMonitor;
 use qubit_lock::TimedMonitor;
@@ -28,6 +29,7 @@ pub(crate) struct QueueState<T> {
 
 impl<T> QueueState<T> {
     /// Creates an open queue with the specified non-zero capacity.
+    #[must_use]
     pub(crate) fn new(capacity: NonZeroUsize) -> Self {
         Self {
             items: VecDeque::new(),
@@ -75,10 +77,7 @@ where
 }
 
 /// Waits up to the condition-wait budget for an item or queue closure.
-pub(crate) fn pop_for<M, T>(
-    queue: &M,
-    timeout: Duration,
-) -> Result<WaitTimeoutResult<Option<T>>, qubit_clock::TimeError>
+pub(crate) fn pop_for<M, T>(queue: &M, timeout: Duration) -> Result<WaitTimeoutResult<Option<T>>, TimeError>
 where
     M: TimedMonitor<State = QueueState<T>> + ?Sized,
 {

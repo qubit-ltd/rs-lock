@@ -63,6 +63,18 @@ use super::internal::WaiterRegistry;
 /// # Type Parameters
 ///
 /// * `T` - State protected by the Tokio mutex.
+///
+/// # Examples
+///
+/// ```no_run
+/// use qubit_lock::TokioMonitor;
+///
+/// async fn read_state() {
+///     let monitor = TokioMonitor::current(42);
+///     let state = monitor.with_read_async(|state| *state).await;
+///     assert_eq!(state, 42);
+/// }
+/// ```
 #[must_use = "retain and use the monitor to coordinate protected state"]
 pub struct TokioMonitor<T> {
     /// Protected monitor state.

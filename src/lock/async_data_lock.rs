@@ -94,6 +94,24 @@ use super::try_lock_error::TryLockError;
 /// # Type Parameters
 ///
 /// * `T` - The type of data protected by the lock
+///
+/// # Examples
+///
+/// ```rust
+/// use qubit_lock::AsyncDataLock;
+/// use tokio::sync::Mutex;
+///
+/// let rt = tokio::runtime::Builder::new_current_thread()
+///     .enable_all()
+///     .build()
+///     .unwrap();
+/// rt.block_on(async {
+///     let lock = Mutex::new(1);
+///     lock.with_write(|value| *value += 1).await;
+///     let value = lock.with_read(|value| *value).await;
+///     assert_eq!(value, 2);
+/// });
+/// ```
 pub trait AsyncDataLock<T: ?Sized>: Send + Sync {
     /// Acquires a read lock asynchronously and executes a closure
     ///

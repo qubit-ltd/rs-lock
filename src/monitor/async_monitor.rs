@@ -159,6 +159,14 @@ where
     /// * `R` - Value returned by `f` and produced by the forwarded future.
     /// * `F` - Read closure forwarded to the wrapped monitor. It must be
     ///   sendable and remain valid for `'a`.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure receiving immutable access to the protected state.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to the value returned by `f`.
     #[inline(always)]
     fn with_read_async<'a, R, F>(&'a self, f: F) -> impl Future<Output = R> + Send + 'a
     where
@@ -175,6 +183,14 @@ where
     /// * `R` - Value returned by `f` and produced by the forwarded future.
     /// * `F` - Write closure forwarded to the wrapped monitor. It must be
     ///   sendable and remain valid for `'a`.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure receiving mutable access to the protected state.
+    ///
+    /// # Returns
+    ///
+    /// A future resolving to the value returned by `f`.
     #[inline(always)]
     fn with_write_async<'a, R, F>(&'a self, f: F) -> impl Future<Output = R> + Send + 'a
     where

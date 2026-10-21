@@ -20,7 +20,7 @@ where
     monitor.clone()
 }
 
-/// Verifies the parking-lot handle satisfies [`SharedMonitor`].
+/// Verifies the standard-library handle satisfies [`SharedMonitor`].
 #[test]
 fn test_shared_monitor_trait_accepts_std_monitor_handle() {
     let monitor = clone_through_trait(Arc::new(StdMonitor::new(false)));

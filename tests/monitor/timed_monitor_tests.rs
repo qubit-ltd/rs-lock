@@ -28,7 +28,7 @@ where
 /// Verifies a named shared monitor handle satisfies [`TimedMonitor`].
 #[test]
 fn test_timed_monitor_trait_accepts_std_monitor() {
-    wait_through_trait(&Arc::new(StdMonitor::new(false)));
+    wait_through_trait(&StdMonitor::new(false));
 }
 
 /// Verifies [`Arc`] forwards the aggregate timed monitor capability.

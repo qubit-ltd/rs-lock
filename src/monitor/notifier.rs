@@ -20,6 +20,16 @@ use std::sync::Arc;
 /// transferred. No notification method guarantees fairness or FIFO selection.
 /// Use this trait as the smallest generic bound when code only emits
 /// notifications and never inspects protected state.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_lock::{Notifier, StdMonitor};
+///
+/// let monitor = StdMonitor::new(());
+/// monitor.notify_one();
+/// monitor.notify_all();
+/// ```
 pub trait Notifier {
     /// Selects at most one already registered waiter without a fairness
     /// guarantee.

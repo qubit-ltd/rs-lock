@@ -17,6 +17,16 @@ use std::fmt;
 /// distinguish immediate lock contention from poisoned lock states. The
 /// [`Self::Poisoned`] variant is returned only by lock implementations that
 /// support poisoning.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_lock::TryLockError;
+///
+/// let error = TryLockError::WouldBlock;
+/// assert_eq!(error, TryLockError::WouldBlock);
+/// ```
+#[must_use]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TryLockError {
     /// The lock could not be acquired immediately because another guard is

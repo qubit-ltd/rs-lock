@@ -23,7 +23,23 @@ use crate::lock::ReadLock;
 use crate::lock::TryLockError;
 use crate::lock::WriteLock;
 
-/// Represents a synchronous lock with explicit shared and exclusive modes.
+/// Provides blocking and non-blocking shared and exclusive access to data.
+///
+/// Multiple read guards may coexist, while a write guard provides exclusive
+/// access. Acquiring a blocking guard may wait for other guards to be dropped.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_lock::ReadWriteLock;
+///
+/// let lock = std::sync::RwLock::new(0);
+/// {
+///     let mut value = ReadWriteLock::write(&lock);
+///     *value = 1;
+/// }
+/// assert_eq!(*ReadWriteLock::read(&lock), 1);
+/// ```
 pub trait ReadWriteLock: Send + Sync {
     /// Shared read guard returned by this lock.
     type ReadGuard<'a>: 'a

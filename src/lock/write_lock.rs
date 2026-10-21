@@ -11,11 +11,26 @@ use crate::lock::Lock;
 use crate::lock::ReadWriteLock;
 use crate::lock::TryLockError;
 
-/// Adapts the write mode of a ReadWriteLock to Lock.
+/// Adapts the exclusive write mode of a [`ReadWriteLock`] to [`Lock`].
+///
+/// Guards acquired through this adapter exclude both readers and other writers.
+/// A blocking acquisition may wait until all existing guards are dropped.
 ///
 /// # Type Parameters
 ///
 /// * `L` - The underlying read-write lock type.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_lock::Lock;
+/// use qubit_lock::ReadWriteLock;
+///
+/// let lock = std::sync::RwLock::new(0);
+/// let write_lock = lock.write_lock();
+/// *write_lock.lock() = 1;
+/// assert_eq!(*ReadWriteLock::read(&lock), 1);
+/// ```
 #[must_use = "use the adapter to acquire a write guard"]
 pub struct WriteLock<'a, L: ?Sized> {
     /// Underlying read-write lock.

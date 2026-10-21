@@ -42,6 +42,28 @@ use crate::monitor::WaitTimeoutResult;
 /// Use this trait as a static generic bound when blocking code needs timed
 /// predicate waits. Its generic methods make it unsuitable as a `dyn`
 /// trait-object interface.
+///
+/// # Examples
+///
+/// ```
+/// use std::time::Duration;
+///
+/// use qubit_lock::StdMonitor;
+/// use qubit_lock::TimeoutConditionWaiter;
+/// use qubit_lock::WaitTimeoutResult;
+///
+/// fn wait_until_ready<W>(waiter: &W) -> WaitTimeoutResult<()>
+/// where
+///     W: TimeoutConditionWaiter<State = bool>,
+/// {
+///     waiter
+///         .wait_until_ready_for(Duration::ZERO, |ready| *ready)
+///         .expect("the monitor timer should complete")
+/// }
+///
+/// let monitor = StdMonitor::new(true);
+/// assert_eq!(wait_until_ready(&monitor), WaitTimeoutResult::Ready(()));
+/// ```
 pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// Blocks until the predicate becomes true or an absolute deadline passes.
     ///

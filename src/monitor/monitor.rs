@@ -23,6 +23,16 @@ use crate::monitor::Notifier;
 /// untimed blocking monitor contract. Its generic methods make it unsuitable
 /// as a `dyn` trait-object interface. Prefer [`ConditionWaiter`] or
 /// [`Notifier`] when an API needs only one narrower capability.
+///
+/// # Examples
+///
+/// ```
+/// use qubit_lock::{Monitor, StdMonitor};
+///
+/// let monitor = StdMonitor::new(0_u32);
+/// monitor.with_write_notify_all(|state| *state += 1);
+/// assert_eq!(monitor.with_read(|state| *state), 1);
+/// ```
 pub trait Monitor: Notifier + ConditionWaiter {
     /// Reads protected monitor state while holding its lock.
     ///
