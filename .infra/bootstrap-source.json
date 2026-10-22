@@ -1,7 +1,7 @@
 {
   "config_sources": {
     "rs-infra-ci": "sha256:2cc68b5ab050769382d7e9af468cb60b2261fb8e387d0ced9974c8d068964271",
-    "rs-infra-dependency": "sha256:ccfb2be8b4ce2606337f85c4047d5eca1f068c45a0eff256fd3a23b13945afeb",
+    "rs-infra-dependency": "sha256:aaead6e3ca51392e39a9f445a2869fe9119fae144ced710d48ad646bc8b586e0",
     "rs-infra-style": "sha256:f5ebba934dfcd04bb4b7a3847f27b8a73dcab28afbfe7cb2a9c2e884ebc4564c",
     "rs-infra-tools": "sha256:b52fdcc1a8382533f3f5f56d0f458fca1e30baa853f6acb394d913ec32972166"
   },
@@ -40,7 +40,7 @@
     },
     ".infra/bin/update-dependencies-by-prefix.sh": {
       "executable": true,
-      "sha256": "01e4d21266906f793bc6edd5663c859cbef66f47835a580d0979c043a12b04d0"
+      "sha256": "2a4d1d0e3b8679cde9ee9523721b142776232e7472d1bad6008d27429b46a19b"
     },
     ".infra/bootstrap-check.py": {
       "executable": true,
@@ -48,7 +48,7 @@
     },
     ".infra/bootstrap.sh": {
       "executable": true,
-      "sha256": "51448c0ab75c1962189a5066df452ce6ad741ac53bff4cb70b7f5c4d0020fd5b"
+      "sha256": "cfbbe07a09cdd178c57e836dbd853c5e19d97bfdf2fce8105174463e8058409c"
     },
     ".infra/ci/local-path-dependencies.tsv": {
       "executable": false,
@@ -64,7 +64,7 @@
     },
     ".infra/dependency/policy/baselines/v2026.10.21.txt": {
       "executable": false,
-      "sha256": "fc4fc29dadcd54465b2aae7abb0447ea1f01e59851e0fe35a5ddcb76318aa516"
+      "sha256": "28698c004087682c5ea0f7a688c3a9880814dcf3c0b29735d9dadc3310fecbfa"
     },
     ".infra/dependency/policy/current.toml": {
       "executable": false,
@@ -87,8 +87,8 @@
       "sha256": "d4687f8f57286d023b55185be016306fa9cc536c69fc9d1888316ad078846cfe"
     }
   },
-  "package_sha256": "f12e3b7bdfdee31d68ae122259723c9259bca5bbd2a4afa73c46c703a789d557",
+  "package_sha256": "557965a29427126d731d50fc40c9fa47cf2bbbbfdb24263cf2b2d1617ad0b418",
   "schema": 1,
   "source_repository": "https://github.com/qubit-ltd/rs-infra-tools.git",
-  "source_revision": "b01e7521496406030b8082711994699f0e70160a"
+  "source_revision": "6d43a931e1e7b5d7e6dca4dc48456a307c4af821"
 }
