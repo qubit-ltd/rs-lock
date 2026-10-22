@@ -1,7 +1,7 @@
 {
   "config_sources": {
     "rs-infra-ci": "sha256:2cc68b5ab050769382d7e9af468cb60b2261fb8e387d0ced9974c8d068964271",
-    "rs-infra-dependency": "sha256:aaead6e3ca51392e39a9f445a2869fe9119fae144ced710d48ad646bc8b586e0",
+    "rs-infra-dependency": "sha256:3d71d8a2f587e5040502dbabaf57b749d7b4485a983eba9e3257b75c27b4dbfc",
     "rs-infra-style": "sha256:f5ebba934dfcd04bb4b7a3847f27b8a73dcab28afbfe7cb2a9c2e884ebc4564c",
     "rs-infra-tools": "sha256:b52fdcc1a8382533f3f5f56d0f458fca1e30baa853f6acb394d913ec32972166"
   },
@@ -48,7 +48,7 @@
     },
     ".infra/bootstrap.sh": {
       "executable": true,
-      "sha256": "cfbbe07a09cdd178c57e836dbd853c5e19d97bfdf2fce8105174463e8058409c"
+      "sha256": "661e466a2f87ffc125ed23c14b01ed5001c335d7dd64ab7cae719ab468c014b9"
     },
     ".infra/ci/local-path-dependencies.tsv": {
       "executable": false,
@@ -64,7 +64,7 @@
     },
     ".infra/dependency/policy/baselines/v2026.10.21.txt": {
       "executable": false,
-      "sha256": "28698c004087682c5ea0f7a688c3a9880814dcf3c0b29735d9dadc3310fecbfa"
+      "sha256": "d0034f8b7d45117d0330a9a0339a0b09ab9b4b073cc453899f222b8c3583632b"
     },
     ".infra/dependency/policy/current.toml": {
       "executable": false,
@@ -87,8 +87,8 @@
       "sha256": "d4687f8f57286d023b55185be016306fa9cc536c69fc9d1888316ad078846cfe"
     }
   },
-  "package_sha256": "557965a29427126d731d50fc40c9fa47cf2bbbbfdb24263cf2b2d1617ad0b418",
+  "package_sha256": "7096d8aa9ac084b6ed3790e39073a5a5cd1bc250bc9c3e8c3ab4485e0cdef354",
   "schema": 1,
   "source_repository": "https://github.com/qubit-ltd/rs-infra-tools.git",
-  "source_revision": "6d43a931e1e7b5d7e6dca4dc48456a307c4af821"
+  "source_revision": "00c7c1aa14ae103acf00dfb13bb06237ed585355"
 }

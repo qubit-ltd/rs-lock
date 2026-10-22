@@ -106,6 +106,13 @@ case "$entrypoint" in
     .infra/bin/align-ci.sh)
         prepare_dependencies
         run_latest rs-infra-style --project "$project_root" fix "$@"
+        alignment_preview=false
+        for arg in "$@"; do
+            case "$arg" in --dry-run|-h|--help) alignment_preview=true ;; esac
+        done
+        if [[ "$alignment_preview" == false ]]; then
+            run_latest rs-infra-ci --project "$project_root" --only clippy check
+        fi
         ;;
     .infra/bin/ci-check.sh)
         source "$shared_root/.infra/lib/cleanup-build-artifacts.sh"
