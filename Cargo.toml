@@ -1,6 +1,6 @@
 [package]
 name = "qubit-lock"
-version = "0.14.2"
+version = "0.14.3"
 edition = "2024"
 rust-version = "1.94"
 authors = ["Haixing Hu <starfish.hu@gmail.com>"]
@@ -45,7 +45,7 @@ parking-lot = ["dep:parking_lot"]
 [dependencies]
 parking_lot = { version = "^0.12", optional = true }
 loom = { version = "^0.7", optional = true }
-tokio = { version = "^1.53", default-features = false, optional = true }
+tokio = { version = "^1.54", default-features = false, optional = true }
 qubit-clock = { version = "^0.13", optional = true }
 
 [dev-dependencies]
@@ -53,7 +53,7 @@ criterion = { version = "^0.8", default-features = false }
 qubit-clock = { version = "^0.13", features = ["test-util"] }
 qubit-collections = "^0.2"
 semver = { version = "^1.0", default-features = false }
-tokio = { version = "1.53", default-features = false, features = ["macros", "rt-multi-thread", "test-util", "time"] }
+tokio = { version = "^1.54", default-features = false, features = ["macros", "rt-multi-thread", "test-util", "time"] }
 
 [[example]]
 name = "clone_test"
