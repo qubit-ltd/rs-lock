@@ -8,7 +8,6 @@
 //! Tests for [`ParkingLotMonitor`](qubit_lock::ParkingLotMonitor).
 
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
@@ -24,7 +23,6 @@ use qubit_lock::WaitTimeoutStatus;
 
 blocking_monitor_contract_tests!(parking_lot_monitor_contract, ParkingLotMonitor);
 
-use super::failing_timer_tests::OncePendingTimer;
 use super::failing_timer_tests::assert_backend_unavailable;
 use super::failing_timer_tests::completion_failing_timer;
 use super::failing_timer_tests::registration_failing_timer;
@@ -491,49 +489,6 @@ fn test_parking_lot_monitor_deadline_helpers_wait_until_timeout() {
         ParkingLotMonitor::wait_until_ready_with_deadline(&monitor, clock.now(), |ready| *ready,),
         Ok(WaitTimeoutResult::TimedOut),
     );
-}
-
-/// Verifies the inherent deadline helper enters the pending wait path.
-#[test]
-fn test_parking_lot_monitor_deadline_wait_propagates_completion_error() {
-    let (timer, poll_count) = OncePendingTimer::new(completion_failing_timer());
-    let monitor = Arc::new(ParkingLotMonitor::with_timer(false, Arc::new(timer)));
-    let (checked_tx, checked_rx) = mpsc::channel();
-    let waiter_monitor = Arc::clone(&monitor);
-    let waiter = thread::spawn(move || {
-        let deadline = waiter_monitor
-            .timer()
-            .clock()
-            .now()
-            .checked_add(Duration::from_secs(1))
-            .expect("test deadline should be representable");
-        let mut checked_tx = Some(checked_tx);
-        ParkingLotMonitor::wait_while_with_deadline(
-            &waiter_monitor,
-            deadline,
-            move |_| {
-                if let Some(checked_tx) = checked_tx.take() {
-                    checked_tx.send(()).expect("test should observe the initial predicate");
-                }
-                true
-            },
-            |_| (),
-        )
-    });
-
-    checked_rx
-        .recv_timeout(Duration::from_secs(1))
-        .expect("waiter should perform the initial predicate check");
-    drop(monitor.lock());
-    monitor.notify_one();
-
-    let error = waiter
-        .join()
-        .expect("waiter should finish")
-        .expect_err("pending deadline wait should propagate timer completion error");
-
-    assert_backend_unavailable(error);
-    assert_eq!(poll_count.load(Ordering::SeqCst), 2);
 }
 
 #[test]

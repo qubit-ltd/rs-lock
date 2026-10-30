@@ -27,9 +27,207 @@ macro_rules! blocking_monitor_contract_tests {
             use qubit_lock::$monitor;
 
             use crate::monitor::failing_timer_tests::DeadlineSignalingTimer;
+            use crate::monitor::failing_timer_tests::GatedCompletionTimer;
             use crate::monitor::failing_timer_tests::assert_backend_unavailable;
             use crate::monitor::failing_timer_tests::completion_failing_timer;
             use crate::monitor::failing_timer_tests::registration_failing_timer;
+
+            const REAL_LIMIT: Duration = Duration::from_secs(5);
+
+            fn assert_completion_error_after_unlock<W>(wait: W)
+            where
+                W: FnOnce(Arc<$monitor<usize>>) -> Result<(), TimeError> + Send + 'static,
+            {
+                let (timer, gate, first_poll_rx) = GatedCompletionTimer::new(completion_failing_timer());
+                let monitor = Arc::new($monitor::with_timer(0usize, Arc::new(timer)));
+                let (wait_result_tx, wait_result_rx) = mpsc::channel();
+                let wait_monitor = Arc::clone(&monitor);
+                let mut first_waiter = Some(thread::spawn(move || {
+                    let result = wait(wait_monitor);
+                    let _ = wait_result_tx.send(result);
+                }));
+
+                let first_polled = first_poll_rx.recv_timeout(REAL_LIMIT).is_ok();
+                let (probe_tx, probe_rx) = mpsc::channel();
+                let probe_monitor = Arc::clone(&monitor);
+                let mut probe = Some(thread::spawn(move || {
+                    probe_monitor.with_write(|state| *state = 1);
+                    let _ = probe_tx.send(());
+                }));
+                let lock_handoff = probe_rx.recv_timeout(REAL_LIMIT).is_ok();
+                let ended_before_gate = wait_result_rx.try_recv().ok();
+                let ended_before_gate_was_set = ended_before_gate.is_some();
+                gate.open();
+                let first_result = ended_before_gate.or_else(|| wait_result_rx.recv_timeout(REAL_LIMIT).ok());
+
+                let first_waiter_done = first_result.is_some();
+                let first_error = match first_result {
+                    Some(Err(error)) => Some(error),
+                    _ => None,
+                };
+                if first_waiter_done {
+                    first_waiter
+                        .take()
+                        .expect("error waiter handle should exist")
+                        .join()
+                        .expect("completed error waiter should not panic");
+                }
+                if lock_handoff {
+                    probe
+                        .take()
+                        .expect("lock probe handle should exist")
+                        .join()
+                        .expect("completed lock probe should not panic");
+                }
+
+                let mut second_waiter = None;
+                let mut notifier = None;
+                let mut notifier_done_rx = None;
+                let mut second_done_rx = None;
+                let mut single_notification_completed = false;
+                if first_error.is_some() && lock_handoff && !ended_before_gate_was_set {
+                    let (checked_tx, checked_rx) = mpsc::channel();
+                    let (done_tx, done_rx) = mpsc::channel();
+                    let second_monitor = Arc::clone(&monitor);
+                    second_waiter = Some(thread::spawn(move || {
+                        let mut checked_tx = Some(checked_tx);
+                        second_monitor.wait_until_ready(move |state| {
+                            if *state != 3 {
+                                if let Some(checked_tx) = checked_tx.take() {
+                                    let _ = checked_tx.send(());
+                                }
+                            }
+                            *state == 3
+                        });
+                        let _ = done_tx.send(());
+                    }));
+                    second_done_rx = Some(done_rx);
+                    let checked = checked_rx.recv_timeout(REAL_LIMIT).is_ok();
+                    if checked {
+                        let notify_monitor = Arc::clone(&monitor);
+                        let (notifier_done_tx, done_rx) = mpsc::channel();
+                        notifier = Some(thread::spawn(move || {
+                            notify_monitor.with_write_notify_one(|state| *state = 3);
+                            let _ = notifier_done_tx.send(());
+                        }));
+                        notifier_done_rx = Some(done_rx);
+                        single_notification_completed = second_done_rx
+                            .as_ref()
+                            .expect("second waiter completion channel should exist")
+                            .recv_timeout(REAL_LIMIT)
+                            .is_ok();
+                    }
+                }
+
+                let second_was_started = second_waiter.is_some();
+                if !single_notification_completed {
+                    gate.open();
+                    let cleanup_monitor = Arc::clone(&monitor);
+                    let (cleanup_tx, cleanup_rx) = mpsc::channel();
+                    let cleanup = thread::spawn(move || {
+                        cleanup_monitor.with_write_notify_all(|state| *state = 3);
+                        let _ = cleanup_tx.send(());
+                    });
+                    if cleanup_rx.recv_timeout(REAL_LIMIT).is_ok() {
+                        cleanup.join().expect("completed cleanup should not panic");
+                    }
+                    if first_waiter.is_some() && wait_result_rx.recv_timeout(REAL_LIMIT).is_ok() {
+                        first_waiter
+                            .take()
+                            .expect("error waiter handle should exist")
+                            .join()
+                            .expect("cleaned error waiter should not panic");
+                    }
+                    if probe.is_some() && probe_rx.recv_timeout(REAL_LIMIT).is_ok() {
+                        probe
+                            .take()
+                            .expect("lock probe handle should exist")
+                            .join()
+                            .expect("cleaned lock probe should not panic");
+                    }
+                    if let (Some(rx), Some(waiter)) = (second_done_rx.as_ref(), second_waiter.take()) {
+                        if rx.recv_timeout(REAL_LIMIT).is_ok() {
+                            waiter.join().expect("cleaned second waiter should not panic");
+                        }
+                    }
+                } else {
+                    if let Some(waiter) = second_waiter.take() {
+                        waiter.join().expect("single-notified waiter should not panic");
+                    }
+                }
+                if let (Some(rx), Some(notifier)) = (notifier_done_rx.as_ref(), notifier) {
+                    if rx.recv_timeout(REAL_LIMIT).is_ok() {
+                        notifier
+                            .join()
+                            .expect("completed notification worker should not panic");
+                    }
+                }
+
+                assert!(
+                    first_polled,
+                    "timed waiter should poll the closed completion gate"
+                );
+                assert!(
+                    lock_handoff,
+                    "probe should acquire the state lock while the waiter is pending"
+                );
+                assert!(
+                    !ended_before_gate_was_set,
+                    "waiter should remain pending until completion gate opens"
+                );
+                let first_error = first_error.expect("completion error should be propagated");
+                assert_backend_unavailable(first_error);
+                assert!(
+                    second_was_started && single_notification_completed,
+                    "next waiter should complete after exactly one notification, without cleanup broadcast"
+                );
+            }
+
+            #[test]
+            fn test_relative_wait_propagates_error_after_unlock() {
+                assert_completion_error_after_unlock(|monitor| {
+                    monitor
+                        .wait_until_for(
+                            Duration::from_secs(1),
+                            |_| false,
+                            |_| panic!("action must not run after Timer failure"),
+                        )
+                        .map(|_| ())
+                });
+            }
+
+            #[test]
+            fn test_deadline_wait_propagates_error_after_unlock() {
+                assert_completion_error_after_unlock(|monitor| {
+                    let deadline = monitor
+                        .timer()
+                        .clock()
+                        .now()
+                        .checked_add(Duration::from_secs(1))
+                        .expect("test deadline should be representable");
+                    monitor
+                        .wait_while_with_deadline(
+                            deadline,
+                            |_| true,
+                            |_| panic!("action must not run after Timer failure"),
+                        )
+                        .map(|_| ())
+                });
+            }
+
+            #[test]
+            fn test_guard_reacquires_after_completion_error() {
+                assert_completion_error_after_unlock(|monitor| {
+                    let mut guard = monitor.lock();
+                    let error = guard
+                        .wait_for(Duration::from_secs(1))
+                        .expect_err("controlled Timer should fail after state lock release");
+                    assert_eq!(*guard, 1, "guard should observe lock-handoff probe write");
+                    *guard = 2;
+                    assert_eq!(*guard, 2, "guard should remain writable after completion error");
+                    Err(error)
+                });
+            }
 
             fn release_and_join_completed_waiters(
                 monitor: &$monitor<bool>,

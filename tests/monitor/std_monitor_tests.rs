@@ -8,7 +8,6 @@
 //! Tests for [`StdMonitor`](qubit_lock::StdMonitor).
 
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
@@ -22,7 +21,6 @@ use qubit_lock::TimeoutConditionWaiter;
 use qubit_lock::WaitTimeoutResult;
 use qubit_lock::WaitTimeoutStatus;
 
-use super::failing_timer_tests::OncePendingTimer;
 use super::failing_timer_tests::assert_backend_unavailable;
 use super::failing_timer_tests::completion_failing_timer;
 use super::failing_timer_tests::registration_failing_timer;
@@ -61,41 +59,6 @@ fn test_std_monitor_completion_error_wins_over_post_wait_readiness() {
     assert_backend_unavailable(error);
     assert_eq!(predicate_checks, 1);
     assert_eq!(action_calls, 0);
-}
-
-/// Verifies an error returned by a blocking timed wait is propagated.
-#[test]
-fn test_std_monitor_blocking_wait_propagates_post_wait_timer_error() {
-    let (timer, poll_count) = OncePendingTimer::new(completion_failing_timer());
-    let monitor = Arc::new(StdMonitor::with_timer(false, Arc::new(timer)));
-    let (checked_tx, checked_rx) = mpsc::channel();
-    let waiter_monitor = Arc::clone(&monitor);
-    let waiter = thread::spawn(move || {
-        let mut checked_tx = Some(checked_tx);
-        waiter_monitor.wait_until_for(
-            Duration::from_secs(1),
-            move |_| {
-                if let Some(checked_tx) = checked_tx.take() {
-                    checked_tx.send(()).expect("test should observe the initial predicate");
-                }
-                false
-            },
-            |_| (),
-        )
-    });
-
-    checked_rx
-        .recv_timeout(Duration::from_secs(1))
-        .expect("waiter should perform the initial predicate check");
-    drop(monitor.lock());
-    monitor.notify_one();
-
-    let error = waiter
-        .join()
-        .expect("waiter should finish")
-        .expect_err("post-wait timer completion should fail");
-    assert_backend_unavailable(error);
-    assert_eq!(poll_count.load(Ordering::SeqCst), 2);
 }
 
 #[test]

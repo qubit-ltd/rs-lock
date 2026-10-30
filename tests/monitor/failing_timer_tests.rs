@@ -10,10 +10,10 @@
 use std::future::poll_fn;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering;
+use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
 use std::task::Poll;
+use std::task::Waker;
 use std::time::Duration;
 
 use qubit_clock::ClockDomain;
@@ -134,29 +134,62 @@ where
     }
 }
 
-/// Timer wrapper that remains pending once before forwarding completion.
-pub(super) struct OncePendingTimer<T> {
+/// Timer wrapper that holds completion until its test gate opens.
+pub(super) struct GatedCompletionTimer<T> {
     /// Wrapped timer providing the eventual result.
     inner: T,
-    /// Number of polls observed across registered futures.
-    poll_count: Arc<AtomicUsize>,
+    /// Gate state shared with the test controller.
+    state: Arc<Mutex<CompletionState>>,
 }
 
-impl<T> OncePendingTimer<T> {
-    /// Creates a wrapper and exposes its shared poll counter.
-    pub(super) fn new(inner: T) -> (Self, Arc<AtomicUsize>) {
-        let poll_count = Arc::new(AtomicUsize::new(0));
+/// Controller for opening a gated Timer completion.
+#[derive(Clone)]
+pub(super) struct CompletionGate {
+    state: Arc<Mutex<CompletionState>>,
+}
+
+/// State shared by the gated Timer and its controller.
+struct CompletionState {
+    open: bool,
+    waker: Option<Waker>,
+    first_poll: Option<Sender<()>>,
+}
+
+impl<T> GatedCompletionTimer<T> {
+    /// Creates a closed gate and a one-shot first-poll observation channel.
+    pub(super) fn new(inner: T) -> (Self, CompletionGate, Receiver<()>) {
+        let (first_poll_tx, first_poll_rx) = std::sync::mpsc::channel();
+        let state = Arc::new(Mutex::new(CompletionState {
+            open: false,
+            waker: None,
+            first_poll: Some(first_poll_tx),
+        }));
         (
             Self {
                 inner,
-                poll_count: Arc::clone(&poll_count),
+                state: Arc::clone(&state),
             },
-            poll_count,
+            CompletionGate { state },
+            first_poll_rx,
         )
     }
 }
 
-impl<T> Timer for OncePendingTimer<T>
+impl CompletionGate {
+    /// Opens completion and wakes the most recently registered poller.
+    pub(super) fn open(&self) {
+        let waker = {
+            let mut state = self.state.lock().expect("completion gate should not poison");
+            state.open = true;
+            state.waker.take()
+        };
+        if let Some(waker) = waker {
+            waker.wake();
+        }
+    }
+}
+
+impl<T> Timer for GatedCompletionTimer<T>
 where
     T: Timer,
 {
@@ -165,15 +198,25 @@ where
         self.inner.clock()
     }
 
-    /// Defers the wrapped future's first completion poll.
+    /// Defers completion until the shared gate opens.
     fn at(&self, deadline: MonotonicInstant) -> Result<TimerFuture, TimeError> {
         let mut future = self.inner.at(deadline)?;
-        let poll_count = Arc::clone(&self.poll_count);
+        let state = Arc::clone(&self.state);
         Ok(Box::pin(poll_fn(move |context| {
-            if poll_count.fetch_add(1, Ordering::SeqCst) == 0 {
-                Poll::Pending
-            } else {
+            let (open, first_poll) = {
+                let mut state = state.lock().expect("completion gate should not poison");
+                if !state.open {
+                    state.waker = Some(context.waker().clone());
+                }
+                (state.open, state.first_poll.take())
+            };
+            if let Some(first_poll) = first_poll {
+                let _ = first_poll.send(());
+            }
+            if open {
                 future.as_mut().poll(context)
+            } else {
+                Poll::Pending
             }
         })))
     }
@@ -215,4 +258,75 @@ pub(super) fn assert_backend_unavailable(error: TimeError) {
     };
     assert_eq!("test", backend);
     assert_eq!("test timer backend unavailable", source.to_string());
+}
+
+#[cfg(test)]
+mod gated_timer_tests {
+    use std::sync::Arc;
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
+    use std::task::Context;
+    use std::task::Poll;
+    use std::task::Wake;
+    use std::task::Waker;
+    use std::time::Duration;
+
+    use qubit_clock::Timer;
+
+    use super::GatedCompletionTimer;
+    use super::assert_backend_unavailable;
+    use super::completion_failing_timer;
+
+    struct CountWake(AtomicUsize);
+
+    impl Wake for CountWake {
+        fn wake(self: Arc<Self>) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+
+        fn wake_by_ref(self: &Arc<Self>) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    fn future(timer: &impl Timer) -> qubit_clock::TimerFuture {
+        let deadline = timer.clock().now().checked_add(Duration::from_secs(1)).unwrap();
+        timer.at(deadline).unwrap()
+    }
+
+    #[test]
+    fn test_gated_completion_timer_pending_then_wakes_and_errors() {
+        let (timer, gate, first_poll_rx) = GatedCompletionTimer::new(completion_failing_timer());
+        let mut future = future(&timer);
+        let counter = Arc::new(CountWake(AtomicUsize::new(0)));
+        let waker = Waker::from(Arc::clone(&counter));
+        let mut context = Context::from_waker(&waker);
+
+        assert!(matches!(future.as_mut().poll(&mut context), Poll::Pending));
+        first_poll_rx.recv_timeout(Duration::from_secs(1)).unwrap();
+        assert!(matches!(future.as_mut().poll(&mut context), Poll::Pending));
+        assert!(first_poll_rx.try_recv().is_err());
+
+        gate.open();
+        assert_eq!(counter.0.load(Ordering::SeqCst), 1);
+        let Poll::Ready(Err(error)) = future.as_mut().poll(&mut context) else {
+            panic!("opened gate should expose completion error");
+        };
+        assert_backend_unavailable(error);
+    }
+
+    #[test]
+    fn test_gated_completion_timer_open_before_first_poll() {
+        let (timer, gate, first_poll_rx) = GatedCompletionTimer::new(completion_failing_timer());
+        gate.open();
+        let mut future = future(&timer);
+        let waker = Waker::from(Arc::new(CountWake(AtomicUsize::new(0))));
+        let mut context = Context::from_waker(&waker);
+
+        let Poll::Ready(Err(error)) = future.as_mut().poll(&mut context) else {
+            panic!("pre-opened gate should expose completion error on first poll");
+        };
+        assert_backend_unavailable(error);
+        first_poll_rx.recv_timeout(Duration::from_secs(1)).unwrap();
+    }
 }
