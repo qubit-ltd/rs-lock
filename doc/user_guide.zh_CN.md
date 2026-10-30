@@ -602,9 +602,11 @@ where
 并继续提供内部状态，而不是拒绝访问。线程持有状态锁时发生 panic，可能使状态只完成
 部分修改。`is_poisoned` 用于检查是否发生过这种情况；普通的 `lock`、`with_read`、
 `with_write` 和等待操作仍可使用，但不会自动清除 poisoning 标记。调用者应先检查状态，
-必要时修复受保护的不变量，再调用 `clear_poison` 明确接受恢复后的状态。
-`clear_poison` 只清除标记，不会验证或回滚状态；以后再次在持锁期间 panic，monitor
-仍会重新进入 poisoned 状态。`Arc<StdMonitor<T>>` 通过 deref coercion 同样公开这两个方法。
+必要时修复受保护的不变量，再调用 `clear_poison` 明确接受恢复后的状态。若使用
+`lock` 恢复，应在同一个 guard 仍存活时修复不变量并调用 `clear_poison`；这两步之间
+不要调用会释放 guard 的等待方法。`clear_poison` 只清除标记，不会验证或回滚状态；
+以后再次在持锁期间 panic，monitor 仍会重新进入 poisoned 状态。`Arc<StdMonitor<T>>`
+通过 deref coercion 同样公开这两个方法。
 
 ```rust
 use std::sync::Arc;
@@ -734,22 +736,25 @@ assert_eq!(result, WaitTimeoutResult::Ready(()));
 异步等待遵循相同的时钟域规则。`TokioMonitor` 会保留自身 timer，因此应从该
 monitor 构造 deadline，再等待：
 
+此示例要求 `qubit-lock` 启用 `async-monitor`，并直接依赖启用 `macros` 与
+`rt-multi-thread` feature 的 Tokio。
+
 ```rust
 use std::time::Duration;
 
-use qubit_lock::{AsyncTimeoutConditionWaiter, TokioMonitor, WaitTimeoutResult};
+use qubit_lock::{TokioMonitor, WaitTimeoutResult};
 
-# #[tokio::main]
-# async fn main() {
-let monitor = TokioMonitor::current(true);
-let deadline = monitor.timer().clock().now()
-    .checked_add(Duration::from_secs(1))
-    .expect("短时长 deadline 应可表示");
-let result = monitor.wait_until_ready_with_deadline_async(deadline, |ready| *ready)
-    .await
-    .expect("deadline 属于此 monitor 的 timer");
-assert_eq!(result, WaitTimeoutResult::Ready(()));
-# }
+#[tokio::main]
+async fn main() {
+    let monitor = TokioMonitor::current(true);
+    let deadline = monitor.timer().clock().now()
+        .checked_add(Duration::from_secs(1))
+        .expect("短时长 deadline 应可表示");
+    let result = monitor.wait_until_ready_with_deadline_async(deadline, |ready| *ready)
+        .await
+        .expect("deadline 属于此 monitor 的 timer");
+    assert_eq!(result, WaitTimeoutResult::Ready(()));
+}
 ```
 
 ### Notification 是无记忆的
@@ -872,7 +877,8 @@ Result<WaitTimeoutResult<R>, qubit_clock::TimeError>
 ```
 
 `WaitTimeoutResult::Ready(R)` 包含 action 结果。
-`WaitTimeoutResult::TimedOut` 表示最终持锁检查后 predicate 仍为 false。
+`WaitTimeoutResult::TimedOut` 表示最终持锁检查时条件仍不能继续执行。对于
+`wait_until_*`，predicate 仍为 false；对于 `wait_while_*`，predicate 仍为 true。
 
 guard 级计时等待返回 `WaitTimeoutStatus`：
 

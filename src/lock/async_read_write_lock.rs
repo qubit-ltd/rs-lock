@@ -38,14 +38,14 @@ use crate::lock::TryLockError;
 /// runtime.block_on(async {
 ///     let lock = RwLock::new(1);
 ///     {
-///         let read_guard = lock.read().await;
+///         let read_guard = AsyncReadWriteLock::read(&lock).await;
 ///         assert_eq!(*read_guard, 1);
 ///     }
 ///     {
-///         let mut write_guard = lock.write().await;
+///         let mut write_guard = AsyncReadWriteLock::write(&lock).await;
 ///         *write_guard += 1;
 ///     }
-///     assert_eq!(*lock.try_read().unwrap(), 2);
+///     assert_eq!(*AsyncReadWriteLock::try_read(&lock).unwrap(), 2);
 /// });
 /// ```
 pub trait AsyncReadWriteLock: Send + Sync {

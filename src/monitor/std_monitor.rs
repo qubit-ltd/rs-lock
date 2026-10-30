@@ -209,7 +209,9 @@ impl<T> StdMonitor<T> {
     /// repair mutations made before the panic. Callers should first recover the
     /// state through [`Self::lock`] or [`Self::with_write`], restore the
     /// application invariant, and only then accept that state by clearing the
-    /// marker.
+    /// marker. When using [`Self::lock`], keep the same guard alive while
+    /// repairing the state and calling this method. Do not call a wait method
+    /// that releases the guard between repair and clearing the marker.
     ///
     /// # Examples
     ///
@@ -230,9 +232,12 @@ impl<T> StdMonitor<T> {
     /// }));
     ///
     /// assert!(monitor.is_poisoned());
-    /// monitor.with_write(|value| *value = 1);
-    /// monitor.clear_poison();
-    /// assert!(!monitor.is_poisoned());
+    /// {
+    ///     let mut guard = monitor.lock();
+    ///     *guard = 1;
+    ///     monitor.clear_poison();
+    ///     assert!(!monitor.is_poisoned());
+    /// }
     /// ```
     #[inline(always)]
     pub fn clear_poison(&self) {

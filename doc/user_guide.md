@@ -648,10 +648,12 @@ while the state lock is held can leave that state partially modified.
 `is_poisoned` reports whether this has happened; ordinary `lock`, `with_read`,
 `with_write`, and wait operations remain available but do not clear the marker.
 After inspecting and, when necessary, repairing the protected invariant, call
-`clear_poison` to explicitly accept the recovered state. `clear_poison` only
-clears the marker: it neither validates nor rolls back state, and a later panic
-while holding the monitor can poison it again. `Arc<StdMonitor<T>>` exposes
-both methods through deref coercion.
+`clear_poison` to explicitly accept the recovered state. If recovery uses
+`lock`, keep that same guard alive while repairing the invariant and calling
+`clear_poison`; do not call a wait method that releases the guard between those
+steps. `clear_poison` only clears the marker: it neither validates nor rolls
+back state, and a later panic while holding the monitor can poison it again.
+`Arc<StdMonitor<T>>` exposes both methods through deref coercion.
 
 ```rust
 use std::sync::Arc;
@@ -788,22 +790,25 @@ assert_eq!(result, WaitTimeoutResult::Ready(()));
 The asynchronous form follows the same clock-domain rule. `TokioMonitor`
 retains its timer, so derive the deadline from that monitor before awaiting:
 
+This example requires `qubit-lock` with the `async-monitor` feature and a direct
+Tokio dependency with the `macros` and `rt-multi-thread` features.
+
 ```rust
 use std::time::Duration;
 
-use qubit_lock::{AsyncTimeoutConditionWaiter, TokioMonitor, WaitTimeoutResult};
+use qubit_lock::{TokioMonitor, WaitTimeoutResult};
 
-# #[tokio::main]
-# async fn main() {
-let monitor = TokioMonitor::current(true);
-let deadline = monitor.timer().clock().now()
-    .checked_add(Duration::from_secs(1))
-    .expect("short deadline should be representable");
-let result = monitor.wait_until_ready_with_deadline_async(deadline, |ready| *ready)
-    .await
-    .expect("deadline belongs to this monitor timer");
-assert_eq!(result, WaitTimeoutResult::Ready(()));
-# }
+#[tokio::main]
+async fn main() {
+    let monitor = TokioMonitor::current(true);
+    let deadline = monitor.timer().clock().now()
+        .checked_add(Duration::from_secs(1))
+        .expect("short deadline should be representable");
+    let result = monitor.wait_until_ready_with_deadline_async(deadline, |ready| *ready)
+        .await
+        .expect("deadline belongs to this monitor timer");
+    assert_eq!(result, WaitTimeoutResult::Ready(()));
+}
 ```
 
 ### Notifications are memoryless
@@ -938,8 +943,9 @@ Result<WaitTimeoutResult<R>, qubit_clock::TimeError>
 ```
 
 `WaitTimeoutResult::Ready(R)` contains the action result.
-`WaitTimeoutResult::TimedOut` means the predicate was still false after the
-final locked check.
+`WaitTimeoutResult::TimedOut` means the condition was still unable to proceed
+at the final locked check. For `wait_until_*`, the predicate was still false;
+for `wait_while_*`, it was still true.
 
 Guard-level timed waits return `WaitTimeoutStatus`:
 

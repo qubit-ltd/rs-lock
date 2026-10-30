@@ -37,10 +37,10 @@ use crate::lock::TryLockError;
 /// runtime.block_on(async {
 ///     let lock = Mutex::new(1);
 ///     {
-///         let mut guard = lock.lock().await;
+///         let mut guard = AsyncLock::lock(&lock).await;
 ///         *guard += 1;
 ///     }
-///     assert_eq!(*lock.try_lock().unwrap(), 2);
+///     assert_eq!(*AsyncLock::try_lock(&lock).unwrap(), 2);
 /// });
 /// ```
 pub trait AsyncLock: Send + Sync {
