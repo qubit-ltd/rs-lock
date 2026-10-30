@@ -14,7 +14,9 @@ macro_rules! blocking_monitor_contract_tests {
             use std::cell::Cell;
             use std::sync::Arc;
             use std::sync::mpsc;
+            use std::sync::mpsc::Receiver;
             use std::thread;
+            use std::thread::JoinHandle;
             use std::time::Duration;
 
             use qubit_clock::ManualMonotonicClock;
@@ -28,6 +30,27 @@ macro_rules! blocking_monitor_contract_tests {
             use crate::monitor::failing_timer_tests::assert_backend_unavailable;
             use crate::monitor::failing_timer_tests::completion_failing_timer;
             use crate::monitor::failing_timer_tests::registration_failing_timer;
+
+            fn release_and_join_completed_waiters(
+                monitor: &$monitor<bool>,
+                done_rx: &Receiver<usize>,
+                waiters: Vec<JoinHandle<()>>,
+                completed: &mut [bool; 2],
+            ) {
+                monitor.with_write_notify_all(|ready| *ready = true);
+                let remaining = completed.iter().filter(|done| !**done).count();
+                for _ in 0..remaining {
+                    let Ok(waiter_id) = done_rx.recv_timeout(Duration::from_secs(5)) else {
+                        break;
+                    };
+                    completed[waiter_id] = true;
+                }
+                for (waiter_id, waiter) in waiters.into_iter().enumerate() {
+                    if completed[waiter_id] {
+                        waiter.join().expect("completed contract waiter should not panic");
+                    }
+                }
+            }
 
             #[test]
             fn test_new_read_write_updates_state() {
@@ -72,14 +95,22 @@ macro_rules! blocking_monitor_contract_tests {
                     );
                 });
 
-                checked_rx
-                    .recv()
-                    .expect("contract waiter should inspect initial state");
+                if let Err(error) = checked_rx.recv_timeout(Duration::from_secs(5)) {
+                    monitor.with_write_notify_all(|ready| *ready = true);
+                    if done_rx.recv_timeout(Duration::from_secs(5)).is_ok() {
+                        waiter.join().expect("released contract waiter should not panic");
+                    }
+                    panic!("contract waiter should inspect initial state before notification: {error}");
+                }
                 monitor.with_write_notify_one(|ready| *ready = true);
 
-                done_rx
-                    .recv()
-                    .expect("contract waiter should receive notification");
+                if let Err(error) = done_rx.recv_timeout(Duration::from_secs(5)) {
+                    monitor.with_write_notify_all(|ready| *ready = true);
+                    if done_rx.recv_timeout(Duration::from_secs(5)).is_ok() {
+                        waiter.join().expect("released contract waiter should not panic");
+                    }
+                    panic!("contract waiter should complete after notify_one: {error}");
+                }
                 waiter.join().expect("contract waiter should not panic");
             }
 
@@ -87,9 +118,9 @@ macro_rules! blocking_monitor_contract_tests {
             fn test_write_notify_all_wakes_registered_waiters() {
                 let monitor = Arc::new($monitor::new(false));
                 let (checked_tx, checked_rx) = mpsc::channel();
-                let (done_tx, done_rx) = mpsc::channel();
+                let (done_tx, done_rx) = mpsc::channel::<usize>();
                 let waiters = (0..2)
-                    .map(|_| {
+                    .map(|waiter_id| {
                         let waiter_monitor = Arc::clone(&monitor);
                         let checked_tx = checked_tx.clone();
                         let done_tx = done_tx.clone();
@@ -107,26 +138,33 @@ macro_rules! blocking_monitor_contract_tests {
                                     *ready
                                 },
                                 |_| {
-                                    done_tx.send(()).expect("contract waiter should complete");
+                                    done_tx.send(waiter_id).expect("contract waiter should complete");
                                 },
                             );
                         })
                     })
                     .collect::<Vec<_>>();
 
+                let mut completed = [false; 2];
                 for _ in 0..2 {
-                    checked_rx
-                        .recv()
-                        .expect("contract waiter should inspect initial state");
+                    if let Err(error) = checked_rx.recv_timeout(Duration::from_secs(5)) {
+                        release_and_join_completed_waiters(&monitor, &done_rx, waiters, &mut completed);
+                        panic!("contract waiters should inspect initial state before notify_all: {error}");
+                    }
                 }
                 monitor.with_write_notify_all(|ready| *ready = true);
 
                 for _ in 0..2 {
-                    done_rx
-                        .recv()
-                        .expect("contract waiter should receive notification");
+                    match done_rx.recv_timeout(Duration::from_secs(5)) {
+                        Ok(waiter_id) => completed[waiter_id] = true,
+                        Err(error) => {
+                            release_and_join_completed_waiters(&monitor, &done_rx, waiters, &mut completed);
+                            panic!("contract waiters should complete after notify_all: {error}");
+                        }
+                    }
                 }
-                for waiter in waiters {
+                for (waiter_id, waiter) in waiters.into_iter().enumerate() {
+                    assert!(completed[waiter_id]);
                     waiter.join().expect("contract waiter should not panic");
                 }
             }

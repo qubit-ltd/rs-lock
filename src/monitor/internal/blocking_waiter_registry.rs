@@ -80,3 +80,46 @@ impl BlockingWaiterRegistry {
         drop(waiter);
     }
 }
+
+#[cfg(all(test, not(loom)))]
+mod tests {
+    use super::BlockingWaiterRegistry;
+    use super::recover;
+    use crate::monitor::Notifier;
+    use crate::monitor::StdMonitor;
+
+    fn assert_selects_one(registry: &BlockingWaiterRegistry, notify: impl FnOnce()) {
+        let first = registry.register();
+        let second = registry.register();
+        notify();
+        let remaining = recover(registry.waiters.lock()).take_all().count();
+        assert_eq!(remaining, 1, "one notification must leave one registration");
+        drop((first, second));
+    }
+
+    #[test]
+    fn test_std_monitor_notify_one_selects_one_registration() {
+        let monitor = StdMonitor::new(());
+        assert_selects_one(&monitor.waiters, || monitor.notify_one());
+    }
+
+    #[test]
+    fn test_std_monitor_notifier_notify_one_selects_one_registration() {
+        let monitor = StdMonitor::new(());
+        assert_selects_one(&monitor.waiters, || Notifier::notify_one(&monitor));
+    }
+
+    #[cfg(feature = "parking-lot")]
+    #[test]
+    fn test_parking_lot_monitor_notify_one_selects_one_registration() {
+        let monitor = crate::monitor::ParkingLotMonitor::new(());
+        assert_selects_one(&monitor.waiters, || monitor.notify_one());
+    }
+
+    #[cfg(feature = "parking-lot")]
+    #[test]
+    fn test_parking_lot_monitor_notifier_notify_one_selects_one_registration() {
+        let monitor = crate::monitor::ParkingLotMonitor::new(());
+        assert_selects_one(&monitor.waiters, || Notifier::notify_one(&monitor));
+    }
+}

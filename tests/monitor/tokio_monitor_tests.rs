@@ -353,8 +353,8 @@ async fn test_tokio_monitor_notify_one_does_not_lose_registered_waiter() {
     monitor.notify_one();
     monitor.notify_one();
 
-    first.await;
-    second.await;
+    assert!(poll_once(first.as_mut(), &first_wakes).is_ready());
+    assert!(poll_once(second.as_mut(), &second_wakes).is_ready());
     assert_eq!(monitor.with_read_async(|available| *available).await, 0);
 }
 
@@ -875,6 +875,8 @@ async fn test_tokio_monitor_async_wait_while_for_includes_initial_predicate_time
 /// Verifies that initial mutex contention does not consume timeout budget.
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_while_for_excludes_initial_lock_contention_from_timeout() {
+    const REAL_TIMEOUT: Duration = Duration::from_secs(5);
+
     let monitor = Arc::new(TokioMonitor::current(false));
     let holder_monitor = Arc::clone(&monitor);
     let (holding_tx, holding_rx) = mpsc::sync_channel(1);
@@ -885,10 +887,14 @@ async fn test_tokio_monitor_async_wait_while_for_excludes_initial_lock_contentio
             .expect("holder runtime should build");
         runtime.block_on(holder_monitor.with_write_async(|_| {
             holding_tx.send(()).expect("test should observe the held state lock");
-            release_rx.recv().expect("holder should receive release permission");
+            release_rx
+                .recv_timeout(REAL_TIMEOUT)
+                .expect("holder should receive release permission");
         }));
     });
-    holding_rx.recv().expect("holder should acquire the state lock");
+    holding_rx
+        .recv_timeout(REAL_TIMEOUT)
+        .expect("holder should acquire the state lock");
 
     let wait = monitor.wait_while_for_async(Duration::from_millis(5), |ready| !*ready, |_| ());
     tokio::pin!(wait);
@@ -976,7 +982,7 @@ async fn test_tokio_monitor_async_wait_until_runs_action_after_notify() {
     assert!(poll_once(waiter.as_mut(), &wake_counter).is_pending());
     monitor.with_write_notify_one_async(|ready| *ready = true).await;
 
-    assert_eq!(waiter.await, 7);
+    assert_eq!(poll_once(waiter.as_mut(), &wake_counter), Poll::Ready(7));
     assert!(!monitor.with_read_async(|ready| *ready).await);
 }
 

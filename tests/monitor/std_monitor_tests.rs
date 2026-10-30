@@ -145,8 +145,10 @@ fn test_std_monitor_write_notify_one_updates_state_and_wakes_waiter() {
     assert!(!monitor.with_read(|ready| *ready));
 }
 
+/// Verifies that one permit completes one consumer using the real waiter
+/// handshake.
 #[test]
-fn test_std_monitor_notify_one_wakes_exactly_one_waiter() {
+fn test_std_monitor_notify_one_consumes_one_permit() {
     let monitor = Arc::new(StdMonitor::new(0_usize));
     let (first_checked_tx, first_checked_rx) = mpsc::channel();
     let (second_checked_tx, second_checked_rx) = mpsc::channel();

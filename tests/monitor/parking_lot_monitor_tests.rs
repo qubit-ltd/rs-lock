@@ -110,8 +110,10 @@ fn test_parking_lot_monitor_write_notify_one_updates_state_and_wakes_waiter() {
     assert!(!monitor.with_read(|ready| *ready));
 }
 
+/// Verifies that one permit completes one consumer using the real waiter
+/// handshake.
 #[test]
-fn test_parking_lot_monitor_notify_one_wakes_exactly_one_waiter() {
+fn test_parking_lot_monitor_notify_one_consumes_one_permit() {
     let monitor = Arc::new(ParkingLotMonitor::new(0_usize));
     let (first_checked_tx, first_checked_rx) = mpsc::channel();
     let (second_checked_tx, second_checked_rx) = mpsc::channel();
@@ -699,14 +701,15 @@ fn test_parking_lot_monitor_wait_while_for_zero_timeout_checks_predicate_once() 
 /// Verifies that readiness wins the final locked timeout check.
 #[test]
 fn test_parking_lot_monitor_wait_while_for_timeout_final_predicate_wins() {
-    let monitor = Arc::new(ParkingLotMonitor::new(false));
+    let clock = ManualMonotonicClock::new_shared();
+    let monitor = Arc::new(ParkingLotMonitor::with_timer(false, clock.new_timer()));
     let (checked_tx, checked_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
     let waiter_monitor = Arc::clone(&monitor);
     let waiter = thread::spawn(move || {
         let mut checked_tx = Some(checked_tx);
         let result = waiter_monitor.wait_while_for(
-            Duration::from_millis(20),
+            Duration::from_secs(1),
             move |ready| {
                 if let Some(checked_tx) = checked_tx.take() {
                     checked_tx
@@ -721,14 +724,17 @@ fn test_parking_lot_monitor_wait_while_for_timeout_final_predicate_wins() {
     });
 
     checked_rx
-        .recv_timeout(Duration::from_secs(1))
+        .recv_timeout(Duration::from_secs(5))
         .expect("waiter should perform the initial predicate check");
-    drop(monitor.lock());
-    monitor.with_write(|ready| *ready = true);
+    assert!(clock.wait_for_waiters(1, Duration::from_secs(5)));
+    let mut guard = monitor.lock();
+    *guard = true;
+    assert!(clock.advance_to_next_deadline().is_some());
+    drop(guard);
 
     assert_time_result_eq!(
         done_rx
-            .recv_timeout(Duration::from_secs(1))
+            .recv_timeout(Duration::from_secs(5))
             .expect("ready predicate should win the final timeout check"),
         Ok(WaitTimeoutResult::Ready(7)),
     );
