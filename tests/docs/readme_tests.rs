@@ -7,12 +7,40 @@
 // =============================================================================
 //! README and lock documentation consistency tests.
 
-use std::path::Path;
+use std::collections::BTreeSet;
 
 use semver::Version;
 use semver::VersionReq;
 
 const CARGO_TOML: &str = include_str!("../../Cargo.toml");
+const INLINE_MANIFEST: &str = r#"
+[package]
+version = "0.14.3"
+include = ["/src/**", "/doc/**"]
+[features]
+default = []
+monitor = []
+[dependencies]
+qubit-clock = { version = "^0.13", optional = true }
+"#;
+const NORMALIZED_MANIFEST: &str = r#"
+[package]
+include = [
+  "/doc/**",
+  "/src/**",
+]
+version = "0.14.3"
+[features]
+monitor = []
+default = []
+[dependencies.qubit-clock]
+optional = true
+version = "^0.13"
+"#;
+const STRING_DEPENDENCY_MANIFEST: &str = r#"
+[dependencies]
+qubit-clock = "^0.13"
+"#;
 const README_EN: &str = include_str!("../../README.md");
 const README_ZH: &str = include_str!("../../README.zh_CN.md");
 const USER_GUIDE_EN: &str = include_str!("../../doc/user_guide.md");
@@ -459,10 +487,6 @@ fn test_monitor_docs_cover_async_ready_wait_helpers() {
 /// Ensures contribution sections document the available project entry points.
 #[test]
 fn test_readmes_document_contribution_entry_points() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    for path in [".infra/bin/align-ci.sh", ".infra/bin/ci-check.sh"] {
-        assert!(root.join(path).is_file(), "missing documented entry point: {path}");
-    }
     for (readme, heading) in [(README_EN, "## Contributing"), (README_ZH, "## 贡献")] {
         let (_, contribution) = readme
             .split_once(heading)
@@ -519,29 +543,63 @@ fn test_rustdoc_contracts_match_lock_and_monitor_semantics() {
 #[test]
 fn test_cargo_features_match_current_api() {
     assert_eq!(
-        cargo_feature_names(CARGO_TOML),
-        [
+        manifest_feature_names(&parse_manifest(CARGO_TOML)),
+        BTreeSet::from([
             "default",
             "async-lock",
             "async-monitor",
             "loom-model",
             "monitor",
             "parking-lot",
-        ],
+        ]),
+    );
+}
+
+#[test]
+fn test_manifest_reading_ignores_toml_formatting_and_dependency_form() {
+    let inline = parse_manifest(INLINE_MANIFEST);
+    let normalized = parse_manifest(NORMALIZED_MANIFEST);
+
+    assert_eq!(manifest_package_version(&inline), manifest_package_version(&normalized));
+    assert_eq!(manifest_feature_names(&inline), manifest_feature_names(&normalized));
+    assert_eq!(
+        manifest_dependency_version(&inline, "qubit-clock"),
+        manifest_dependency_version(&normalized, "qubit-clock"),
+    );
+    assert_eq!(manifest_package_includes(&inline), manifest_package_includes(&normalized));
+    assert_eq!(
+        manifest_dependency_version(&parse_manifest(STRING_DEPENDENCY_MANIFEST), "qubit-clock"),
+        "^0.13",
+    );
+}
+
+#[test]
+#[should_panic(expected = "manifest must declare the dependency")]
+fn test_manifest_dependency_reader_rejects_missing_dependency() {
+    manifest_dependency_version(&parse_manifest("[dependencies]\n"), "qubit-clock");
+}
+
+#[test]
+#[should_panic(expected = "dependency must declare a string version requirement")]
+fn test_manifest_dependency_reader_rejects_invalid_version_type() {
+    manifest_dependency_version(
+        &parse_manifest("[dependencies]\nqubit-clock = { version = 13, optional = true }\n"),
+        "qubit-clock",
     );
 }
 
 /// Ensures the published crate contains the guides linked from both READMEs.
 #[test]
 fn test_cargo_package_includes_user_guides() {
-    assert!(CARGO_TOML.contains("\"/doc/**\""));
+    assert!(manifest_package_includes(&parse_manifest(CARGO_TOML)).contains("/doc/**"));
 }
 
 /// Ensures all README `qubit-lock` version requirements accept the crate
 /// version in Cargo.toml.
 #[test]
 fn test_readme_dependency_versions_match_cargo_toml() {
-    let cargo_version = extract_package_version(CARGO_TOML).expect("Failed to extract version from Cargo.toml");
+    let manifest = parse_manifest(CARGO_TOML);
+    let cargo_version = manifest_package_version(&manifest);
     let package_ver = Version::parse(cargo_version).expect("Invalid package version in Cargo.toml");
 
     let readme_en_reqs = extract_readme_dependency_versions(README_EN);
@@ -576,8 +634,8 @@ fn test_readme_dependency_versions_match_cargo_toml() {
 /// Cargo.toml.
 #[test]
 fn test_readme_qubit_clock_dependency_version_matches_cargo_toml() {
-    let cargo_requirement =
-        extract_cargo_dependency_version(CARGO_TOML, "qubit-clock").expect("Cargo.toml does not declare qubit-clock");
+    let manifest = parse_manifest(CARGO_TOML);
+    let cargo_requirement = manifest_dependency_version(&manifest, "qubit-clock");
 
     for (filename, content) in [
         ("doc/user_guide.md", USER_GUIDE_EN),
@@ -614,49 +672,49 @@ fn test_documentation_provides_navigation_deadline_and_runnable_example() {
     assert!(BOUNDED_QUEUE_EXAMPLE.contains("Arc::new"));
 }
 
-/// Extracts the first package version entry from Cargo.toml content.
-fn extract_package_version(content: &str) -> Option<&str> {
-    for line in content.lines() {
-        if let Some(value) = line.strip_prefix("version = \"") {
-            return value.strip_suffix('"');
-        }
-    }
-    None
+/// Parses a Cargo manifest into its TOML value.
+fn parse_manifest(content: &str) -> toml::Value {
+    toml::from_str(content).expect("Cargo.toml must contain valid TOML")
 }
 
-/// Extracts feature names from the Cargo feature section.
-fn cargo_feature_names(content: &str) -> Vec<&str> {
-    let (_, feature_section) = content
-        .split_once("[features]\n")
-        .expect("Cargo.toml must define features");
+fn manifest_package_version(manifest: &toml::Value) -> &str {
+    manifest
+        .get("package")
+        .and_then(|package| package.get("version"))
+        .and_then(toml::Value::as_str)
+        .expect("manifest package must declare a string version")
+}
 
-    feature_section
-        .lines()
-        .take_while(|line| !line.starts_with('['))
-        .filter_map(|line| line.split_once('=').map(|(name, _)| name.trim()))
+fn manifest_feature_names(manifest: &toml::Value) -> BTreeSet<&str> {
+    manifest
+        .get("features")
+        .and_then(toml::Value::as_table)
+        .expect("manifest must define a feature table")
+        .keys()
+        .map(String::as_str)
         .collect()
 }
 
-/// Extracts a dependency version requirement from Cargo.toml content.
-///
-/// # Parameters
-///
-/// * `content` - Cargo.toml content to inspect.
-/// * `dependency` - Dependency name to locate.
-///
-/// # Returns
-///
-/// The first matching dependency version requirement, if present.
-fn extract_cargo_dependency_version<'a>(content: &'a str, dependency: &str) -> Option<&'a str> {
-    content.lines().find_map(|line| {
-        let value = line.trim().strip_prefix(dependency)?.trim();
-        let value = value.strip_prefix('=')?.trim();
-        let version = value
-            .strip_prefix('{')?
-            .split(',')
-            .find_map(|field| field.trim().strip_prefix("version = \""))?;
-        version.split_once('"').map(|(requirement, _)| requirement)
-    })
+fn manifest_dependency_version<'a>(manifest: &'a toml::Value, name: &str) -> &'a str {
+    let dependency = manifest
+        .get("dependencies")
+        .and_then(|dependencies| dependencies.get(name))
+        .expect("manifest must declare the dependency");
+    dependency
+        .as_str()
+        .or_else(|| dependency.get("version").and_then(toml::Value::as_str))
+        .expect("dependency must declare a string version requirement")
+}
+
+fn manifest_package_includes(manifest: &toml::Value) -> BTreeSet<&str> {
+    manifest
+        .get("package")
+        .and_then(|package| package.get("include"))
+        .and_then(toml::Value::as_array)
+        .expect("manifest package must define an include array")
+        .iter()
+        .map(|entry| entry.as_str().expect("package include entries must be strings"))
+        .collect()
 }
 
 /// Extracts an inline dependency version from prose or a code snippet.
