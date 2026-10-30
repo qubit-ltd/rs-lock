@@ -44,6 +44,23 @@ use crate::lock::WriteLock;
 ///
 /// run_exclusively(&std::sync::Mutex::new(()));
 /// ```
+///
+/// A read-mode adapter cannot be used where exclusive acquisition is required:
+///
+/// ```compile_fail
+/// use std::sync::RwLock;
+///
+/// use qubit_lock::ExclusiveLock;
+/// use qubit_lock::ReadWriteLock;
+///
+/// fn run_exclusively<L: ExclusiveLock + ?Sized>(lock: &L) {
+///     let _guard = lock.lock();
+/// }
+///
+/// let lock = RwLock::new(());
+/// let read_mode = lock.read_lock();
+/// run_exclusively(&read_mode);
+/// ```
 pub trait ExclusiveLock: Lock {}
 
 impl<L> ExclusiveLock for &L where L: ExclusiveLock + ?Sized {}
