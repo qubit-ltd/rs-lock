@@ -703,36 +703,36 @@ fn test_std_monitor_wait_while_for_zero_timeout_checks_predicate_once() {
 /// Verifies that readiness wins the final locked timeout check.
 #[test]
 fn test_std_monitor_wait_while_for_timeout_final_predicate_wins() {
-    let monitor = Arc::new(StdMonitor::new(false));
+    let clock = ManualMonotonicClock::new_shared();
+    let monitor = Arc::new(StdMonitor::with_timer(false, clock.new_timer()));
     let (checked_tx, checked_rx) = mpsc::channel();
     let (done_tx, done_rx) = mpsc::channel();
     let waiter_monitor = Arc::clone(&monitor);
     let waiter = thread::spawn(move || {
         let mut checked_tx = Some(checked_tx);
         let result = waiter_monitor.wait_while_for(
-            Duration::from_millis(20),
+            Duration::from_secs(1),
             move |ready| {
                 if let Some(checked_tx) = checked_tx.take() {
-                    checked_tx
-                        .send(())
-                        .expect("test should observe the initial predicate check");
+                    checked_tx.send(()).expect("initial check should be observed");
                 }
                 !*ready
             },
             |_| 7,
         );
-        done_tx.send(result).expect("test should receive wait result");
+        done_tx.send(result).expect("wait result should be received");
     });
-
     checked_rx
-        .recv_timeout(Duration::from_secs(1))
-        .expect("waiter should perform the initial predicate check");
-    drop(monitor.lock());
-    monitor.with_write(|ready| *ready = true);
-
+        .recv_timeout(Duration::from_secs(5))
+        .expect("waiter should check the initial state");
+    assert!(clock.wait_for_waiters(1, Duration::from_secs(5)));
+    let mut guard = monitor.lock();
+    *guard = true;
+    assert!(clock.advance_to_next_deadline().is_some());
+    drop(guard);
     assert_time_result_eq!(
         done_rx
-            .recv_timeout(Duration::from_secs(1))
+            .recv_timeout(Duration::from_secs(5))
             .expect("ready predicate should win the final timeout check"),
         Ok(WaitTimeoutResult::Ready(7)),
     );
