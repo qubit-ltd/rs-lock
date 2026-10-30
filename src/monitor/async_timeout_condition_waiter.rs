@@ -19,14 +19,18 @@ use crate::monitor::WaitTimeoutResult;
 
 /// Waits asynchronously for predicates over protected state with timeouts.
 ///
-/// The timeout is a condition-wait budget, aligned with
-/// [`std::sync::Condvar::wait_timeout_while`]. The returned future is lazy, so
-/// construction and time before its first poll consume no budget. Initial
-/// state-lock contention is excluded. The budget starts after acquiring the
-/// state lock and before the first predicate check, so predicate work consumes
-/// it. If waiting is required, one fixed deadline is reused across wakeups. A
-/// timed wait may return after the timeout while reacquiring the state lock. A
-/// zero timeout still checks the predicate. After waiting begins, Timer
+/// The relative `*_for_async` methods use a condition-wait budget, aligned
+/// with [`std::sync::Condvar::wait_timeout_while`]. Their futures are lazy:
+/// time before the first poll and initial state-lock contention do not consume
+/// that budget. It starts after acquiring the state lock and before the first
+/// predicate check, and one fixed deadline is reused across wakeups.
+///
+/// The absolute `*_with_deadline_async` methods also return lazy futures, but
+/// their supplied deadline is never reset. Time before the first poll and
+/// time spent acquiring the initial state lock both advance toward that
+/// deadline. Neither form can interrupt mutex acquisition or reacquisition.
+/// A timed wait may return after its timeout while reacquiring the state lock.
+/// A zero timeout still checks the predicate. After waiting begins, Timer
 /// registration or completion errors take precedence over every post-wait
 /// predicate result, and the action is not run. When the Timer completes
 /// successfully, a final locked predicate check still wins over timeout.

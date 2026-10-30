@@ -862,8 +862,12 @@ predicate 检查优先于成功的 Timer 完成。Timer 注册或完成错误优
 这些方法仍不是严格的返回时限：到达 deadline 无法中断 mutex 的获取或重新获取，
 ready action 也没有执行时限。
 
-异步等待 future 是惰性的：首次 poll 前的时间不消耗预算，初始异步状态锁竞争也不
-计入预算。drop pending future 会注销其 waiter，也不会执行 action。取消不会回滚受保护状态的变化，
+相对异步 `*_for_async` 等待使用上文所述的条件等待预算：首次 poll 前的时间和初始状态锁竞争
+都不消耗预算。取得状态锁后、首次 predicate 检查前开始计时。绝对异步
+`*_with_deadline_async` future 同样是惰性的，但不会重置调用方提供的 deadline；首次 poll 前的时间和
+初始状态锁竞争都会推进 deadline。两种形式都无法中断 mutex 的获取或重新获取。
+
+drop pending future 会注销其 waiter，也不会执行 action。取消不会回滚受保护状态的变化，
 包括其他任务已经完成的修改。如果 `notify_one` 已经选择该 waiter，
 取消会丢弃这次选择，不会转交给其他或未来 waiter。
 

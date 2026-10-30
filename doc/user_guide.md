@@ -932,10 +932,17 @@ still not hard return-time guarantees: reaching the deadline cannot interrupt
 mutex acquisition or reacquisition, and the ready action runs without a time
 limit.
 
-Async wait futures are lazy: time before the first poll does not consume the
-budget, and initial async state-lock contention is excluded. Dropping a
-pending future unregisters its waiter and does not run the action. Cancellation
-does not roll back protected-state changes made by other tasks. If `notify_one`
+Relative async `*_for_async` waits use the condition-wait budget described
+above: time before the first poll and initial state-lock contention do not
+consume it. The budget starts after acquiring the state lock and before the
+first predicate check. Absolute async `*_with_deadline_async` futures are also
+lazy, but their supplied deadline is never reset; time before the first poll
+and initial state-lock contention both advance toward it. Neither form can
+interrupt mutex acquisition or reacquisition.
+
+Dropping a pending future unregisters its waiter and does not run the action.
+Cancellation does not roll back protected-state changes made by other tasks.
+If `notify_one`
 already selected that waiter, cancellation discards the selection; it is not
 transferred to another or future waiter.
 
