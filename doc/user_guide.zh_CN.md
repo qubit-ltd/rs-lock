@@ -203,11 +203,15 @@ fn pop_for<M, T>(
 where
     M: TimedMonitor<State = QueueState<T>> + ?Sized,
 {
-    queue.wait_until_for(
+    let result = queue.wait_until_for(
         timeout,
         |state| state.closed || !state.items.is_empty(),
         |state| state.items.pop_front(),
-    )
+    );
+    if matches!(&result, Ok(WaitTimeoutResult::Ready(Some(_)))) {
+        queue.notify_all();
+    }
+    result
 }
 ```
 
@@ -707,6 +711,46 @@ runtime。
 
 异步 deadline 形式为 `wait_until_with_deadline_async`、
 `wait_until_ready_with_deadline_async` 和 `wait_while_with_deadline_async`。
+
+绝对 deadline 必须来自执行等待的 monitor Timer 所属时钟域。若多个操作共享
+截止点，应从这些操作使用的 monitor Timer 构造它。不同 clock domain 中即使时间数值
+相同也不能互换。若等待确有必要而 deadline 属于其他域，方法会返回 Timer domain 错误；
+Timer 注册或完成也可能返回错误。
+
+```rust
+use std::time::Duration;
+
+use qubit_lock::{StdMonitor, TimeoutConditionWaiter, WaitTimeoutResult};
+
+let monitor = StdMonitor::new(true);
+let deadline = monitor.timer().clock().now()
+    .checked_add(Duration::from_secs(1))
+    .expect("短时长 deadline 应可表示");
+let result = monitor.wait_until_ready_with_deadline(deadline, |ready| *ready)
+    .expect("deadline 属于此 monitor 的 timer");
+assert_eq!(result, WaitTimeoutResult::Ready(()));
+```
+
+异步等待遵循相同的时钟域规则。`TokioMonitor` 会保留自身 timer，因此应从该
+monitor 构造 deadline，再等待：
+
+```rust
+use std::time::Duration;
+
+use qubit_lock::{AsyncTimeoutConditionWaiter, TokioMonitor, WaitTimeoutResult};
+
+# #[tokio::main]
+# async fn main() {
+let monitor = TokioMonitor::current(true);
+let deadline = monitor.timer().clock().now()
+    .checked_add(Duration::from_secs(1))
+    .expect("短时长 deadline 应可表示");
+let result = monitor.wait_until_ready_with_deadline_async(deadline, |ready| *ready)
+    .await
+    .expect("deadline 属于此 monitor 的 timer");
+assert_eq!(result, WaitTimeoutResult::Ready(()));
+# }
+```
 
 ### Notification 是无记忆的
 

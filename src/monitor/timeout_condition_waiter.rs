@@ -41,7 +41,10 @@ use crate::monitor::WaitTimeoutResult;
 ///
 /// Use this trait as a static generic bound when blocking code needs timed
 /// predicate waits. Its generic methods make it unsuitable as a `dyn`
-/// trait-object interface.
+/// trait-object interface. Absolute deadlines must come from the clock domain
+/// of the monitor Timer used for the wait. Operations sharing a deadline must
+/// use timers in that same domain; equal instant values do not imply a shared
+/// domain.
 ///
 /// # Examples
 ///
@@ -67,9 +70,10 @@ use crate::monitor::WaitTimeoutResult;
 pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// Blocks until the predicate becomes true or an absolute deadline passes.
     ///
-    /// The supplied deadline keeps advancing while acquiring the state lock,
-    /// evaluating the predicate, waiting, and reacquiring the lock. A ready
-    /// predicate wins even when the deadline has already passed.
+    /// The supplied deadline must belong to the clock domain of this
+    /// waiter's Timer. The deadline keeps advancing while acquiring the state
+    /// lock, evaluating the predicate, waiting, and reacquiring the lock. A
+    /// ready predicate wins even when the deadline has already passed.
     ///
     /// # Type Parameters
     ///
@@ -79,7 +83,9 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     ///
     /// # Parameters
     ///
-    /// * deadline - Absolute monotonic deadline for the condition wait.
+    /// * `deadline` - Absolute monotonic deadline from this monitor Timer's
+    ///   clock domain. Equal timestamp values from different domains are not
+    ///   interchangeable.
     /// * predicate - Predicate that returns true when the state is ready.
     /// * action - Action to run after the predicate becomes true.
     ///
@@ -90,8 +96,9 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     ///
     /// # Errors
     ///
-    /// Returns Timer domain, registration, or completion errors when waiting
-    /// is required. After waiting begins, such an error prevents action.
+    /// Returns a Timer domain error if waiting is required and the deadline
+    /// belongs to another clock domain, or a registration/completion error
+    /// from the Timer. After waiting begins, such an error prevents action.
     ///
     /// # Panics
     ///
@@ -113,7 +120,8 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// Blocks until the predicate becomes true or an absolute deadline passes.
     ///
     /// This convenience method does not run an action and otherwise has the
-    /// same deadline and error semantics as wait_until_with_deadline.
+    /// same deadline and error semantics as wait_until_with_deadline. The
+    /// deadline must be from this monitor Timer's clock domain.
     ///
     /// # Type Parameters
     ///
@@ -121,7 +129,9 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     ///
     /// # Parameters
     ///
-    /// * deadline - Absolute monotonic deadline for the condition wait.
+    /// * `deadline` - Absolute monotonic deadline from this monitor Timer's
+    ///   clock domain. Equal timestamp values from different domains are not
+    ///   interchangeable.
     /// * predicate - Predicate that returns true when the state is ready.
     ///
     /// # Returns
@@ -130,7 +140,8 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     ///
     /// # Errors
     ///
-    /// Returns Timer errors when waiting is required.
+    /// Returns a Timer domain error for a deadline from another clock domain,
+    /// or a Timer registration/completion error, when waiting is required.
     ///
     /// # Panics
     ///
@@ -157,7 +168,9 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     ///
     /// # Parameters
     ///
-    /// * deadline - Absolute monotonic deadline for the condition wait.
+    /// * `deadline` - Absolute monotonic deadline from this monitor Timer's
+    ///   clock domain. Equal timestamp values from different domains are not
+    ///   interchangeable.
     /// * predicate - Predicate that returns true while waiting continues.
     /// * action - Action to run after the predicate becomes false.
     ///
@@ -168,8 +181,9 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     ///
     /// # Errors
     ///
-    /// Returns Timer domain, registration, or completion errors when waiting
-    /// is required.
+    /// Returns a Timer domain error if waiting is required and the deadline
+    /// belongs to another clock domain, or a registration/completion error
+    /// from the Timer.
     ///
     /// # Panics
     ///

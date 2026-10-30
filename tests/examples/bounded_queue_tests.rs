@@ -12,8 +12,13 @@
 mod bounded_queue;
 
 use std::num::NonZeroUsize;
+use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
+use std::sync::mpsc;
+use std::sync::mpsc::Sender;
+use std::thread;
 use std::time::Duration;
 
 use bounded_queue::QueueState;
@@ -34,6 +39,8 @@ struct CountingMonitor {
     inner: ParkingLotMonitor<QueueState<i32>>,
     /// Number of calls made through [`Notifier::notify_all`].
     notify_all_count: AtomicUsize,
+    /// One-shot observer for a predicate that finds the queue full.
+    blocked_tx: Mutex<Option<Sender<()>>>,
 }
 
 impl CountingMonitor {
@@ -50,6 +57,7 @@ impl CountingMonitor {
         Self {
             inner: ParkingLotMonitor::new(state),
             notify_all_count: AtomicUsize::new(0),
+            blocked_tx: Mutex::new(None),
         }
     }
 
@@ -80,12 +88,23 @@ impl ConditionWaiter for CountingMonitor {
     type State = QueueState<i32>;
 
     /// Delegates an untimed predicate wait to the real monitor.
-    fn wait_while<R, P, F>(&self, predicate: P, action: F) -> R
+    fn wait_while<R, P, F>(&self, mut predicate: P, action: F) -> R
     where
         P: FnMut(&Self::State) -> bool,
         F: FnOnce(&mut Self::State) -> R,
     {
-        self.inner.wait_while(predicate, action)
+        self.inner.wait_while(
+            |state| {
+                let waiting = predicate(state);
+                if waiting
+                    && let Some(sender) = self.blocked_tx.lock().expect("observer mutex should not poison").take()
+                {
+                    sender.send(()).expect("test should observe blocked producer");
+                }
+                waiting
+            },
+            action,
+        )
     }
 }
 
@@ -165,4 +184,51 @@ fn test_pop_for_notifies_after_releasing_capacity() {
         notifications_before_pop + 1,
         "a successful timed dequeue must notify producers waiting for capacity",
     );
+}
+
+#[test]
+fn test_pop_for_wakes_producer_waiting_for_capacity() {
+    let capacity = NonZeroUsize::new(1).expect("capacity must be non-zero");
+    let queue = Arc::new(CountingMonitor::new(QueueState::new(capacity)));
+    assert_eq!(push(queue.as_ref(), 1), Ok(()));
+    let (checked_tx, checked_rx) = mpsc::channel();
+    *queue.blocked_tx.lock().expect("observer mutex should not poison") = Some(checked_tx);
+    let (done_tx, done_rx) = mpsc::channel();
+    let producer_queue = Arc::clone(&queue);
+    let producer = thread::spawn(move || {
+        let result = push(producer_queue.as_ref(), 2);
+        done_tx.send(result).expect("test should receive producer result");
+    });
+
+    if checked_rx.recv_timeout(Duration::from_secs(5)).is_err() {
+        // Release the producer's predicate by removing the known queued item.
+        let _ = pop_for(queue.as_ref(), Duration::ZERO);
+        queue.notify_all();
+        let completion = done_rx.recv_timeout(Duration::from_secs(6));
+        if completion.is_ok() {
+            producer.join().expect("producer should finish after early cleanup");
+        }
+        panic!("producer should observe full queue");
+    }
+
+    drop(queue.inner.lock());
+    let dequeued = pop_for(queue.as_ref(), Duration::ZERO);
+    let completion = done_rx.recv_timeout(Duration::from_secs(6));
+    if completion.is_err() {
+        // Retry notification after the known dequeue so the producer can
+        // observe the released capacity even if the first notify was lost.
+        queue.notify_all();
+        let cleaned = done_rx.recv_timeout(Duration::from_secs(6));
+        if cleaned.is_ok() {
+            producer.join().expect("producer should finish cleanup");
+        }
+        panic!("timed dequeue failed to wake registered producer: {completion:?}");
+    }
+    let completion = completion.expect("producer completion was checked");
+    producer.join().expect("producer should finish");
+    assert_eq!(
+        dequeued.expect("dequeue should succeed"),
+        WaitTimeoutResult::Ready(Some(1)),
+    );
+    assert_eq!(completion, Ok(()),);
 }

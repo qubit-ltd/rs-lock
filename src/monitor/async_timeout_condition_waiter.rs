@@ -42,7 +42,10 @@ use crate::monitor::WaitTimeoutResult;
 ///
 /// Use this trait as a static generic bound when asynchronous code needs timed
 /// predicate waits. Its return-position `impl Future` methods make it
-/// unsuitable as a `dyn` trait-object interface.
+/// unsuitable as a `dyn` trait-object interface. Absolute deadlines must come
+/// from the clock domain of the monitor Timer used for the wait. Operations
+/// sharing a deadline must use timers in that same domain; equal instant
+/// values do not imply a shared domain.
 ///
 /// # Examples
 ///
@@ -58,12 +61,14 @@ use crate::monitor::WaitTimeoutResult;
 /// # #[tokio::main]
 /// # async fn main() {
 /// let monitor = TokioMonitor::current(true);
-/// let result = monitor
-///     .wait_until_for_async(Duration::from_secs(1), |ready| *ready, |_| "ready")
-///     .await
-///     .expect("timer should remain available");
-///
-/// assert_eq!(result, WaitTimeoutResult::Ready("ready"));
+/// let deadline = monitor.timer().clock().now()
+///     .checked_add(Duration::from_secs(1))
+///     .expect("short deadline should be representable");
+/// let result = monitor.wait_until_ready_with_deadline_async(
+///     deadline,
+///     |ready| *ready,
+/// ).await.expect("deadline belongs to this monitor timer");
+/// assert_eq!(result, WaitTimeoutResult::Ready(()));
 /// # }
 /// ```
 pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
@@ -71,7 +76,8 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     /// absolute deadline passes.
     ///
     /// The future is lazy, but the supplied deadline is not reset when it is
-    /// first polled. A ready predicate wins even when the deadline has passed.
+    /// first polled. The deadline must belong to this waiter's Timer clock
+    /// domain. A ready predicate wins even when the deadline has passed.
     ///
     /// # Type Parameters
     ///
@@ -83,7 +89,9 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     ///
     /// # Parameters
     ///
-    /// * deadline - Absolute monotonic deadline for the condition wait.
+    /// * `deadline` - Absolute monotonic deadline from this monitor Timer's
+    ///   clock domain. Equal timestamp values from different domains are not
+    ///   interchangeable.
     /// * predicate - Predicate that returns true when the state is ready.
     /// * action - Action to run after the predicate becomes true.
     ///
@@ -93,7 +101,9 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     ///
     /// # Errors
     ///
-    /// The future resolves to Timer errors when waiting is required.
+    /// The future resolves to a Timer domain error if waiting is required and
+    /// the deadline belongs to another clock domain, or to a Timer
+    /// registration/completion error.
     ///
     /// # Panics
     ///
@@ -123,7 +133,9 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     ///
     /// # Parameters
     ///
-    /// * deadline - Absolute monotonic deadline for the condition wait.
+    /// * `deadline` - Absolute monotonic deadline from this monitor Timer's
+    ///   clock domain. Equal timestamp values from different domains are not
+    ///   interchangeable.
     /// * predicate - Predicate that returns true when the state is ready.
     ///
     /// # Returns
@@ -132,7 +144,9 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     ///
     /// # Errors
     ///
-    /// The future resolves to Timer errors when waiting is required.
+    /// The future resolves to a Timer domain error for a deadline from another
+    /// clock domain, or to a Timer registration/completion error, when waiting
+    /// is required.
     ///
     /// # Panics
     ///
@@ -162,7 +176,9 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     ///
     /// # Parameters
     ///
-    /// * deadline - Absolute monotonic deadline for the condition wait.
+    /// * `deadline` - Absolute monotonic deadline from this monitor Timer's
+    ///   clock domain. Equal timestamp values from different domains are not
+    ///   interchangeable.
     /// * predicate - Predicate that returns true while waiting continues.
     /// * action - Action to run after the predicate becomes false.
     ///
@@ -172,7 +188,9 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     ///
     /// # Errors
     ///
-    /// The future resolves to Timer errors when waiting is required.
+    /// The future resolves to a Timer domain error if waiting is required and
+    /// the deadline belongs to another clock domain, or to a Timer
+    /// registration/completion error.
     ///
     /// # Panics
     ///

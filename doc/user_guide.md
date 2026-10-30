@@ -220,11 +220,15 @@ fn pop_for<M, T>(
 where
     M: TimedMonitor<State = QueueState<T>> + ?Sized,
 {
-    queue.wait_until_for(
+    let result = queue.wait_until_for(
         timeout,
         |state| state.closed || !state.items.is_empty(),
         |state| state.items.pop_front(),
-    )
+    );
+    if matches!(&result, Ok(WaitTimeoutResult::Ready(Some(_)))) {
+        queue.notify_all();
+    }
+    result
 }
 ```
 
@@ -759,6 +763,48 @@ a readiness predicate; inspect the protected state after it returns.
 The async deadline forms are `wait_until_with_deadline_async`,
 `wait_until_ready_with_deadline_async`, and
 `wait_while_with_deadline_async`.
+
+An absolute deadline belongs to the clock domain of the monitor Timer used by
+the wait. To share one cutoff across operations, create it from the timer of
+the monitor those operations use. Equal timestamp values from separate clock
+domains are not interchangeable. If waiting is required, a deadline from a
+different domain returns a Timer domain error; timer registration or
+completion can also return an error.
+
+```rust
+use std::time::Duration;
+
+use qubit_lock::{StdMonitor, TimeoutConditionWaiter, WaitTimeoutResult};
+
+let monitor = StdMonitor::new(true);
+let deadline = monitor.timer().clock().now()
+    .checked_add(Duration::from_secs(1))
+    .expect("short deadline should be representable");
+let result = monitor.wait_until_ready_with_deadline(deadline, |ready| *ready)
+    .expect("deadline belongs to this monitor timer");
+assert_eq!(result, WaitTimeoutResult::Ready(()));
+```
+
+The asynchronous form follows the same clock-domain rule. `TokioMonitor`
+retains its timer, so derive the deadline from that monitor before awaiting:
+
+```rust
+use std::time::Duration;
+
+use qubit_lock::{AsyncTimeoutConditionWaiter, TokioMonitor, WaitTimeoutResult};
+
+# #[tokio::main]
+# async fn main() {
+let monitor = TokioMonitor::current(true);
+let deadline = monitor.timer().clock().now()
+    .checked_add(Duration::from_secs(1))
+    .expect("short deadline should be representable");
+let result = monitor.wait_until_ready_with_deadline_async(deadline, |ready| *ready)
+    .await
+    .expect("deadline belongs to this monitor timer");
+assert_eq!(result, WaitTimeoutResult::Ready(()));
+# }
+```
 
 ### Notifications are memoryless
 

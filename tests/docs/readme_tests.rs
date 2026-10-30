@@ -7,6 +7,8 @@
 // =============================================================================
 //! README and lock documentation consistency tests.
 
+use std::path::Path;
+
 use semver::Version;
 use semver::VersionReq;
 
@@ -36,6 +38,31 @@ const TOKIO_MONITOR_SRC: &str = include_str!("../../src/monitor/tokio_monitor.rs
 /// wrapping.
 fn normalize_readme_text(content: &str) -> String {
     content.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn pop_for_body_without_whitespace(content: &str, label: &str) -> String {
+    let normalized = content.replace("\r\n", "\n");
+    let (_, function) = normalized
+        .split_once("fn pop_for<")
+        .unwrap_or_else(|| panic!("{label}: missing pop_for function"));
+    let (_, body) = function
+        .split_once("\n{\n")
+        .unwrap_or_else(|| panic!("{label}: missing pop_for body opening"));
+    let (body, _) = body
+        .split_once("\n}")
+        .unwrap_or_else(|| panic!("{label}: missing pop_for body closing"));
+    body.chars().filter(|character| !character.is_whitespace()).collect()
+}
+
+#[test]
+fn test_user_guide_pop_for_matches_runnable_example() {
+    for (label, guide) in [("English", USER_GUIDE_EN), ("Chinese", USER_GUIDE_ZH)] {
+        assert_eq!(
+            pop_for_body_without_whitespace(guide, label),
+            pop_for_body_without_whitespace(BOUNDED_QUEUE_EXAMPLE, "example"),
+            "{label} pop_for must preserve the runnable example notification protocol",
+        );
+    }
 }
 
 /// Ensures README files document the current data-lock method names.
@@ -413,13 +440,23 @@ fn test_monitor_docs_cover_async_ready_wait_helpers() {
     }
 }
 
-/// Ensures the Chinese README contribution section matches the project
-/// template.
+/// Ensures contribution sections document the available project entry points.
 #[test]
-fn test_readme_zh_uses_contribution_template() {
-    assert!(README_ZH.contains(
-        "欢迎贡献。请遵循 Rust API 指南，及时更新公共 API 文档与测试，并在提交\nPull Request 前运行 `./align-ci.sh`格式化代码，运行`./ci-check.sh`对齐CI要求。"
-    ));
+fn test_readmes_document_contribution_entry_points() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    for path in [".infra/bin/align-ci.sh", ".infra/bin/ci-check.sh"] {
+        assert!(root.join(path).is_file(), "missing documented entry point: {path}");
+    }
+    for (readme, heading) in [(README_EN, "## Contributing"), (README_ZH, "## 贡献")] {
+        let (_, contribution) = readme
+            .split_once(heading)
+            .expect("README contribution section must exist");
+        let contribution = contribution.split("\n## ").next().expect("section exists");
+        assert!(contribution.contains("./.infra/bin/align-ci.sh"));
+        assert!(contribution.contains("./.infra/bin/ci-check.sh"));
+        assert!(!contribution.contains("./align-ci.sh"));
+        assert!(!contribution.contains("./ci-check.sh"));
+    }
 }
 
 /// Ensures public API documentation stays aligned with root-only exports.
