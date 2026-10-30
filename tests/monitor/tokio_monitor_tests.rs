@@ -35,6 +35,7 @@ use qubit_lock::WaitTimeoutResult;
 
 use super::failing_timer_tests::assert_backend_unavailable;
 use super::failing_timer_tests::completion_failing_timer;
+use super::failing_timer_tests::GatedCompletionTimer;
 use super::failing_timer_tests::registration_failing_timer;
 
 /// Returns a future after proving at compile time that it is sendable.
@@ -833,6 +834,250 @@ async fn test_tokio_monitor_deadline_helpers_wait_and_complete() {
         .advance_to_next_deadline()
         .expect("rechecked deadline wait should retain its original timer");
     assert_time_result_eq!(repeat_wait.await, Ok(WaitTimeoutResult::TimedOut));
+}
+
+#[tokio::test]
+async fn test_tokio_monitor_deadline_cross_domain_ready_skips_timer() {
+    let monitor_clock = ManualMonotonicClock::new_shared();
+    let deadline_clock = ManualMonotonicClock::new_shared();
+    let monitor = TokioMonitor::with_timer(true, monitor_clock.new_timer());
+    let deadline = deadline_clock
+        .now()
+        .checked_add(Duration::from_secs(1))
+        .expect("deadline should be representable");
+    let mut action_calls = 0;
+
+    let result = monitor
+        .wait_until_with_deadline_async(deadline, |ready| *ready, |_| action_calls += 1)
+        .await;
+
+    assert_time_result_eq!(result, Ok(WaitTimeoutResult::Ready(())));
+    assert_eq!(action_calls, 1);
+    assert_eq!(monitor_clock.pending_waiters(), 0);
+}
+
+#[tokio::test]
+async fn test_tokio_monitor_deadline_cross_domain_wait_reports_domains() {
+    let monitor_clock = ManualMonotonicClock::new_shared();
+    let deadline_clock = ManualMonotonicClock::new_shared();
+    let monitor = TokioMonitor::with_timer(false, monitor_clock.new_timer());
+    let deadline = deadline_clock
+        .now()
+        .checked_add(Duration::from_secs(1))
+        .expect("deadline should be representable");
+    let monitor_domain = monitor.timer().clock().now().domain();
+    let deadline_domain = deadline.domain();
+    let mut action_calls = 0;
+
+    let error = monitor
+        .wait_until_with_deadline_async(deadline, |ready| *ready, |_| action_calls += 1)
+        .await
+        .expect_err("a waiting cross-domain deadline must fail");
+
+    assert!(matches!(
+        error,
+        TimeError::ClockDomainMismatch { expected, actual }
+            if expected == monitor_domain && actual == deadline_domain
+    ));
+    assert_eq!(action_calls, 0);
+    assert!(!monitor.with_read_async(|ready| *ready).await);
+    assert_eq!(monitor_clock.pending_waiters(), 0);
+    assert_eq!(deadline_clock.pending_waiters(), 0);
+}
+
+#[tokio::test]
+async fn test_tokio_monitor_deadline_propagates_registration_error() {
+    let monitor = TokioMonitor::with_timer(false, Arc::new(registration_failing_timer()));
+    let deadline = monitor
+        .timer()
+        .clock()
+        .now()
+        .checked_add(Duration::from_secs(1))
+        .expect("short deadline must be representable");
+    let mut action_calls = 0;
+    let result = monitor
+        .wait_until_with_deadline_async(deadline, |ready| *ready, |_| action_calls += 1)
+        .await;
+
+    assert_backend_unavailable(result.expect_err("registration must fail"));
+    assert_eq!(action_calls, 0);
+    assert!(!monitor.with_read_async(|ready| *ready).await);
+}
+
+#[tokio::test]
+async fn test_tokio_monitor_deadline_ready_skips_registration_error() {
+    let monitor = TokioMonitor::with_timer(true, Arc::new(registration_failing_timer()));
+    let deadline = monitor
+        .timer()
+        .clock()
+        .now()
+        .checked_add(Duration::from_secs(1))
+        .expect("short deadline must be representable");
+    let mut action_calls = 0;
+
+    let result = monitor
+        .wait_until_with_deadline_async(deadline, |ready| *ready, |_| action_calls += 1)
+        .await;
+
+    assert_time_result_eq!(result, Ok(WaitTimeoutResult::Ready(())));
+    assert_eq!(action_calls, 1);
+    assert!(monitor.with_read_async(|ready| *ready).await);
+}
+
+#[tokio::test]
+async fn test_tokio_monitor_deadline_propagates_first_completion_error() {
+    let (timer, gate, _first_poll) = GatedCompletionTimer::new(completion_failing_timer());
+    let monitor = TokioMonitor::with_timer(false, Arc::new(timer));
+    let deadline = monitor
+        .timer()
+        .clock()
+        .now()
+        .checked_add(Duration::from_secs(1))
+        .expect("short deadline must be representable");
+    let predicate_checks = Arc::new(AtomicUsize::new(0));
+    let action_calls = Arc::new(AtomicUsize::new(0));
+    let predicate_counter = Arc::clone(&predicate_checks);
+    let action_counter = Arc::clone(&action_calls);
+    let mut waiter = Box::pin(monitor.wait_until_with_deadline_async(
+        deadline,
+        move |ready| {
+            predicate_counter.fetch_add(1, Ordering::SeqCst);
+            *ready
+        },
+        move |_| {
+            action_counter.fetch_add(1, Ordering::SeqCst);
+        },
+    ));
+    let wakes = Arc::new(WakeCounter::default());
+
+    assert!(poll_once(waiter.as_mut(), &wakes).is_pending());
+    gate.open();
+    let result = match poll_once(waiter.as_mut(), &wakes) {
+        Poll::Ready(result) => result,
+        Poll::Pending => panic!("opened completion gate should surface timer error"),
+    };
+    drop(waiter);
+
+    assert_backend_unavailable(result.expect_err("timer completion must fail"));
+    assert_eq!(predicate_checks.load(Ordering::SeqCst), 1);
+    assert_eq!(action_calls.load(Ordering::SeqCst), 0);
+    assert!(!monitor.with_read_async(|ready| *ready).await);
+}
+
+#[tokio::test]
+async fn test_tokio_monitor_deadline_notification_then_completion_error_wins() {
+    let (timer, gate, _first_poll) = GatedCompletionTimer::new(completion_failing_timer());
+    let monitor = TokioMonitor::with_timer(false, Arc::new(timer));
+    let deadline = monitor
+        .timer()
+        .clock()
+        .now()
+        .checked_add(Duration::from_secs(1))
+        .expect("short deadline must be representable");
+    let predicate_checks = Arc::new(AtomicUsize::new(0));
+    let action_calls = Arc::new(AtomicUsize::new(0));
+    let predicate_counter = Arc::clone(&predicate_checks);
+    let action_counter = Arc::clone(&action_calls);
+    let mut waiter = Box::pin(monitor.wait_until_with_deadline_async(
+        deadline,
+        move |ready| {
+            predicate_counter.fetch_add(1, Ordering::SeqCst);
+            *ready
+        },
+        move |_| {
+            action_counter.fetch_add(1, Ordering::SeqCst);
+        },
+    ));
+    let wakes = Arc::new(WakeCounter::default());
+
+    assert!(poll_once(waiter.as_mut(), &wakes).is_pending());
+    monitor.with_write_notify_one_async(|ready| *ready = true).await;
+    gate.open();
+    let result = match poll_once(waiter.as_mut(), &wakes) {
+        Poll::Ready(result) => result,
+        Poll::Pending => panic!("opened completion gate should surface timer error"),
+    };
+    drop(waiter);
+
+    assert_backend_unavailable(result.expect_err("timer completion must fail"));
+    assert_eq!(predicate_checks.load(Ordering::SeqCst), 1);
+    assert_eq!(action_calls.load(Ordering::SeqCst), 0);
+    assert!(monitor.with_read_async(|ready| *ready).await);
+}
+
+#[tokio::test]
+async fn test_tokio_monitor_deadline_cancel_unselected_waiter_cleans_up() {
+    let clock = ManualMonotonicClock::new_shared();
+    let monitor = TokioMonitor::with_timer(false, clock.new_timer());
+    let deadline = clock
+        .now()
+        .checked_add(Duration::from_secs(1))
+        .expect("deadline should be representable");
+    let mut cancelled = Box::pin(monitor.wait_until_with_deadline_async(
+        deadline,
+        |ready| *ready,
+        |_| panic!("cancelled waiter action must not run"),
+    ));
+    let wakes = Arc::new(WakeCounter::default());
+    assert!(poll_once(cancelled.as_mut(), &wakes).is_pending());
+    assert!(clock.pending_waiters() > 0);
+    drop(cancelled);
+    assert_eq!(clock.pending_waiters(), 0);
+
+    let mut successor = Box::pin(monitor.wait_until_with_deadline_async(
+        deadline,
+        |ready| *ready,
+        |_| 9,
+    ));
+    assert!(poll_once(successor.as_mut(), &wakes).is_pending());
+    monitor.with_write_notify_one_async(|ready| *ready = true).await;
+    assert_time_result_eq!(successor.await, Ok(WaitTimeoutResult::Ready(9)));
+    assert!(monitor.with_read_async(|ready| *ready).await);
+    assert_eq!(clock.pending_waiters(), 0);
+}
+
+#[tokio::test]
+async fn test_tokio_monitor_deadline_cancel_selected_waiter_keeps_other_registered() {
+    let clock = ManualMonotonicClock::new_shared();
+    let monitor = TokioMonitor::with_timer(false, clock.new_timer());
+    let deadline = clock
+        .now()
+        .checked_add(Duration::from_secs(1))
+        .expect("deadline should be representable");
+    let mut waiters: Vec<Option<Pin<Box<dyn Future<Output = Result<WaitTimeoutResult<()>, TimeError>> + Send>>>> =
+        (0..2)
+            .map(|_| {
+                Some(Box::pin(monitor.wait_until_with_deadline_async(
+                    deadline,
+                    |ready| *ready,
+                    |_| (),
+                )) as Pin<Box<dyn Future<Output = Result<WaitTimeoutResult<()>, TimeError>> + Send>>)
+            })
+            .collect();
+    let wakes = [Arc::new(WakeCounter::default()), Arc::new(WakeCounter::default())];
+    for (waiter, wake) in waiters.iter_mut().zip(&wakes) {
+        assert!(poll_once(waiter.as_mut().expect("waiter exists").as_mut(), wake).is_pending());
+    }
+
+    monitor.notify_one();
+    let selected = wakes
+        .iter()
+        .position(|wake| wake.count() > 0)
+        .expect("notify_one must select one registered waiter");
+    let unselected = 1 - selected;
+    assert_eq!(wakes[selected].count(), 1);
+    assert_eq!(wakes[unselected].count(), 0);
+    drop(waiters[selected].take());
+    monitor.with_write_async(|ready| *ready = true).await;
+    assert!(poll_once(waiters[unselected].as_mut().unwrap().as_mut(), &wakes[unselected]).is_pending());
+    monitor.notify_one();
+    assert!(matches!(
+        poll_once(waiters[unselected].as_mut().unwrap().as_mut(), &wakes[unselected]),
+        Poll::Ready(Ok(WaitTimeoutResult::Ready(())))
+    ));
+    drop(waiters[unselected].take());
+    assert!(monitor.with_read_async(|ready| *ready).await);
+    assert_eq!(clock.pending_waiters(), 0);
 }
 
 /// Verifies that the first predicate check consumes the timeout budget.
