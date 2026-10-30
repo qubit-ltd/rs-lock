@@ -19,6 +19,32 @@ use crate::monitor::Notifier;
 /// asynchronous condition waits. Use [`crate::monitor::AsyncTimedMonitor`] when
 /// callers also require timeout-based waits.
 ///
+/// # Examples
+///
+/// Use a generic capability bound to update state and notify waiters without
+/// binding the operation to a concrete monitor implementation.
+///
+/// ```
+/// use qubit_lock::AsyncMonitor;
+/// use qubit_lock::TokioMonitor;
+///
+/// async fn publish<M>(monitor: &M, value: i32) -> usize
+/// where
+///     M: AsyncMonitor<State = Vec<i32>> + ?Sized,
+/// {
+///     monitor
+///         .with_write_notify_all_async(|items| items.push(value))
+///         .await;
+///     monitor.with_read_async(|items| items.len()).await
+/// }
+///
+/// #[tokio::main(flavor = "current_thread")]
+/// async fn main() {
+///     let monitor = TokioMonitor::current(Vec::<i32>::new());
+///     assert_eq!(publish(&monitor, 7).await, 1);
+/// }
+/// ```
+///
 /// Its return-position `impl Future` methods make this trait unsuitable as a
 /// `dyn` trait-object interface. Prefer narrower capability traits when the
 /// complete contract is unnecessary.
