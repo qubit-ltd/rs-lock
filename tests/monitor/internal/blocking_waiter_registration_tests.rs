@@ -22,24 +22,11 @@ use qubit_lock::WaitTimeoutResult;
 
 const REAL_LIMIT: Duration = Duration::from_secs(5);
 
-fn collect_waiter<M: Monitor<State = bool>>(monitor: &M, done: &mpsc::Receiver<bool>, waiter: JoinHandle<()>) -> bool {
-    let observed = done.recv_timeout(REAL_LIMIT);
-    let completed_on_time = observed.is_ok();
-    let result = match observed {
-        Ok(value) => Ok(value),
-        Err(_) => {
-            monitor.with_write_notify_all(|ready| *ready = true);
-            done.recv_timeout(REAL_LIMIT)
-        }
-    };
-    if result.is_ok() {
-        waiter.join().expect("completed waiter should not panic");
-    }
-    let value = result.expect("waiter should finish even during cleanup");
-    assert!(
-        completed_on_time,
-        "waiter required cleanup instead of the intended signal"
-    );
+fn collect_waiter(done: &mpsc::Receiver<bool>, waiter: JoinHandle<()>) -> bool {
+    let value = done
+        .recv_timeout(REAL_LIMIT)
+        .expect("waiter did not report a result within the real-time limit");
+    waiter.join().expect("completed waiter should not panic");
     value
 }
 
@@ -56,10 +43,7 @@ where
             .expect("controller should receive first result");
     });
     let advanced = clock.advance_to_next_deadline_after_waiters(1, REAL_LIMIT);
-    if advanced.is_none() {
-        monitor.with_write_notify_all(|ready| *ready = true);
-    }
-    let first_timed_out = collect_waiter(&*monitor, &first_rx, first);
+    let first_timed_out = collect_waiter(&first_rx, first);
     assert!(advanced.is_some(), "first waiter must register before clock advance");
     assert!(first_timed_out, "first waiter must genuinely time out");
 
@@ -76,14 +60,22 @@ where
         });
         done_tx.send(true).expect("controller should receive second result");
     });
-    let checked = checked_rx.recv_timeout(REAL_LIMIT);
-    if checked.is_ok() {
-        monitor.with_write_notify_one(|ready| *ready = true);
-    } else {
-        monitor.with_write_notify_all(|ready| *ready = true);
-    }
-    let completed = collect_waiter(&*monitor, &done_rx, second);
-    assert!(checked.is_ok(), "second waiter must observe blocked state");
+    checked_rx
+        .recv_timeout(REAL_LIMIT)
+        .expect("second waiter must observe blocked state");
+    let notifier_monitor = Arc::clone(&monitor);
+    let (notified_tx, notified_rx) = mpsc::channel();
+    let notifier = thread::spawn(move || {
+        notifier_monitor.with_write_notify_one(|ready| *ready = true);
+        notified_tx
+            .send(())
+            .expect("controller should observe notification");
+    });
+    notified_rx
+        .recv_timeout(REAL_LIMIT)
+        .expect("notifier could not finish the monitor handshake");
+    notifier.join().expect("notifier should not panic");
+    let completed = collect_waiter(&done_rx, second);
     assert!(completed);
 }
 

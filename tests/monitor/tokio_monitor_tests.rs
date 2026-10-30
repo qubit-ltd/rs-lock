@@ -192,13 +192,29 @@ async fn test_tokio_monitor_uses_injected_manual_timer_without_real_delay() {
             .await
     });
 
-    let reached = clock.advance_to_next_deadline_async().await;
+    let reached = match tokio::time::timeout(
+        Duration::from_secs(5),
+        clock.advance_to_next_deadline_async(),
+    )
+    .await
+    {
+        Ok(reached) => reached,
+        Err(_) => {
+            waiter.abort();
+            panic!("manual timer deadline was not registered within the real-time limit");
+        }
+    };
     assert_eq!(Duration::from_secs(8), reached.elapsed_since_origin());
 
-    assert_time_result_eq!(
-        Ok(WaitTimeoutResult::TimedOut),
-        waiter.await.expect("waiter task should finish"),
-    );
+    let mut waiter = waiter;
+    let outcome = match tokio::time::timeout(Duration::from_secs(5), &mut waiter).await {
+        Ok(joined) => joined.expect("waiter task should finish"),
+        Err(_) => {
+            waiter.abort();
+            panic!("waiter did not complete after manual time advanced");
+        }
+    };
+    assert_time_result_eq!(Ok(WaitTimeoutResult::TimedOut), outcome);
 }
 
 /// Verifies that the monitor's retained Tokio timer can be polled by another
