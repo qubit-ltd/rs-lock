@@ -60,6 +60,11 @@ Both conditions are derived from the same protected state.
 > `ParkingLotMonitor`. Enable `monitor` for the former and both `monitor` and
 > `parking-lot` for the latter; Section 4 shows the dependency declarations.
 
+For the blocking example, combine the following three marked Rust blocks in
+order. Keep their imports as written: the state block owns the shared-state
+imports and the operations block owns `Monitor`.
+
+<!-- rs-lock-example: queue-state -->
 ```rust
 use std::{
     collections::VecDeque,
@@ -92,6 +97,7 @@ removing, or closing can make one of the waiting groups ready.
 The domain functions depend on the monitor capabilities they use, not on a
 specific lock type or condition-variable guard.
 
+<!-- rs-lock-example: queue-ops -->
 ```rust
 use qubit_lock::Monitor;
 
@@ -145,11 +151,9 @@ readiness. Each waiter then rechecks its own predicate while holding the
 monitor lock. This does not make `notify_all` universally better: when every
 waiter has the same predicate, `notify_one` is usually the better choice.
 
+<!-- rs-lock-example: blocking-main -->
 ```rust
-use std::{
-    num::NonZeroUsize,
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use qubit_lock::{
     ParkingLotMonitor,
@@ -184,6 +188,10 @@ would instead carry backend-specific guards through waits, repeat each
 condition loop by hand, choose a poisoning policy, and preserve the ordering
 between state updates and waiter registration itself.
 
+For the manual-time variant, append `timed-ops` after the shared state and
+operations, then use `manual-main` instead of `blocking-main`. It requires a
+direct `qubit-clock` dependency with its `test-util` feature.
+
 The [complete runnable example](../examples/bounded_queue.rs) uses the same
 queue operations with `ParkingLotMonitor`, checks the zero-timeout path, and
 wakes a consumer after it has observed an empty queue. Run it with:
@@ -205,6 +213,7 @@ queue, `TimedOut` means the final locked predicate check was still false, and
 `Err(TimeError)` identifies Timer registration or completion failure rather
 than a real timeout.
 
+<!-- rs-lock-example: timed-ops -->
 ```rust
 use std::time::Duration;
 
@@ -236,21 +245,15 @@ Every concrete monitor provides `with_timer`. The test injects a
 `ManualMonotonicClock` into the production `ParkingLotMonitor` type and advances
 only after the waiter is registered:
 
+<!-- rs-lock-example: manual-main -->
 ```rust
-use std::{
-    num::NonZeroUsize,
-    sync::Arc,
-    time::Duration,
-};
+use std::sync::Arc;
 
 use qubit_clock::{
     ManualMonotonicClock,
     MonotonicClock,
 };
-use qubit_lock::{
-    ParkingLotMonitor,
-    WaitTimeoutResult,
-};
+use qubit_lock::ParkingLotMonitor;
 
 fn main() {
     let clock = ManualMonotonicClock::new_shared();
@@ -288,11 +291,13 @@ the result meanings. It uses `AsyncMonitor` and `AsyncTimedMonitor`, with
 `TokioMonitor` as the concrete type. The closures run synchronously while the
 monitor holds state; do not await or perform blocking I/O inside them.
 
+For this variant, combine the shared state block with `tokio-main` instead of
+the blocking operations and main blocks. Enable `async-monitor` and directly
+depend on Tokio with `macros`, `rt-multi-thread`, and `time` enabled.
+
+<!-- rs-lock-example: tokio-main -->
 ```rust
-use std::{
-    num::NonZeroUsize,
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use qubit_lock::{
     AsyncConditionWaiter,

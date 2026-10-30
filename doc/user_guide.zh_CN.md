@@ -51,6 +51,10 @@
 > **Feature 前提：** 阻塞式案例使用 `StdMonitor` 和 `ParkingLotMonitor`。前者需要
 > `monitor`，后者同时需要 `monitor` 与 `parking-lot`；依赖声明见第 4 节。
 
+阻塞式示例按顺序组合下面三个带标记的 Rust 代码块。保留各块中的导入；状态块负责共享
+状态类型的导入，操作块负责导入 `Monitor`。
+
+<!-- rs-lock-example: queue-state -->
 ```rust
 use std::{
     collections::VecDeque,
@@ -81,6 +85,7 @@ impl<T> QueueState<T> {
 
 领域函数只依赖它们实际使用的 monitor 能力，而不依赖某一种具体锁或条件变量 guard。
 
+<!-- rs-lock-example: queue-ops -->
 ```rust
 use qubit_lock::Monitor;
 
@@ -132,11 +137,9 @@ worker 能继续执行；反过来也一样。因此，示例在任何可能改�
 `notify_all`，让每个等待者在持有 monitor 锁时重新检查自己的 predicate。这并不表示
 `notify_all` 永远更好：所有等待者使用同一个 predicate 时，`notify_one` 通常更合适。
 
+<!-- rs-lock-example: blocking-main -->
 ```rust
-use std::{
-    num::NonZeroUsize,
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use qubit_lock::{
     ParkingLotMonitor,
@@ -169,6 +172,9 @@ fn main() {
 使用 `Mutex`/`Condvar`，队列代码就得让后端专用 guard 穿过每次等待，手动编写条件循环，
 选择 poisoning 策略，并自行保证状态更新与等待者注册的顺序正确。
 
+手动时间变体在共享状态与操作后追加 `timed-ops` 代码块，再用 `manual-main` 替换
+`blocking-main`。它需要直接依赖启用 `test-util` 的 `qubit-clock`。
+
 [完整可运行示例](../examples/bounded_queue.rs)使用相同的队列操作和
 `ParkingLotMonitor`，检查零时长 timeout 路径，并在消费者观察到空队列后将其唤醒。运行命令：
 
@@ -188,6 +194,7 @@ Result<WaitTimeoutResult<Option<T>>, qubit_clock::TimeError>
 最终持锁 predicate 检查仍为 false，`Err(TimeError)` 表示 Timer 注册或完成失败，而
 不是真实 timeout。
 
+<!-- rs-lock-example: timed-ops -->
 ```rust
 use std::time::Duration;
 
@@ -218,21 +225,15 @@ where
 每个具体 monitor 都提供 `with_timer`。测试向生产使用的 `ParkingLotMonitor` 注入
 `ManualMonotonicClock`，并且只在 waiter 注册后推进时间：
 
+<!-- rs-lock-example: manual-main -->
 ```rust
-use std::{
-    num::NonZeroUsize,
-    sync::Arc,
-    time::Duration,
-};
+use std::sync::Arc;
 
 use qubit_clock::{
     ManualMonotonicClock,
     MonotonicClock,
 };
-use qubit_lock::{
-    ParkingLotMonitor,
-    WaitTimeoutResult,
-};
+use qubit_lock::ParkingLotMonitor;
 
 fn main() {
     let clock = ManualMonotonicClock::new_shared();
@@ -268,11 +269,9 @@ Tokio 版本保留 `QueueState<T>`、两类 predicate、关闭规则和结果含
 `AsyncMonitor` 和 `AsyncTimedMonitor`，具体类型是 `TokioMonitor`。持锁期间传入的
 closure 仍同步执行；不要在其中 await 或执行阻塞 I/O。
 
+<!-- rs-lock-example: tokio-main -->
 ```rust
-use std::{
-    num::NonZeroUsize,
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use qubit_lock::{
     AsyncConditionWaiter,
