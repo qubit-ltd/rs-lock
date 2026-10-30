@@ -67,9 +67,7 @@ where
     let (notified_tx, notified_rx) = mpsc::channel();
     let notifier = thread::spawn(move || {
         notifier_monitor.with_write_notify_one(|ready| *ready = true);
-        notified_tx
-            .send(())
-            .expect("controller should observe notification");
+        notified_tx.send(()).expect("controller should observe notification");
     });
     notified_rx
         .recv_timeout(REAL_LIMIT)

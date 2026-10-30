@@ -192,12 +192,7 @@ async fn test_tokio_monitor_uses_injected_manual_timer_without_real_delay() {
             .await
     });
 
-    let reached = match tokio::time::timeout(
-        Duration::from_secs(5),
-        clock.advance_to_next_deadline_async(),
-    )
-    .await
-    {
+    let reached = match tokio::time::timeout(Duration::from_secs(5), clock.advance_to_next_deadline_async()).await {
         Ok(reached) => reached,
         Err(_) => {
             waiter.abort();
