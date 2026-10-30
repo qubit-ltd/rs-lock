@@ -33,9 +33,9 @@ use qubit_lock::Notifier;
 use qubit_lock::TokioMonitor;
 use qubit_lock::WaitTimeoutResult;
 
+use super::failing_timer_tests::GatedCompletionTimer;
 use super::failing_timer_tests::assert_backend_unavailable;
 use super::failing_timer_tests::completion_failing_timer;
-use super::failing_timer_tests::GatedCompletionTimer;
 use super::failing_timer_tests::registration_failing_timer;
 
 /// Returns a future after proving at compile time that it is sendable.
@@ -1024,11 +1024,7 @@ async fn test_tokio_monitor_deadline_cancel_unselected_waiter_cleans_up() {
     drop(cancelled);
     assert_eq!(clock.pending_waiters(), 0);
 
-    let mut successor = Box::pin(monitor.wait_until_with_deadline_async(
-        deadline,
-        |ready| *ready,
-        |_| 9,
-    ));
+    let mut successor = Box::pin(monitor.wait_until_with_deadline_async(deadline, |ready| *ready, |_| 9));
     assert!(poll_once(successor.as_mut(), &wakes).is_pending());
     monitor.with_write_notify_one_async(|ready| *ready = true).await;
     assert_time_result_eq!(successor.await, Ok(WaitTimeoutResult::Ready(9)));
@@ -1044,16 +1040,13 @@ async fn test_tokio_monitor_deadline_cancel_selected_waiter_keeps_other_register
         .now()
         .checked_add(Duration::from_secs(1))
         .expect("deadline should be representable");
-    let mut waiters: Vec<Option<Pin<Box<dyn Future<Output = Result<WaitTimeoutResult<()>, TimeError>> + Send>>>> =
-        (0..2)
-            .map(|_| {
-                Some(Box::pin(monitor.wait_until_with_deadline_async(
-                    deadline,
-                    |ready| *ready,
-                    |_| (),
-                )) as Pin<Box<dyn Future<Output = Result<WaitTimeoutResult<()>, TimeError>> + Send>>)
-            })
-            .collect();
+    let mut waiters: [Option<_>; 2] = std::array::from_fn(|_| {
+        Some(Box::pin(monitor.wait_until_with_deadline_async(
+            deadline,
+            |ready| *ready,
+            |_| (),
+        )))
+    });
     let wakes = [Arc::new(WakeCounter::default()), Arc::new(WakeCounter::default())];
     for (waiter, wake) in waiters.iter_mut().zip(&wakes) {
         assert!(poll_once(waiter.as_mut().expect("waiter exists").as_mut(), wake).is_pending());

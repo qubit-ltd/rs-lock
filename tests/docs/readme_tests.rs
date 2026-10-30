@@ -566,7 +566,10 @@ fn test_manifest_reading_ignores_toml_formatting_and_dependency_form() {
         manifest_dependency_version(&inline, "qubit-clock"),
         manifest_dependency_version(&normalized, "qubit-clock"),
     );
-    assert_eq!(manifest_package_includes(&inline), manifest_package_includes(&normalized));
+    assert_eq!(
+        manifest_package_includes(&inline),
+        manifest_package_includes(&normalized)
+    );
     assert_eq!(
         manifest_dependency_version(&parse_manifest(STRING_DEPENDENCY_MANIFEST), "qubit-clock"),
         "^0.13",
