@@ -68,9 +68,9 @@ fn test_loom_waiter_registry_notify_all_races_with_cancellation() {
 
         let selected = notifier.join().expect("model notifier should finish");
         let cancelled = cancellation.join().expect("model cancellation should finish");
-        let observed_first = selected.contains(&10) || cancelled == Some(10);
-        assert!(observed_first, "first waiter must be removed exactly once");
-        assert!(selected.contains(&20), "second waiter must be notified");
+        let removed_count = selected.iter().filter(|&&value| value == 10).count() + usize::from(cancelled == Some(10));
+        assert_eq!(removed_count, 1, "first waiter must be removed exactly once");
+        assert_eq!(selected.iter().filter(|&&value| value == 20).count(), 1);
         assert_eq!(registry.take_one(), None);
     });
 }

@@ -949,10 +949,12 @@ fn test_std_monitor_reports_and_clears_poisoning() {
         "recovering access must not silently clear the poison marker",
     );
 
-    monitor.with_write(|value| *value = 11);
-    monitor.clear_poison();
-
-    assert!(!monitor.is_poisoned());
+    {
+        let mut guard = monitor.lock();
+        *guard = 11;
+        monitor.clear_poison();
+        assert!(!monitor.is_poisoned());
+    }
     assert_eq!(monitor.with_read(|value| *value), 11);
 }
 

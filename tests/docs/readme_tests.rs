@@ -65,6 +65,22 @@ fn test_user_guide_pop_for_matches_runnable_example() {
     }
 }
 
+#[test]
+fn test_user_guides_do_not_use_rustdoc_hidden_lines() {
+    for (language, guide) in [("English", USER_GUIDE_EN), ("Chinese", USER_GUIDE_ZH)] {
+        for section in guide.split("```rust").skip(1) {
+            let code = section.split("```").next().expect("Rust block exists");
+            assert!(
+                !code.lines().any(|line| {
+                    let line = line.trim_start();
+                    line == "#" || line.starts_with("# ")
+                }),
+                "{language} guide must display ordinary Rust source",
+            );
+        }
+    }
+}
+
 /// Ensures README files document the current data-lock method names.
 #[test]
 fn test_readme_documents_data_lock_api_names() {

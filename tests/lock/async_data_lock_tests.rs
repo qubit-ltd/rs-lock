@@ -696,6 +696,23 @@ mod async_rwlock_data_trait_tests {
     }
 
     #[tokio_test]
+    async fn test_async_rwlock_reads_remain_shared() {
+        use std::future::Future;
+        use std::task::Context;
+        use std::task::Poll;
+        use std::task::Waker;
+
+        let lock = AsyncRwLock::new(42);
+        let native_reader = lock.read().await;
+        assert_eq!(AsyncDataLock::try_with_read(&lock, |value| *value), Ok(42));
+        let mut read = Box::pin(AsyncDataLock::with_read(&lock, |value| *value));
+        let mut context = Context::from_waker(Waker::noop());
+        assert!(matches!(read.as_mut().poll(&mut context), Poll::Ready(42)));
+        drop(read);
+        drop(native_reader);
+    }
+
+    #[tokio_test]
     async fn test_tokio_async_rwlock_write() {
         let rwlock = AsyncRwLock::new(0);
         let result = AsyncDataLock::with_write(&rwlock, |value| {

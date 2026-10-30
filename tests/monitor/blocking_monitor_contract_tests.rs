@@ -258,29 +258,56 @@ macro_rules! blocking_monitor_contract_tests {
             #[test]
             fn test_total_timeout_includes_initial_lock_contention() {
                 let timeout = Duration::from_secs(1);
+                let real_limit = Duration::from_secs(5);
                 let clock = ManualMonotonicClock::new_shared();
                 let (sampled_tx, sampled_rx) = mpsc::channel();
                 let timer = DeadlineSignalingTimer::new(clock.new_timer(), Arc::clone(&clock), sampled_tx);
                 let monitor = Arc::new($monitor::with_timer(false, Arc::new(timer)));
                 let guard = monitor.lock();
                 let waiter_monitor = Arc::clone(&monitor);
-                let waiter =
-                    thread::spawn(move || waiter_monitor.wait_until_ready_with_total_timeout(timeout, |ready| *ready));
-
-                sampled_rx
-                    .recv()
-                    .expect("waiter should sample its total deadline");
-                clock
-                    .advance(timeout)
-                    .expect("manual clock should reach the total deadline");
+                let (done_tx, done_rx) = mpsc::channel();
+                let waiter = thread::spawn(move || {
+                    let result = waiter_monitor.wait_until_ready_with_total_timeout(timeout, |ready| *ready);
+                    done_tx
+                        .send(result)
+                        .expect("controller should receive wait result");
+                });
+                let sampled = sampled_rx.recv_timeout(real_limit);
+                let advance_result = if sampled.is_ok() {
+                    Some(clock.advance(timeout))
+                } else {
+                    None
+                };
                 drop(guard);
-
-                assert_eq!(
+                if sampled.is_err() || advance_result.as_ref().is_some_and(Result::is_err) {
+                    monitor.with_write_notify_all(|ready| *ready = true);
+                }
+                let completed = done_rx.recv_timeout(real_limit);
+                let completed_on_time = completed.is_ok();
+                let result = match completed {
+                    Ok(result) => Ok(result),
+                    Err(_) => {
+                        monitor.with_write_notify_all(|ready| *ready = true);
+                        done_rx.recv_timeout(real_limit)
+                    }
+                };
+                if result.is_ok() {
                     waiter
                         .join()
-                        .expect("total-timeout waiter should not panic")
-                        .expect("manual Timer should complete successfully"),
-                    WaitTimeoutResult::TimedOut,
+                        .expect("completed total-timeout waiter should not panic");
+                }
+                let result = result.expect("total-timeout waiter should finish during cleanup");
+                assert!(
+                    sampled.is_ok(),
+                    "total deadline must be sampled before acquiring state lock"
+                );
+                advance_result
+                    .expect("sampling should allow clock advance")
+                    .expect("manual clock should reach the deadline");
+                assert!(completed_on_time, "total-timeout waiter required cleanup");
+                assert_eq!(
+                    result.expect("manual Timer should complete"),
+                    WaitTimeoutResult::TimedOut
                 );
             }
 
