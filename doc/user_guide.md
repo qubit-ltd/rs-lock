@@ -265,10 +265,9 @@ fn main() {
         pop_for(&*waiting_queue, Duration::from_secs(16))
     });
 
-    let _ = clock.advance_to_next_deadline_after_waiters(
-        1,
-        Duration::from_secs(1),
-    );
+    clock
+        .advance_to_next_deadline_after_waiters(1, Duration::from_secs(1))
+        .expect("waiter should register before advancing manual time");
 
     assert!(matches!(
         waiter.join().expect("waiter should finish"),
@@ -280,6 +279,7 @@ fn main() {
 The production wait algorithm runs against the injected timer. The clock lets
 the test observe waiter registration before advancing time, so no
 `thread::sleep` is needed.
+If the real-time guard expires before registration, the example fails explicitly instead of joining a waiter whose manual deadline has not been advanced.
 
 ### Tokio keeps the state machine, not the blocking calls
 
@@ -994,10 +994,9 @@ fn main() {
         )
     });
 
-    let _ = clock.advance_to_next_deadline_after_waiters(
-        1,
-        Duration::from_secs(1),
-    );
+    clock
+        .advance_to_next_deadline_after_waiters(1, Duration::from_secs(1))
+        .expect("waiter should register before advancing manual time");
 
     assert!(matches!(
         waiter.join().expect("waiter should finish"),
@@ -1010,6 +1009,7 @@ The clock's waiter and deadline observers coordinate advancement after
 registration instead of guessing with a real sleep. Monitor and timer
 registrations are cancellation-safe, and multiple components can share one
 manual clock domain. Tokio monitors use the same injection design.
+If the real-time guard expires before registration, the example fails explicitly instead of joining a waiter whose manual deadline has not been advanced.
 
 ## 12. Choosing components and avoiding mistakes
 

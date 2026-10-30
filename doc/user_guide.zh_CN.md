@@ -247,10 +247,9 @@ fn main() {
         pop_for(&*waiting_queue, Duration::from_secs(16))
     });
 
-    let _ = clock.advance_to_next_deadline_after_waiters(
-        1,
-        Duration::from_secs(1),
-    );
+    clock
+        .advance_to_next_deadline_after_waiters(1, Duration::from_secs(1))
+        .expect("waiter should register before advancing manual time");
 
     assert!(matches!(
         waiter.join().expect("waiter should finish"),
@@ -261,6 +260,7 @@ fn main() {
 
 生产等待算法运行在注入的 Timer 上。时钟让测试能够在推进时间前确认等待者已注册，
 因此不需要 `thread::sleep`。
+若等待者在真实时间守卫到期前仍未注册，示例会明确失败，避免等待尚未推进手动截止时间的线程。
 
 ### Tokio 保留状态机，而不是阻塞调用
 
@@ -924,10 +924,9 @@ fn main() {
         )
     });
 
-    let _ = clock.advance_to_next_deadline_after_waiters(
-        1,
-        Duration::from_secs(1),
-    );
+    clock
+        .advance_to_next_deadline_after_waiters(1, Duration::from_secs(1))
+        .expect("waiter should register before advancing manual time");
 
     assert!(matches!(
         waiter.join().expect("waiter should finish"),
@@ -939,6 +938,7 @@ fn main() {
 clock 的 waiter 和 deadline 观察接口会在注册后协调推进时间，不需要用真实 sleep
 猜测。Monitor 和 Timer 注册都支持安全取消，多个组件也可以共享同一个手动时间域。
 Tokio monitor 使用相同的注入设计。
+若等待者在真实时间守卫到期前仍未注册，示例会明确失败，避免等待尚未推进手动截止时间的线程。
 
 ## 12. 组件选择与常见错误
 
