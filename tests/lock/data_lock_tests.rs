@@ -12,7 +12,6 @@
 use std::sync::Arc;
 use std::sync::Barrier;
 use std::sync::Mutex;
-#[cfg(feature = "parking-lot")]
 use std::sync::RwLock;
 use std::sync::mpsc;
 use std::thread;
@@ -529,16 +528,13 @@ mod data_lock_trait_tests {
 }
 
 #[cfg(feature = "parking-lot")]
-mod rwlock_trait_tests {
+mod parking_lot_rwlock_trait_tests {
     use super::Arc;
     use super::DataLock;
     use super::Duration;
     use super::ParkingLotRwLock;
-    use super::RwLock;
     use super::TryLockError;
-    use super::increment_i32;
     use super::mpsc;
-    use super::read_i32;
     use super::thread;
 
     #[test]
@@ -799,6 +795,18 @@ mod rwlock_trait_tests {
         let result = rw_lock.with_read(|value| *value);
         assert_eq!(result, 50); // 5 writers × 10 increments each
     }
+}
+
+mod std_rwlock_trait_tests {
+    use super::Arc;
+    use super::DataLock;
+    use super::Duration;
+    use super::RwLock;
+    use super::TryLockError;
+    use super::increment_i32;
+    use super::mpsc;
+    use super::read_i32;
+    use super::thread;
 
     // Tests for std::sync::RwLock trait implementation
     #[test]
