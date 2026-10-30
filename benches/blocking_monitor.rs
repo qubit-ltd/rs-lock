@@ -293,7 +293,8 @@ fn benchmark_notify_all(criterion: &mut Criterion) {
                         monitor.with_write_notify_all(|ready| *ready = true);
                         finish_waiters(waiter_count, done_rx, waiters);
                     },
-                    BatchSize::SmallInput,
+                    // Each input owns live waiter threads; keep only one input alive at a time.
+                    BatchSize::PerIteration,
                 );
             },
         );
@@ -308,7 +309,8 @@ fn benchmark_notify_all(criterion: &mut Criterion) {
                         condition.1.notify_all();
                         finish_waiters(waiter_count, done_rx, waiters);
                     },
-                    BatchSize::SmallInput,
+                    // Each input owns live waiter threads; keep only one input alive at a time.
+                    BatchSize::PerIteration,
                 );
             },
         );
@@ -331,7 +333,8 @@ fn benchmark_notify_one(criterion: &mut Criterion) {
                 monitor.notify_one();
                 let _ = black_box(finish_timed_waiter(done_rx, waiter));
             },
-            BatchSize::SmallInput,
+            // Each input owns live waiter threads; keep only one input alive at a time.
+            BatchSize::PerIteration,
         );
     });
     group.bench_function("parking_lot_condvar", |bencher| {
@@ -341,7 +344,8 @@ fn benchmark_notify_one(criterion: &mut Criterion) {
                 condition.1.notify_one();
                 black_box(finish_timed_waiter(done_rx, waiter));
             },
-            BatchSize::SmallInput,
+            // Each input owns live waiter threads; keep only one input alive at a time.
+            BatchSize::PerIteration,
         );
     });
     group.finish();
