@@ -817,6 +817,29 @@ mod std_rwlock_trait_tests {
     }
 
     #[test]
+    fn test_std_rwlock_with_read_allows_an_existing_reader() {
+        let rwlock = Arc::new(RwLock::new(42));
+        let first_reader = rwlock.read().expect("lock should not be poisoned");
+        let (done_tx, done_rx) = mpsc::channel();
+        let worker_lock = Arc::clone(&rwlock);
+        let worker = thread::spawn(move || {
+            let value = DataLock::with_read(&*worker_lock, |value| *value);
+            let _ = done_tx.send(value);
+        });
+
+        let observed_while_read_locked = done_rx.recv_timeout(Duration::from_secs(5));
+        drop(first_reader);
+        let finished = observed_while_read_locked.is_ok()
+            || done_rx.recv_timeout(Duration::from_secs(5)).is_ok();
+        if finished {
+            worker.join().expect("reader should not panic");
+        } else {
+            drop(worker);
+        }
+        assert_eq!(observed_while_read_locked, Ok(42));
+    }
+
+    #[test]
     fn test_std_rwlock_write() {
         let rwlock = RwLock::new(0);
         let result = DataLock::with_write(&rwlock, |value| {
@@ -831,6 +854,29 @@ mod std_rwlock_trait_tests {
         let rwlock = RwLock::new(42);
         let result = DataLock::try_with_read(&rwlock, |value| *value);
         assert_eq!(result, Ok(42));
+    }
+
+    #[test]
+    fn test_std_rwlock_try_with_read_allows_an_existing_reader() {
+        let rwlock = Arc::new(RwLock::new(42));
+        let first_reader = rwlock.read().expect("lock should not be poisoned");
+        let (done_tx, done_rx) = mpsc::channel();
+        let worker_lock = Arc::clone(&rwlock);
+        let worker = thread::spawn(move || {
+            let value = DataLock::try_with_read(&*worker_lock, |value| *value);
+            let _ = done_tx.send(value);
+        });
+
+        let observed_while_read_locked = done_rx.recv_timeout(Duration::from_secs(5));
+        drop(first_reader);
+        let finished = observed_while_read_locked.is_ok()
+            || done_rx.recv_timeout(Duration::from_secs(5)).is_ok();
+        if finished {
+            worker.join().expect("try-reader should not panic");
+        } else {
+            drop(worker);
+        }
+        assert_eq!(observed_while_read_locked, Ok(Ok(42)));
     }
 
     #[test]

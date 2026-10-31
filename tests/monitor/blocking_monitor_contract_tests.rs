@@ -370,14 +370,40 @@ macro_rules! blocking_monitor_contract_tests {
             #[test]
             fn test_wait_until_ready_blocks_until_notify_one() {
                 let monitor = Arc::new($monitor::new(false));
+                let (checked_tx, checked_rx) = mpsc::channel();
+                let (done_tx, done_rx) = mpsc::channel();
                 let waiter_monitor = Arc::clone(&monitor);
                 let waiter = thread::spawn(move || {
-                    waiter_monitor.wait_until_ready(|ready| *ready);
+                    let mut checked_tx = Some(checked_tx);
+                    waiter_monitor.wait_until_ready(move |ready| {
+                        if !*ready {
+                            if let Some(sender) = checked_tx.take() {
+                                let _ = sender.send(());
+                            }
+                        }
+                        *ready
+                    });
+                    let _ = done_tx.send(());
                 });
+                checked_rx
+                    .recv_timeout(REAL_LIMIT)
+                    .expect("waiter should inspect the blocking predicate");
 
-                monitor.with_write_notify_one(|ready| *ready = true);
-
-                waiter.join().expect("contract waiter should not panic");
+                let (notified_tx, notified_rx) = mpsc::channel();
+                let notifier = thread::spawn(move || {
+                    monitor.with_write_notify_one(|ready| *ready = true);
+                    let _ = notified_tx.send(());
+                });
+                let notified = notified_rx.recv_timeout(REAL_LIMIT);
+                let completed = done_rx.recv_timeout(REAL_LIMIT);
+                if notified.is_ok() {
+                    notifier.join().expect("notifier should not panic");
+                }
+                if completed.is_ok() {
+                    waiter.join().expect("waiter should not panic");
+                }
+                assert_eq!(notified, Ok(()), "notification should return");
+                assert_eq!(completed, Ok(()), "registered ready wait should finish");
             }
 
             #[test]

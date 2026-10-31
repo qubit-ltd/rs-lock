@@ -246,18 +246,33 @@ fn test_tokio_monitor_uses_timer_across_runtimes() {
 
 #[tokio::test]
 async fn test_tokio_monitor_cancellation_removes_manual_timer_registration() {
+    let real_limit = Duration::from_secs(5);
     let clock = ManualMonotonicClock::new_shared();
     let monitor = Arc::new(TokioMonitor::with_timer(false, clock.new_timer()));
     let waiter_monitor = Arc::clone(&monitor);
-    let waiter = tokio::spawn(async move {
+    let mut waiter = tokio::spawn(async move {
         waiter_monitor
             .wait_until_for_async(Duration::from_secs(8), |ready| *ready, |_| ())
             .await
     });
 
-    let _deadline = clock.wait_for_next_deadline_async().await;
+    if tokio::time::timeout(real_limit, clock.wait_for_next_deadline_async())
+        .await
+        .is_err()
+    {
+        waiter.abort();
+        let _ = tokio::time::timeout(real_limit, &mut waiter).await;
+        panic!("manual timer deadline was not registered within the real-time limit");
+    }
     waiter.abort();
-    let error = waiter.await.expect_err("aborted waiter task should be cancelled");
+    let joined = match tokio::time::timeout(real_limit, &mut waiter).await {
+        Ok(joined) => joined,
+        Err(_) => {
+            waiter.abort();
+            panic!("cancelled waiter did not finish within the real-time limit");
+        }
+    };
+    let error = joined.expect_err("aborted waiter task should be cancelled");
     assert!(error.is_cancelled());
     assert_eq!(clock.pending_waiters(), 0);
 }
