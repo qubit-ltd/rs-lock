@@ -925,11 +925,22 @@ whole method call: initial state-lock contention is excluded, and the action
 after readiness is excluded.
 
 After acquiring the state lock and before the first predicate check, the
-monitor samples the start time and derives one fixed absolute deadline. The
-first predicate check, every later predicate check, waiter registration, and
-all waiting consume this budget. Notifications and spurious wakeups never
-restart it. A timed wait may return after the timeout while reacquiring the
-state lock, exactly as a condition variable does.
+monitor samples the start time. If the predicate requires waiting and the
+timeout is nonzero, it derives one fixed absolute deadline from that sampled
+time. An immediately ready predicate or a zero timeout skips deadline
+construction and Timer registration. Once waiting begins, every later
+predicate check, waiter registration, and all waiting consume this budget.
+Notifications and spurious wakeups never restart it. A timed wait may return
+after the timeout while reacquiring the state lock, exactly as a condition
+variable does.
+
+For relative waits, deadline construction can return
+`TimeError::InstantOverflow` only when the initial predicate requires waiting
+and the timeout is nonzero. The action is not run on this error. Blocking
+`*_with_total_timeout` methods construct the deadline before acquiring the
+state lock or checking the predicate, so an overflow is returned even if the
+state is already ready. `Duration::MAX` is not an infinite-wait sentinel; use
+the corresponding untimed method when no deadline is needed.
 
 A zero timeout still performs the initial predicate check. At the deadline, a
 final predicate check under the lock wins over a successful timer completion.
@@ -979,8 +990,9 @@ Guard-level timed waits return `WaitTimeoutStatus`:
 - `TimedOut` means the deadline was reached.
 
 Callers using a guard must still inspect protected state after either status.
-A `TimeError` identifies timer registration or completion failure rather than
-a real timeout. The guard remains held and usable after such an error.
+A `TimeError` reports a clock-domain mismatch, deadline arithmetic overflow,
+or Timer registration/completion failure rather than a normal timeout. For
+guard-level waits, the guard remains held and usable after a returned error.
 
 `WaitTimeoutResult` provides `is_ready`, `is_timed_out`, `into_option`, and
 `map`; `WaitTimeoutStatus` provides `is_woken` and `is_timed_out`.

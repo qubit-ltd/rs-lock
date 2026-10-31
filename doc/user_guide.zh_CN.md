@@ -863,10 +863,16 @@ async fn main() {
 对齐。它不是整个方法调用的硬性 deadline：初始状态锁竞争不计入预算，predicate
 就绪之后执行的 action 也不计入预算。
 
-取得状态锁后、首次 predicate 检查前，monitor 会采样起始时间并推导出一个固定的
-绝对 deadline。第一次和之后的每次 predicate 检查、waiter 注册以及全部等待时间都会
-消耗这份预算；notification 与虚假唤醒都不会重新开始计时。和条件变量一样，重新获取
-状态锁时可能在 timeout 后返回。
+取得状态锁后、首次 predicate 检查前，monitor 会采样起始时间。只有 predicate 要求继续等待
+且 timeout 非零时，才根据该采样点构造固定的绝对 deadline；初次已就绪或 timeout 为零时，会
+跳过 deadline 构造和 Timer 注册。开始等待后，之后的每次 predicate 检查、waiter 注册以及全部
+等待时间都会消耗这份预算；notification 与虚假唤醒都不会重新开始计时。和条件变量一样，
+重新获取状态锁时可能在 timeout 后返回。
+
+相对等待只有在初始 predicate 要求继续等待且 timeout 非零时，才可能因 deadline 构造溢出而返回
+`TimeError::InstantOverflow`；此时不会运行 action。阻塞式 `*_with_total_timeout` 在获取状态锁和
+检查 predicate 之前构造 deadline，因此即使状态已经就绪，也可能先返回溢出错误。`Duration::MAX`
+不是无限等待标志；不需要 deadline 时应使用对应的不带 timeout 的方法。
 
 零时长 timeout 仍会执行初始 predicate 检查。到达 deadline 后，最后一次持锁
 predicate 检查优先于成功的 Timer 完成。Timer 注册或完成错误优先于等待后的就绪结果，
@@ -905,8 +911,9 @@ guard 级计时等待返回 `WaitTimeoutStatus`：
 - `Woken` 表示等待在 deadline 前返回，原因可能是 notification 或虚假唤醒。
 - `TimedOut` 表示到达 deadline。
 
-使用 guard 的调用方在收到任一状态后都必须继续检查受保护状态。`TimeError` 表示
-Timer 注册或完成失败，不是真实超时。发生该错误后，guard 仍处于持锁且可用状态。
+使用 guard 的调用方在收到任一状态后都必须继续检查受保护状态。`TimeError` 表示时钟域不匹配、
+deadline 算术溢出或 Timer 注册/完成失败，不是正常超时。对于 guard 级等待，返回错误后 guard
+仍处于持锁且可用状态。
 
 `WaitTimeoutResult` 提供 `is_ready`、`is_timed_out`、`into_option` 和 `map`；
 `WaitTimeoutStatus` 提供 `is_woken` 和 `is_timed_out`。
