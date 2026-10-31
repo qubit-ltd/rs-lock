@@ -238,6 +238,10 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     ///
     /// # Errors
     ///
+    /// Returns [`TimeError::InstantOverflow`] if waiting is required and adding
+    /// `timeout` to the sampled start time cannot represent a deadline in the
+    /// Timer's clock domain. This error is not reported as a normal timeout.
+    ///
     /// The future resolves to Timer registration or completion errors rather
     /// than reporting them as timeouts. After waiting begins, such an error
     /// takes precedence over a post-wait ready predicate and prevents `action`
@@ -288,6 +292,10 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     ///
     /// # Errors
     ///
+    /// Returns [`TimeError::InstantOverflow`] if waiting is required and adding
+    /// `timeout` to the sampled start time cannot represent a deadline in the
+    /// Timer's clock domain. This error is not reported as a normal timeout.
+    ///
     /// The future resolves to Timer registration or completion errors rather
     /// than reporting them as timeouts. After waiting begins, such an error
     /// takes precedence over a post-wait ready predicate.
@@ -336,6 +344,10 @@ pub trait AsyncTimeoutConditionWaiter: AsyncConditionWaiter {
     /// expires while the predicate still requires waiting.
     ///
     /// # Errors
+    ///
+    /// Returns [`TimeError::InstantOverflow`] if waiting is required and adding
+    /// `timeout` to the sampled start time cannot represent a deadline in the
+    /// Timer's clock domain. This error is not reported as a normal timeout.
     ///
     /// The future resolves to Timer registration or completion errors rather
     /// than reporting them as timeouts. After waiting begins, such an error

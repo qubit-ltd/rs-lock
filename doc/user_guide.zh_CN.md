@@ -269,6 +269,16 @@ Tokio 版本保留 `QueueState<T>`、两类 predicate、关闭规则和结果含
 `AsyncMonitor` 和 `AsyncTimedMonitor`，具体类型是 `TokioMonitor`。持锁期间传入的
 closure 仍同步执行；不要在其中 await 或执行阻塞 I/O。
 
+本变体只需将前面的共享状态定义与下面的 `tokio-main` 代码块组合，替换阻塞版本的
+队列操作和 `main`，不要把多个入口拼接到同一文件。启用 `async-monitor`，并在应用中
+直接声明 Tokio 依赖，开启 `macros`、`rt-multi-thread` 和 `time`：
+
+```toml
+[dependencies]
+qubit-lock = { version = "0.14", default-features = false, features = ["async-monitor"] }
+tokio = { version = "1.54", default-features = false, features = ["macros", "rt-multi-thread", "time"] }
+```
+
 <!-- rs-lock-example: tokio-main -->
 ```rust
 use std::sync::Arc;
