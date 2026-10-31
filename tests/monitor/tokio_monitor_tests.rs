@@ -240,8 +240,18 @@ fn test_tokio_monitor_uses_timer_across_runtimes() {
         "advancing the polling runtime must not complete the timeout"
     );
 
-    target.block_on(tokio::time::advance(Duration::from_secs(5)));
-    assert_time_result_eq!(Ok(WaitTimeoutResult::TimedOut), polling.block_on(wait),);
+    target.block_on(async {
+        tokio::time::advance(Duration::from_secs(5)).await;
+        tokio::task::yield_now().await;
+    });
+    let wake_counter = Arc::new(WakeCounter::default());
+    let result = polling.block_on(async {
+        match poll_once(wait.as_mut(), &wake_counter) {
+            Poll::Ready(result) => result,
+            Poll::Pending => panic!("target timer did not complete after its runtime advanced"),
+        }
+    });
+    assert_time_result_eq!(Ok(WaitTimeoutResult::TimedOut), result);
 }
 
 #[tokio::test]
@@ -424,7 +434,13 @@ async fn test_tokio_monitor_signal_reacquire_crossing_deadline_times_out() {
     release_tx.send(()).expect("holder should receive release permission");
     holder.join().expect("holder thread should finish");
 
-    assert_time_result_eq!(wait.await, Ok(WaitTimeoutResult::TimedOut));
+    let result = match poll_once(wait.as_mut(), &wake_counter) {
+        Poll::Ready(result) => result,
+        Poll::Pending => {
+            panic!("deadline waiter remained pending after lock release and time advance")
+        }
+    };
+    assert_time_result_eq!(result, Ok(WaitTimeoutResult::TimedOut));
 }
 
 /// Verifies that `Notifier::notify_all` selects every waiter registered at the
@@ -781,6 +797,7 @@ async fn test_tokio_monitor_async_wait_while_for_uses_condition_wait_budget() {
     tokio::time::advance(Duration::from_millis(10)).await;
 
     tokio::pin!(wait);
+    let wake_counter = Arc::new(WakeCounter::default());
     assert!(
         std::future::poll_fn(|context| { Poll::Ready(wait.as_mut().poll(context)) })
             .await
@@ -795,7 +812,11 @@ async fn test_tokio_monitor_async_wait_while_for_uses_condition_wait_budget() {
             .is_pending(),
     );
     tokio::time::advance(Duration::from_millis(1)).await;
-    assert_time_result_eq!(wait.await, Ok(WaitTimeoutResult::TimedOut));
+    let result = match poll_once(wait.as_mut(), &wake_counter) {
+        Poll::Ready(result) => result,
+        Poll::Pending => panic!("condition waiter remained pending after manual time advanced"),
+    };
+    assert_time_result_eq!(result, Ok(WaitTimeoutResult::TimedOut));
 }
 
 /// Verifies an absolute deadline includes time before the first poll.
@@ -810,7 +831,13 @@ async fn test_tokio_monitor_async_wait_while_with_deadline_includes_pre_poll_tim
         .advance(Duration::from_millis(1))
         .expect("manual clock should advance before the first poll");
 
-    assert_time_result_eq!(wait.await, Ok(WaitTimeoutResult::TimedOut));
+    tokio::pin!(wait);
+    let wake_counter = Arc::new(WakeCounter::default());
+    let result = match poll_once(wait.as_mut(), &wake_counter) {
+        Poll::Ready(result) => result,
+        Poll::Pending => panic!("expired deadline waiter remained pending on its first poll"),
+    };
+    assert_time_result_eq!(result, Ok(WaitTimeoutResult::TimedOut));
     assert_eq!(clock.pending_waiters(), 0);
 }
 
@@ -830,7 +857,11 @@ async fn test_tokio_monitor_deadline_helpers_wait_and_complete() {
 
     assert!(poll_once(ready_wait.as_mut(), &wake_counter).is_pending());
     ready_monitor.with_write_notify_one_async(|ready| *ready = true).await;
-    assert_time_result_eq!(ready_wait.await, Ok(WaitTimeoutResult::Ready(7)));
+    let result = match poll_once(ready_wait.as_mut(), &wake_counter) {
+        Poll::Ready(result) => result,
+        Poll::Pending => panic!("notified ready waiter remained pending"),
+    };
+    assert_time_result_eq!(result, Ok(WaitTimeoutResult::Ready(7)));
 
     let timeout_monitor = TokioMonitor::with_timer(false, clock.new_timer());
     let timeout_deadline = clock
@@ -844,7 +875,11 @@ async fn test_tokio_monitor_deadline_helpers_wait_and_complete() {
     let _ = clock
         .advance_to_next_deadline()
         .expect("deadline helper should register a timer");
-    assert_time_result_eq!(timeout_wait.await, Ok(WaitTimeoutResult::TimedOut),);
+    let result = match poll_once(timeout_wait.as_mut(), &wake_counter) {
+        Poll::Ready(result) => result,
+        Poll::Pending => panic!("deadline waiter remained pending after manual time advanced"),
+    };
+    assert_time_result_eq!(result, Ok(WaitTimeoutResult::TimedOut));
 
     let repeat_monitor = TokioMonitor::with_timer(false, clock.new_timer());
     let repeat_deadline = clock
@@ -859,7 +894,13 @@ async fn test_tokio_monitor_deadline_helpers_wait_and_complete() {
     let _ = clock
         .advance_to_next_deadline()
         .expect("rechecked deadline wait should retain its original timer");
-    assert_time_result_eq!(repeat_wait.await, Ok(WaitTimeoutResult::TimedOut));
+    let result = match poll_once(repeat_wait.as_mut(), &wake_counter) {
+        Poll::Ready(result) => result,
+        Poll::Pending => {
+            panic!("rechecked deadline waiter remained pending after manual time advanced")
+        }
+    };
+    assert_time_result_eq!(result, Ok(WaitTimeoutResult::TimedOut));
 }
 
 #[tokio::test]
@@ -1053,7 +1094,11 @@ async fn test_tokio_monitor_deadline_cancel_unselected_waiter_cleans_up() {
     let mut successor = Box::pin(monitor.wait_until_with_deadline_async(deadline, |ready| *ready, |_| 9));
     assert!(poll_once(successor.as_mut(), &wakes).is_pending());
     monitor.with_write_notify_one_async(|ready| *ready = true).await;
-    assert_time_result_eq!(successor.await, Ok(WaitTimeoutResult::Ready(9)));
+    let result = match poll_once(successor.as_mut(), &wakes) {
+        Poll::Ready(result) => result,
+        Poll::Pending => panic!("successor waiter remained pending after notification"),
+    };
+    assert_time_result_eq!(result, Ok(WaitTimeoutResult::Ready(9)));
     assert!(monitor.with_read_async(|ready| *ready).await);
     assert_eq!(clock.pending_waiters(), 0);
 }
@@ -1133,7 +1178,11 @@ async fn test_tokio_monitor_async_wait_while_for_includes_initial_predicate_time
         .advance_to_next_deadline()
         .expect("registered deadline should advance");
 
-    assert_time_result_eq!(waiter.await, Ok(WaitTimeoutResult::TimedOut));
+    let result = match poll_once(waiter.as_mut(), &wake_counter) {
+        Poll::Ready(result) => result,
+        Poll::Pending => panic!("condition waiter remained pending after manual time advanced"),
+    };
+    assert_time_result_eq!(result, Ok(WaitTimeoutResult::TimedOut));
 }
 
 /// Verifies that initial mutex contention does not consume timeout budget.
@@ -1162,6 +1211,7 @@ async fn test_tokio_monitor_async_wait_while_for_excludes_initial_lock_contentio
 
     let wait = monitor.wait_while_for_async(Duration::from_millis(5), |ready| !*ready, |_| ());
     tokio::pin!(wait);
+    let wake_counter = Arc::new(WakeCounter::default());
     assert!(
         std::future::poll_fn(|context| { Poll::Ready(wait.as_mut().poll(context)) })
             .await
@@ -1179,7 +1229,11 @@ async fn test_tokio_monitor_async_wait_while_for_excludes_initial_lock_contentio
     );
 
     tokio::time::advance(Duration::from_millis(5)).await;
-    assert_time_result_eq!(wait.await, Ok(WaitTimeoutResult::TimedOut));
+    let result = match poll_once(wait.as_mut(), &wake_counter) {
+        Poll::Ready(result) => result,
+        Poll::Pending => panic!("condition waiter remained pending after timeout budget elapsed"),
+    };
+    assert_time_result_eq!(result, Ok(WaitTimeoutResult::TimedOut));
 }
 
 /// Verifies that notifications reuse one fixed timeout deadline.
@@ -1271,7 +1325,11 @@ async fn test_tokio_monitor_async_wait_while_for_returns_ready_after_notify() {
     monitor.with_write_async(|ready| *ready = true).await;
     monitor.notify_one();
 
-    assert_time_result_eq!(waiter.await, Ok(WaitTimeoutResult::Ready(9)),);
+    let result = match poll_once(waiter.as_mut(), &wake_counter) {
+        Poll::Ready(result) => result,
+        Poll::Pending => panic!("notified condition waiter remained pending"),
+    };
+    assert_time_result_eq!(result, Ok(WaitTimeoutResult::Ready(9)));
 }
 
 /// Verifies that an unnotified ready predicate wins the final deadline check.
@@ -1297,5 +1355,10 @@ async fn test_tokio_monitor_async_wait_while_for_rechecks_state_after_timeout() 
     monitor.with_write_async(|ready| *ready = true).await;
     tokio::time::advance(Duration::from_millis(20)).await;
 
-    assert_time_result_eq!(wait.await, Ok(WaitTimeoutResult::Ready(9)),);
+    let wake_counter = Arc::new(WakeCounter::default());
+    let result = match poll_once(wait.as_mut(), &wake_counter) {
+        Poll::Ready(result) => result,
+        Poll::Pending => panic!("ready condition waiter remained pending after deadline and state update"),
+    };
+    assert_time_result_eq!(result, Ok(WaitTimeoutResult::Ready(9)));
 }

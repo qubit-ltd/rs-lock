@@ -465,17 +465,21 @@ fn test_std_monitor_deadline_helpers_wait_until_timeout() {
         .checked_add(WAIT_TIMEOUT)
         .expect("manual clock deadline should be representable");
     let waiter_monitor = Arc::clone(&monitor);
-    let waiter =
-        thread::spawn(move || StdMonitor::wait_until_ready_with_deadline(&waiter_monitor, deadline, |ready| *ready));
+    let (done_tx, done_rx) = mpsc::channel();
+    let waiter = thread::spawn(move || {
+        let result = StdMonitor::wait_until_ready_with_deadline(&waiter_monitor, deadline, |ready| *ready);
+        let _ = done_tx.send(result);
+    });
 
     let _ = clock
         .advance_to_next_deadline_after_waiters(1, Duration::from_secs(1))
         .expect("deadline helper should register a condition waiter");
 
-    assert_time_result_eq!(
-        waiter.join().expect("deadline waiter should finish"),
-        Ok(WaitTimeoutResult::TimedOut),
-    );
+    let result = done_rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("deadline helper waiter did not complete after manual time advanced");
+    waiter.join().expect("deadline waiter should finish without panic");
+    assert_time_result_eq!(result, Ok(WaitTimeoutResult::TimedOut),);
     assert_time_result_eq!(
         <StdMonitor<bool> as TimeoutConditionWaiter>::wait_while_with_deadline(&monitor, clock.now(), |_| false, |_| 7,),
         Ok(WaitTimeoutResult::Ready(7)),
@@ -496,9 +500,10 @@ fn test_std_monitor_deadline_wait_rechecks_after_notification() {
         .checked_add(WAIT_TIMEOUT)
         .expect("manual clock deadline should be representable");
     let waiter_monitor = Arc::clone(&monitor);
+    let (done_tx, done_rx) = mpsc::channel();
     let waiter = thread::spawn(move || {
         let mut checks = 0;
-        waiter_monitor.wait_while_with_deadline(
+        let result = waiter_monitor.wait_while_with_deadline(
             deadline,
             move |_| {
                 checks += 1;
@@ -508,7 +513,8 @@ fn test_std_monitor_deadline_wait_rechecks_after_notification() {
                 true
             },
             |_| (),
-        )
+        );
+        let _ = done_tx.send(result);
     });
 
     assert_eq!(
@@ -532,10 +538,11 @@ fn test_std_monitor_deadline_wait_rechecks_after_notification() {
         .advance_to_next_deadline()
         .expect("deadline wait should retain its original deadline");
 
-    assert_time_result_eq!(
-        waiter.join().expect("deadline waiter should finish"),
-        Ok(WaitTimeoutResult::TimedOut),
-    );
+    let result = done_rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("deadline waiter did not complete after manual time advanced");
+    waiter.join().expect("deadline waiter should finish without panic");
+    assert_time_result_eq!(result, Ok(WaitTimeoutResult::TimedOut),);
 }
 
 #[test]
@@ -563,16 +570,21 @@ fn test_std_monitor_uses_injected_manual_timer_without_real_delay() {
     let monitor = Arc::new(StdMonitor::with_timer(false, clock.new_timer()));
     assert_eq!(clock.now().domain(), monitor.timer().clock().now().domain(),);
     let waiter_monitor = Arc::clone(&monitor);
-    let waiter = thread::spawn(move || waiter_monitor.wait_until_for(Duration::from_secs(8), |ready| *ready, |_| ()));
+    let (done_tx, done_rx) = mpsc::channel();
+    let waiter = thread::spawn(move || {
+        let result = waiter_monitor.wait_until_for(Duration::from_secs(8), |ready| *ready, |_| ());
+        let _ = done_tx.send(result);
+    });
 
     let _reached = clock
         .advance_to_next_deadline_after_waiters(1, Duration::from_secs(1))
         .expect("monitor deadline should be registered");
 
-    assert_time_result_eq!(
-        Ok(WaitTimeoutResult::TimedOut),
-        waiter.join().expect("waiter should finish"),
-    );
+    let result = done_rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("manual timer waiter did not complete after manual time advanced");
+    waiter.join().expect("waiter should finish without panic");
+    assert_time_result_eq!(Ok(WaitTimeoutResult::TimedOut), result);
 }
 
 #[test]
