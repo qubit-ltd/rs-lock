@@ -50,6 +50,7 @@ const LIB_RS: &str = include_str!("../../src/lib.rs");
 const READ_WRITE_LOCK_SRC: &str = include_str!("../../src/lock/read_write_lock.rs");
 const ASYNC_CONDITION_WAITER_SRC: &str = include_str!("../../src/monitor/async_condition_waiter.rs");
 const ASYNC_READ_WRITE_LOCK_SRC: &str = include_str!("../../src/lock/async_read_write_lock.rs");
+const STD_MONITOR_SRC: &str = include_str!("../../src/monitor/std_monitor.rs");
 
 /// Collapses Markdown whitespace so public-symbol checks tolerate line
 /// wrapping.
@@ -234,6 +235,8 @@ fn test_readme_documents_feature_tiers() {
 /// Ensures both guides name the standard-monitor poison APIs.
 #[test]
 fn test_user_guides_reference_std_monitor_poison_apis() {
+    assert!(STD_MONITOR_SRC.contains("pub fn is_poisoned"));
+    assert!(STD_MONITOR_SRC.contains("pub fn clear_poison"));
     assert!(USER_GUIDE_EN.contains("`is_poisoned`"));
     assert!(USER_GUIDE_EN.contains("`clear_poison`"));
     assert!(USER_GUIDE_ZH.contains("`is_poisoned`"));
