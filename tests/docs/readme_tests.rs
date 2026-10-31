@@ -51,7 +51,8 @@ const READ_WRITE_LOCK_SRC: &str = include_str!("../../src/lock/read_write_lock.r
 const ASYNC_CONDITION_WAITER_SRC: &str = include_str!("../../src/monitor/async_condition_waiter.rs");
 const ASYNC_READ_WRITE_LOCK_SRC: &str = include_str!("../../src/lock/async_read_write_lock.rs");
 
-/// Collapses Markdown whitespace so public-symbol checks tolerate line wrapping.
+/// Collapses Markdown whitespace so public-symbol checks tolerate line
+/// wrapping.
 fn normalize_readme_text(content: &str) -> String {
     content.split_whitespace().collect::<Vec<_>>().join(" ")
 }

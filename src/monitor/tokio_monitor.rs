@@ -60,8 +60,8 @@ use super::internal::WaiterRegistry;
 /// alive with time enabled and be driven while a timed wait is pending, though
 /// the wait future may be polled from another runtime context. Injected timers
 /// retain their own progress requirements. An immediately ready predicate does
-/// not create a timer future, and a zero budget does not create one for relative
-/// waits. Closures and predicates execute
+/// not create a timer future, and a zero budget does not create one for
+/// relative waits. Closures and predicates execute
 /// while the state mutex is held and must not re-enter the same monitor; doing
 /// so can deadlock.
 ///
