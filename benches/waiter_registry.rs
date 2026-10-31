@@ -483,7 +483,11 @@ fn benchmark_waiter_registry(criterion: &mut Criterion) {
             |bencher, &waiter_count| {
                 bencher.iter_batched_ref(
                     || prepare_ordered_index_waiters(waiter_count),
-                    |waiters| black_box(waiters.take_all()),
+                    |waiters| {
+                        for waiter in waiters.take_all() {
+                            black_box(waiter);
+                        }
+                    },
                     BatchSize::SmallInput,
                 );
             },
@@ -529,7 +533,11 @@ fn benchmark_waiter_registry(criterion: &mut Criterion) {
             |bencher, &waiter_count| {
                 bencher.iter_batched_ref(
                     || prepare_btree_hash_waiters(waiter_count),
-                    |waiters| black_box(waiters.take_all()),
+                    |waiters| {
+                        for waiter in waiters.take_all() {
+                            black_box(waiter);
+                        }
+                    },
                     BatchSize::SmallInput,
                 );
             },
