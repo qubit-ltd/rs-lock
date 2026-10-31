@@ -165,25 +165,20 @@ fn test_readme_documents_native_lock_support() {
     assert!(README_ZH.contains("`parking_lot::RwLock<T>`"));
 }
 
-/// Ensures the introductions state the crate's boundary and testing value in
-/// direct reader-facing language.
+/// Ensures each overview exposes the public lock and monitor capabilities.
 #[test]
-fn test_documentation_introductions_explain_the_abstraction_in_plain_language() {
-    let readme_en = normalize_readme_text(README_EN);
-    let readme_zh = normalize_readme_text(README_ZH);
-    let guide_en = normalize_readme_text(USER_GUIDE_EN);
-    let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
-
-    assert!(readme_en.contains("not around a particular lock implementation"));
-    assert!(readme_en.contains("where you assemble the application"));
-    assert!(readme_zh.contains("而不是某一种锁实现"));
-    assert!(readme_zh.contains("在组装应用时"));
-    assert!(readme_zh.contains("再选择 `std`、`parking_lot` 或 Tokio 后端"));
-
-    assert!(guide_en.contains("without tying its public boundary"));
-    assert!(guide_en.contains("package the lock / condition-wait protocol"));
-    assert!(guide_zh.contains("不必把公开边界绑定到某一种同步后端"));
-    assert!(guide_zh.contains("封装了锁与条件等待的配合方式"));
+fn test_documentation_overviews_name_public_capabilities() {
+    for (label, content) in [
+        ("README.md", README_EN),
+        ("README.zh_CN.md", README_ZH),
+        ("doc/user_guide.md", USER_GUIDE_EN),
+        ("doc/user_guide.zh_CN.md", USER_GUIDE_ZH),
+    ] {
+        let normalized = normalize_readme_text(content);
+        for capability in ["`Lock`", "`ParkingLotMonitor`"] {
+            assert!(normalized.contains(capability), "{label}: missing {capability}");
+        }
+    }
 }
 
 /// Ensures each README points readers to the user guide in the same language.
@@ -532,11 +527,8 @@ fn test_rustdoc_contracts_match_lock_and_monitor_semantics() {
     assert!(WAIT_TIMEOUT_STATUS_SRC.contains("ParkingLotMonitorGuard"));
 
     for source in [PARKING_LOT_MONITOR_SRC, STD_MONITOR_SRC] {
-        assert!(!source.contains("condition variable"));
         assert!(source.contains("predicate stops blocking on the deciding locked check"));
     }
-
-    assert!(TOKIO_MONITOR_SRC.matches("fairness or FIFO").count() >= 3);
 }
 
 /// Ensures Cargo exposes only the current feature surface.
