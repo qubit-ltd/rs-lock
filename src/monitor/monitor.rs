@@ -147,12 +147,25 @@ impl<M: ?Sized> Monitor for Arc<M>
 where
     M: Monitor,
 {
-    /// Delegates protected-state reading to the shared monitor.
+    /// See [`Monitor::with_read`] for the protected-state access contract.
     ///
     /// # Type Parameters
     ///
     /// * `R` - Value returned by the forwarded read closure.
     /// * `F` - Read closure forwarded to the wrapped monitor.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Read closure receiving shared access through the wrapped
+    ///   monitor.
+    ///
+    /// # Returns
+    ///
+    /// The value returned by `f`, without transformation.
+    ///
+    /// # Panics
+    ///
+    /// Propagates panics from `f` or the wrapped monitor implementation.
     #[inline(always)]
     fn with_read<R, F>(&self, f: F) -> R
     where
@@ -161,12 +174,25 @@ where
         self.as_ref().with_read(f)
     }
 
-    /// Delegates protected-state mutation to the shared monitor.
+    /// See [`Monitor::with_write`] for the protected-state access contract.
     ///
     /// # Type Parameters
     ///
     /// * `R` - Value returned by the forwarded write closure.
     /// * `F` - Write closure forwarded to the wrapped monitor.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Write closure receiving mutable access through the wrapped
+    ///   monitor.
+    ///
+    /// # Returns
+    ///
+    /// The value returned by `f`, without transformation.
+    ///
+    /// # Panics
+    ///
+    /// Propagates panics from `f` or the wrapped monitor implementation.
     #[inline(always)]
     fn with_write<R, F>(&self, f: F) -> R
     where

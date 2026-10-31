@@ -374,8 +374,8 @@ impl<M> AsyncTimeoutConditionWaiter for Arc<M>
 where
     M: AsyncTimeoutConditionWaiter + ?Sized,
 {
-    /// Forwards an absolute-deadline async condition wait to the wrapped
-    /// monitor.
+    /// See [`AsyncTimeoutConditionWaiter::wait_while_with_deadline_async`] for
+    /// the complete lazy-wait, cancellation, and error-precedence contract.
     ///
     /// # Type Parameters
     ///
@@ -384,6 +384,29 @@ where
     ///   sendable and remain valid for `'a`.
     /// * `F` - Action closure forwarded to the wrapped monitor. It must be
     ///   sendable and remain valid for `'a`.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Absolute deadline in the wrapped monitor Timer's clock
+    ///   domain.
+    /// * `predicate` - Returns `true` while waiting must continue.
+    /// * `action` - Runs with mutable state after the predicate becomes false.
+    ///
+    /// # Returns
+    ///
+    /// A lazy future yielding the action result as
+    /// [`WaitTimeoutResult::Ready`], or [`WaitTimeoutResult::TimedOut`] if
+    /// the final predicate still blocks.
+    ///
+    /// # Errors
+    ///
+    /// Forwards errors from the wrapped waiter unchanged, including Timer
+    /// clock-domain, registration, and completion errors when waiting is
+    /// needed.
+    ///
+    /// # Panics
+    ///
+    /// Propagates panics from the wrapped waiter, predicate, or action.
     #[inline(always)]
     fn wait_while_with_deadline_async<'a, R, P, F>(
         &'a self,
