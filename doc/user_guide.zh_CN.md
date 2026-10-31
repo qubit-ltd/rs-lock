@@ -263,15 +263,20 @@ fn main() {
 因此不需要 `thread::sleep`。
 若等待者在真实时间守卫到期前仍未注册，示例会明确失败，避免等待尚未推进手动截止时间的线程。
 
-### Tokio 保留状态机，而不是阻塞调用
+### Tokio：一次状态更新与通知
 
-Tokio 版本保留 `QueueState<T>`、两类 predicate、关闭规则和结果含义。它使用
-`AsyncMonitor` 和 `AsyncTimedMonitor`，具体类型是 `TokioMonitor`。持锁期间传入的
-closure 仍同步执行；不要在其中 await 或执行阻塞 I/O。
+这个最小示例复用 `QueueState<T>`，演示一个生产者放入一个元素，以及一个消费者等待并取出
+该元素。它使用 `AsyncConditionWaiter`、`AsyncMonitor` 和 `TokioMonitor`，没有实现
+生产者的容量等待、关闭操作或计时接收，因此不是前面有界队列的完整异步版本。扩展成完整
+队列时，仍需补齐容量和关闭状态检查，并在影响任一组等待条件的状态变化后通知等待者。
 
-本变体只需将前面的共享状态定义与下面的 `tokio-main` 代码块组合，替换阻塞版本的
-队列操作和 `main`，不要把多个入口拼接到同一文件。启用 `async-monitor`，并在应用中
-直接声明 Tokio 依赖，开启 `macros`、`rt-multi-thread` 和 `time`：
+消费者也可能在生产者更新状态后才首次运行。示例中的断言只检查消费者取得了元素，并不证明
+消费者曾挂起或已注册的等待者经历了通知唤醒。闭包在持有状态锁时同步执行，不要在其中
+执行阻塞 I/O。
+
+将前面的共享状态定义与下面的 `tokio-main` 代码块组合，不要拼入阻塞版本的队列操作或
+`main`。启用 `async-monitor`，并直接声明 Tokio 依赖，开启 `macros`、
+`rt-multi-thread` 和 `time`：
 
 ```toml
 [dependencies]
@@ -312,10 +317,12 @@ async fn main() {
 }
 ```
 
-异步等待 future 是惰性的。Timer 属于捕获或注入的目标 runtime；该 runtime 必须存活并
-启用 time driver，直到计时等待完成。drop pending future 会注销 waiter，不执行
-action，也不会回滚其他 task 已经完成的状态修改。如果 `notify_one` 已选择该 waiter，
-取消会丢弃这次 selection，而不会转交给另一个 waiter。
+异步等待 future 是惰性的。丢弃尚未完成的等待 future 会注销其等待者，不执行 action，
+也不会回滚其他任务已经完成的状态修改。如果 `notify_one` 已选择该等待者，取消会丢弃
+这次选择，不会转交给其他等待者。
+
+当前示例没有计时等待。使用计时等待时，需要让 Timer 捕获或注入的目标 runtime 保持
+存活、启用 time driver，并持续推进到等待完成；超时语义见第 9 节。
 
 ## 3. 为什么需要这些抽象
 

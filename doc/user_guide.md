@@ -284,16 +284,24 @@ the test observe waiter registration before advancing time, so no
 `thread::sleep` is needed.
 If the real-time guard expires before registration, the example fails explicitly instead of joining a waiter whose manual deadline has not been advanced.
 
-### Tokio keeps the state machine, not the blocking calls
+### Tokio: one state update and notification
 
-The Tokio version keeps `QueueState<T>`, both predicates, the close rule, and
-the result meanings. It uses `AsyncMonitor` and `AsyncTimedMonitor`, with
-`TokioMonitor` as the concrete type. The closures run synchronously while the
-monitor holds state; do not await or perform blocking I/O inside them.
+This small example reuses `QueueState<T>` to show one producer inserting one
+item and one consumer waiting for and removing it. It uses
+`AsyncConditionWaiter`, `AsyncMonitor`, and `TokioMonitor`. It does not implement
+producer capacity waits, a close operation, or timed receive, so it is not a
+complete asynchronous version of the bounded queue above. A complete queue
+still needs capacity and closed-state checks and notifications after changes
+that affect either group of waiters.
 
-For this variant, combine the shared state block with `tokio-main` instead of
-the blocking operations and main blocks. Enable `async-monitor` and directly
-depend on Tokio with `macros`, `rt-multi-thread`, and `time` enabled.
+The consumer may first run after the producer has updated the state. The
+assertion checks that it receives the item; it does not prove that the consumer
+suspended or that a registered waiter was awakened. Closures run synchronously
+while the monitor holds the state lock; do not perform blocking I/O inside them.
+
+Combine the shared state block with `tokio-main` below, without the blocking
+operations or main blocks. Enable `async-monitor` and directly depend on Tokio
+with `macros`, `rt-multi-thread`, and `time` enabled.
 
 <!-- rs-lock-example: tokio-main -->
 ```rust
@@ -746,9 +754,14 @@ async fn main() {
 }
 ```
 
-The captured target runtime must stay alive, have time enabled, and keep
-running until a timed wait completes. A timed future may be polled from another
-runtime context; the timer still belongs to the captured or injected runtime.
+Async wait futures are lazy. Dropping a pending wait future unregisters its
+waiter, does not run the action, and does not roll back protected-state changes
+made by another task. If `notify_one` selected that waiter, cancellation
+discards the selection instead of transferring it to another waiter.
+
+This example performs no timed wait. When using timed waits, keep the timer's
+captured or injected target runtime alive with time enabled and progressing
+until the wait completes; see Section 9 for timeout semantics.
 
 ## 9. Waiting, notification, and timeout semantics
 
