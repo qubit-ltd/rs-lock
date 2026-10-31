@@ -23,6 +23,27 @@ use qubit_lock::WaitTimeoutStatus;
 
 blocking_monitor_contract_tests!(parking_lot_monitor_contract, ParkingLotMonitor);
 
+/// Runs a potentially blocking test operation with a bounded completion wait.
+///
+/// On failure the worker is detached, not cancelled. Captured resources must
+/// be test-local, and the operation must release its guards before returning.
+fn run_bounded_operation<R, F>(label: &str, operation: F) -> R
+where
+    R: Send + 'static,
+    F: FnOnce() -> R + Send + 'static,
+{
+    let (done_tx, done_rx) = mpsc::channel();
+    let worker = thread::spawn(move || {
+        let result = operation();
+        let _ = done_tx.send(result);
+    });
+    let result = done_rx
+        .recv_timeout(Duration::from_secs(5))
+        .unwrap_or_else(|error| panic!("{label}: operation did not complete: {error}"));
+    worker.join().expect("completed operation worker should not panic");
+    result
+}
+
 use super::failing_timer_tests::assert_backend_unavailable;
 use super::failing_timer_tests::completion_failing_timer;
 use super::failing_timer_tests::registration_failing_timer;
@@ -90,11 +111,13 @@ fn test_parking_lot_monitor_write_notify_one_updates_state_and_wakes_waiter() {
     checked_rx
         .recv_timeout(Duration::from_secs(1))
         .expect("waiter should check state before notification");
-    drop(monitor.lock());
-
-    let write_result = monitor.with_write_notify_one(|ready| {
-        *ready = true;
-        5
+    let notifying_monitor = Arc::clone(&monitor);
+    let write_result = run_bounded_operation("write and notify_one", move || {
+        drop(notifying_monitor.lock());
+        notifying_monitor.with_write_notify_one(|ready| {
+            *ready = true;
+            5
+        })
     });
 
     assert_eq!(write_result, 5);
@@ -158,10 +181,12 @@ fn test_parking_lot_monitor_notify_one_consumes_one_permit() {
     second_checked_rx
         .recv_timeout(Duration::from_secs(1))
         .expect("second waiter should check state");
-    drop(monitor.lock());
-
-    monitor.with_write(|available| *available = 1);
-    monitor.notify_one();
+    let notifying_monitor = Arc::clone(&monitor);
+    run_bounded_operation("registration handshake and notify_one", move || {
+        drop(notifying_monitor.lock());
+        notifying_monitor.with_write(|available| *available = 1);
+        notifying_monitor.notify_one();
+    });
     done_rx
         .recv_timeout(Duration::from_secs(1))
         .expect("one waiter should finish after notify_one");
@@ -170,7 +195,10 @@ fn test_parking_lot_monitor_notify_one_consumes_one_permit() {
         "notify_one must not finish both registered waiters"
     );
 
-    monitor.with_write_notify_all(|available| *available = 1);
+    let notifying_monitor = Arc::clone(&monitor);
+    run_bounded_operation("remaining waiter cleanup", move || {
+        notifying_monitor.with_write_notify_all(|available| *available = 1);
+    });
     done_rx
         .recv_timeout(Duration::from_secs(1))
         .expect("remaining waiter should finish during cleanup");
@@ -222,11 +250,13 @@ fn test_parking_lot_monitor_write_notify_all_wakes_all_waiters() {
     second_checked_rx
         .recv_timeout(Duration::from_secs(1))
         .expect("second waiter should check state before notification");
-    drop(monitor.lock());
-
-    let write_result = monitor.with_write_notify_all(|ready| {
-        *ready = true;
-        2
+    let notifying_monitor = Arc::clone(&monitor);
+    let write_result = run_bounded_operation("write and notify_all", move || {
+        drop(notifying_monitor.lock());
+        notifying_monitor.with_write_notify_all(|ready| {
+            *ready = true;
+            2
+        })
     });
 
     assert_eq!(write_result, 2);
@@ -359,12 +389,12 @@ fn test_parking_lot_monitor_wait_until_blocks_until_notify_one() {
     checked_rx
         .recv_timeout(Duration::from_secs(1))
         .expect("waiter should check the initial state within timeout");
-    drop(monitor.lock());
-
-    monitor.with_write(|ready| {
-        *ready = true;
+    let notifying_monitor = Arc::clone(&monitor);
+    run_bounded_operation("state update and raw notify_one", move || {
+        drop(notifying_monitor.lock());
+        notifying_monitor.with_write(|ready| *ready = true);
+        notifying_monitor.notify_one();
     });
-    monitor.notify_one();
 
     assert_eq!(
         done_rx
@@ -389,6 +419,7 @@ fn test_parking_lot_monitor_guard_wait_for_returns_woken_when_notified() {
         let notified = guard
             .wait_for(Duration::from_secs(5))
             .expect("standard Timer should register");
+        drop(guard);
         done_tx.send(notified).expect("test should receive waiter result");
     });
 
@@ -398,8 +429,11 @@ fn test_parking_lot_monitor_guard_wait_for_returns_woken_when_notified() {
 
     // Reacquiring the monitor lock proves the waiter entered the condvar wait
     // and released the mutex, so the notification cannot be sent too early.
-    drop(monitor.lock());
-    monitor.notify_one();
+    let notifying_monitor = Arc::clone(&monitor);
+    run_bounded_operation("registration handshake and notify_one", move || {
+        drop(notifying_monitor.lock());
+        notifying_monitor.notify_one();
+    });
 
     assert_eq!(
         done_rx
@@ -693,10 +727,14 @@ fn test_parking_lot_monitor_wait_while_for_timeout_final_predicate_wins() {
         .recv_timeout(Duration::from_secs(5))
         .expect("waiter should perform the initial predicate check");
     assert!(clock.wait_for_waiters(1, Duration::from_secs(5)));
-    let mut guard = monitor.lock();
-    *guard = true;
-    assert!(clock.advance_to_next_deadline().is_some());
-    drop(guard);
+    let updating_monitor = Arc::clone(&monitor);
+    let updating_clock = Arc::clone(&clock);
+    run_bounded_operation("ready state before final timeout check", move || {
+        let mut guard = updating_monitor.lock();
+        *guard = true;
+        assert!(updating_clock.advance_to_next_deadline().is_some());
+        drop(guard);
+    });
 
     assert_time_result_eq!(
         done_rx
@@ -730,10 +768,11 @@ fn test_parking_lot_monitor_wait_until_for_returns_result_when_predicate_true() 
     started_rx
         .recv_timeout(Duration::from_secs(1))
         .expect("waiter should start within timeout");
-    monitor.with_write(|ready| {
-        *ready = true;
+    let notifying_monitor = Arc::clone(&monitor);
+    run_bounded_operation("state update and raw notify_one", move || {
+        notifying_monitor.with_write(|ready| *ready = true);
+        notifying_monitor.notify_one();
     });
-    monitor.notify_one();
 
     assert_time_result_eq!(
         done_rx
@@ -770,17 +809,20 @@ fn test_parking_lot_monitor_wait_until_ignores_notification_until_predicate_true
     checked_rx
         .recv_timeout(Duration::from_secs(1))
         .expect("waiter should check the initial state within timeout");
-    drop(monitor.lock());
-    monitor.notify_all();
+    let notifying_monitor = Arc::clone(&monitor);
+    run_bounded_operation("registration handshake and notify_all", move || {
+        drop(notifying_monitor.lock());
+        notifying_monitor.notify_all();
+    });
     checked_rx
         .recv_timeout(Duration::from_secs(1))
         .expect("waiter should recheck after notification");
-    drop(monitor.lock());
-
-    monitor.with_write(|ready| {
-        *ready = true;
+    let notifying_monitor = Arc::clone(&monitor);
+    run_bounded_operation("state update and raw notify_all", move || {
+        drop(notifying_monitor.lock());
+        notifying_monitor.with_write(|ready| *ready = true);
+        notifying_monitor.notify_all();
     });
-    monitor.notify_all();
 
     done_rx
         .recv_timeout(Duration::from_secs(1))
@@ -819,10 +861,11 @@ fn test_parking_lot_monitor_notify_all_wakes_all_ready_waiters() {
             .expect("waiter should start within timeout");
     }
 
-    monitor.with_write(|permits| {
-        *permits = WAITER_COUNT;
+    let notifying_monitor = Arc::clone(&monitor);
+    run_bounded_operation("state update and raw notify_all", move || {
+        notifying_monitor.with_write(|permits| *permits = WAITER_COUNT);
+        notifying_monitor.notify_all();
     });
-    monitor.notify_all();
 
     for _ in 0..WAITER_COUNT {
         done_rx
@@ -892,12 +935,12 @@ fn test_parking_lot_monitor_wait_until_continues_after_panic_while_locked() {
     checked_rx
         .recv_timeout(Duration::from_secs(1))
         .expect("waiter should check the initial state within timeout");
-    drop(monitor.lock());
-
-    monitor.with_write(|ready| {
-        *ready = true;
+    let notifying_monitor = Arc::clone(&monitor);
+    run_bounded_operation("state update and raw notify_all", move || {
+        drop(notifying_monitor.lock());
+        notifying_monitor.with_write(|ready| *ready = true);
+        notifying_monitor.notify_all();
     });
-    monitor.notify_all();
 
     done_rx
         .recv_timeout(Duration::from_secs(1))

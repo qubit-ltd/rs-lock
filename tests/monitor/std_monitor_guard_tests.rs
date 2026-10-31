@@ -21,6 +21,27 @@ use qubit_lock::WaitTimeoutStatus;
 use super::failing_timer_tests::assert_backend_unavailable;
 use super::failing_timer_tests::registration_failing_timer;
 
+/// Runs a potentially blocking operation with a bounded completion wait.
+///
+/// On failure the worker is detached, not cancelled; captured resources must
+/// be test-local, and the operation must release its guards before returning.
+fn run_bounded_operation<R, F>(label: &str, operation: F) -> R
+where
+    R: Send + 'static,
+    F: FnOnce() -> R + Send + 'static,
+{
+    let (done_tx, done_rx) = mpsc::channel();
+    let worker = thread::spawn(move || {
+        let result = operation();
+        let _ = done_tx.send(result);
+    });
+    let result = done_rx
+        .recv_timeout(Duration::from_secs(5))
+        .unwrap_or_else(|error| panic!("{label}: operation did not complete: {error}"));
+    worker.join().expect("completed operation worker should not panic");
+    result
+}
+
 #[test]
 fn test_std_monitor_guard_updates_state() {
     let monitor = StdMonitor::new(Vec::new());
@@ -62,9 +83,12 @@ fn test_std_monitor_guard_notify_one_releases_lock_and_wakes_waiter() {
     checked_rx
         .recv_timeout(Duration::from_secs(1))
         .expect("waiter should check the initial false predicate");
-    let mut guard = monitor.lock();
-    *guard = true;
-    guard.notify_one();
+    let notifying_monitor = Arc::clone(&monitor);
+    run_bounded_operation("guard notify_one", move || {
+        let mut guard = notifying_monitor.lock();
+        *guard = true;
+        guard.notify_one();
+    });
 
     done_rx
         .recv_timeout(Duration::from_secs(1))
@@ -109,9 +133,12 @@ fn test_std_monitor_guard_notify_all_releases_lock_and_wakes_waiters() {
             .recv_timeout(Duration::from_secs(1))
             .expect("each waiter should check the initial false predicate");
     }
-    let mut guard = monitor.lock();
-    *guard = true;
-    guard.notify_all();
+    let notifying_monitor = Arc::clone(&monitor);
+    run_bounded_operation("guard notify_all", move || {
+        let mut guard = notifying_monitor.lock();
+        *guard = true;
+        guard.notify_all();
+    });
 
     for _ in 0..2 {
         done_rx
