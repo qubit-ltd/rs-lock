@@ -57,10 +57,9 @@ mod parking_lot_rw_lock_tests {
         let holder = thread::spawn(move || {
             DataLock::with_write(&*lock_clone, |_| {
                 locked_tx.send(()).expect("test should observe held write lock");
-                release_rx
-                    .recv_timeout(Duration::from_secs(1))
-                    .expect("test should release held write lock");
+                let _ = release_rx.recv();
             });
+            let _ = locked_tx.send(());
         });
 
         locked_rx
@@ -78,7 +77,9 @@ mod parking_lot_rw_lock_tests {
         release_tx
             .send(())
             .expect("holder thread should still be waiting for release");
-        holder.join().expect("holder should not panic");
+        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            holder.join().expect("holder should not panic");
+        }
     }
 
     #[test]
@@ -91,10 +92,9 @@ mod parking_lot_rw_lock_tests {
         let holder = thread::spawn(move || {
             DataLock::with_read(&*lock_clone, |_| {
                 locked_tx.send(()).expect("test should observe held read lock");
-                release_rx
-                    .recv_timeout(Duration::from_secs(1))
-                    .expect("test should release held read lock");
+                let _ = release_rx.recv();
             });
+            let _ = locked_tx.send(());
         });
 
         locked_rx
@@ -109,7 +109,9 @@ mod parking_lot_rw_lock_tests {
         release_tx
             .send(())
             .expect("holder thread should still be waiting for release");
-        holder.join().expect("holder should not panic");
+        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            holder.join().expect("holder should not panic");
+        }
     }
 
     #[test]

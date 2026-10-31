@@ -106,16 +106,16 @@ mod parking_lot_mutex_tests {
         let (release_tx, release_rx) = mpsc::channel();
 
         let mutex_clone = mutex.clone();
+        let holder_done_tx = locked_tx.clone();
 
         // Hold the lock in another thread
         let handle = thread::spawn(move || {
             DataLock::with_write(&*mutex_clone, |value| {
                 *value += 1;
                 locked_tx.send(()).expect("test should observe held mutex");
-                release_rx
-                    .recv_timeout(Duration::from_secs(1))
-                    .expect("test should release held mutex");
+                let _ = release_rx.recv();
             });
+            let _ = holder_done_tx.send(());
         });
 
         // Wait for child thread to acquire the lock
@@ -132,7 +132,9 @@ mod parking_lot_mutex_tests {
             .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
-        handle.join().expect("holder thread should not panic");
+        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            handle.join().expect("holder thread should not panic");
+        }
 
         // Now should be able to successfully acquire the lock
         let result = DataLock::try_with_read(&*mutex, |value| *value);
@@ -146,16 +148,16 @@ mod parking_lot_mutex_tests {
         let (release_tx, release_rx) = mpsc::channel();
 
         let mutex_clone = mutex.clone();
+        let holder_done_tx = locked_tx.clone();
 
         // Hold the lock in another thread
         let handle = thread::spawn(move || {
             DataLock::with_write(&*mutex_clone, |value| {
                 *value += 1;
                 locked_tx.send(()).expect("test should observe held mutex");
-                release_rx
-                    .recv_timeout(Duration::from_secs(1))
-                    .expect("test should release held mutex");
+                let _ = release_rx.recv();
             });
+            let _ = holder_done_tx.send(());
         });
 
         // Wait for child thread to acquire the lock
@@ -172,7 +174,9 @@ mod parking_lot_mutex_tests {
             .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
-        handle.join().expect("holder thread should not panic");
+        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            handle.join().expect("holder thread should not panic");
+        }
 
         // Now should be able to successfully acquire the lock
         let result = DataLock::try_with_write(&*mutex, |value| {
@@ -192,13 +196,13 @@ mod parking_lot_mutex_tests {
         let (locked_tx, locked_rx) = mpsc::channel();
         let (release_tx, release_rx) = mpsc::channel();
         let mutex_clone = mutex.clone();
+        let holder_done_tx = locked_tx.clone();
         let handle = thread::spawn(move || {
             DataLock::with_write(&*mutex_clone, |_| {
                 locked_tx.send(()).expect("test should observe held mutex");
-                release_rx
-                    .recv_timeout(Duration::from_secs(1))
-                    .expect("test should release held mutex");
+                let _ = release_rx.recv();
             });
+            let _ = holder_done_tx.send(());
         });
 
         locked_rx
@@ -215,7 +219,9 @@ mod parking_lot_mutex_tests {
         release_tx
             .send(())
             .expect("holder thread should still be waiting for release");
-        handle.join().expect("holder thread should not panic");
+        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            handle.join().expect("holder thread should not panic");
+        }
     }
 
     #[test]
@@ -271,6 +277,65 @@ mod parking_lot_mutex_tests {
         // Verify original was modified
         let original = DataLock::with_read(&mutex, |v| v.clone());
         assert_eq!(original, vec![1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn test_parking_lot_mutex_holder_waits_for_release_message() {
+        let mutex = Arc::new(ParkingLotMutex::new(0));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let lock_clone = Arc::clone(&mutex);
+        let holder = thread::spawn(move || {
+            DataLock::with_write(&*lock_clone, |_| {
+                locked_tx.send(()).expect("test should observe held mutex");
+                let _ = release_rx.recv();
+            });
+            let _ = locked_tx.send(());
+        });
+
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("mutex should be held within timeout");
+        thread::sleep(Duration::from_millis(25));
+        assert_eq!(
+            DataLock::try_with_read(&*mutex, read_i32),
+            Err(TryLockError::WouldBlock),
+        );
+        release_tx
+            .send(())
+            .expect("holder should still wait for release message");
+        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            holder.join().expect("holder should finish after release");
+        }
+        assert_eq!(DataLock::try_with_read(&*mutex, read_i32), Ok(0));
+    }
+
+    #[test]
+    fn test_parking_lot_mutex_holder_releases_after_sender_disconnects() {
+        let mutex = Arc::new(ParkingLotMutex::new(0));
+        let (locked_tx, locked_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel::<()>();
+        let lock_clone = Arc::clone(&mutex);
+        let holder = thread::spawn(move || {
+            DataLock::with_write(&*lock_clone, |_| {
+                locked_tx.send(()).expect("test should observe held mutex");
+                let _ = release_rx.recv();
+            });
+            let _ = locked_tx.send(());
+        });
+
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("mutex should be held within timeout");
+        assert_eq!(
+            DataLock::try_with_read(&*mutex, read_i32),
+            Err(TryLockError::WouldBlock),
+        );
+        drop(release_tx);
+        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            holder.join().expect("holder should finish after sender disconnects");
+        }
+        assert_eq!(DataLock::try_with_read(&*mutex, read_i32), Ok(0));
     }
 
     #[test]

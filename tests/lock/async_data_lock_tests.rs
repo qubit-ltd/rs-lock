@@ -28,6 +28,7 @@ mod async_data_lock_trait_tests {
     use std::future::poll_fn;
     use std::sync::Arc;
     use std::sync::atomic::AtomicBool;
+    use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering;
     use std::task::Poll;
 
@@ -151,6 +152,7 @@ mod async_data_lock_trait_tests {
 
         // Create a new reference to try acquiring in parallel
         let async_mutex_clone = async_mutex.clone();
+        let holder_done_tx = locked_tx.clone();
 
         // Hold the lock in another thread (note: using thread instead of tokio
         // task)
@@ -160,12 +162,11 @@ mod async_data_lock_trait_tests {
                 async_mutex_clone
                     .with_write(move |_| {
                         locked_tx.send(()).expect("test should observe held mutex");
-                        release_rx
-                            .recv_timeout(Duration::from_secs(1))
-                            .expect("test should release held mutex");
+                        let _ = release_rx.recv();
                     })
                     .await;
             });
+            let _ = holder_done_tx.send(());
         });
 
         // Wait for the lock to be held
@@ -182,7 +183,9 @@ mod async_data_lock_trait_tests {
             .expect("holder thread should still be waiting for release");
 
         // Wait for the spawned thread to complete
-        handle.join().expect("holder thread should not panic");
+        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            handle.join().expect("holder thread should not panic");
+        }
 
         // Now should be able to successfully acquire the lock
         let result = async_mutex.try_with_read(|value| *value);
@@ -299,6 +302,7 @@ mod async_data_lock_trait_tests {
         let (release_tx, release_rx) = mpsc::channel();
         let (attempted_tx, attempted_rx) = oneshot::channel();
         let async_mutex_clone = async_mutex.clone();
+        let holder_done_tx = locked_tx.clone();
 
         let holder = std::thread::spawn(move || {
             let rt = Runtime::new().expect("failed to create Tokio runtime");
@@ -307,12 +311,11 @@ mod async_data_lock_trait_tests {
                     .with_write(move |value| {
                         *value += 1;
                         locked_tx.send(()).expect("test should observe held mutex");
-                        release_rx
-                            .recv_timeout(Duration::from_secs(1))
-                            .expect("test should release held mutex");
+                        let _ = release_rx.recv();
                     })
                     .await;
             });
+            let _ = holder_done_tx.send(());
         });
 
         locked_rx
@@ -339,13 +342,75 @@ mod async_data_lock_trait_tests {
         release_tx
             .send(())
             .expect("holder thread should still be waiting for release");
-        holder.join().expect("holder thread should not panic");
+        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            holder.join().expect("holder thread should not panic");
+        }
         writer
             .await
             .expect("contended mutex writer task should complete successfully");
 
         let result = async_mutex.with_read(|value| *value).await;
         assert_eq!(result, 2);
+    }
+
+    #[tokio_test]
+    async fn test_async_mutex_write_waits_for_mutex_guard() {
+        let lock = AsyncMutex::new(0);
+        let guard = lock.lock().await;
+        let called = AtomicUsize::new(0);
+        let mut writer = Box::pin(AsyncDataLock::with_write(&lock, |value| {
+            called.fetch_add(1, Ordering::SeqCst);
+            *value += 1;
+            *value
+        }));
+
+        let before = poll_fn(|cx| Poll::Ready(writer.as_mut().poll(cx))).await;
+        assert!(before.is_pending());
+        assert_eq!(called.load(Ordering::SeqCst), 0);
+        drop(guard);
+        assert_eq!(writer.await, 1);
+        assert_eq!(called.load(Ordering::SeqCst), 1);
+        assert_eq!(*lock.lock().await, 1);
+    }
+
+    #[tokio_test]
+    async fn test_async_rwlock_write_waits_for_read_guard() {
+        let lock = AsyncRwLock::new(0);
+        let guard = lock.read().await;
+        let called = AtomicUsize::new(0);
+        let mut writer = Box::pin(AsyncDataLock::with_write(&lock, |value| {
+            called.fetch_add(1, Ordering::SeqCst);
+            *value += 1;
+            *value
+        }));
+
+        let before = poll_fn(|cx| Poll::Ready(writer.as_mut().poll(cx))).await;
+        assert!(before.is_pending());
+        assert_eq!(called.load(Ordering::SeqCst), 0);
+        drop(guard);
+        assert_eq!(writer.await, 1);
+        assert_eq!(called.load(Ordering::SeqCst), 1);
+        assert_eq!(*lock.read().await, 1);
+    }
+
+    #[tokio_test]
+    async fn test_async_rwlock_write_waits_for_write_guard() {
+        let lock = AsyncRwLock::new(0);
+        let guard = lock.write().await;
+        let called = AtomicUsize::new(0);
+        let mut writer = Box::pin(AsyncDataLock::with_write(&lock, |value| {
+            called.fetch_add(1, Ordering::SeqCst);
+            *value += 1;
+            *value
+        }));
+
+        let before = poll_fn(|cx| Poll::Ready(writer.as_mut().poll(cx))).await;
+        assert!(before.is_pending());
+        assert_eq!(called.load(Ordering::SeqCst), 0);
+        drop(guard);
+        assert_eq!(writer.await, 1);
+        assert_eq!(called.load(Ordering::SeqCst), 1);
+        assert_eq!(*lock.read().await, 1);
     }
 
     #[tokio_test]

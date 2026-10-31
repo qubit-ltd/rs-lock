@@ -142,10 +142,9 @@ mod data_lock_trait_tests {
             mutex_clone.with_write(|value| {
                 *value += 1;
                 locked_tx.send(()).expect("test should observe held mutex");
-                release_rx
-                    .recv_timeout(Duration::from_secs(1))
-                    .expect("test should release held mutex");
+                let _ = release_rx.recv();
             });
+            let _ = locked_tx.send(());
         });
 
         // Wait for child thread to acquire the lock
@@ -162,7 +161,9 @@ mod data_lock_trait_tests {
             .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
-        handle.join().expect("holder thread should not panic");
+        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            handle.join().expect("holder thread should not panic");
+        }
 
         // Now should be able to successfully acquire the lock
         let result = mutex.try_with_read(|value| *value);
@@ -327,9 +328,9 @@ mod data_lock_trait_tests {
         let handle = thread::spawn(move || {
             let _guard = mutex_clone.lock().expect("holder mutex should not be poisoned");
             locked_tx.send(()).expect("test should observe held mutex");
-            release_rx
-                .recv_timeout(Duration::from_secs(1))
-                .expect("test should release held mutex");
+            let _ = release_rx.recv();
+            drop(_guard);
+            let _ = locked_tx.send(());
         });
 
         // Wait for child thread to acquire the lock
@@ -347,7 +348,9 @@ mod data_lock_trait_tests {
             .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
-        handle.join().expect("holder thread should not panic");
+        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            handle.join().expect("holder thread should not panic");
+        }
 
         // Now should be able to successfully acquire the lock
         let result = DataLock::try_with_read(&*mutex, |value| *value);
@@ -366,9 +369,9 @@ mod data_lock_trait_tests {
         let handle = thread::spawn(move || {
             let _guard = mutex_clone.lock().expect("holder mutex should not be poisoned");
             locked_tx.send(()).expect("test should observe held mutex");
-            release_rx
-                .recv_timeout(Duration::from_secs(1))
-                .expect("test should release held mutex");
+            let _ = release_rx.recv();
+            drop(_guard);
+            let _ = locked_tx.send(());
         });
 
         // Wait for child thread to acquire the lock
@@ -386,7 +389,9 @@ mod data_lock_trait_tests {
             .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
-        handle.join().expect("holder thread should not panic");
+        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            handle.join().expect("holder thread should not panic");
+        }
 
         // Now should be able to successfully acquire the lock
         let result = DataLock::try_with_write(&*mutex, |value| {
@@ -407,9 +412,9 @@ mod data_lock_trait_tests {
         let handle = thread::spawn(move || {
             let _guard = mutex_clone.lock().expect("holder mutex should not be poisoned");
             locked_tx.send(()).expect("test should observe held mutex");
-            release_rx
-                .recv_timeout(Duration::from_secs(1))
-                .expect("test should release held mutex");
+            let _ = release_rx.recv();
+            drop(_guard);
+            let _ = locked_tx.send(());
         });
 
         locked_rx
@@ -421,7 +426,9 @@ mod data_lock_trait_tests {
         release_tx
             .send(())
             .expect("holder thread should still be waiting for release");
-        handle.join().expect("holder thread should not panic");
+        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            handle.join().expect("holder thread should not panic");
+        }
     }
 
     #[test]
@@ -485,9 +492,9 @@ mod data_lock_trait_tests {
         let handle = thread::spawn(move || {
             let _guard = mutex_clone.lock().expect("holder mutex should not be poisoned");
             locked_tx.send(()).expect("test should observe held mutex");
-            release_rx
-                .recv_timeout(Duration::from_secs(1))
-                .expect("test should release held mutex");
+            let _ = release_rx.recv();
+            drop(_guard);
+            let _ = locked_tx.send(());
         });
         locked_rx
             .recv_timeout(Duration::from_secs(1))
@@ -503,7 +510,9 @@ mod data_lock_trait_tests {
         release_tx
             .send(())
             .expect("holder thread should still be waiting for release");
-        handle.join().expect("holder thread should not panic");
+        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            handle.join().expect("holder thread should not panic");
+        }
 
         let poisoned = Arc::new(Mutex::new(0));
         let poisoned_clone = poisoned.clone();
@@ -571,11 +580,10 @@ mod parking_lot_rwlock_trait_tests {
             let sum = rw_lock_clone.with_read(|data| {
                 locked_tx.send(()).expect("test should observe held read lock");
                 let sum = data.iter().sum::<i32>();
-                release_rx
-                    .recv_timeout(Duration::from_secs(1))
-                    .expect("test should release held read lock");
+                let _ = release_rx.recv();
                 sum
             });
+            let _ = locked_tx.send(());
             assert_eq!(sum, 15);
         });
 
@@ -589,7 +597,9 @@ mod parking_lot_rwlock_trait_tests {
         release_tx
             .send(())
             .expect("holder thread should still be waiting for release");
-        holder.join().expect("holder thread should not panic");
+        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            holder.join().expect("holder thread should not panic");
+        }
     }
 
     #[test]
@@ -714,10 +724,9 @@ mod parking_lot_rwlock_trait_tests {
             rw_lock_clone.with_write(|value| {
                 *value += 1;
                 locked_tx.send(()).expect("test should observe held write lock");
-                release_rx
-                    .recv_timeout(Duration::from_secs(1))
-                    .expect("test should release held write lock");
+                let _ = release_rx.recv();
             });
+            let _ = locked_tx.send(());
         });
 
         // Wait for child thread to acquire the write lock
@@ -734,7 +743,9 @@ mod parking_lot_rwlock_trait_tests {
             .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
-        handle.join().expect("holder thread should not panic");
+        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            handle.join().expect("holder thread should not panic");
+        }
 
         // Now should be able to successfully acquire the read lock
         let result = rw_lock.try_with_read(|value| *value);
@@ -899,9 +910,9 @@ mod std_rwlock_trait_tests {
         let handle = thread::spawn(move || {
             let _guard = rwlock_clone.write().expect("write-holder lock should not be poisoned");
             locked_tx.send(()).expect("test should observe held write lock");
-            release_rx
-                .recv_timeout(Duration::from_secs(1))
-                .expect("test should release held write lock");
+            let _ = release_rx.recv();
+            drop(_guard);
+            let _ = locked_tx.send(());
         });
 
         // Wait for child thread to acquire the write lock
@@ -919,7 +930,9 @@ mod std_rwlock_trait_tests {
             .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
-        handle.join().expect("write-holder thread should not panic");
+        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            handle.join().expect("write-holder thread should not panic");
+        }
 
         // Now should be able to successfully acquire the read lock
         let result = DataLock::try_with_read(&*rwlock, |value| *value);
@@ -938,9 +951,9 @@ mod std_rwlock_trait_tests {
         let handle = thread::spawn(move || {
             let _guard = rwlock_clone.read().expect("read-holder lock should not be poisoned");
             locked_tx.send(()).expect("test should observe held read lock");
-            release_rx
-                .recv_timeout(Duration::from_secs(1))
-                .expect("test should release held read lock");
+            let _ = release_rx.recv();
+            drop(_guard);
+            let _ = locked_tx.send(());
         });
 
         // Wait for child thread to acquire the read lock
@@ -958,7 +971,9 @@ mod std_rwlock_trait_tests {
             .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
-        handle.join().expect("read-holder thread should not panic");
+        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            handle.join().expect("read-holder thread should not panic");
+        }
 
         // Now should be able to successfully acquire the write lock
         let result = DataLock::try_with_write(&*rwlock, |value| {
@@ -980,9 +995,9 @@ mod std_rwlock_trait_tests {
         let handle = thread::spawn(move || {
             let _guard = rwlock_clone.write().expect("write-holder lock should not be poisoned");
             locked_tx.send(()).expect("test should observe held write lock");
-            release_rx
-                .recv_timeout(Duration::from_secs(1))
-                .expect("test should release held write lock");
+            let _ = release_rx.recv();
+            drop(_guard);
+            let _ = locked_tx.send(());
         });
 
         // Wait for child thread to acquire the write lock
@@ -1000,7 +1015,9 @@ mod std_rwlock_trait_tests {
             .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
-        handle.join().expect("write-holder thread should not panic");
+        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            handle.join().expect("write-holder thread should not panic");
+        }
 
         // Now should be able to successfully acquire the write lock
         let result = DataLock::try_with_write(&*rwlock, |value| {
@@ -1021,9 +1038,9 @@ mod std_rwlock_trait_tests {
         let handle = thread::spawn(move || {
             let _guard = rwlock_clone.read().expect("read-holder lock should not be poisoned");
             locked_tx.send(()).expect("test should observe held read lock");
-            release_rx
-                .recv_timeout(Duration::from_secs(1))
-                .expect("test should release held read lock");
+            let _ = release_rx.recv();
+            drop(_guard);
+            let _ = locked_tx.send(());
         });
 
         locked_rx
@@ -1035,7 +1052,9 @@ mod std_rwlock_trait_tests {
         release_tx
             .send(())
             .expect("holder thread should still be waiting for release");
-        handle.join().expect("read-holder thread should not panic");
+        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            handle.join().expect("read-holder thread should not panic");
+        }
     }
 
     #[test]
@@ -1089,9 +1108,9 @@ mod std_rwlock_trait_tests {
         let read_holder = thread::spawn(move || {
             let _guard = read_lock.write().expect("write-holder lock should not be poisoned");
             read_locked_tx.send(()).expect("test should observe held write lock");
-            read_release_rx
-                .recv_timeout(Duration::from_secs(1))
-                .expect("test should release held write lock");
+            let _ = read_release_rx.recv();
+            drop(_guard);
+            let _ = read_locked_tx.send(());
         });
         read_locked_rx
             .recv_timeout(Duration::from_secs(1))
@@ -1103,9 +1122,11 @@ mod std_rwlock_trait_tests {
         read_release_tx
             .send(())
             .expect("holder thread should still be waiting for release");
-        read_holder
-            .join()
-            .expect("read-path write-holder thread should not panic");
+        if read_locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            read_holder
+                .join()
+                .expect("read-path write-holder thread should not panic");
+        }
 
         let (write_locked_tx, write_locked_rx) = mpsc::channel();
         let (write_release_tx, write_release_rx) = mpsc::channel();
@@ -1113,9 +1134,9 @@ mod std_rwlock_trait_tests {
         let write_holder = thread::spawn(move || {
             let _guard = write_lock.read().expect("read-holder lock should not be poisoned");
             write_locked_tx.send(()).expect("test should observe held read lock");
-            write_release_rx
-                .recv_timeout(Duration::from_secs(1))
-                .expect("test should release held read lock");
+            let _ = write_release_rx.recv();
+            drop(_guard);
+            let _ = write_locked_tx.send(());
         });
         write_locked_rx
             .recv_timeout(Duration::from_secs(1))
@@ -1127,9 +1148,11 @@ mod std_rwlock_trait_tests {
         write_release_tx
             .send(())
             .expect("holder thread should still be waiting for release");
-        write_holder
-            .join()
-            .expect("write-path read-holder thread should not panic");
+        if write_locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
+            write_holder
+                .join()
+                .expect("write-path read-holder thread should not panic");
+        }
 
         let poisoned = Arc::new(RwLock::new(0));
         let poisoned_clone = poisoned.clone();

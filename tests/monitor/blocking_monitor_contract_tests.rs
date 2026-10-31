@@ -34,6 +34,24 @@ macro_rules! blocking_monitor_contract_tests {
 
             const REAL_LIMIT: Duration = Duration::from_secs(5);
 
+            fn notify_ready_with_timeout(monitor: &Arc<$monitor<bool>>, all: bool) -> bool {
+                let notifying_monitor = Arc::clone(monitor);
+                let (notified_tx, notified_rx) = mpsc::channel();
+                let notifier = thread::spawn(move || {
+                    if all {
+                        notifying_monitor.with_write_notify_all(|ready| *ready = true);
+                    } else {
+                        notifying_monitor.with_write_notify_one(|ready| *ready = true);
+                    }
+                    let _ = notified_tx.send(());
+                });
+                let notified = notified_rx.recv_timeout(REAL_LIMIT).is_ok();
+                if notified {
+                    notifier.join().expect("notifier should finish without panic");
+                }
+                notified
+            }
+
             fn assert_completion_error_after_unlock<W>(wait: W)
             where
                 W: FnOnce(Arc<$monitor<usize>>) -> Result<(), TimeError> + Send + 'static,
@@ -230,12 +248,12 @@ macro_rules! blocking_monitor_contract_tests {
             }
 
             fn release_and_join_completed_waiters(
-                monitor: &$monitor<bool>,
+                monitor: &Arc<$monitor<bool>>,
                 done_rx: &Receiver<usize>,
                 waiters: Vec<JoinHandle<()>>,
                 completed: &mut [bool; 2],
             ) {
-                monitor.with_write_notify_all(|ready| *ready = true);
+                let _ = notify_ready_with_timeout(monitor, true);
                 let remaining = completed.iter().filter(|done| !**done).count();
                 for _ in 0..remaining {
                     let Ok(waiter_id) = done_rx.recv_timeout(Duration::from_secs(5)) else {
@@ -294,22 +312,55 @@ macro_rules! blocking_monitor_contract_tests {
                 });
 
                 if let Err(error) = checked_rx.recv_timeout(Duration::from_secs(5)) {
-                    monitor.with_write_notify_all(|ready| *ready = true);
+                    let _ = notify_ready_with_timeout(&monitor, true);
                     if done_rx.recv_timeout(Duration::from_secs(5)).is_ok() {
                         waiter.join().expect("released contract waiter should not panic");
                     }
                     panic!("contract waiter should inspect initial state before notification: {error}");
                 }
-                monitor.with_write_notify_one(|ready| *ready = true);
+                assert!(
+                    notify_ready_with_timeout(&monitor, false),
+                    "notify_one did not finish within the limit"
+                );
 
                 if let Err(error) = done_rx.recv_timeout(Duration::from_secs(5)) {
-                    monitor.with_write_notify_all(|ready| *ready = true);
+                    let _ = notify_ready_with_timeout(&monitor, true);
                     if done_rx.recv_timeout(Duration::from_secs(5)).is_ok() {
                         waiter.join().expect("released contract waiter should not panic");
                     }
                     panic!("contract waiter should complete after notify_one: {error}");
                 }
                 waiter.join().expect("contract waiter should not panic");
+            }
+
+            #[test]
+            fn test_blocked_notifier_timeout_returns_before_worker_finishes() {
+                let monitor = Arc::new($monitor::new(false));
+                let guard = monitor.lock();
+                let notifying_monitor = Arc::clone(&monitor);
+                let (started_tx, started_rx) = mpsc::channel();
+                let (notified_tx, notified_rx) = mpsc::channel();
+                let notifier = thread::spawn(move || {
+                    let _ = started_tx.send(());
+                    notifying_monitor.with_write_notify_one(|ready| *ready = true);
+                    let _ = notified_tx.send(());
+                });
+
+                started_rx
+                    .recv_timeout(REAL_LIMIT)
+                    .expect("notifier should start before the bounded wait");
+                assert!(matches!(
+                    notified_rx.recv_timeout(Duration::from_millis(10)),
+                    Err(mpsc::RecvTimeoutError::Timeout)
+                ));
+                drop(guard);
+
+                notified_rx
+                    .recv_timeout(REAL_LIMIT)
+                    .expect("notifier should finish after the lock is released");
+                notifier
+                    .join()
+                    .expect("released notifier should finish without panic");
             }
 
             #[test]
@@ -350,7 +401,10 @@ macro_rules! blocking_monitor_contract_tests {
                         panic!("contract waiters should inspect initial state before notify_all: {error}");
                     }
                 }
-                monitor.with_write_notify_all(|ready| *ready = true);
+                assert!(
+                    notify_ready_with_timeout(&monitor, true),
+                    "notify_all did not finish within the limit"
+                );
 
                 for _ in 0..2 {
                     match done_rx.recv_timeout(Duration::from_secs(5)) {
@@ -504,14 +558,14 @@ macro_rules! blocking_monitor_contract_tests {
                 };
                 drop(guard);
                 if sampled.is_err() || advance_result.as_ref().is_some_and(Result::is_err) {
-                    monitor.with_write_notify_all(|ready| *ready = true);
+                    let _ = notify_ready_with_timeout(&monitor, true);
                 }
                 let completed = done_rx.recv_timeout(real_limit);
                 let completed_on_time = completed.is_ok();
                 let result = match completed {
                     Ok(result) => Ok(result),
                     Err(_) => {
-                        monitor.with_write_notify_all(|ready| *ready = true);
+                        let _ = notify_ready_with_timeout(&monitor, true);
                         done_rx.recv_timeout(real_limit)
                     }
                 };

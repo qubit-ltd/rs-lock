@@ -596,6 +596,8 @@ fn test_std_monitor_wait_while_for_excludes_initial_lock_contention_from_timeout
     let (done_tx, done_rx) = mpsc::channel();
     let waiter_monitor = Arc::clone(&monitor);
     let waiter = thread::spawn(move || {
+        // This signal means the thread started; the following call may still block
+        // acquiring the lock.
         started_tx.send(()).expect("test should observe wait start");
         let result = waiter_monitor.wait_while_for(WAIT_TIMEOUT, |ready| !*ready, |_| ());
         done_tx.send(result).expect("test should receive wait result");

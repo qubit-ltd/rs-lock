@@ -68,12 +68,51 @@ fn test_blocking_timed_wait_returns_ready_after_notification() {
         .recv_timeout(Duration::from_secs(5))
         .expect("waiter should check the initial state");
     assert!(clock.wait_for_waiters(1, Duration::from_secs(5)));
-    monitor.with_write(|ready| *ready = true);
-    monitor.notify_one();
+    let notifying_monitor = Arc::clone(&monitor);
+    let (notified_tx, notified_rx) = mpsc::channel();
+    let notifier = thread::spawn(move || {
+        notifying_monitor.with_write_notify_one(|ready| *ready = true);
+        let _ = notified_tx.send(());
+    });
+    let notified = notified_rx.recv_timeout(Duration::from_secs(5));
+    if notified.is_ok() {
+        notifier.join().expect("notifier should finish without panic");
+    }
+    assert!(notified.is_ok(), "notification did not finish within the limit");
     let result = done_rx
         .recv_timeout(Duration::from_secs(5))
         .expect("notification should complete the wait")
         .expect("manual timer should complete without error");
     assert_eq!(result, WaitTimeoutResult::Ready(7));
     waiter.join().expect("waiter should finish after notification");
+}
+
+/// Verifies a timed-out control wait can release a blocked notifier and join
+/// it.
+#[test]
+fn test_blocked_notifier_timeout_returns_before_worker_finishes() {
+    let monitor = Arc::new(StdMonitor::new(false));
+    let guard = monitor.lock();
+    let notifying_monitor = Arc::clone(&monitor);
+    let (started_tx, started_rx) = mpsc::channel();
+    let (notified_tx, notified_rx) = mpsc::channel();
+    let notifier = thread::spawn(move || {
+        let _ = started_tx.send(());
+        notifying_monitor.with_write_notify_one(|ready| *ready = true);
+        let _ = notified_tx.send(());
+    });
+
+    started_rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("notifier should start before the bounded wait");
+    assert!(matches!(
+        notified_rx.recv_timeout(Duration::from_millis(10)),
+        Err(mpsc::RecvTimeoutError::Timeout)
+    ));
+    drop(guard);
+
+    notified_rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("notifier should finish after the lock is released");
+    notifier.join().expect("released notifier should finish without panic");
 }

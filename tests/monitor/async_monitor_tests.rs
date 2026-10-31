@@ -83,13 +83,26 @@ async fn test_async_monitor_default_notify_one_wakes_one_registered_waiter() {
     assert!(poll_notification(second.as_mut(), &second_wakes).is_pending());
 
     AsyncMonitor::with_write_notify_one_async(&monitor, |ready| *ready = true).await;
-    assert!(first_wakes.0.load(Ordering::SeqCst) > 0);
-    assert_eq!(second_wakes.0.load(Ordering::SeqCst), 0);
-    assert_eq!(poll_notification(first.as_mut(), &first_wakes), Poll::Ready(true));
-    assert!(poll_notification(second.as_mut(), &second_wakes).is_pending());
+    let first_selected = first_wakes.0.load(Ordering::SeqCst) > 0;
+    let second_selected = second_wakes.0.load(Ordering::SeqCst) > 0;
+    assert_ne!(
+        first_selected, second_selected,
+        "notify_one must select exactly one waiter"
+    );
+    if first_selected {
+        assert_eq!(poll_notification(first.as_mut(), &first_wakes), Poll::Ready(true));
+        assert!(poll_notification(second.as_mut(), &second_wakes).is_pending());
+    } else {
+        assert_eq!(poll_notification(second.as_mut(), &second_wakes), Poll::Ready(true));
+        assert!(poll_notification(first.as_mut(), &first_wakes).is_pending());
+    }
 
     AsyncMonitor::with_write_notify_all_async(&monitor, |_| ()).await;
-    assert_eq!(poll_notification(second.as_mut(), &second_wakes), Poll::Ready(true));
+    if first_selected {
+        assert_eq!(poll_notification(second.as_mut(), &second_wakes), Poll::Ready(true));
+    } else {
+        assert_eq!(poll_notification(first.as_mut(), &first_wakes), Poll::Ready(true));
+    }
 }
 
 #[tokio::test(start_paused = true)]

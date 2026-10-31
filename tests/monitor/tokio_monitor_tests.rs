@@ -1186,6 +1186,7 @@ async fn test_tokio_monitor_async_wait_while_for_excludes_initial_lock_contentio
 #[tokio::test(start_paused = true)]
 async fn test_tokio_monitor_async_wait_while_for_reuses_fixed_timeout_deadline() {
     let monitor = TokioMonitor::current(false);
+    let started_at = tokio::time::Instant::now();
     let wait = monitor.wait_while_for_async(Duration::from_millis(10), |ready| !*ready, |_| ());
     tokio::pin!(wait);
     assert!(
@@ -1205,7 +1206,9 @@ async fn test_tokio_monitor_async_wait_while_for_reuses_fixed_timeout_deadline()
     }
 
     tokio::time::advance(Duration::from_millis(2)).await;
-    assert_time_result_eq!(wait.await, Ok(WaitTimeoutResult::TimedOut));
+    let observed = std::future::poll_fn(|context| Poll::Ready(wait.as_mut().poll(context))).await;
+    assert!(matches!(observed, Poll::Ready(Ok(WaitTimeoutResult::TimedOut))));
+    assert_eq!(started_at.elapsed(), Duration::from_millis(10));
 }
 
 /// Verifies that zero timeout evaluates the initial predicate exactly once.

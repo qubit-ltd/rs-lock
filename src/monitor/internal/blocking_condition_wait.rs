@@ -248,3 +248,58 @@ where
     }
     wait_while_with_timer_locked(guard, future, waiting, f, wait)
 }
+
+#[cfg(all(test, not(loom)))]
+mod tests {
+    use std::cell::RefCell;
+    use std::task::Poll;
+    use std::time::Duration;
+
+    use qubit_clock::ManualMonotonicClock;
+    use qubit_clock::MonotonicClock;
+
+    use super::wait_while_for;
+    use crate::monitor::WaitTimeoutResult;
+    use crate::monitor::WaitTimeoutStatus;
+    use crate::monitor::internal::BlockingConditionWaiter;
+
+    #[test]
+    fn test_lock_acquisition_precedes_relative_budget_sample() {
+        let clock = ManualMonotonicClock::new_shared();
+        let timer = clock.new_timer();
+        let state = RefCell::new(false);
+        let result = wait_while_for(
+            &timer,
+            Duration::from_millis(20),
+            || {
+                let guard = state.borrow_mut();
+                clock
+                    .advance(Duration::from_millis(60))
+                    .expect("manual clock should advance in lock");
+                guard
+            },
+            |ready| !*ready,
+            |_| (),
+            |_guard, future| {
+                assert!(matches!(
+                    BlockingConditionWaiter::poll_timer_without_waiter(future),
+                    Poll::Pending
+                ));
+                let deadline = clock
+                    .wait_for_next_deadline(Duration::from_secs(1))
+                    .expect("condition-wait deadline should be registered");
+                assert_eq!(deadline.elapsed_since_origin(), Duration::from_millis(80));
+                let _ = clock
+                    .advance_to_next_deadline()
+                    .expect("registered deadline should advance");
+                assert!(matches!(
+                    BlockingConditionWaiter::poll_timer_without_waiter(future),
+                    Poll::Ready(Ok(()))
+                ));
+                Ok(WaitTimeoutStatus::TimedOut)
+            },
+        );
+
+        assert!(matches!(result, Ok(WaitTimeoutResult::TimedOut)));
+    }
+}
