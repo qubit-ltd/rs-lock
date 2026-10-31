@@ -24,6 +24,13 @@ use crate::lock::TryLockError;
 /// cancels that attempt and does not produce a guard. Once acquisition
 /// resolves, the returned guard owns the lock until the guard is dropped.
 ///
+/// `AsyncLock` does not imply exclusive entry. An
+/// [`AsyncReadLock`](crate::AsyncReadLock) adapter acquires shared read access,
+/// so multiple guards may coexist. Generic code must not rely on this trait
+/// alone for mutual exclusion. Callers that require exclusive entry must
+/// select a mutex or an [`AsyncWriteLock`](crate::AsyncWriteLock) adapter
+/// whose acquisition contract provides it.
+///
 /// # Examples
 ///
 /// ```rust
