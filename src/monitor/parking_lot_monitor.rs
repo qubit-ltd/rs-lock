@@ -609,6 +609,11 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// # Errors
     ///
+    /// Returns [`TimeError::InstantOverflow`] if the initial predicate requires
+    /// waiting, `timeout` is nonzero, and constructing the fixed deadline
+    /// overflows. An immediately ready predicate or a zero timeout skips
+    /// deadline construction. Overflow is an error, not a timeout, and prevents
+    /// `f` from running.
     /// Returns Timer registration or completion errors rather than reporting
     /// them as timeouts. After waiting begins, such an error takes precedence
     /// over post-wait readiness.
@@ -804,6 +809,11 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// # Errors
     ///
+    /// Returns [`TimeError::InstantOverflow`] if the initial predicate requires
+    /// waiting, `timeout` is nonzero, and constructing the fixed deadline
+    /// overflows. An immediately ready predicate or a zero timeout skips
+    /// deadline construction. Overflow is an error, not a timeout, and prevents
+    /// `f` from running.
     /// Returns Timer registration or completion errors rather than reporting
     /// them as timeouts. After waiting begins, such an error takes precedence
     /// over post-wait readiness.
@@ -976,6 +986,10 @@ impl<T> ParkingLotMonitor<T> {
     ///
     /// # Errors
     ///
+    /// Returns [`TimeError::InstantOverflow`] if the initial predicate requires
+    /// waiting, `timeout` is nonzero, and constructing the fixed deadline
+    /// overflows. An immediately ready predicate or a zero timeout skips
+    /// deadline construction. Overflow is an error, not a timeout.
     /// Returns Timer registration or completion errors rather than reporting
     /// them as timeouts. After waiting begins, such an error takes precedence
     /// over post-wait readiness.

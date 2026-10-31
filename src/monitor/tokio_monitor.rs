@@ -43,20 +43,25 @@ use super::internal::WaiterRegistry;
 /// state guard, and unregisters its Tokio notification waiter without running
 /// the action or rolling back protected-state changes. If `notify_one` has
 /// already selected that waiter, cancellation discards that selection instead
-/// of transferring it to another or future waiter. Timed waits align with
-/// [`std::sync::Condvar::wait_timeout_while`]: after acquiring the state lock
-/// and before the first predicate check, they sample one fixed deadline. The
-/// initial mutex contention is excluded, but predicate work, registration, and
-/// waiting consume the condition-wait budget; a signal cannot restart or
-/// extend it. A timed wait may return after the timeout while reacquiring the
+/// of transferring it to another or future waiter. Relative `*_for_async`
+/// waits align with [`std::sync::Condvar::wait_timeout_while`]: they sample one
+/// fixed deadline after acquiring the state lock and before the first predicate
+/// check. Initial mutex contention is excluded from that condition-wait budget.
+/// Absolute `*_with_deadline_async` waits use the caller's deadline, so time
+/// before the first poll and initial mutex contention consume the remaining
+/// budget.
+/// Predicate work, registration, and waiting consume the relative condition-
+/// wait budget; a signal cannot restart or extend the deadline. A timed wait
+/// may return after the timeout while reacquiring the
 /// state lock. When a signal and the deadline are both ready, the deadline is
 /// selected first, followed by one final locked predicate check. The default
 /// Tokio timer captures a
 /// runtime handle during monitor construction. Its target runtime must remain
 /// alive with time enabled and be driven while a timed wait is pending, though
 /// the wait future may be polled from another runtime context. Injected timers
-/// retain their own progress requirements. An immediately ready predicate and
-/// a zero budget do not create a timer future. Closures and predicates execute
+/// retain their own progress requirements. An immediately ready predicate does
+/// not create a timer future, and a zero budget does not create one for relative
+/// waits. Closures and predicates execute
 /// while the state mutex is held and must not re-enter the same monitor; doing
 /// so can deadlock.
 ///

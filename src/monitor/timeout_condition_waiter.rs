@@ -361,6 +361,11 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     ///
     /// # Errors
     ///
+    /// Returns [`TimeError::InstantOverflow`] if the initial predicate requires
+    /// waiting, `timeout` is nonzero, and constructing the fixed deadline
+    /// overflows. An immediately ready predicate or a zero timeout skips
+    /// deadline construction. Overflow is an error, not a timeout, and prevents
+    /// `action` from running.
     /// Returns Timer registration or completion errors rather than reporting
     /// them as timeouts. After waiting begins, such an error takes precedence
     /// over a post-wait ready predicate and prevents `action` from running.
@@ -405,6 +410,10 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     ///
     /// # Errors
     ///
+    /// Returns [`TimeError::InstantOverflow`] if the initial predicate requires
+    /// waiting, `timeout` is nonzero, and constructing the fixed deadline
+    /// overflows. An immediately ready predicate or a zero timeout skips
+    /// deadline construction. Overflow is an error, not a timeout.
     /// Returns Timer registration or completion errors rather than reporting
     /// them as timeouts. After waiting begins, such an error takes precedence
     /// over a post-wait ready predicate.
@@ -444,6 +453,11 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     ///
     /// # Errors
     ///
+    /// Returns [`TimeError::InstantOverflow`] if the initial predicate requires
+    /// waiting, `timeout` is nonzero, and constructing the fixed deadline
+    /// overflows. An immediately ready predicate or a zero timeout skips
+    /// deadline construction. Overflow is an error, not a timeout, and prevents
+    /// `action` from running.
     /// Returns Timer registration or completion errors rather than reporting
     /// them as timeouts. After waiting begins, such an error takes precedence
     /// over a post-wait ready predicate and prevents `action` from running.
