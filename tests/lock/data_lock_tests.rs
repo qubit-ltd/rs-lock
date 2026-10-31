@@ -829,8 +829,7 @@ mod std_rwlock_trait_tests {
 
         let observed_while_read_locked = done_rx.recv_timeout(Duration::from_secs(5));
         drop(first_reader);
-        let finished = observed_while_read_locked.is_ok()
-            || done_rx.recv_timeout(Duration::from_secs(5)).is_ok();
+        let finished = observed_while_read_locked.is_ok() || done_rx.recv_timeout(Duration::from_secs(5)).is_ok();
         if finished {
             worker.join().expect("reader should not panic");
         } else {
@@ -869,8 +868,7 @@ mod std_rwlock_trait_tests {
 
         let observed_while_read_locked = done_rx.recv_timeout(Duration::from_secs(5));
         drop(first_reader);
-        let finished = observed_while_read_locked.is_ok()
-            || done_rx.recv_timeout(Duration::from_secs(5)).is_ok();
+        let finished = observed_while_read_locked.is_ok() || done_rx.recv_timeout(Duration::from_secs(5)).is_ok();
         if finished {
             worker.join().expect("try-reader should not panic");
         } else {

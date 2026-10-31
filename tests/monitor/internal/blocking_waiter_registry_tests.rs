@@ -51,10 +51,7 @@ fn test_blocking_waiter_registry_notifies_all_ready_waiters() {
         let id = checked_rx
             .recv_timeout(real_limit)
             .expect("each waiter should inspect the blocking predicate");
-        assert!(
-            !checked[id],
-            "predicate handshake should identify distinct waiters"
-        );
+        assert!(!checked[id], "predicate handshake should identify distinct waiters");
         checked[id] = true;
     }
     assert_eq!(checked, [true; 2]);
@@ -86,8 +83,5 @@ fn test_blocking_waiter_registry_notifies_all_ready_waiters() {
     }
     assert_eq!(notified, Ok(()), "broadcast should return");
     assert!(unique, "completion must identify distinct waiters");
-    assert_eq!(
-        completed, [true; 2],
-        "both registered waiters should finish"
-    );
+    assert_eq!(completed, [true; 2], "both registered waiters should finish");
 }
