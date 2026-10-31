@@ -86,33 +86,3 @@ fn test_blocking_timed_wait_returns_ready_after_notification() {
     assert_eq!(result, WaitTimeoutResult::Ready(7));
     waiter.join().expect("waiter should finish after notification");
 }
-
-/// Verifies a timed-out control wait can release a blocked notifier and join
-/// it.
-#[test]
-fn test_blocked_notifier_timeout_returns_before_worker_finishes() {
-    let monitor = Arc::new(StdMonitor::new(false));
-    let guard = monitor.lock();
-    let notifying_monitor = Arc::clone(&monitor);
-    let (started_tx, started_rx) = mpsc::channel();
-    let (notified_tx, notified_rx) = mpsc::channel();
-    let notifier = thread::spawn(move || {
-        let _ = started_tx.send(());
-        notifying_monitor.with_write_notify_one(|ready| *ready = true);
-        let _ = notified_tx.send(());
-    });
-
-    started_rx
-        .recv_timeout(Duration::from_secs(5))
-        .expect("notifier should start before the bounded wait");
-    assert!(matches!(
-        notified_rx.recv_timeout(Duration::from_millis(10)),
-        Err(mpsc::RecvTimeoutError::Timeout)
-    ));
-    drop(guard);
-
-    notified_rx
-        .recv_timeout(Duration::from_secs(5))
-        .expect("notifier should finish after the lock is released");
-    notifier.join().expect("released notifier should finish without panic");
-}

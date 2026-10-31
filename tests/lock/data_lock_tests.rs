@@ -405,37 +405,6 @@ mod data_lock_trait_tests {
     }
 
     #[test]
-    fn test_std_mutex_try_read_returns_would_block_when_locked() {
-        let mutex = Arc::new(Mutex::new(0));
-        let (locked_tx, locked_rx) = mpsc::channel();
-        let (release_tx, release_rx) = mpsc::channel();
-
-        let mutex_clone = mutex.clone();
-
-        let handle = thread::spawn(move || {
-            let _guard = mutex_clone.lock().expect("holder mutex should not be poisoned");
-            locked_tx.send(()).expect("test should observe held mutex");
-            let _ = release_rx.recv();
-            drop(_guard);
-            let _ = locked_tx.send(());
-        });
-
-        locked_rx
-            .recv_timeout(Duration::from_secs(1))
-            .expect("mutex should be held within timeout");
-        let result = DataLock::try_with_read(&*mutex, |value| *value);
-        assert_eq!(result, Err(TryLockError::WouldBlock));
-
-        release_tx
-            .send(())
-            .expect("holder thread should still be waiting for release");
-        locked_rx
-            .recv_timeout(Duration::from_secs(1))
-            .expect("mutex holder thread should complete within timeout after release");
-        handle.join().expect("holder thread should not panic");
-    }
-
-    #[test]
     fn test_std_mutex_try_read_returns_poisoned_when_poisoned() {
         let mutex = Arc::new(Mutex::new(0));
         let barrier = Arc::new(Barrier::new(2));

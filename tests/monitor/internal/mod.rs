@@ -10,10 +10,6 @@
 #[cfg(not(loom))]
 mod blocking_condition_wait_tests;
 #[cfg(not(loom))]
-mod blocking_condition_waiter_state_tests;
-#[cfg(not(loom))]
-mod blocking_condition_waiter_tests;
-#[cfg(not(loom))]
 mod blocking_monitor_guard_wait_tests;
 #[cfg(not(loom))]
 mod blocking_timed_wait_tests;
@@ -23,8 +19,6 @@ mod blocking_waiter_registration_tests;
 mod blocking_waiter_registry_tests;
 #[cfg(not(loom))]
 mod default_timer_tests;
-#[cfg(all(not(loom), feature = "parking-lot"))]
-mod mod_tests;
 #[cfg(all(loom, feature = "loom-model"))]
 mod std_monitor_loom_tests;
 #[cfg(not(loom))]

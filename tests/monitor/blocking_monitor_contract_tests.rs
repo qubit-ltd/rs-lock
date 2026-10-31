@@ -305,7 +305,8 @@ macro_rules! blocking_monitor_contract_tests {
                             }
                             *ready
                         },
-                        |_| {
+                        |ready| {
+                            assert!(*ready, "ready action should observe the updated protected state");
                             done_tx.send(()).expect("contract waiter should complete");
                         },
                     );

@@ -49,11 +49,11 @@ fn test_monitor_trait_accepts_arc_wrapped_implementation() {
     use_monitor(&Arc::new(StdMonitor::new(false)));
 }
 
-/// Verifies a parking-lot handle satisfies [`Monitor`].
+/// Verifies a bare parking-lot monitor satisfies [`Monitor`].
 #[cfg(feature = "parking-lot")]
 #[test]
 fn test_monitor_trait_accepts_parking_lot_monitor() {
-    use_monitor(&Arc::new(ParkingLotMonitor::new(false)));
+    use_monitor(&ParkingLotMonitor::new(false));
 }
 
 /// Verifies [`Arc`] forwards a parking-lot monitor's aggregate capability.
