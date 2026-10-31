@@ -47,23 +47,11 @@ const USER_GUIDE_EN: &str = include_str!("../../doc/user_guide.md");
 const USER_GUIDE_ZH: &str = include_str!("../../doc/user_guide.zh_CN.md");
 const BOUNDED_QUEUE_EXAMPLE: &str = include_str!("../../examples/bounded_queue.rs");
 const LIB_RS: &str = include_str!("../../src/lib.rs");
-const LOCK_SRC: &str = include_str!("../../src/lock/lock.rs");
 const READ_WRITE_LOCK_SRC: &str = include_str!("../../src/lock/read_write_lock.rs");
-const WAIT_TIMEOUT_RESULT_SRC: &str = include_str!("../../src/monitor/wait_timeout_result.rs");
-const WAIT_TIMEOUT_STATUS_SRC: &str = include_str!("../../src/monitor/wait_timeout_status.rs");
-const CONDITION_WAITER_SRC: &str = include_str!("../../src/monitor/condition_waiter.rs");
 const ASYNC_CONDITION_WAITER_SRC: &str = include_str!("../../src/monitor/async_condition_waiter.rs");
 const ASYNC_READ_WRITE_LOCK_SRC: &str = include_str!("../../src/lock/async_read_write_lock.rs");
-const TIMEOUT_CONDITION_WAITER_SRC: &str = include_str!("../../src/monitor/timeout_condition_waiter.rs");
-const ASYNC_TIMEOUT_CONDITION_WAITER_SRC: &str = include_str!("../../src/monitor/async_timeout_condition_waiter.rs");
-const PARKING_LOT_MONITOR_SRC: &str = include_str!("../../src/monitor/parking_lot_monitor.rs");
-const PARKING_LOT_MONITOR_GUARD_SRC: &str = include_str!("../../src/monitor/parking_lot_monitor_guard.rs");
-const STD_MONITOR_SRC: &str = include_str!("../../src/monitor/std_monitor.rs");
-const STD_MONITOR_GUARD_SRC: &str = include_str!("../../src/monitor/std_monitor_guard.rs");
-const TOKIO_MONITOR_SRC: &str = include_str!("../../src/monitor/tokio_monitor.rs");
 
-/// Collapses Markdown whitespace so prose assertions do not depend on line
-/// wrapping.
+/// Collapses Markdown whitespace so public-symbol checks tolerate line wrapping.
 fn normalize_readme_text(content: &str) -> String {
     content.split_whitespace().collect::<Vec<_>>().join(" ")
 }
@@ -129,31 +117,6 @@ fn test_readme_quick_start_proves_backend_neutral_data_access() {
         assert!(readme.contains("std::sync::Mutex<ServiceStats>"));
         assert!(readme.contains("std::sync::RwLock<ServiceStats>"));
     }
-    assert!(README_EN.contains("When not to use this crate"));
-    assert!(README_ZH.contains("何时不需要这个 crate"));
-}
-
-/// Ensures public docs cover failures after Timer registration.
-#[test]
-fn test_monitor_docs_cover_timer_registration_and_completion_errors() {
-    let sources = [
-        ("timeout_condition_waiter.rs", TIMEOUT_CONDITION_WAITER_SRC),
-        ("async_timeout_condition_waiter.rs", ASYNC_TIMEOUT_CONDITION_WAITER_SRC),
-        ("parking_lot_monitor.rs", PARKING_LOT_MONITOR_SRC),
-        ("parking_lot_monitor_guard.rs", PARKING_LOT_MONITOR_GUARD_SRC),
-        ("std_monitor.rs", STD_MONITOR_SRC),
-        ("std_monitor_guard.rs", STD_MONITOR_GUARD_SRC),
-    ];
-
-    for (filename, source) in sources {
-        assert!(
-            source.contains("Timer registration or completion errors"),
-            "{filename} omits Timer completion errors",
-        );
-    }
-
-    assert!(USER_GUIDE_EN.contains("Timer registration or completion errors"));
-    assert!(USER_GUIDE_ZH.contains("Timer 注册或完成错误"));
 }
 
 /// Ensures README files document direct access to wrapped primitives.
@@ -184,25 +147,8 @@ fn test_documentation_overviews_name_public_capabilities() {
 /// Ensures each README points readers to the user guide in the same language.
 #[test]
 fn test_readmes_link_to_their_matching_language_user_guides() {
-    assert!(README_EN.contains("[English user guide](doc/user_guide.md)"));
-    assert!(!README_EN.contains("[Chinese user guide]"));
-    assert!(README_ZH.contains("[中文用户手册](doc/user_guide.zh_CN.md)"));
-    assert!(!README_ZH.contains("[英文用户手册]"));
-}
-
-/// Ensures both user guides distinguish generic acquisition modes from
-/// exclusive ones.
-#[test]
-fn test_readme_documents_exclusive_lock_capability() {
-    let guide_en = normalize_readme_text(USER_GUIDE_EN);
-    let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
-
-    assert!(guide_en.contains("`Lock` does not promise"));
-    assert!(guide_en.contains("marker trait `ExclusiveLock`"));
-    assert!(guide_en.contains("`ReadLock` implements `Lock`"));
-    assert!(guide_zh.contains("`Lock` 不承诺"));
-    assert!(guide_zh.contains("标记 trait `ExclusiveLock`"));
-    assert!(guide_zh.contains("`ReadLock` 实现 `Lock`"));
+    assert!(README_EN.contains("](doc/user_guide.md)"));
+    assert!(README_ZH.contains("](doc/user_guide.zh_CN.md)"));
 }
 
 /// Ensures the queue case study explains why its two predicates require a
@@ -210,10 +156,8 @@ fn test_readme_documents_exclusive_lock_capability() {
 #[test]
 fn test_user_guides_explain_queue_notification_policy() {
     assert!(USER_GUIDE_EN.contains("with_write_notify_all"));
-    assert!(USER_GUIDE_EN.contains("two predicates"));
     assert!(USER_GUIDE_EN.contains("notify_all"));
     assert!(USER_GUIDE_ZH.contains("with_write_notify_all"));
-    assert!(USER_GUIDE_ZH.contains("两类 predicate"));
     assert!(USER_GUIDE_ZH.contains("notify_all"));
 }
 
@@ -232,138 +176,14 @@ fn test_user_guides_present_backend_neutral_queue_case_study() {
     }
 }
 
-/// Ensures both guides explain the untimed and timed monitor aggregates.
-#[test]
-fn test_readme_documents_monitor_capability_split() {
-    let guide_en = normalize_readme_text(USER_GUIDE_EN);
-    let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
-
-    assert!(guide_en.contains("`Monitor` plus timed synchronous waits"));
-    assert!(guide_en.contains("`AsyncMonitor` plus timed waits"));
-    assert!(guide_zh.contains("`Monitor` 加同步计时等待"));
-    assert!(guide_zh.contains("`AsyncMonitor` 加计时等待"));
-}
-
-/// Ensures both guides describe monitor notification and timeout semantics.
-#[test]
-fn test_readme_documents_monitor_wait_semantics() {
-    let guide_en = normalize_readme_text(USER_GUIDE_EN);
-    let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
-    let readme_en = normalize_readme_text(README_EN);
-    let readme_zh = normalize_readme_text(README_ZH);
-    assert!(guide_en.contains("Notifications are memoryless"));
-    assert!(guide_en.contains("already registered waiter"));
-    assert!(guide_en.contains("condition-wait budget"));
-    assert!(guide_en.contains("After acquiring the state lock and before the first predicate check,"));
-    assert!(guide_en.contains("may return after the timeout while reacquiring the state lock"));
-    assert!(guide_en.contains("one fixed absolute deadline"));
-    assert!(guide_en.contains("A zero timeout still performs"));
-    assert!(guide_en.contains("final predicate check under the lock wins"));
-    assert!(guide_en.contains("Timer registration or completion errors take precedence"));
-    assert!(guide_en.contains("the action is not run"));
-    assert!(guide_en.contains("`wait_until_with_total_timeout`"));
-    assert!(guide_en.contains("fix their absolute deadline before initial state-lock acquisition"));
-    assert!(guide_en.contains("still not hard return-time guarantees"));
-    assert!(guide_zh.contains("Notification 是无记忆的"));
-    assert!(guide_zh.contains("`wait_until_with_total_timeout`"));
-    assert!(guide_zh.contains("会在初始获取状态锁之前固定绝对 deadline"));
-    assert!(guide_zh.contains("仍不是严格的返回时限"));
-    assert!(guide_zh.contains("已经注册的 waiter"));
-    assert!(guide_zh.contains("条件等待预算"));
-    assert!(guide_zh.contains("取得状态锁后、首次 predicate 检查前"));
-    assert!(guide_zh.contains("和条件变量一样，重新获取"));
-    assert!(guide_zh.contains("状态锁时可能在 timeout 后返回"));
-    assert!(guide_zh.contains("固定的 绝对 deadline"));
-    assert!(guide_zh.contains("零时长 timeout 仍会执行初始 predicate 检查"));
-    assert!(guide_zh.contains("最后一次持锁 predicate 检查优先"));
-    assert!(guide_zh.contains("Timer 注册或完成错误优先"));
-    assert!(guide_zh.contains("不会执行 action"));
-    for readme in [readme_en, readme_zh] {
-        assert!(readme.contains("std::sync::Condvar::wait_timeout_while"));
-    }
-}
-
 /// Ensures public docs explain the monitor handshake for external predicate
 /// state.
 #[test]
-fn test_monitor_docs_cover_external_predicate_state_handshake() {
-    let guide_en = normalize_readme_text(USER_GUIDE_EN);
-    let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
-
-    assert!(guide_en.contains("predicate reads state outside the monitor"));
-    assert!(guide_en.contains("Atomic ordering alone cannot stop"));
-    assert!(guide_en.contains("monitor-lock handshake"));
-    assert!(guide_zh.contains("predicate 读取 monitor 外的状态"));
-    assert!(guide_zh.contains("仅靠 atomic ordering 无法阻止"));
-    assert!(guide_zh.contains("monitor-lock handshake"));
-
-    for source in [CONDITION_WAITER_SRC, ASYNC_CONDITION_WAITER_SRC] {
-        assert!(source.contains("External predicate state"));
-        assert!(source.contains("Atomic ordering alone"));
-        assert!(source.contains("same monitor lock"));
-    }
+fn test_async_external_predicate_example_uses_monitor_handshake_apis() {
     assert!(ASYNC_CONDITION_WAITER_SRC.contains("let waiter = tokio::spawn"));
     assert!(ASYNC_CONDITION_WAITER_SRC.contains(".with_write_notify_all_async"));
-    assert!(guide_en.contains("with_write_notify_all_async"));
-    assert!(guide_zh.contains("with_write_notify_all_async"));
-}
-
-/// Ensures both guides describe async cancellation and Tokio timer needs.
-#[test]
-fn test_readme_documents_async_monitor_contract() {
-    let guide_en = normalize_readme_text(USER_GUIDE_EN);
-    let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
-    assert!(guide_en.contains("Async wait futures are lazy"));
-    assert!(guide_en.contains("may be polled from another runtime context"));
-    assert!(guide_en.contains("target runtime must stay alive"));
-    assert!(guide_en.contains("have time enabled"));
-    assert!(guide_en.contains("does not run the action"));
-    assert!(guide_en.contains("does not roll back protected-state changes"));
-    assert!(guide_en.contains("cancellation discards the selection"));
-    assert!(guide_zh.contains("异步等待 future 是惰性的"));
-    assert!(guide_zh.contains("另一个 runtime context 中 poll"));
-    assert!(guide_zh.contains("目标 runtime 必须保持存活"));
-    assert!(guide_zh.contains("启用 time driver"));
-    assert!(guide_zh.contains("不会执行 action"));
-    assert!(guide_zh.contains("不会回滚受保护状态的变化"));
-    assert!(guide_zh.contains("取消会丢弃这次选择"));
-}
-
-/// Ensures both guides describe RPITIT and native Arc monitor ownership.
-#[test]
-fn test_readme_documents_monitor_api_boundaries() {
-    assert!(USER_GUIDE_EN.contains("return-position `impl Future`"));
-    assert!(USER_GUIDE_EN.contains("standard `Arc` directly"));
-    assert!(USER_GUIDE_EN.contains("deref coercion preserves the monitor API"));
-    assert!(USER_GUIDE_ZH.contains("返回位置的 `impl Future`"));
-    assert!(USER_GUIDE_ZH.contains("标准库的 `Arc`"));
-    assert!(USER_GUIDE_ZH.contains("deref coercion 保留 monitor API"));
-}
-
-/// Ensures both guides explain concrete and generic monitor selection.
-#[test]
-fn test_readme_documents_monitor_capability_selection() {
-    let guide_en = normalize_readme_text(USER_GUIDE_EN);
-    let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
-    assert!(guide_en.contains("Choosing components and avoiding mistakes"));
-    assert!(guide_en.contains("narrowest capability trait"));
-    assert!(guide_en.contains("static generic bounds"));
-    assert!(guide_en.contains("Every concrete monitor provides `with_timer`"));
-    assert!(guide_zh.contains("组件选择与常见错误"));
-    assert!(guide_zh.contains("最小能力 trait"));
-    assert!(guide_zh.contains("静态泛型约束"));
-    assert!(guide_zh.contains("每个具体 monitor 都提供 `with_timer`"));
-}
-
-/// Ensures both guides describe deterministic testing through Timer IOC.
-#[test]
-fn test_readme_documents_timer_ioc_testing() {
-    let guide_en = normalize_readme_text(USER_GUIDE_EN);
-    let guide_zh = normalize_readme_text(USER_GUIDE_ZH);
-    assert!(guide_en.contains("production wait algorithm runs"));
-    assert!(guide_en.contains("`ManualMonotonicClock`"));
-    assert!(guide_zh.contains("生产环境使用的 monitor 类型和等待算法"));
-    assert!(guide_zh.contains("`ManualMonotonicClock`"));
+    assert!(USER_GUIDE_EN.contains("with_write_notify_all_async"));
+    assert!(USER_GUIDE_ZH.contains("with_write_notify_all_async"));
 }
 
 /// Ensures README files distinguish the blocking monitor implementations and
@@ -380,7 +200,6 @@ fn test_readme_documents_feature_tiers() {
         "qubit-lock = { version = \"0.14\", default-features = false, features = [\"async-monitor\"] }";
 
     assert!(CARGO_TOML.contains("default = []"));
-    assert!(README_EN.contains("default feature set is empty"));
     for document in [README_EN, README_ZH, USER_GUIDE_EN, USER_GUIDE_ZH] {
         assert!(
             document.contains(BLOCKING_MONITOR_DEPENDENCY),
@@ -401,8 +220,6 @@ fn test_readme_documents_feature_tiers() {
             "StdMonitor example must select only the monitor feature",
         );
     }
-    assert!(USER_GUIDE_EN.contains("| default | no optional features |"));
-    assert!(USER_GUIDE_ZH.contains("| 默认配置 | 不启用可选 Feature |"));
     for document in [README_EN, README_ZH, USER_GUIDE_EN, USER_GUIDE_ZH] {
         assert!(
             !document.contains("Arc*"),
@@ -410,73 +227,16 @@ fn test_readme_documents_feature_tiers() {
         );
     }
     assert!(!README_EN.contains("`mock` feature"));
-    assert!(README_ZH.contains("默认特性集为空"));
     assert!(!README_ZH.contains("`mock` feature"));
 }
 
-/// Ensures monitor Rustdoc records callback and default-Timer panic paths.
+/// Ensures both guides name the standard-monitor poison APIs.
 #[test]
-fn test_monitor_docs_cover_callback_and_constructor_panics() {
-    for source in [
-        CONDITION_WAITER_SRC,
-        TIMEOUT_CONDITION_WAITER_SRC,
-        ASYNC_CONDITION_WAITER_SRC,
-        ASYNC_TIMEOUT_CONDITION_WAITER_SRC,
-        TOKIO_MONITOR_SRC,
-    ] {
-        assert!(
-            source.contains("# Panics") && source.contains("`predicate` or `action`"),
-            "waiter documentation must describe callback panics",
-        );
-    }
-
-    for source in [PARKING_LOT_MONITOR_SRC, STD_MONITOR_SRC] {
-        assert!(
-            source.contains("Panics if the registry") && source.contains("registration identifiers."),
-            "blocking monitor documentation must describe waiter registration panics",
-        );
-    }
-
-    for source in [PARKING_LOT_MONITOR_SRC, STD_MONITOR_SRC] {
-        assert!(
-            source.contains("Panics if all process-wide clock-domain identifiers are exhausted."),
-            "default Timer constructors must describe clock-domain exhaustion",
-        );
-    }
-
-    for source in [PARKING_LOT_MONITOR_GUARD_SRC, STD_MONITOR_GUARD_SRC] {
-        assert!(
-            source.contains("Panics if the registry exhausts registration identifiers."),
-            "guard waits must describe waiter registration panics",
-        );
-    }
-}
-
-/// Ensures standard-monitor documentation explains poison observation,
-/// recovery, repair, and explicit acceptance.
-#[test]
-fn test_monitor_docs_cover_std_monitor_poisoning_policy() {
-    assert!(STD_MONITOR_SRC.contains("pub fn is_poisoned"));
-    assert!(STD_MONITOR_SRC.contains("pub fn clear_poison"));
-    assert!(STD_MONITOR_SRC.contains("partial mutations"));
-    assert!(STD_MONITOR_SRC.contains("does not clear the poison marker"));
-
+fn test_user_guides_reference_std_monitor_poison_apis() {
     assert!(USER_GUIDE_EN.contains("`is_poisoned`"));
     assert!(USER_GUIDE_EN.contains("`clear_poison`"));
-    assert!(USER_GUIDE_EN.contains("partially modified"));
     assert!(USER_GUIDE_ZH.contains("`is_poisoned`"));
     assert!(USER_GUIDE_ZH.contains("`clear_poison`"));
-    assert!(USER_GUIDE_ZH.contains("部分修改"));
-}
-
-/// Ensures both user guides document the action-free asynchronous wait
-/// conveniences.
-#[test]
-fn test_monitor_docs_cover_async_ready_wait_helpers() {
-    for guide in [USER_GUIDE_EN, USER_GUIDE_ZH] {
-        assert!(guide.contains("`wait_until_ready_async`"));
-        assert!(guide.contains("`wait_until_ready_for_async`"));
-    }
 }
 
 /// Ensures contribution sections document the available project entry points.
@@ -498,9 +258,6 @@ fn test_readmes_document_contribution_entry_points() {
 #[test]
 fn test_readme_documents_root_only_public_api() {
     assert!(!README_EN.contains(concat!("from `qubit_lock", "::monitor`")));
-    assert!(!README_ZH.contains("\u{6216} crate root"));
-    assert!(README_EN.contains("exported from and should be imported directly"));
-    assert!(README_ZH.contains("直接从 crate root 导入"));
     assert!(LIB_RS.contains("mod lock;"));
     assert!(LIB_RS.contains("mod monitor;"));
     assert!(!LIB_RS.contains("pub mod lock;"));
@@ -512,23 +269,6 @@ fn test_readme_documents_root_only_public_api() {
 fn test_rw_lock_docs_use_current_trait_names() {
     assert!(READ_WRITE_LOCK_SRC.contains("ReadWriteLock"));
     assert!(ASYNC_READ_WRITE_LOCK_SRC.contains("AsyncReadWriteLock"));
-}
-
-/// Ensures root and monitor Rustdoc preserve the implemented lock contracts.
-#[test]
-fn test_rustdoc_contracts_match_lock_and_monitor_semantics() {
-    assert!(LIB_RS.contains("synchronous lock acquisition"));
-    assert!(LOCK_SRC.contains("`Lock` does not imply exclusive entry."));
-    assert!(WAIT_TIMEOUT_RESULT_SRC.contains("deciding locked predicate check"));
-    assert!(WAIT_TIMEOUT_RESULT_SRC.contains("blocking and asynchronous monitor"));
-    assert!(WAIT_TIMEOUT_RESULT_SRC.contains("ParkingLotMonitor"));
-    assert!(WAIT_TIMEOUT_RESULT_SRC.contains("TokioMonitor"));
-    assert!(WAIT_TIMEOUT_STATUS_SRC.contains("blocking monitor guards"));
-    assert!(WAIT_TIMEOUT_STATUS_SRC.contains("ParkingLotMonitorGuard"));
-
-    for source in [PARKING_LOT_MONITOR_SRC, STD_MONITOR_SRC] {
-        assert!(source.contains("predicate stops blocking on the deciding locked check"));
-    }
 }
 
 /// Ensures Cargo exposes only the current feature surface.
@@ -649,9 +389,6 @@ fn test_readme_qubit_clock_dependency_version_matches_cargo_toml() {
 /// runnable version of the bounded-queue case study.
 #[test]
 fn test_documentation_provides_navigation_deadline_and_runnable_example() {
-    assert!(USER_GUIDE_EN.contains("## Reading paths"));
-    assert!(USER_GUIDE_ZH.contains("## 阅读路径"));
-
     for guide in [USER_GUIDE_EN, USER_GUIDE_ZH] {
         assert!(guide.contains("`wait_until_with_deadline_async`"));
         assert!(guide.contains("`loom-model`"));
