@@ -77,9 +77,10 @@ mod parking_lot_rw_lock_tests {
         release_tx
             .send(())
             .expect("holder thread should still be waiting for release");
-        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
-            holder.join().expect("holder should not panic");
-        }
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("write-lock holder thread should complete within timeout after release");
+        holder.join().expect("holder should not panic");
     }
 
     #[test]
@@ -109,9 +110,10 @@ mod parking_lot_rw_lock_tests {
         release_tx
             .send(())
             .expect("holder thread should still be waiting for release");
-        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
-            holder.join().expect("holder should not panic");
-        }
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("read-lock holder thread should complete within timeout after release");
+        holder.join().expect("holder should not panic");
     }
 
     #[test]

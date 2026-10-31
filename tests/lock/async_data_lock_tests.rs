@@ -183,9 +183,10 @@ mod async_data_lock_trait_tests {
             .expect("holder thread should still be waiting for release");
 
         // Wait for the spawned thread to complete
-        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
-            handle.join().expect("holder thread should not panic");
-        }
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("mutex holder thread should complete within timeout after release");
+        handle.join().expect("holder thread should not panic");
 
         // Now should be able to successfully acquire the lock
         let result = async_mutex.try_with_read(|value| *value);
@@ -342,9 +343,10 @@ mod async_data_lock_trait_tests {
         release_tx
             .send(())
             .expect("holder thread should still be waiting for release");
-        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
-            holder.join().expect("holder thread should not panic");
-        }
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("mutex holder thread should complete within timeout after release");
+        holder.join().expect("holder thread should not panic");
         writer
             .await
             .expect("contended mutex writer task should complete successfully");

@@ -132,9 +132,10 @@ mod parking_lot_mutex_tests {
             .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
-        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
-            handle.join().expect("holder thread should not panic");
-        }
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("mutex holder thread should complete within timeout after release");
+        handle.join().expect("holder thread should not panic");
 
         // Now should be able to successfully acquire the lock
         let result = DataLock::try_with_read(&*mutex, |value| *value);
@@ -174,9 +175,10 @@ mod parking_lot_mutex_tests {
             .expect("holder thread should still be waiting for release");
 
         // Wait for child thread to complete
-        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
-            handle.join().expect("holder thread should not panic");
-        }
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("mutex holder thread should complete within timeout after release");
+        handle.join().expect("holder thread should not panic");
 
         // Now should be able to successfully acquire the lock
         let result = DataLock::try_with_write(&*mutex, |value| {
@@ -219,9 +221,10 @@ mod parking_lot_mutex_tests {
         release_tx
             .send(())
             .expect("holder thread should still be waiting for release");
-        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
-            handle.join().expect("holder thread should not panic");
-        }
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("mutex holder thread should complete within timeout after release");
+        handle.join().expect("holder thread should not panic");
     }
 
     #[test]
@@ -304,9 +307,10 @@ mod parking_lot_mutex_tests {
         release_tx
             .send(())
             .expect("holder should still wait for release message");
-        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
-            holder.join().expect("holder should finish after release");
-        }
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("mutex holder thread should complete within timeout after release");
+        holder.join().expect("holder should finish after release");
         assert_eq!(DataLock::try_with_read(&*mutex, read_i32), Ok(0));
     }
 
@@ -332,9 +336,10 @@ mod parking_lot_mutex_tests {
             Err(TryLockError::WouldBlock),
         );
         drop(release_tx);
-        if locked_rx.recv_timeout(Duration::from_secs(1)).is_ok() {
-            holder.join().expect("holder should finish after sender disconnects");
-        }
+        locked_rx
+            .recv_timeout(Duration::from_secs(1))
+            .expect("mutex holder thread should complete within timeout after release");
+        holder.join().expect("holder should finish after sender disconnects");
         assert_eq!(DataLock::try_with_read(&*mutex, read_i32), Ok(0));
     }
 
