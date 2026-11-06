@@ -152,6 +152,7 @@ impl<M: ?Sized> ConditionWaiter for Arc<M>
 where
     M: ConditionWaiter,
 {
+    /// Uses the protected state type exposed by the wrapped monitor.
     type State = M::State;
 
     /// Delegates a blocking condition wait to the shared monitor.

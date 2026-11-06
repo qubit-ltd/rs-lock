@@ -361,6 +361,16 @@ where
     L: AsyncDataLock<T>,
 {
     /// Delegates an asynchronous read operation to the borrowed lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to inspect the protected data.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure that receives an immutable reference to the protected
+    ///   data.
     #[inline(always)]
     fn with_read<R, F>(&self, f: F) -> impl Future<Output = R> + Send
     where
@@ -371,6 +381,15 @@ where
     }
 
     /// Delegates an asynchronous write operation to the borrowed lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to mutate the protected data.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure that receives a mutable reference to the protected data.
     #[inline(always)]
     fn with_write<R, F>(&self, f: F) -> impl Future<Output = R> + Send
     where
@@ -381,6 +400,16 @@ where
     }
 
     /// Delegates a non-blocking read operation to the borrowed lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to inspect the protected data.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure that receives an immutable reference to the protected
+    ///   data.
     #[inline(always)]
     fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -390,6 +419,15 @@ where
     }
 
     /// Delegates a non-blocking write operation to the borrowed lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to mutate the protected data.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure that receives a mutable reference to the protected data.
     #[inline(always)]
     fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -404,6 +442,16 @@ where
     L: AsyncDataLock<T>,
 {
     /// Delegates an asynchronous read operation to the shared lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to inspect the protected data.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure that receives an immutable reference to the protected
+    ///   data.
     #[inline(always)]
     fn with_read<R, F>(&self, f: F) -> impl Future<Output = R> + Send
     where
@@ -414,6 +462,15 @@ where
     }
 
     /// Delegates an asynchronous write operation to the shared lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to mutate the protected data.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure that receives a mutable reference to the protected data.
     #[inline(always)]
     fn with_write<R, F>(&self, f: F) -> impl Future<Output = R> + Send
     where
@@ -424,6 +481,16 @@ where
     }
 
     /// Delegates a non-blocking read operation to the shared lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to inspect the protected data.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure that receives an immutable reference to the protected
+    ///   data.
     #[inline(always)]
     fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -433,6 +500,15 @@ where
     }
 
     /// Delegates a non-blocking write operation to the shared lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to mutate the protected data.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure that receives a mutable reference to the protected data.
     #[inline(always)]
     fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -454,6 +530,11 @@ where
 /// * `T` - The type of data protected by the lock
 impl<T: ?Sized + Send> AsyncDataLock<T> for AsyncMutex<T> {
     /// Acquires the mutex and executes a read-only closure.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to inspect the protected data.
     ///
     /// # Parameters
     ///
@@ -479,6 +560,11 @@ impl<T: ?Sized + Send> AsyncDataLock<T> for AsyncMutex<T> {
 
     /// Acquires the mutex and executes a mutable closure.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to mutate the protected data.
+    ///
     /// # Parameters
     ///
     /// * `f` - Closure receiving mutable access to the protected value.
@@ -502,6 +588,11 @@ impl<T: ?Sized + Send> AsyncDataLock<T> for AsyncMutex<T> {
     }
 
     /// Attempts to acquire the mutex without waiting for a read-only closure.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to inspect the protected data.
     ///
     /// # Parameters
     ///
@@ -527,6 +618,11 @@ impl<T: ?Sized + Send> AsyncDataLock<T> for AsyncMutex<T> {
     }
 
     /// Attempts to acquire the mutex without waiting for a mutable closure.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to mutate the protected data.
     ///
     /// # Parameters
     ///
@@ -566,6 +662,11 @@ impl<T: ?Sized + Send> AsyncDataLock<T> for AsyncMutex<T> {
 impl<T: ?Sized + Send + Sync> AsyncDataLock<T> for AsyncRwLock<T> {
     /// Acquires a shared read lock and executes a closure.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to inspect the protected data.
+    ///
     /// # Parameters
     ///
     /// * `f` - Closure receiving immutable access to the protected value.
@@ -590,6 +691,11 @@ impl<T: ?Sized + Send + Sync> AsyncDataLock<T> for AsyncRwLock<T> {
 
     /// Acquires an exclusive write lock and executes a closure.
     ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to mutate the protected data.
+    ///
     /// # Parameters
     ///
     /// * `f` - Closure receiving mutable access to the protected value.
@@ -613,6 +719,11 @@ impl<T: ?Sized + Send + Sync> AsyncDataLock<T> for AsyncRwLock<T> {
     }
 
     /// Attempts to acquire a shared read lock without waiting.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to inspect the protected data.
     ///
     /// # Parameters
     ///
@@ -639,6 +750,11 @@ impl<T: ?Sized + Send + Sync> AsyncDataLock<T> for AsyncRwLock<T> {
     }
 
     /// Attempts to acquire an exclusive write lock without waiting.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to mutate the protected data.
     ///
     /// # Parameters
     ///

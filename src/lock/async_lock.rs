@@ -79,6 +79,10 @@ impl<L> AsyncLock for &L
 where
     L: AsyncLock + ?Sized,
 {
+    /// Guard type produced by the underlying lock for the same borrow lifetime.
+    ///
+    /// Dropping this guard releases the lock according to `L`'s acquisition
+    /// semantics.
     type Guard<'a>
         = L::Guard<'a>
     where
@@ -101,6 +105,10 @@ impl<L> AsyncLock for Arc<L>
 where
     L: AsyncLock + ?Sized,
 {
+    /// Guard type produced by the shared lock for the same borrow lifetime.
+    ///
+    /// The `Arc` keeps the lock allocation shared, while the guard still
+    /// borrows the lock for `'a` and releases it when dropped.
     type Guard<'a>
         = L::Guard<'a>
     where
@@ -123,6 +131,10 @@ impl<T> AsyncLock for Mutex<T>
 where
     T: Send + ?Sized,
 {
+    /// Tokio mutex guard that holds the mutex for the borrow lifetime.
+    ///
+    /// Dropping the guard unlocks the mutex and makes it available to another
+    /// acquisition.
     type Guard<'a>
         = MutexGuard<'a, T>
     where

@@ -20,13 +20,23 @@ use crate::monitor::Monitor;
 /// ```
 /// use std::sync::Arc;
 ///
+/// use qubit_lock::Monitor;
 /// use qubit_lock::SharedMonitor;
 /// use qubit_lock::StdMonitor;
 ///
 /// fn require_shared_monitor<M: SharedMonitor>() {}
 ///
+/// let monitor = Arc::new(StdMonitor::new(true));
 /// require_shared_monitor::<Arc<StdMonitor<bool>>>();
+/// assert!(monitor.with_read(|state| *state));
 /// ```
-pub trait SharedMonitor: Monitor + Clone + Send + Sync + 'static {}
+pub trait SharedMonitor: Monitor + Clone + Send + Sync + 'static {
+    // empty
+}
 
-impl<T> SharedMonitor for T where T: Monitor + Clone + Send + Sync + 'static {}
+impl<T> SharedMonitor for T
+where
+    T: Monitor + Clone + Send + Sync + 'static,
+{
+    // empty
+}

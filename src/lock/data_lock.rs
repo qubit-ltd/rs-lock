@@ -328,6 +328,15 @@ where
     L: DataLock<T>,
 {
     /// Delegates a read operation to the borrowed lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure receiving immutable access to the protected value.
     #[inline(always)]
     fn with_read<R, F>(&self, f: F) -> R
     where
@@ -337,6 +346,15 @@ where
     }
 
     /// Delegates a write operation to the borrowed lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure receiving mutable access to the protected value.
     #[inline(always)]
     fn with_write<R, F>(&self, f: F) -> R
     where
@@ -346,6 +364,15 @@ where
     }
 
     /// Delegates a non-blocking read operation to the borrowed lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure receiving immutable access to the protected value.
     #[inline(always)]
     fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -355,6 +382,15 @@ where
     }
 
     /// Delegates a non-blocking write operation to the borrowed lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure receiving mutable access to the protected value.
     #[inline(always)]
     fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -369,6 +405,15 @@ where
     L: DataLock<T>,
 {
     /// Delegates a read operation to the shared inner lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure receiving immutable access to the protected value.
     #[inline(always)]
     fn with_read<R, F>(&self, f: F) -> R
     where
@@ -378,6 +423,15 @@ where
     }
 
     /// Delegates a write operation to the shared inner lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure receiving mutable access to the protected value.
     #[inline(always)]
     fn with_write<R, F>(&self, f: F) -> R
     where
@@ -387,6 +441,15 @@ where
     }
 
     /// Delegates a non-blocking read operation to the shared inner lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure receiving immutable access to the protected value.
     #[inline(always)]
     fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -396,6 +459,15 @@ where
     }
 
     /// Delegates a non-blocking write operation to the shared inner lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure receiving mutable access to the protected value.
     #[inline(always)]
     fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -429,6 +501,11 @@ impl<T: ?Sized + Send> DataLock<T> for Mutex<T> {
     ///
     /// Panics if the mutex is poisoned or `f` panics. A panic from `f` may
     /// poison the mutex.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
     #[inline]
     fn with_read<R, F>(&self, f: F) -> R
     where
@@ -452,6 +529,11 @@ impl<T: ?Sized + Send> DataLock<T> for Mutex<T> {
     ///
     /// Panics if the mutex is poisoned or `f` panics. A panic from `f` may
     /// poison the mutex.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
     #[inline]
     fn with_write<R, F>(&self, f: F) -> R
     where
@@ -480,6 +562,11 @@ impl<T: ?Sized + Send> DataLock<T> for Mutex<T> {
     ///
     /// Propagates a panic from `f` when the mutex is acquired. That panic may
     /// poison the mutex.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
     #[inline]
     fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -496,7 +583,7 @@ impl<T: ?Sized + Send> DataLock<T> for Mutex<T> {
     ///
     /// # Parameters
     ///
-    /// * `f` - Closure receiving mutable access when the mutex is acquired.
+    /// * `f` - Closure receiving mutable access to the protected value.
     ///
     /// # Returns
     ///
@@ -511,6 +598,11 @@ impl<T: ?Sized + Send> DataLock<T> for Mutex<T> {
     ///
     /// Propagates a panic from `f` when the mutex is acquired. That panic may
     /// poison the mutex.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
     #[inline]
     fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -548,6 +640,11 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for RwLock<T> {
     /// # Panics
     ///
     /// Panics if the read-write lock is poisoned or `f` panics.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
     #[inline]
     fn with_read<R, F>(&self, f: F) -> R
     where
@@ -571,6 +668,11 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for RwLock<T> {
     ///
     /// Panics if the read-write lock is poisoned or `f` panics. A panic from
     /// `f` may poison the lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
     #[inline]
     fn with_write<R, F>(&self, f: F) -> R
     where
@@ -598,6 +700,11 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for RwLock<T> {
     /// # Panics
     ///
     /// Propagates a panic from `f` when the read lock is acquired.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
     #[inline]
     fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -614,7 +721,7 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for RwLock<T> {
     ///
     /// # Parameters
     ///
-    /// * `f` - Closure receiving mutable access when a write lock is acquired.
+    /// * `f` - Closure receiving mutable access to the protected value.
     ///
     /// # Returns
     ///
@@ -629,6 +736,11 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for RwLock<T> {
     ///
     /// Propagates a panic from `f` when the write lock is acquired. That panic
     /// may poison the read-write lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
     #[inline]
     fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -666,6 +778,11 @@ impl<T: ?Sized + Send> DataLock<T> for ParkingLotMutex<T> {
     /// # Panics
     ///
     /// Propagates a panic from `f`. parking_lot mutexes are not poisoned.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
     #[inline]
     fn with_read<R, F>(&self, f: F) -> R
     where
@@ -688,6 +805,11 @@ impl<T: ?Sized + Send> DataLock<T> for ParkingLotMutex<T> {
     /// # Panics
     ///
     /// Propagates a panic from `f`. parking_lot mutexes are not poisoned.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
     #[inline]
     fn with_write<R, F>(&self, f: F) -> R
     where
@@ -716,6 +838,11 @@ impl<T: ?Sized + Send> DataLock<T> for ParkingLotMutex<T> {
     ///
     /// Propagates a panic from `f` when the mutex is acquired. parking_lot
     /// mutexes are not poisoned.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
     #[inline]
     fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -728,7 +855,7 @@ impl<T: ?Sized + Send> DataLock<T> for ParkingLotMutex<T> {
     ///
     /// # Parameters
     ///
-    /// * `f` - Closure receiving mutable access when the mutex is acquired.
+    /// * `f` - Closure receiving mutable access to the protected value.
     ///
     /// # Returns
     ///
@@ -743,6 +870,11 @@ impl<T: ?Sized + Send> DataLock<T> for ParkingLotMutex<T> {
     ///
     /// Propagates a panic from `f` when the mutex is acquired. parking_lot
     /// mutexes are not poisoned.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
     #[inline]
     fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -780,6 +912,11 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for ParkingLotRwLock<T> {
     ///
     /// Propagates a panic from `f`. parking_lot read-write locks are not
     /// poisoned.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
     #[inline]
     fn with_read<R, F>(&self, f: F) -> R
     where
@@ -803,6 +940,11 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for ParkingLotRwLock<T> {
     ///
     /// Propagates a panic from `f`. parking_lot read-write locks are not
     /// poisoned.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
     #[inline]
     fn with_write<R, F>(&self, f: F) -> R
     where
@@ -831,6 +973,11 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for ParkingLotRwLock<T> {
     ///
     /// Propagates a panic from `f` when the read lock is acquired. parking_lot
     /// read-write locks are not poisoned.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
     #[inline]
     fn try_with_read<R, F>(&self, f: F) -> Result<R, TryLockError>
     where
@@ -843,7 +990,7 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for ParkingLotRwLock<T> {
     ///
     /// # Parameters
     ///
-    /// * `f` - Closure receiving mutable access when a write lock is acquired.
+    /// * `f` - Closure receiving mutable access to the protected value.
     ///
     /// # Returns
     ///
@@ -858,6 +1005,11 @@ impl<T: ?Sized + Send + Sync> DataLock<T> for ParkingLotRwLock<T> {
     ///
     /// Propagates a panic from `f` when the write lock is acquired. parking_lot
     /// read-write locks are not poisoned.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - The result type produced by the closure.
+    /// * `F` - The closure type used to access the protected data.
     #[inline]
     fn try_with_write<R, F>(&self, f: F) -> Result<R, TryLockError>
     where

@@ -60,6 +60,10 @@ impl<L> Lock for ReadLock<'_, L>
 where
     L: ReadWriteLock + ?Sized,
 {
+    /// Uses the underlying lock's read guard for this adapter's shared access.
+    ///
+    /// The guard is tied to the borrow of this adapter, so it cannot outlive
+    /// the borrowed read-write lock.
     type Guard<'a>
         = L::ReadGuard<'a>
     where

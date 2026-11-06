@@ -60,6 +60,10 @@ impl<L> Lock for WriteLock<'_, L>
 where
     L: ReadWriteLock + ?Sized,
 {
+    /// Guard that holds the underlying lock in exclusive write mode.
+    ///
+    /// The guard borrows the write-lock adapter and releases the write mode
+    /// when dropped.
     type Guard<'a>
         = L::WriteGuard<'a>
     where

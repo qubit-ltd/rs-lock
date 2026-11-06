@@ -292,6 +292,7 @@ impl<'a, T> ParkingLotMonitorGuard<'a, T> {
 }
 
 impl<T> Deref for ParkingLotMonitorGuard<'_, T> {
+    /// The state type protected by this monitor guard.
     type Target = T;
 
     /// Returns an immutable reference to the protected state.

@@ -50,7 +50,10 @@
 pub enum WaitTimeoutResult<R> {
     /// The predicate was ready on the deciding locked predicate check and
     /// produced this value.
-    Ready(R),
+    Ready(
+        /// Value produced when the predicate succeeds on the deciding check.
+        R,
+    ),
     /// The timeout completed and the predicate still blocked on the deciding
     /// locked predicate check.
     TimedOut,

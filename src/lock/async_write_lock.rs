@@ -66,6 +66,7 @@ impl<L> AsyncLock for AsyncWriteLock<'_, L>
 where
     L: AsyncReadWriteLock + ?Sized,
 {
+    /// Write guard produced by the underlying read-write lock.
     type Guard<'a>
         = L::WriteGuard<'a>
     where

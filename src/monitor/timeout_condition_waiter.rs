@@ -171,8 +171,8 @@ pub trait TimeoutConditionWaiter: ConditionWaiter {
     /// * `deadline` - Absolute monotonic deadline from this monitor Timer's
     ///   clock domain. Equal timestamp values from different domains are not
     ///   interchangeable.
-    /// * predicate - Predicate that returns true while waiting continues.
-    /// * action - Action to run after the predicate becomes false.
+    /// * `predicate` - Predicate that returns true while waiting continues.
+    /// * `action` - Action to run after the predicate becomes false.
     ///
     /// # Returns
     ///
@@ -490,6 +490,25 @@ where
     /// * `R` - Value produced by `action` when the predicate becomes false.
     /// * `P` - Waiting predicate forwarded to the wrapped monitor.
     /// * `F` - Action closure forwarded to the wrapped monitor.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Absolute deadline forwarded to the wrapped monitor.
+    /// * `predicate` - Predicate forwarded to the wrapped monitor.
+    /// * `action` - Action forwarded to the wrapped monitor.
+    ///
+    /// # Returns
+    ///
+    /// The timed-wait result returned by the wrapped monitor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error from the wrapped monitor's Timer.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from the wrapped monitor, including from `predicate`
+    /// or `action`.
     #[inline(always)]
     fn wait_while_with_deadline<R, P, F>(
         &self,

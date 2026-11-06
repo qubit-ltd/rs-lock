@@ -122,10 +122,12 @@ impl<L> ReadWriteLock for &L
 where
     L: ReadWriteLock + ?Sized,
 {
+    /// The shared guard type used when this lock is borrowed by reference.
     type ReadGuard<'a>
         = L::ReadGuard<'a>
     where
         Self: 'a;
+    /// The exclusive guard type used when this lock is borrowed by reference.
     type WriteGuard<'a>
         = L::WriteGuard<'a>
     where
@@ -160,10 +162,12 @@ impl<L> ReadWriteLock for Arc<L>
 where
     L: ReadWriteLock + ?Sized,
 {
+    /// The shared guard type retained by the shared ownership handle.
     type ReadGuard<'a>
         = L::ReadGuard<'a>
     where
         Self: 'a;
+    /// The exclusive guard type retained by the shared ownership handle.
     type WriteGuard<'a>
         = L::WriteGuard<'a>
     where
@@ -198,10 +202,14 @@ impl<T> ReadWriteLock for RwLock<T>
 where
     T: Send + Sync + ?Sized,
 {
+    /// The standard-library guard that holds a shared borrow of the protected
+    /// data.
     type ReadGuard<'a>
         = RwLockReadGuard<'a, T>
     where
         Self: 'a;
+    /// The standard-library guard that holds exclusive access to the protected
+    /// data.
     type WriteGuard<'a>
         = RwLockWriteGuard<'a, T>
     where
@@ -253,10 +261,12 @@ impl<T> ReadWriteLock for ParkingLotRwLock<T>
 where
     T: Send + Sync + ?Sized,
 {
+    /// The parking_lot guard that holds a shared borrow of the protected data.
     type ReadGuard<'a>
         = ParkingLotRwLockReadGuard<'a, T>
     where
         Self: 'a;
+    /// The parking_lot guard that holds exclusive access to the protected data.
     type WriteGuard<'a>
         = ParkingLotRwLockWriteGuard<'a, T>
     where

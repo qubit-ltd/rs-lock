@@ -1270,9 +1270,29 @@ impl<T> Notifier for StdMonitor<T> {
 }
 
 impl<T> ConditionWaiter for StdMonitor<T> {
+    /// State protected by this monitor and exposed to waiter predicates.
     type State = T;
 
     /// Blocks while the predicate remains true, then runs the action.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `action`.
+    /// * `P` - Predicate evaluated against the protected state.
+    /// * `F` - Action run after the predicate becomes false.
+    ///
+    /// # Parameters
+    ///
+    /// * `predicate` - Returns `true` while this thread must continue waiting.
+    /// * `action` - Receives mutable state after waiting finishes.
+    ///
+    /// # Returns
+    ///
+    /// The value returned by `action`.
+    ///
+    /// # Panics
+    ///
+    /// Propagates panics from `predicate` or `action`.
     #[inline(always)]
     fn wait_while<R, P, F>(&self, predicate: P, action: F) -> R
     where
@@ -1285,6 +1305,24 @@ impl<T> ConditionWaiter for StdMonitor<T> {
 
 impl<T> Monitor for StdMonitor<T> {
     /// Reads protected state while holding the monitor lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `F` - Closure that reads the protected state.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure called with an immutable reference while the lock is
+    ///   held.
+    ///
+    /// # Returns
+    ///
+    /// The value returned by `f`.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f` after the lock is released.
     #[inline(always)]
     fn with_read<R, F>(&self, f: F) -> R
     where
@@ -1294,6 +1332,23 @@ impl<T> Monitor for StdMonitor<T> {
     }
 
     /// Mutates protected state while holding the monitor lock.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `f`.
+    /// * `F` - Closure that mutates the protected state.
+    ///
+    /// # Parameters
+    ///
+    /// * `f` - Closure called with mutable state while the lock is held.
+    ///
+    /// # Returns
+    ///
+    /// The value returned by `f`.
+    ///
+    /// # Panics
+    ///
+    /// Propagates a panic from `f` after the lock is released.
     #[inline(always)]
     fn with_write<R, F>(&self, f: F) -> R
     where
@@ -1305,6 +1360,32 @@ impl<T> Monitor for StdMonitor<T> {
 
 impl<T> TimeoutConditionWaiter for StdMonitor<T> {
     /// Blocks while the predicate remains true or until an absolute deadline.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `action`.
+    /// * `P` - Predicate evaluated against the protected state.
+    /// * `F` - Action run after waiting finishes.
+    ///
+    /// # Parameters
+    ///
+    /// * `deadline` - Absolute deadline in this monitor's Timer clock domain.
+    /// * `predicate` - Returns `true` while this thread must continue waiting.
+    /// * `action` - Receives mutable state after waiting finishes.
+    ///
+    /// # Returns
+    ///
+    /// `Ready` with the action result, or `TimedOut` if the predicate remains
+    /// blocking when the deadline completes.
+    ///
+    /// # Errors
+    ///
+    /// Returns Timer domain, registration, or completion errors when waiting
+    /// is required.
+    ///
+    /// # Panics
+    ///
+    /// Propagates panics from `predicate` or `action`.
     #[inline(always)]
     fn wait_while_with_deadline<R, P, F>(
         &self,
@@ -1320,6 +1401,31 @@ impl<T> TimeoutConditionWaiter for StdMonitor<T> {
     }
 
     /// Blocks while the predicate remains true with one operation-wide budget.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `action`.
+    /// * `P` - Predicate evaluated against the protected state.
+    /// * `F` - Action run after waiting finishes.
+    ///
+    /// # Parameters
+    ///
+    /// * `timeout` - Relative budget fixed before initial lock acquisition.
+    /// * `predicate` - Returns `true` while this thread must continue waiting.
+    /// * `action` - Receives mutable state after waiting finishes.
+    ///
+    /// # Returns
+    ///
+    /// `Ready` with the action result, or `TimedOut` if the predicate remains
+    /// blocking when the operation-wide deadline completes.
+    ///
+    /// # Errors
+    ///
+    /// Returns deadline construction or Timer errors when waiting is required.
+    ///
+    /// # Panics
+    ///
+    /// Propagates panics from `predicate` or `action`.
     #[inline(always)]
     fn wait_while_with_total_timeout<R, P, F>(
         &self,
@@ -1335,6 +1441,32 @@ impl<T> TimeoutConditionWaiter for StdMonitor<T> {
     }
 
     /// Blocks while the predicate remains true or until the timeout expires.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` - Value returned by `action`.
+    /// * `P` - Predicate evaluated against the protected state.
+    /// * `F` - Action run after waiting finishes.
+    ///
+    /// # Parameters
+    ///
+    /// * `timeout` - Relative budget used for this condition wait.
+    /// * `predicate` - Returns `true` while this thread must continue waiting.
+    /// * `action` - Receives mutable state after waiting finishes.
+    ///
+    /// # Returns
+    ///
+    /// `Ready` with the action result, or `TimedOut` if the predicate remains
+    /// blocking when the relative timeout completes.
+    ///
+    /// # Errors
+    ///
+    /// Returns Timer registration or completion errors when waiting is
+    /// required.
+    ///
+    /// # Panics
+    ///
+    /// Propagates panics from `predicate` or `action`.
     #[inline(always)]
     fn wait_while_for<R, P, F>(
         &self,

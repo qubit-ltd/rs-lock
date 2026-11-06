@@ -376,6 +376,7 @@ impl<T> Notifier for TokioMonitor<T> {
 }
 
 impl<T: Send> AsyncConditionWaiter for TokioMonitor<T> {
+    /// State value protected by this monitor and passed to its wait predicates.
     type State = T;
 
     /// Returns a future that rechecks the protected predicate until it becomes

@@ -18,7 +18,9 @@ use std::sync::Arc;
 /// have memoryless condition-variable semantics, so every wakeup rechecks the
 /// predicate and no fairness is guaranteed.
 ///
-/// # External predicate state
+/// # Examples
+///
+/// ## External predicate state
 ///
 /// If a predicate reads state outside [`Self::State`], every predicate-changing
 /// update must participate in the same monitor lock handshake before notifying
@@ -76,7 +78,10 @@ use std::sync::Arc;
 /// predicate waits but no timeout. Its return-position `impl Future` methods
 /// make it unsuitable as a `dyn` trait-object interface.
 pub trait AsyncConditionWaiter {
-    /// State protected by the monitor.
+    /// The data protected by this monitor and observed by its predicates.
+    ///
+    /// Implementations provide access to this state only while holding their
+    /// monitor lock; actions receive mutable access under the same lock.
     type State;
 
     /// Returns a future that waits until the predicate becomes true.
@@ -187,6 +192,7 @@ impl<M> AsyncConditionWaiter for Arc<M>
 where
     M: AsyncConditionWaiter + ?Sized,
 {
+    /// The wrapped monitor's protected data, observed under its lock.
     type State = M::State;
 
     /// Forwards the asynchronous wait to the wrapped monitor.

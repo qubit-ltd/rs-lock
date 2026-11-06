@@ -65,6 +65,7 @@ impl<L> AsyncLock for AsyncReadLock<'_, L>
 where
     L: AsyncReadWriteLock + ?Sized,
 {
+    /// Uses the underlying lock's shared read guard for each acquired lock.
     type Guard<'a>
         = L::ReadGuard<'a>
     where

@@ -76,6 +76,7 @@ impl<L> Lock for &L
 where
     L: Lock + ?Sized,
 {
+    /// Guard borrowed from the wrapped lock for the duration of `'a`.
     type Guard<'a>
         = L::Guard<'a>
     where
@@ -98,6 +99,7 @@ impl<L> Lock for Arc<L>
 where
     L: Lock + ?Sized,
 {
+    /// Guard borrowed from the shared lock for the duration of `'a`.
     type Guard<'a>
         = L::Guard<'a>
     where
@@ -120,6 +122,7 @@ impl<T> Lock for Mutex<T>
 where
     T: Send + ?Sized,
 {
+    /// Standard mutex guard that unlocks the mutex when dropped.
     type Guard<'a>
         = MutexGuard<'a, T>
     where
@@ -151,6 +154,7 @@ impl<T> Lock for ParkingLotMutex<T>
 where
     T: Send + ?Sized,
 {
+    /// Parking-lot mutex guard that unlocks the mutex when dropped.
     type Guard<'a>
         = ParkingLotMutexGuard<'a, T>
     where

@@ -36,6 +36,8 @@ use crate::monitor::TimeoutConditionWaiter;
 /// let monitor = StdMonitor::new(true);
 /// check_ready(&monitor);
 /// ```
-pub trait TimedMonitor: Monitor + TimeoutConditionWaiter {}
+pub trait TimedMonitor: Monitor + TimeoutConditionWaiter {
+    // empty
+}
 
 impl<M: ?Sized> TimedMonitor for M where M: Monitor + TimeoutConditionWaiter {}

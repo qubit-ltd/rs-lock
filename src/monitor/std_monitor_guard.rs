@@ -245,6 +245,11 @@ impl<'a, T> StdMonitorGuard<'a, T> {
 
     /// Waits for a notification or an absolute Timer deadline.
     ///
+    /// The guard remains usable after this method returns: it releases the
+    /// protected state while waiting and reacquires the lock before returning.
+    /// A wake does not imply that the protected state satisfies any particular
+    /// predicate, so callers must inspect the state again.
+    ///
     /// # Parameters
     ///
     /// * `deadline` - Absolute deadline in this monitor's Timer domain.
@@ -299,6 +304,7 @@ impl<'a, T> StdMonitorGuard<'a, T> {
 }
 
 impl<T> Deref for StdMonitorGuard<'_, T> {
+    /// The state value protected by this monitor guard.
     type Target = T;
 
     /// Returns an immutable reference to the protected state.

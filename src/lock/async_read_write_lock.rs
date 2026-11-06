@@ -120,10 +120,12 @@ impl<L> AsyncReadWriteLock for &L
 where
     L: AsyncReadWriteLock + ?Sized,
 {
+    /// Uses the wrapped lock's shared guard type for this borrowed adapter.
     type ReadGuard<'a>
         = L::ReadGuard<'a>
     where
         Self: 'a;
+    /// Uses the wrapped lock's exclusive guard type for this borrowed adapter.
     type WriteGuard<'a>
         = L::WriteGuard<'a>
     where
@@ -158,10 +160,12 @@ impl<L> AsyncReadWriteLock for Arc<L>
 where
     L: AsyncReadWriteLock + ?Sized,
 {
+    /// Uses the wrapped lock's shared guard type for this shared owner.
     type ReadGuard<'a>
         = L::ReadGuard<'a>
     where
         Self: 'a;
+    /// Uses the wrapped lock's exclusive guard type for this shared owner.
     type WriteGuard<'a>
         = L::WriteGuard<'a>
     where
@@ -196,10 +200,12 @@ impl<T> AsyncReadWriteLock for RwLock<T>
 where
     T: Send + Sync + ?Sized,
 {
+    /// Returns Tokio's borrowed shared guard, which releases on drop.
     type ReadGuard<'a>
         = RwLockReadGuard<'a, T>
     where
         Self: 'a;
+    /// Returns Tokio's borrowed exclusive guard, which releases on drop.
     type WriteGuard<'a>
         = RwLockWriteGuard<'a, T>
     where

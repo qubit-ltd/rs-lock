@@ -27,6 +27,8 @@ use crate::monitor::AsyncMonitor;
 ///
 /// require_shared_monitor::<Arc<TokioMonitor<u32>>>();
 /// ```
-pub trait SharedAsyncMonitor: AsyncMonitor + Clone + Send + Sync + 'static {}
+pub trait SharedAsyncMonitor: AsyncMonitor + Clone + Send + Sync + 'static {
+    // empty
+}
 
 impl<T> SharedAsyncMonitor for T where T: AsyncMonitor + Clone + Send + Sync + 'static {}
