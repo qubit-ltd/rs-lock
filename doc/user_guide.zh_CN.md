@@ -511,6 +511,7 @@ parking_lot 和 Tokio 锁没有 poisoning，因此它们只会报告竞争。
 不会阻塞 executor 线程；它们等待获取锁，然后在持有 guard 时运行同步闭包。
 `try_*` 方法不会等待。
 
+<!-- rs-lock-example: async-data-lock -->
 ```rust
 use qubit_lock::AsyncDataLock;
 
@@ -536,6 +537,7 @@ async fn main() {
 `read_lock()` 和 `write_lock()` adapter。`AsyncReadLock` 表示共享侧，
 `AsyncWriteLock` 表示独占侧。
 
+<!-- rs-lock-example: async-rw-lock -->
 ```rust
 use qubit_lock::{AsyncLock, AsyncReadWriteLock};
 
@@ -735,18 +737,21 @@ runtime。
 相同也不能互换。若等待确有必要而 deadline 属于其他域，方法会返回 Timer domain 错误；
 Timer 注册或完成也可能返回错误。
 
+<!-- rs-lock-example: deadline-blocking -->
 ```rust
 use std::time::Duration;
 
 use qubit_lock::{StdMonitor, TimeoutConditionWaiter, WaitTimeoutResult};
 
-let monitor = StdMonitor::new(true);
-let deadline = monitor.timer().clock().now()
-    .checked_add(Duration::from_secs(1))
-    .expect("短时长 deadline 应可表示");
-let result = monitor.wait_until_ready_with_deadline(deadline, |ready| *ready)
-    .expect("deadline 属于此 monitor 的 timer");
-assert_eq!(result, WaitTimeoutResult::Ready(()));
+fn main() {
+    let monitor = StdMonitor::new(true);
+    let deadline = monitor.timer().clock().now()
+        .checked_add(Duration::from_secs(1))
+        .expect("短时长 deadline 应可表示");
+    let result = monitor.wait_until_ready_with_deadline(deadline, |ready| *ready)
+        .expect("deadline 属于此 monitor 的 timer");
+    assert_eq!(result, WaitTimeoutResult::Ready(()));
+}
 ```
 
 异步等待遵循相同的时钟域规则。`TokioMonitor` 会保留自身 timer，因此应从该
@@ -755,6 +760,7 @@ monitor 构造 deadline，再等待：
 此示例要求 `qubit-lock` 启用 `async-monitor`，并直接依赖启用 `macros` 与
 `rt-multi-thread` feature 的 Tokio。
 
+<!-- rs-lock-example: deadline-async -->
 ```rust
 use std::time::Duration;
 
@@ -791,6 +797,7 @@ predicate 和回调都在持有 monitor 状态锁时执行；它们的 panic 会
 monitor-lock handshake。仅靠 atomic ordering 无法阻止 notification 落在 predicate
 检查和 waiter 注册之间：
 
+<!-- rs-lock-example: external-state-blocking -->
 ```rust
 use std::{
     sync::{
@@ -824,6 +831,7 @@ fn main() {
 
 异步协议相同；应使用组合式异步 helper，避免更新跨过 waiter 注册：
 
+<!-- rs-lock-example: external-state-async -->
 ```rust
 use std::sync::{
     Arc,

@@ -7,4 +7,5 @@ for relative_path in .infra/bin/align-ci.sh .infra/bin/ci-check.sh; do
         exit 1
     fi
 done
+python3 -m unittest discover -s "$project_root/.infra/tests" -p 'test_check_user_guides.py'
 exec python3 "$project_root/.infra/check-user-guides.py" --project "$project_root"

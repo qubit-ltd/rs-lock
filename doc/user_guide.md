@@ -546,6 +546,7 @@ The types in this section require the `async-lock` feature.
 run a synchronous closure while holding the guard. The `try_*` methods do not
 wait.
 
+<!-- rs-lock-example: async-data-lock -->
 ```rust
 use qubit_lock::AsyncDataLock;
 
@@ -571,6 +572,7 @@ Any callback panic propagates; Tokio locks are not poisoned.
 `read_lock()` and `write_lock()` adapters. `AsyncReadLock` represents the
 shared side; `AsyncWriteLock` represents the exclusive side.
 
+<!-- rs-lock-example: async-rw-lock -->
 ```rust
 use qubit_lock::{AsyncLock, AsyncReadWriteLock};
 
@@ -791,18 +793,21 @@ domains are not interchangeable. If waiting is required, a deadline from a
 different domain returns a Timer domain error; timer registration or
 completion can also return an error.
 
+<!-- rs-lock-example: deadline-blocking -->
 ```rust
 use std::time::Duration;
 
 use qubit_lock::{StdMonitor, TimeoutConditionWaiter, WaitTimeoutResult};
 
-let monitor = StdMonitor::new(true);
-let deadline = monitor.timer().clock().now()
-    .checked_add(Duration::from_secs(1))
-    .expect("short deadline should be representable");
-let result = monitor.wait_until_ready_with_deadline(deadline, |ready| *ready)
-    .expect("deadline belongs to this monitor timer");
-assert_eq!(result, WaitTimeoutResult::Ready(()));
+fn main() {
+    let monitor = StdMonitor::new(true);
+    let deadline = monitor.timer().clock().now()
+        .checked_add(Duration::from_secs(1))
+        .expect("short deadline should be representable");
+    let result = monitor.wait_until_ready_with_deadline(deadline, |ready| *ready)
+        .expect("deadline belongs to this monitor timer");
+    assert_eq!(result, WaitTimeoutResult::Ready(()));
+}
 ```
 
 The asynchronous form follows the same clock-domain rule. `TokioMonitor`
@@ -811,6 +816,7 @@ retains its timer, so derive the deadline from that monitor before awaiting:
 This example requires `qubit-lock` with the `async-monitor` feature and a direct
 Tokio dependency with the `macros` and `rt-multi-thread` features.
 
+<!-- rs-lock-example: deadline-async -->
 ```rust
 use std::time::Duration;
 
@@ -850,6 +856,7 @@ that may make it ready must still take part in the monitor-lock handshake.
 Atomic ordering alone cannot stop a notification from falling between the
 predicate check and waiter registration:
 
+<!-- rs-lock-example: external-state-blocking -->
 ```rust
 use std::{
     sync::{
@@ -884,6 +891,7 @@ fn main() {
 The asynchronous protocol is the same; use the combined async helper so the
 update cannot straddle waiter registration:
 
+<!-- rs-lock-example: external-state-async -->
 ```rust
 use std::sync::{
     Arc,

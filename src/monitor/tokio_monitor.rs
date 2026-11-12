@@ -532,6 +532,60 @@ impl<T: Send> AsyncMonitor for TokioMonitor<T> {
 }
 
 impl<T: Send> TokioMonitor<T> {
+    /// Waits with one fixed Timer after the caller's initial predicate check.
+    ///
+    /// The caller must hold `guard` after finding that its first predicate
+    /// check still requires waiting, and must provide a Timer future that has
+    /// already been constructed for the intended deadline. This helper does
+    /// not repeat that first check or sample a clock; it reuses the same Timer
+    /// future across every notification and timeout decision.
+    ///
+    /// # Type Parameters
+    ///
+    /// * `R` is the result returned by `action`.
+    /// * `P` is the predicate checked after each wakeup.
+    /// * `F` is the action run when the predicate becomes ready.
+    ///
+    /// # Parameters
+    ///
+    /// * `self` is the monitor whose state and waiter registry are used.
+    /// * `guard` is the state guard retained after the caller's initial check.
+    /// * `deadline` is the fixed Timer future to await.
+    /// * `predicate` determines whether waiting must continue.
+    /// * `action` computes the result when the predicate is ready.
+    async fn wait_while_with_timer_locked<R, P, F>(
+        &self,
+        mut guard: tokio::sync::MutexGuard<'_, T>,
+        mut deadline: TimerFuture,
+        mut predicate: P,
+        action: F,
+    ) -> Result<WaitTimeoutResult<R>, TimeError>
+    where
+        R: Send,
+        P: FnMut(&T) -> bool + Send,
+        F: FnOnce(&mut T) -> R + Send,
+    {
+        loop {
+            let registration = self.register_waiter();
+            drop(guard);
+            let status = registration.wait_until_signalled_or_deadline(&mut deadline).await;
+            drop(registration);
+            guard = self.state.lock().await;
+            let status = status?;
+            let deadline_reached = if status.is_timed_out() {
+                true
+            } else {
+                Self::deadline_reached(&mut deadline).await?
+            };
+            if !predicate(&*guard) {
+                return Ok(WaitTimeoutResult::Ready(action(&mut *guard)));
+            }
+            if deadline_reached {
+                return Ok(WaitTimeoutResult::TimedOut);
+            }
+        }
+    }
+
     /// Returns a future that waits until a predicate becomes true or an
     /// absolute deadline passes.
     ///
@@ -729,25 +783,8 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
             if Self::deadline_reached(&mut deadline).await? {
                 return Ok(WaitTimeoutResult::TimedOut);
             }
-            loop {
-                let registration = self.register_waiter();
-                drop(guard);
-                let status = registration.wait_until_signalled_or_deadline(&mut deadline).await;
-                drop(registration);
-                guard = self.state.lock().await;
-                let status = status?;
-                let deadline_reached = if status.is_timed_out() {
-                    true
-                } else {
-                    Self::deadline_reached(&mut deadline).await?
-                };
-                if !predicate(&*guard) {
-                    return Ok(WaitTimeoutResult::Ready(action(&mut *guard)));
-                }
-                if deadline_reached {
-                    return Ok(WaitTimeoutResult::TimedOut);
-                }
-            }
+            self.wait_while_with_timer_locked(guard, deadline, predicate, action)
+                .await
         }
     }
 
@@ -904,26 +941,9 @@ impl<T: Send> AsyncTimeoutConditionWaiter for TokioMonitor<T> {
             }
 
             let deadline_at = started_at.checked_add(timeout)?;
-            let mut deadline = self.timer.at(deadline_at)?;
-            loop {
-                let registration = self.register_waiter();
-                drop(guard);
-                let status = registration.wait_until_signalled_or_deadline(&mut deadline).await;
-                drop(registration);
-                guard = self.state.lock().await;
-                let status = status?;
-                let deadline_reached = if status.is_timed_out() {
-                    true
-                } else {
-                    Self::deadline_reached(&mut deadline).await?
-                };
-                if !predicate(&*guard) {
-                    return Ok(WaitTimeoutResult::Ready(action(&mut *guard)));
-                }
-                if deadline_reached {
-                    return Ok(WaitTimeoutResult::TimedOut);
-                }
-            }
+            let deadline = self.timer.at(deadline_at)?;
+            self.wait_while_with_timer_locked(guard, deadline, predicate, action)
+                .await
         }
     }
 }
