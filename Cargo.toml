@@ -1,6 +1,6 @@
 [package]
 name = "qubit-lock"
-version = "0.14.5"
+version = "0.14.6"
 edition = "2024"
 rust-version = "1.94"
 authors = ["Haixing Hu <starfish.hu@gmail.com>"]
@@ -53,7 +53,7 @@ criterion = { version = "^0.8", default-features = false }
 qubit-clock = { version = "^0.13", features = ["test-util"] }
 qubit-collections = "^0.2"
 semver = { version = "^1.0", default-features = false }
-toml = "^1.1"
+toml = "^1.2"
 tokio = { version = "^1.54", default-features = false, features = ["macros", "rt-multi-thread", "test-util", "time"] }
 
 [[example]]
